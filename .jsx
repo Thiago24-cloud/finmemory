@@ -1,0 +1,107 @@
+import React, { useState } from 'react';
+import Head from 'next/head';
+
+export default function Dashboard() {
+  // Estado para armazenar as transações que virão do Supabase no futuro
+  const [transacoes, setTransacoes] = useState([]);
+
+  return (
+    <div style={{ 
+      fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif', 
+      backgroundColor: '#f0f2f5', 
+      minHeight: '100vh',
+      color: '#1c1e21'
+    }}>
+      <Head>
+        <title>FinMemory | Meu Financeiro Inteligente</title>
+      </Head>
+
+      {/* Barra de Navegação Simples */}
+      <nav style={{ 
+        backgroundColor: '#fff', 
+        padding: '15px 30px', 
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <h2 style={{ margin: 0, color: '#007bff' }}>🚀 FinMemory</h2>
+        <button style={{
+          backgroundColor: '#4285F4',
+          color: 'white',
+          border: 'none',
+          padding: '8px 16px',
+          borderRadius: '5px',
+          fontWeight: 'bold',
+          cursor: 'pointer'
+        }}>
+          Sair
+        </button>
+      </nav>
+
+      <main style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px' }}>
+        
+        {/* Card de Boas-vindas e Ação Principal */}
+        <section style={{ 
+          backgroundColor: '#fff', 
+          padding: '30px', 
+          borderRadius: '12px', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          textAlign: 'center',
+          marginBottom: '30px'
+        }}>
+          <h1>Bem-vindo ao seu Financeiro</h1>
+          <p style={{ color: '#65676b', marginBottom: '25px' }}>
+            Nossa IA está pronta para ler seus e-mails e organizar seus gastos.
+          </p>
+          
+          <button 
+            onClick={() => window.location.href = '/api/auth/google'}
+            style={{
+              backgroundColor: '#34a853',
+              color: 'white',
+              border: 'none',
+              padding: '15px 30px',
+              borderRadius: '8px',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'transform 0.2s'
+            }}
+          >
+            🔌 Conectar Gmail agora
+          </button>
+        </section>
+
+        {/* Lista de Transações (Simulada para o MVP) */}
+        <section>
+          <h3 style={{ marginBottom: '15px' }}>Últimas Atividades</h3>
+          {transacoes.length === 0 ? (
+            <div style={{ 
+              backgroundColor: '#fff', 
+              padding: '40px', 
+              borderRadius: '12px', 
+              textAlign: 'center',
+              border: '2px dashed #ccd0d5'
+            }}>
+              <p style={{ color: '#8d949e' }}>
+                Nenhuma transação encontrada. <br/>
+                Conecte seu e-mail para começar a automação!
+              </p>
+            </div>
+          ) : (
+            // Aqui entrará o mapeamento das transações reais do Supabase
+            <div style={{ backgroundColor: '#fff', borderRadius: '12px' }}>
+              {/* Exemplo de item de lista futura */}
+            </div>
+          )}
+        </section>
+
+      </main>
+
+      <footer style={{ textAlign: 'center', marginTop: '50px', paddingBottom: '30px', color: '#8d949e', fontSize: '14px' }}>
+        &copy; 2025 FinMemory - Inteligência Financeira Automática
+      </footer>
+    </div>
+  );
+}

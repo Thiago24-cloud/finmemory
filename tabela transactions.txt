@@ -1,0 +1,23 @@
+-- Cria a tabela para armazenar os gastos processados pela IA
+CREATE TABLE transactions (
+  -- ID único para cada transação
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  
+  -- E-mail do dono do gasto (para vincular ao usuário certo)
+  email_usuario TEXT NOT NULL,
+  
+  -- Valor do gasto (ex: 50.00)
+  amount DECIMAL(10,2),
+  
+  -- Nome da loja ou estabelecimento (ex: Amazon, Farmácia)
+  store TEXT,
+  
+  -- Categoria do gasto (ex: Alimentação, Transporte)
+  category TEXT,
+  
+  -- Data em que o gasto ocorreu
+  date DATE,
+  
+  -- Data e hora em que o sistema registrou no banco
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
