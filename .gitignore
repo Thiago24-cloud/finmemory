@@ -65,3 +65,6 @@ reports/
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+# Backups locais
+*.backup
+teste-pre-deploy.md
