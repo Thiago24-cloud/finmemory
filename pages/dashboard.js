@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -12,37 +12,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get('user_id');
-    const success = urlParams.get('success');
-    const error = urlParams.get('error');
+  const loadTransactions = useCallback(async (userId) => {
+    if (!userId) return;
     
-    if (error) {
-      alert('❌ Erro na autenticação. Tente novamente.');
-    }
-    
-    if (userId) {
-      localStorage.setItem('user_id', userId);
-      setUser({ id: userId });
-      window.history.replaceState({}, '', '/dashboard');
-      loadTransactions(userId);
-      
-      if (success === 'true') {
-        setTimeout(() => {
-          handleSyncEmails(userId, true);
-        }, 1000);
-      }
-    } else {
-      const savedUserId = localStorage.getItem('user_id');
-      if (savedUserId) {
-        setUser({ id: savedUserId });
-        loadTransactions(savedUserId);
-      }
-    }
-  }, []);
-
-  const loadTransactions = async (userId) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -59,13 +31,9 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleConnectGmail = () => {
-    window.location.href = '/api/auth/google';
-  };
-
-  const handleSyncEmails = async (userId = null, isFirstSync = false) => {
+  const handleSyncEmails = useCallback(async (userId = null, isFirstSync = false) => {
     const targetUserId = userId || user?.id;
     
     if (!targetUserId) {
@@ -103,9 +71,49 @@ export default function Dashboard() {
     } finally {
       setSyncing(false);
     }
+  }, [user, loadTransactions]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('user_id');
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+    
+    if (error) {
+      alert('❌ Erro na autenticação. Tente novamente.');
+    }
+    
+    if (userId) {
+      localStorage.setItem('user_id', userId);
+      setUser({ id: userId });
+      window.history.replaceState({}, '', '/dashboard');
+      loadTransactions(userId);
+      
+      if (success === 'true') {
+        setTimeout(() => {
+          handleSyncEmails(userId, true);
+        }, 1000);
+      }
+    } else {
+      const savedUserId = localStorage.getItem('user_id');
+      if (savedUserId) {
+        setUser({ id: savedUserId });
+        loadTransactions(savedUserId);
+      }
+    }
+  }, [loadTransactions, handleSyncEmails]);
+
+  const handleConnectGmail = () => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/api/auth/google';
+    }
   };
 
   const handleDisconnect = () => {
+    if (typeof window === 'undefined') return;
+    
     if (confirm('Deseja desconectar?')) {
       localStorage.removeItem('user_id');
       setUser(null);
@@ -333,7 +341,7 @@ function TransactionCard({ transaction }) {
             fontWeight: 'bold',
             color: '#667eea'
           }}>
-            R$ {parseFloat(transaction.total).toFixed(2)}
+            R$ {(parseFloat(transaction.total) || 0).toFixed(2)}
           </p>
         </div>
       </div>
@@ -383,13 +391,13 @@ function TransactionCard({ transaction }) {
                         <strong>{produto.descricao}</strong>
                       </td>
                       <td style={{ padding: '14px', textAlign: 'center' }}>
-                        {parseFloat(produto.quantidade).toFixed(0)} {produto.unidade}
+                        {(parseFloat(produto.quantidade) || 0).toFixed(0)} {produto.unidade || 'UN'}
                       </td>
                       <td style={{ padding: '14px', textAlign: 'right' }}>
-                        R$ {parseFloat(produto.valor_unitario).toFixed(2)}
+                        R$ {(parseFloat(produto.valor_unitario) || 0).toFixed(2)}
                       </td>
                       <td style={{ padding: '14px', textAlign: 'right', fontWeight: 'bold' }}>
-                        R$ {parseFloat(produto.valor_total).toFixed(2)}
+                        R$ {(parseFloat(produto.valor_total) || 0).toFixed(2)}
                       </td>
                     </tr>
                   ))}
