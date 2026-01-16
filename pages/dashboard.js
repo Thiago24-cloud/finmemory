@@ -1,9 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('⚠️ Variáveis de ambiente do Supabase não configuradas');
+}
+
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  supabaseUrl || '',
+  supabaseKey || ''
 );
 
 export default function Dashboard() {
@@ -13,7 +20,10 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
 
   const loadTransactions = useCallback(async (userId) => {
-    if (!userId) return;
+    if (!userId) {
+      console.warn('loadTransactions: userId não fornecido');
+      return;
+    }
     
     setLoading(true);
     try {
@@ -24,10 +34,14 @@ export default function Dashboard() {
         .order('data', { ascending: false })
         .order('hora', { ascending: false });
 
-      if (error) throw error;
-      setTransactions(data || []);
+      if (error) {
+        console.error('Erro ao carregar transações:', error);
+        throw error;
+      }
+      setTransactions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar transações:', error);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -37,7 +51,12 @@ export default function Dashboard() {
     const targetUserId = userId || user?.id;
     
     if (!targetUserId) {
-      alert('Você precisa conectar o Gmail primeiro!');
+      alert('⚠️ Você precisa conectar o Gmail primeiro!');
+      return;
+    }
+
+    if (syncing) {
+      console.warn('Sincronização já em andamento');
       return;
     }
 
@@ -49,29 +68,36 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: targetUserId,
-          firstSync: isFirstSync
+          firstSync: Boolean(isFirstSync)
         })
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const data = await response.json();
 
       if (data.success) {
-        if (data.processed > 0) {
-          alert(`✅ ${data.processed} nota${data.processed > 1 ? 's' : ''} fiscal${data.processed > 1 ? 'is' : ''} processada${data.processed > 1 ? 's' : ''}!`);
+        const processed = parseInt(data.processed) || 0;
+        if (processed > 0) {
+          alert(`✅ ${processed} nota${processed > 1 ? 's' : ''} fiscal${processed > 1 ? 'is' : ''} processada${processed > 1 ? 's' : ''}!`);
         } else {
           alert('ℹ️ Nenhuma nota fiscal nova encontrada.');
         }
         await loadTransactions(targetUserId);
       } else {
-        alert('❌ Erro ao sincronizar');
+        const errorMsg = data.error || 'Erro desconhecido';
+        console.error('Erro ao sincronizar:', errorMsg);
+        alert(`❌ Erro ao sincronizar: ${errorMsg}`);
       }
     } catch (error) {
-      console.error('Erro:', error);
-      alert('❌ Erro ao sincronizar');
+      console.error('Erro na sincronização:', error);
+      alert(`❌ Erro ao sincronizar: ${error.message}`);
     } finally {
       setSyncing(false);
     }
-  }, [user, loadTransactions]);
+  }, [user, loadTransactions, syncing]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -83,6 +109,7 @@ export default function Dashboard() {
     
     if (error) {
       alert('❌ Erro na autenticação. Tente novamente.');
+      return;
     }
     
     if (userId) {
@@ -103,7 +130,8 @@ export default function Dashboard() {
         loadTransactions(savedUserId);
       }
     }
-  }, [loadTransactions, handleSyncEmails]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadTransactions]);
 
   const handleConnectGmail = () => {
     if (typeof window !== 'undefined') {
@@ -114,11 +142,16 @@ export default function Dashboard() {
   const handleDisconnect = () => {
     if (typeof window === 'undefined') return;
     
-    if (confirm('Deseja desconectar?')) {
-      localStorage.removeItem('user_id');
-      setUser(null);
-      setTransactions([]);
-      window.location.href = '/dashboard';
+    if (confirm('⚠️ Deseja realmente desconectar? Suas transações não serão perdidas.')) {
+      try {
+        localStorage.removeItem('user_id');
+        setUser(null);
+        setTransactions([]);
+        window.location.href = '/dashboard';
+      } catch (error) {
+        console.error('Erro ao desconectar:', error);
+        alert('❌ Erro ao desconectar. Tente novamente.');
+      }
     }
   };
 
