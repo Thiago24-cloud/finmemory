@@ -1,15 +1,32 @@
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
 
+// Validação das variáveis de ambiente
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('❌ ERRO CRÍTICO: Variáveis do Supabase não configuradas!');
+  console.error('Configure: NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY');
+}
+
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 export default async function handler(req, res) {
-  console.log('========================================');
+  console.log('========================================')
   console.log('🔍 CALLBACK DEBUG - INÍCIO');
-  console.log('========================================');
+  console.log('========================================')
+  
+  // Validação de variáveis de ambiente
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+    console.error('❌ ERRO: Variáveis do Google OAuth não configuradas!');
+    return res.redirect('/dashboard?error=config_error');
+  }
+  
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('❌ ERRO: Variáveis do Supabase não configuradas!');
+    return res.redirect('/dashboard?error=config_error');
+  }
   
   try {
     const { code } = req.query;

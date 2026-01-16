@@ -2,15 +2,43 @@ import { google } from 'googleapis';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Validação das variáveis de ambiente
+if (!process.env.OPENAI_API_KEY) {
+  console.error('❌ ERRO: OPENAI_API_KEY não configurada!');
+}
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('❌ ERRO: Variáveis do Supabase não configuradas!');
+}
+
+const openai = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || '' 
+});
+
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Validação de variáveis de ambiente
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('❌ ERRO: OPENAI_API_KEY não configurada!');
+    return res.status(500).json({ 
+      success: false,
+      error: 'Configuração do servidor incompleta (OpenAI)' 
+    });
+  }
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('❌ ERRO: Variáveis do Supabase não configuradas!');
+    return res.status(500).json({ 
+      success: false,
+      error: 'Configuração do servidor incompleta (Supabase)' 
+    });
   }
 
   try {
