@@ -1,10 +1,15 @@
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
+import { validateSupabase, validateGoogleOAuth } from '../../lib/env-validator';
 
-// Validação das variáveis de ambiente
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+// Validação das variáveis de ambiente no carregamento do módulo
+const supabaseValidation = validateSupabase();
+if (!supabaseValidation.allValid) {
   console.error('❌ ERRO CRÍTICO: Variáveis do Supabase não configuradas!');
-  console.error('Configure: NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY');
+  console.error('Configure: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY');
+  supabaseValidation.results.forEach(r => {
+    if (!r.valid) console.error(`  - ${r.name}: ${r.description}`);
+  });
 }
 
 const supabase = createClient(
@@ -13,18 +18,26 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  console.log('========================================')
+  console.log('========================================');
   console.log('🔍 CALLBACK DEBUG - INÍCIO');
-  console.log('========================================')
+  console.log('========================================');
   
   // Validação de variáveis de ambiente
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+  const googleValidation = validateGoogleOAuth();
+  if (!googleValidation.allValid) {
     console.error('❌ ERRO: Variáveis do Google OAuth não configuradas!');
+    googleValidation.results.forEach(r => {
+      if (!r.valid) console.error(`  - ${r.name}: ${r.description}`);
+    });
     return res.redirect('/dashboard?error=config_error');
   }
   
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  const supabaseValidation = validateSupabase();
+  if (!supabaseValidation.allValid) {
     console.error('❌ ERRO: Variáveis do Supabase não configuradas!');
+    supabaseValidation.results.forEach(r => {
+      if (!r.valid) console.error(`  - ${r.name}: ${r.description}`);
+    });
     return res.redirect('/dashboard?error=config_error');
   }
   
