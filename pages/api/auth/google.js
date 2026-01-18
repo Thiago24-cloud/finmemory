@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { validateGoogleOAuth } from '../../lib/env-validator';
+import { validateGoogleOAuth } from '../../lib/env-validator.mjs';
 import crypto from 'crypto';
 
 export default async function handler(req, res) {

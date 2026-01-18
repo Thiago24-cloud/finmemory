@@ -9,7 +9,7 @@
  *   npm run validate-env
  */
 
-import { logValidationReport } from '../lib/env-validator.js';
+import { logValidationReport } from '../lib/env-validator.mjs';
 
 console.log('🔍 FinMemory - Validação de Ambiente\n');
 

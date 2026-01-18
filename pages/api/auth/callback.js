@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
-import { validateSupabase, validateGoogleOAuth } from '../../lib/env-validator';
+import { validateSupabase, validateGoogleOAuth } from '../../lib/env-validator.mjs';
 
 // Validação das variáveis de ambiente no carregamento do módulo
 const supabaseValidation = validateSupabase();
