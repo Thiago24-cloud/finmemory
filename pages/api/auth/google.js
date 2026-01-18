@@ -1,52 +1,75 @@
 import { google } from 'googleapis';
-import { createClient } from '@supabase/supabase-js';
-
-// Inicializa o cliente do Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+import { validateGoogleOAuth } from '../../lib/env-validator';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
-  const { code } = req.query; // O código que o Google enviou na URL
-
-  if (!code) {
-    return res.status(400).json({ error: 'Código não fornecido pelo Google' });
-  }
-
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GMAIL_CLIENT_ID,
-    process.env.GMAIL_CLIENT_SECRET,
-    `https://${process.env.VERCEL_URL}/api/auth/callback/google`
-  );
-
+  console.log('========================================');
+  console.log('🔍 GOOGLE OAUTH DEBUG - INÍCIO');
+  console.log('========================================');
+  
+  console.log('📋 Verificando variáveis de ambiente:');
+  console.log('CLIENT_ID exists:', !!process.env.GOOGLE_CLIENT_ID);
+  console.log('CLIENT_ID:', process.env.GOOGLE_CLIENT_ID?.substring(0, 30) + '...');
+  console.log('CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
+  console.log('CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET?.substring(0, 15) + '...');
+  console.log('REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI);  
+  
+  // Validação de variáveis de ambiente
+  const googleValidation = validateGoogleOAuth();
+  if (!googleValidation.allValid) {
+    console.error('❌ ERRO: Variáveis de ambiente do Google não configuradas!');
+    googleValidation.results.forEach(r => {
+      if (!r.valid) console.error(`  - ${r.name}: ${r.description}`);
+    });
+    const missing = googleValidation.results.filter(r => !r.valid).map(r => r.name);
+    return res.status(500).json({ 
+      error: 'Configuração do servidor incompleta',
+      message: 'Variáveis de ambiente do Google OAuth não configuradas. Contate o administrador.',
+      missing: missing
+    });
+  }  
+  
   try {
-    // 1. Troca o código pelos Tokens (Access Token e Refresh Token)
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
-
-    // 2. Pega o e-mail do usuário para saber de quem é a conta
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const userinfo = await oauth2.userinfo.get();
-    const userEmail = userinfo.data.email;
-
-    // 3. Salva o Refresh Token no Supabase
-    // IMPORTANTE: A tabela 'user_connections' precisa existir no seu Supabase!
-    const { error } = await supabase
-      .from('user_connections')
-      .upsert({ 
-        email_usuario: userEmail,
-        refresh_token: tokens.refresh_token,
-        provider: 'google'
-      }, { onConflict: 'email_usuario' });
-
-    if (error) throw error;
-
-    // 4. Tudo certo! Manda o usuário de volta para o Dashboard
-    res.redirect('/?success=true');
-
+    // 🔒 NOVO: Gerar state token para segurança CSRF
+    const state = crypto.randomBytes(32).toString('hex');
+    
+    // 🔒 NOVO: Salvar state em cookie seguro
+    res.setHeader('Set-Cookie', `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+    
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+    console.log('✅ OAuth2Client criado com sucesso');
+    
+    const authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile'
+      ],
+      prompt: 'consent',
+      state: state  // 🔒 NOVO: Adicionar state na URL
+    });
+    
+    console.log('✅ Auth URL gerada com state:', authUrl.substring(0, 80) + '...');
+    console.log('🔒 State token gerado e salvo em cookie');
+    console.log('🚀 Redirecionando para Google...');
+    console.log('========================================');
+    
+    res.redirect(authUrl);
   } catch (error) {
-    console.error('Erro no callback do Google:', error);
-    res.redirect('/?error=auth_failed');
+    console.error('========================================');
+    console.error('❌ ERRO COMPLETO:');
+    console.error('Mensagem:', error.message);
+    console.error('Stack:', error.stack);
+    console.error('========================================');
+    
+    res.status(500).json({ 
+      error: 'Erro ao iniciar autenticação',
+      details: error.message 
+    });
   }
 }

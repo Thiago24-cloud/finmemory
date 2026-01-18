@@ -42,13 +42,37 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     console.log('📝 Code recebido:', code?.substring(0, 20) + '...');
+    console.log('🔒 State recebido:', state?.substring(0, 20) + '...');
 
     if (!code) {
       console.error('❌ Nenhum código OAuth recebido!');
       return res.redirect('/dashboard?error=no_code');
     }
+
+    // 🔒 NOVO: Validar state token (proteção CSRF)
+    const cookies = req.headers.cookie?.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {});
+    
+    const savedState = cookies?.oauth_state;
+    
+    console.log('🔒 Validando state token...');
+    console.log('- State da URL:', state);
+    console.log('- State do cookie:', savedState?.substring(0, 20) + '...');
+    
+    if (!state || !savedState || state !== savedState) {
+      console.error('❌ State token inválido! Possível ataque CSRF.');
+      return res.redirect('/dashboard?error=invalid_state');
+    }
+    
+    console.log('✅ State token válido!');
+    
+    // 🔒 NOVO: Limpar cookie do state após validação
+    res.setHeader('Set-Cookie', 'oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');
 
     console.log('🔑 Criando OAuth2Client...');
     const oauth2Client = new google.auth.OAuth2(
