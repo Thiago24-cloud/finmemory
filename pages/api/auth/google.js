@@ -1,6 +1,24 @@
 import { google } from 'googleapis';
-import { validateGoogleOAuth } from '../../lib/env-validator.mjs';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
+
+// Função para validar variáveis do Google OAuth
+function validateGoogleOAuth() {
+  const required = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'];
+  const results = [];
+  let allValid = true;
+  
+  for (const name of required) {
+    const valid = !!process.env[name];
+    results.push({ 
+      name, 
+      valid, 
+      message: valid ? `✅ ${name} configurada` : `❌ ${name} não configurada` 
+    });
+    if (!valid) allValid = false;
+  }
+  
+  return { allValid, results };
+}
 
 export default async function handler(req, res) {
   console.log('========================================');

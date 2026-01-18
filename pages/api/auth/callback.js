@@ -1,6 +1,44 @@
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
-import { validateSupabase, validateGoogleOAuth } from '../../lib/env-validator.mjs';
+
+// Funções de validação inline para evitar problemas de import
+function validateSupabase() {
+  const required = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+  const results = [];
+  let allValid = true;
+  
+  for (const name of required) {
+    const valid = !!process.env[name];
+    results.push({ 
+      name, 
+      valid, 
+      message: valid ? `✅ ${name}` : `❌ ${name}`,
+      description: `Variável ${name} necessária para Supabase`
+    });
+    if (!valid) allValid = false;
+  }
+  
+  return { allValid, results };
+}
+
+function validateGoogleOAuth() {
+  const required = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'];
+  const results = [];
+  let allValid = true;
+  
+  for (const name of required) {
+    const valid = !!process.env[name];
+    results.push({ 
+      name, 
+      valid, 
+      message: valid ? `✅ ${name}` : `❌ ${name}`,
+      description: `Variável ${name} necessária para Google OAuth`
+    });
+    if (!valid) allValid = false;
+  }
+  
+  return { allValid, results };
+}
 
 // Validação das variáveis de ambiente no carregamento do módulo
 const supabaseValidation = validateSupabase();
