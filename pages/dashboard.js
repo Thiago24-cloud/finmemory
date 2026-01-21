@@ -163,7 +163,22 @@ export default function Dashboard() {
       fontFamily: 'system-ui, sans-serif'
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        
+        {/* Menu superior com links */}
+        <nav style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: '24px',
+          marginBottom: '12px',
+        }}>
+          <a href="/privacidade" style={{ color: '#667eea', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
+            Privacidade
+          </a>
+          <a href="/termos" style={{ color: '#764ba2', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
+            Termos de Uso
+          </a>
+        </nav>
+        {/* ...existing code... */}
         <div style={{ 
           background: 'white',
           borderRadius: '16px',
