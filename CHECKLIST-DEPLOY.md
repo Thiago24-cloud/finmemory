@@ -37,7 +37,9 @@ Use este checklist antes de fazer deploy na Vercel.
   - [ ] `userinfo.profile`
   - [ ] `gmail.readonly`
 - [ ] Redirect URIs configurados:
-  - [ ] `http://localhost:3000/api/auth/callback` (dev)
+  - [ ] `http://localhost:3000/api/auth/callback/google` (dev)
+  - [ ] `https://www.finmemory.com.br/api/auth/callback/google` (prod)
+  - [ ] `https://finmemory.com.br/api/auth/callback/google` (prod)
   - [ ] `https://finmemory.vercel.app/api/auth/callback` (prod)
 - [ ] Copiado `GOOGLE_CLIENT_ID`
 - [ ] Copiado `GOOGLE_CLIENT_SECRET` ⚠️ SECRETO
@@ -66,7 +68,7 @@ Use este checklist antes de fazer deploy na Vercel.
 ### Google OAuth
 - [ ] `GOOGLE_CLIENT_ID` (Production + Preview + Development)
 - [ ] `GOOGLE_CLIENT_SECRET` (Production + Preview + Development)
-- [ ] `GOOGLE_REDIRECT_URI` = `https://finmemory.vercel.app/api/auth/callback`
+- [ ] `GOOGLE_REDIRECT_URI` = `http://localhost:3000/api/auth/callback/google,https://www.finmemory.com.br/api/auth/callback/google,https://finmemory.com.br/api/auth/callback/google`
 
 ### OpenAI
 - [ ] `OPENAI_API_KEY` (Production + Preview + Development)
@@ -102,7 +104,7 @@ Se estiver testando localmente:
 
 - [ ] Arquivo `.env.local` criado (não `.env`)
 - [ ] Todas as 7 variáveis configuradas no `.env.local`
-- [ ] `GOOGLE_REDIRECT_URI` = `http://localhost:3000/api/auth/callback`
+- [ ] `GOOGLE_REDIRECT_URI` = `http://localhost:3000/api/auth/callback/google,https://www.finmemory.com.br/api/auth/callback/google,https://finmemory.com.br/api/auth/callback/google`
 - [ ] Executado: `npm run validate-env` ✅
 - [ ] Executado: `npm install`
 - [ ] Executado: `npm run dev`

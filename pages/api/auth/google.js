@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   console.log('CLIENT_ID:', process.env.GOOGLE_CLIENT_ID?.substring(0, 30) + '...');
   console.log('CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
   console.log('CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET?.substring(0, 15) + '...');
-  console.log('REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI);  
+  console.log('REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI);  // Pode ser múltiplas, separadas por vírgula
   
   // Validação de variáveis de ambiente
   const googleValidation = validateGoogleOAuth();

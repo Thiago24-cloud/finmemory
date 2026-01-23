@@ -29,7 +29,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```env
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxx
-GOOGLE_REDIRECT_URI=https://finmemory.vercel.app/api/auth/callback
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/callback/google,https://www.finmemory.com.br/api/auth/callback/google,https://finmemory.com.br/api/auth/callback/google
 ```
 **Por que:** Permite login com Google e acesso aos emails do Gmail.
 
@@ -116,7 +116,9 @@ Para **CADA UMA** das variáveis listadas acima:
    - Clique em **"SAVE"**
    
    ⚠️ **Para desenvolvimento local**, adicione também:
-   - `http://localhost:3000/api/auth/callback`
+   - `http://localhost:3000/api/auth/callback/google`
+   - `https://www.finmemory.com.br/api/auth/callback/google`
+   - `https://finmemory.com.br/api/auth/callback/google`
 
 7. **Configure a OAuth Consent Screen:**
    - Vá em **OAuth consent screen**

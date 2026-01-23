@@ -70,7 +70,10 @@ Configure em https://console.cloud.google.com
 **Variáveis necessárias:**
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REDIRECT_URI`
+- `GOOGLE_REDIRECT_URI` (pode ser múltiplas, separadas por vírgula):
+   - http://localhost:3000/api/auth/callback/google
+   - https://www.finmemory.com.br/api/auth/callback/google
+   - https://finmemory.com.br/api/auth/callback/google
 
 ### Passo 3: OpenAI
 Crie API key em https://platform.openai.com

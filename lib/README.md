@@ -104,7 +104,10 @@ Cada validação retorna:
 ##### Google OAuth (3 variáveis)
 - `GOOGLE_CLIENT_ID` - Client ID
 - `GOOGLE_CLIENT_SECRET` - Client Secret (secreto)
-- `GOOGLE_REDIRECT_URI` - URI de redirecionamento
+- `GOOGLE_REDIRECT_URI` - URLs de redirecionamento autorizadas, separadas por vírgula:
+  - http://localhost:3000/api/auth/callback/google
+  - https://www.finmemory.com.br/api/auth/callback/google
+  - https://finmemory.com.br/api/auth/callback/google
 
 ##### OpenAI (1 variável)
 - `OPENAI_API_KEY` - API Key (secreta)
