@@ -21,8 +21,10 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/react": "^19.2.9",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.22"
+    "eslint-config-next": "^14.2.22",
+    "typescript": "^5.9.3"
   },
   "resolutions": {
     "glob": "^10.4.5",
