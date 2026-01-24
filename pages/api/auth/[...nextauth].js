@@ -18,7 +18,7 @@ export const authOptions = {
           prompt: 'consent',
           access_type: 'offline',
           response_type: 'code',
-          scope: 'openid email profile'
+          scope: 'openid email profile https://www.googleapis.com/auth/gmail.readonly'
         }
       }
     })
@@ -105,7 +105,7 @@ export const authOptions = {
   
   pages: {
     signIn: '/',
-    error: '/dashboard?error=auth_failed'
+    error: '/auth-error'
   },
   
   session: {

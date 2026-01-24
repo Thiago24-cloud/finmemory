@@ -138,7 +138,9 @@ export default function Dashboard() {
     const error = urlParams.get('error');
     
     if (error) {
-      alert('❌ Erro na autenticação. Tente novamente.');
+      // Erros de autenticação agora são tratados pela página /auth-error
+      // Mas caso chegue aqui diretamente, mostra mensagem genérica
+      console.error('Erro de autenticação:', error);
       window.history.replaceState({}, '', '/dashboard');
       return;
     }
