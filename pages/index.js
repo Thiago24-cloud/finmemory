@@ -1,4 +1,44 @@
+import { useSession, signIn } from 'next-auth/react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push('/dashboard?success=true');
+    }
+  }, [status, router]);
+
+  const handleSignIn = () => {
+    signIn('google', { callbackUrl: '/dashboard?success=true' });
+  };
+
+  if (status === 'loading') {
+    return (
+      <div style={{ 
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{
+          background: 'white',
+          padding: '40px',
+          borderRadius: '20px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ fontSize: '18px', color: '#666' }}>Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ 
       minHeight: '100vh',
@@ -44,8 +84,8 @@ export default function Home() {
           gap: '16px',
           alignItems: 'center'
         }}>
-          <a 
-            href="/api/auth/google" 
+          <button 
+            onClick={handleSignIn}
             style={{ 
               display: 'flex',
               alignItems: 'center',
@@ -54,10 +94,11 @@ export default function Home() {
               padding: '16px 40px',
               background: 'linear-gradient(135deg, #34A853, #0F9D58)',
               color: 'white',
-              textDecoration: 'none',
+              border: 'none',
               borderRadius: '8px',
               fontSize: '18px',
               fontWeight: 'bold',
+              cursor: 'pointer',
               transition: 'transform 0.2s, box-shadow 0.2s',
               boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)',
               width: '100%',
@@ -79,7 +120,7 @@ export default function Home() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
             Entrar com Google
-          </a>
+          </button>
           
           <a 
             href="/dashboard" 
@@ -95,7 +136,8 @@ export default function Home() {
               border: '2px solid #667eea',
               transition: 'all 0.2s',
               width: '100%',
-              maxWidth: '400px'
+              maxWidth: '400px',
+              textAlign: 'center'
             }}
             onMouseOver={(e) => {
               e.target.style.background = '#667eea';
@@ -106,7 +148,7 @@ export default function Home() {
               e.target.style.color = '#667eea';
             }}
           >
-            Continuar sem login
+            Ver Dashboard
           </a>
         </div>
         

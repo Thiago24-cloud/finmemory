@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,13 +15,37 @@ const supabase = createClient(
 );
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
+  const { data: session, status } = useSession();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [userId, setUserId] = useState(null);
 
-  const loadTransactions = useCallback(async (userId) => {
-    if (!userId) {
+  // Get Supabase user ID from session or localStorage
+  useEffect(() => {
+    if (session?.user?.supabaseId) {
+      setUserId(session.user.supabaseId);
+      localStorage.setItem('user_id', session.user.supabaseId);
+    } else if (session?.user?.email) {
+      // Fetch user ID from Supabase if not in session
+      const fetchUserId = async () => {
+        const { data } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', session.user.email)
+          .single();
+        
+        if (data) {
+          setUserId(data.id);
+          localStorage.setItem('user_id', data.id);
+        }
+      };
+      fetchUserId();
+    }
+  }, [session]);
+
+  const loadTransactions = useCallback(async (uid) => {
+    if (!uid) {
       console.warn('loadTransactions: userId não fornecido');
       return;
     }
@@ -30,7 +55,7 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from('transacoes')
         .select('*, produtos (*)')
-        .eq('user_id', userId)
+        .eq('user_id', uid)
         .order('data', { ascending: false })
         .order('hora', { ascending: false });
 
@@ -47,10 +72,8 @@ export default function Dashboard() {
     }
   }, []);
 
-  const handleSyncEmails = useCallback(async (userId = null, isFirstSync = false) => {
-    const targetUserId = userId || user?.id;
-    
-    if (!targetUserId) {
+  const handleSyncEmails = useCallback(async (isFirstSync = false) => {
+    if (!userId) {
       alert('⚠️ Você precisa conectar o Gmail primeiro!');
       return;
     }
@@ -67,7 +90,7 @@ export default function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: targetUserId,
+          userId: userId,
           firstSync: Boolean(isFirstSync)
         })
       });
@@ -85,7 +108,7 @@ export default function Dashboard() {
         } else {
           alert('ℹ️ Nenhuma nota fiscal nova encontrada.');
         }
-        await loadTransactions(targetUserId);
+        await loadTransactions(userId);
       } else {
         const errorMsg = data.error || 'Erro desconhecido';
         console.error('Erro ao sincronizar:', errorMsg);
@@ -97,63 +120,57 @@ export default function Dashboard() {
     } finally {
       setSyncing(false);
     }
-  }, [user, loadTransactions, syncing]);
+  }, [userId, loadTransactions, syncing]);
 
+  // Load transactions when userId changes
+  useEffect(() => {
+    if (userId) {
+      loadTransactions(userId);
+    }
+  }, [userId, loadTransactions]);
+
+  // Check URL params for first sync
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get('user_id');
     const success = urlParams.get('success');
     const error = urlParams.get('error');
     
     if (error) {
       alert('❌ Erro na autenticação. Tente novamente.');
+      window.history.replaceState({}, '', '/dashboard');
       return;
     }
     
-    if (userId) {
-      localStorage.setItem('user_id', userId);
-      setUser({ id: userId });
+    if (success === 'true' && userId) {
       window.history.replaceState({}, '', '/dashboard');
-      loadTransactions(userId);
-      
-      if (success === 'true') {
-        setTimeout(() => {
-          handleSyncEmails(userId, true);
-        }, 1000);
-      }
-    } else {
-      const savedUserId = localStorage.getItem('user_id');
-      if (savedUserId) {
-        setUser({ id: savedUserId });
-        loadTransactions(savedUserId);
-      }
+      setTimeout(() => {
+        handleSyncEmails(true);
+      }, 1000);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTransactions]);
+  }, [userId, handleSyncEmails]);
 
   const handleConnectGmail = () => {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/api/auth/google';
-    }
+    signIn('google', { callbackUrl: '/dashboard?success=true' });
   };
 
-  const handleDisconnect = () => {
-    if (typeof window === 'undefined') return;
-    
+  const handleDisconnect = async () => {
     if (confirm('⚠️ Deseja realmente desconectar? Suas transações não serão perdidas.')) {
       try {
         localStorage.removeItem('user_id');
-        setUser(null);
+        setUserId(null);
         setTransactions([]);
-        window.location.href = '/dashboard';
+        await signOut({ callbackUrl: '/dashboard' });
       } catch (error) {
         console.error('Erro ao desconectar:', error);
         alert('❌ Erro ao desconectar. Tente novamente.');
       }
     }
   };
+
+  const isAuthenticated = status === 'authenticated' && session;
+  const isLoading = status === 'loading';
 
   return (
     <div style={{ 
@@ -171,14 +188,15 @@ export default function Dashboard() {
           gap: '24px',
           marginBottom: '12px',
         }}>
-          <a href="/privacidade" style={{ color: '#667eea', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
+          <a href="/privacidade" style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
             Privacidade
           </a>
-          <a href="/termos" style={{ color: '#764ba2', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
+          <a href="/termos" style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
             Termos de Uso
           </a>
         </nav>
-        {/* ...existing code... */}
+
+        {/* Header */}
         <div style={{ 
           background: 'white',
           borderRadius: '16px',
@@ -202,12 +220,16 @@ export default function Dashboard() {
               🚀 FinMemory
             </h1>
             <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
-              Seu histórico financeiro inteligente
+              {isAuthenticated ? `Olá, ${session.user.name || session.user.email}!` : 'Seu histórico financeiro inteligente'}
             </p>
           </div>
           
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            {!user ? (
+            {isLoading ? (
+              <div style={{ padding: '14px 28px', color: '#666' }}>
+                Carregando...
+              </div>
+            ) : !isAuthenticated ? (
               <button
                 onClick={handleConnectGmail}
                 style={{
@@ -226,7 +248,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <button
-                  onClick={() => handleSyncEmails()}
+                  onClick={() => handleSyncEmails(false)}
                   disabled={syncing}
                   style={{
                     padding: '14px 28px',
@@ -262,7 +284,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {!user ? (
+        {/* Content */}
+        {isLoading ? (
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '60px',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+            <p style={{ fontSize: '18px', color: '#666' }}>
+              Carregando sessão...
+            </p>
+          </div>
+        ) : !isAuthenticated ? (
           <div style={{
             background: 'white',
             borderRadius: '16px',
@@ -303,7 +339,7 @@ export default function Dashboard() {
           }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
             <p style={{ fontSize: '18px', color: '#666' }}>
-              Carregando...
+              Carregando transações...
             </p>
           </div>
         ) : transactions.length === 0 ? (
