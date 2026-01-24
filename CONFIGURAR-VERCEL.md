@@ -29,9 +29,12 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```env
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxx
-GOOGLE_REDIRECT_URI=https://finmemory.vercel.app/api/auth/callback/google
+NEXTAUTH_URL=https://www.finmemory.com.br
+NEXTAUTH_SECRET=sua-chave-secreta-gerada-com-openssl
 ```
 **Por que:** Permite login com Google e acesso aos emails do Gmail.
+
+⚠️ **IMPORTANTE:** A variável `NEXTAUTH_URL` DEVE ser o domínio principal do seu app!
 
 ### 3. **OpenAI** (Inteligência Artificial) ⚠️ OBRIGATÓRIO
 ```env
@@ -109,10 +112,12 @@ Para **CADA UMA** das variáveis listadas acima:
 | `GOOGLE_CLIENT_ID` | **Client ID** |
 | `GOOGLE_CLIENT_SECRET` | **Client secret** |
 
-6. **IMPORTANTE - Configure o Redirect URI:**
+6. **IMPORTANTE - Configure os Redirect URIs:**
    - Na mesma tela, em **"Authorized redirect URIs"**
-   - Clique em **"+ ADD URI"**
-   - Adicione: `https://finmemory.vercel.app/api/auth/callback/google`
+   - Clique em **"+ ADD URI"** e adicione TODAS estas URLs:
+   - ✅ `https://www.finmemory.com.br/api/auth/callback/google`
+   - ✅ `https://finmemory.com.br/api/auth/callback/google`
+   - ✅ `http://localhost:3000/api/auth/callback/google` (para desenvolvimento)
    - Clique em **"SAVE"**
 
 7. **Configure a OAuth Consent Screen:**
@@ -152,10 +157,13 @@ Antes de fazer o deploy, confirme:
 - [ ] **Google OAuth**
   - [ ] `GOOGLE_CLIENT_ID` configurada
   - [ ] `GOOGLE_CLIENT_SECRET` configurada
-  - [ ] `GOOGLE_REDIRECT_URI` = `https://finmemory.vercel.app/api/auth/callback/google`
-  - [ ] Redirect URI adicionado no Google Console
+  - [ ] `NEXTAUTH_URL` = `https://www.finmemory.com.br`
+  - [ ] `NEXTAUTH_SECRET` configurada (gere com: openssl rand -base64 32)
+  - [ ] Redirect URIs adicionados no Google Console:
+    - [ ] `https://www.finmemory.com.br/api/auth/callback/google`
+    - [ ] `https://finmemory.com.br/api/auth/callback/google`
   - [ ] OAuth Consent Screen configurada
-  - [ ] Escopos Gmail adicionados
+  - [ ] Escopos Gmail adicionados (`gmail.readonly`)
 
 - [ ] **OpenAI**
   - [ ] `OPENAI_API_KEY` configurada
@@ -183,10 +191,12 @@ Antes de fazer o deploy, confirme:
 **Causa:** Credenciais do Google não configuradas ou incorretas
 
 **Solução:**
-1. Verifique todas as 3 variáveis do Google
-2. Confirme que o Redirect URI está correto na Vercel
-3. Confirme que o Redirect URI foi adicionado no Google Console
-4. Formato correto: `https://finmemory.vercel.app/api/auth/callback/google`
+1. Verifique as variáveis: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`
+2. Confirme que `NEXTAUTH_URL` = `https://www.finmemory.com.br`
+3. Confirme que os Redirect URIs foram adicionados no Google Console
+4. URIs necessárias:
+   - `https://www.finmemory.com.br/api/auth/callback/google`
+   - `https://finmemory.com.br/api/auth/callback/google`
 
 ### Problema: "OPENAI_API_KEY não configurada"
 **Causa:** Chave da OpenAI não foi adicionada
@@ -300,8 +310,24 @@ Com tudo configurado, seu app deve:
 ## ✅ Como testar se funcionou:
 
 Após o redeploy:
-1. Acesse: https://finmemory.vercel.app
+1. Acesse: https://www.finmemory.com.br
 2. Clique em "Conectar Gmail"
 3. Deve redirecionar para o Google (sem erro 500)
 
 Se ainda der erro, verifique os logs no Vercel Dashboard.
+
+---
+
+## 🚨 Erro: redirect_uri_mismatch
+
+Se você está vendo este erro, significa que a URL de callback não está cadastrada no Google Console.
+
+**Solução:**
+1. Acesse: https://console.cloud.google.com/apis/credentials
+2. Clique na sua credencial OAuth 2.0
+3. Em "Authorized redirect URIs", adicione:
+   - `https://www.finmemory.com.br/api/auth/callback/google`
+   - `https://finmemory.com.br/api/auth/callback/google`
+4. Clique em "SAVE"
+5. Na Vercel, certifique-se que `NEXTAUTH_URL=https://www.finmemory.com.br`
+6. Faça um redeploy
