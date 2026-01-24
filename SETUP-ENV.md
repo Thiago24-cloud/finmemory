@@ -20,10 +20,7 @@
 5. Configure:
    - **Application type**: Web application
    - **Authorized redirect URIs**: 
-   - `http://localhost:3000/api/auth/callback/google` (desenvolvimento)
-   - `https://www.finmemory.com.br/api/auth/callback/google` (produção)
-   - `https://finmemory.com.br/api/auth/callback/google` (produção)
-     - `https://finmemory.vercel.app/api/auth/callback` (produção)
+     - `https://finmemory.vercel.app/api/auth/callback/google` (produção)
 6. Copie:
    - **Client ID** → use como `GOOGLE_CLIENT_ID`
    - **Client Secret** → use como `GOOGLE_CLIENT_SECRET`

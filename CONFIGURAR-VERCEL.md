@@ -29,7 +29,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```env
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxx
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/callback/google,https://www.finmemory.com.br/api/auth/callback/google,https://finmemory.com.br/api/auth/callback/google
+GOOGLE_REDIRECT_URI=https://finmemory.vercel.app/api/auth/callback/google
 ```
 **Por que:** Permite login com Google e acesso aos emails do Gmail.
 
@@ -112,13 +112,8 @@ Para **CADA UMA** das variáveis listadas acima:
 6. **IMPORTANTE - Configure o Redirect URI:**
    - Na mesma tela, em **"Authorized redirect URIs"**
    - Clique em **"+ ADD URI"**
-   - Adicione: `https://finmemory.vercel.app/api/auth/callback`
+   - Adicione: `https://finmemory.vercel.app/api/auth/callback/google`
    - Clique em **"SAVE"**
-   
-   ⚠️ **Para desenvolvimento local**, adicione também:
-   - `http://localhost:3000/api/auth/callback/google`
-   - `https://www.finmemory.com.br/api/auth/callback/google`
-   - `https://finmemory.com.br/api/auth/callback/google`
 
 7. **Configure a OAuth Consent Screen:**
    - Vá em **OAuth consent screen**
@@ -157,7 +152,7 @@ Antes de fazer o deploy, confirme:
 - [ ] **Google OAuth**
   - [ ] `GOOGLE_CLIENT_ID` configurada
   - [ ] `GOOGLE_CLIENT_SECRET` configurada
-  - [ ] `GOOGLE_REDIRECT_URI` configurada
+  - [ ] `GOOGLE_REDIRECT_URI` = `https://finmemory.vercel.app/api/auth/callback/google`
   - [ ] Redirect URI adicionado no Google Console
   - [ ] OAuth Consent Screen configurada
   - [ ] Escopos Gmail adicionados
@@ -191,7 +186,7 @@ Antes de fazer o deploy, confirme:
 1. Verifique todas as 3 variáveis do Google
 2. Confirme que o Redirect URI está correto na Vercel
 3. Confirme que o Redirect URI foi adicionado no Google Console
-4. Formato correto: `https://finmemory.vercel.app/api/auth/callback`
+4. Formato correto: `https://finmemory.vercel.app/api/auth/callback/google`
 
 ### Problema: "OPENAI_API_KEY não configurada"
 **Causa:** Chave da OpenAI não foi adicionada
