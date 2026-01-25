@@ -86,7 +86,10 @@ export default async function handler(req, res) {
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     // Busca por termos relacionados a notas fiscais (no assunto ou corpo)
-    let query = 'cupom fiscal OR nota fiscal OR NFC-e OR NF-e OR danfe OR comprovante de compra OR recibo';
+    // Inclui busca em todas as pastas (inbox, promoções, etc.)
+    let query = 'in:anywhere (cupom OR fiscal OR nota OR NFC-e OR NF-e OR danfe OR comprovante OR recibo OR drogaria OR farmacia)';
+    
+    console.log('🔎 Query de busca:', query);
     
     if (firstSync) {
       query += ' newer_than:30d';
