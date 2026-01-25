@@ -9,8 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "validate-env": "node scripts/validate-env.mjs",
-    "prebuild": "node scripts/validate-env.mjs"
+    "validate-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
