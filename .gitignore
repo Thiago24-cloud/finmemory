@@ -28,8 +28,8 @@ coverage/
 .env
 .env.local
 .env.*.local
-.env.production
 .env.test
+# Nota: .env.production contém apenas variáveis PÚBLICAS (NEXT_PUBLIC_*) e pode ir para o repo
 
 # OS / Editor
 .DS_Store
