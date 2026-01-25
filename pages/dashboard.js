@@ -2,17 +2,29 @@ import { useEffect, useState, useCallback } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
+let supabaseInstance = null;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('⚠️ Variáveis de ambiente do Supabase não configuradas');
+function getSupabase() {
+  if (typeof window === 'undefined') {
+    // Durante SSR/build, retorna null
+    return null;
+  }
+  
+  if (!supabaseInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('⚠️ Variáveis de ambiente do Supabase não configuradas');
+      return null;
+    }
+    
+    supabaseInstance = createClient(supabaseUrl, supabaseKey);
+  }
+  
+  return supabaseInstance;
 }
-
-const supabase = createClient(
-  supabaseUrl || '',
-  supabaseKey || ''
-);
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -29,6 +41,9 @@ export default function Dashboard() {
     } else if (session?.user?.email) {
       // Fetch user ID from Supabase if not in session
       const fetchUserId = async () => {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        
         const { data } = await supabase
           .from('users')
           .select('id')
@@ -47,6 +62,12 @@ export default function Dashboard() {
   const loadTransactions = useCallback(async (uid) => {
     if (!uid) {
       console.warn('loadTransactions: userId não fornecido');
+      return;
+    }
+    
+    const supabase = getSupabase();
+    if (!supabase) {
+      console.warn('loadTransactions: Supabase não disponível');
       return;
     }
     
