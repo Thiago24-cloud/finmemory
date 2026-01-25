@@ -42,17 +42,30 @@ export default function Dashboard() {
       // Fetch user ID from Supabase if not in session
       const fetchUserId = async () => {
         const supabase = getSupabase();
-        if (!supabase) return;
+        if (!supabase) {
+          console.error('❌ Supabase não disponível');
+          return;
+        }
         
-        const { data } = await supabase
+        console.log('🔍 Buscando user_id para email:', session.user.email);
+        
+        const { data, error } = await supabase
           .from('users')
           .select('id')
           .eq('email', session.user.email)
           .single();
         
+        if (error) {
+          console.error('❌ Erro ao buscar user_id:', error);
+          return;
+        }
+        
         if (data) {
+          console.log('✅ User ID encontrado:', data.id);
           setUserId(data.id);
           localStorage.setItem('user_id', data.id);
+        } else {
+          console.warn('⚠️ Nenhum usuário encontrado para este email');
         }
       };
       fetchUserId();
@@ -71,6 +84,7 @@ export default function Dashboard() {
       return;
     }
     
+    console.log('📊 Carregando transações para user_id:', uid);
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -81,12 +95,14 @@ export default function Dashboard() {
         .order('hora', { ascending: false });
 
       if (error) {
-        console.error('Erro ao carregar transações:', error);
+        console.error('❌ Erro ao carregar transações:', error);
         throw error;
       }
+      
+      console.log('✅ Transações carregadas:', data?.length || 0);
       setTransactions(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Erro ao carregar transações:', error);
+      console.error('❌ Erro ao carregar transações:', error);
       setTransactions([]);
     } finally {
       setLoading(false);
