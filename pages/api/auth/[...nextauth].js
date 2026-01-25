@@ -2,11 +2,23 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase client for storing user data
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+// Lazy initialization do Supabase - só cria quando realmente necessário
+let supabaseInstance = null;
+
+function getSupabase() {
+  if (!supabaseInstance) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!url || !key) {
+      console.warn('⚠️ Variáveis do Supabase não configuradas no servidor');
+      return null;
+    }
+    
+    supabaseInstance = createClient(url, key);
+  }
+  return supabaseInstance;
+}
 
 export const authOptions = {
   providers: [
@@ -33,6 +45,12 @@ export const authOptions = {
       console.log('Provider:', account.provider);
       
       try {
+        const supabase = getSupabase();
+        if (!supabase) {
+          console.warn('⚠️ Supabase não disponível, pulando salvamento do usuário');
+          return true; // Still allow sign in
+        }
+        
         // Save user to Supabase
         const userData = {
           email: user.email,
@@ -86,14 +104,17 @@ export const authOptions = {
       
       // Get the Supabase user ID
       try {
-        const { data } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', session.user.email)
-          .single();
-        
-        if (data) {
-          session.user.supabaseId = data.id;
+        const supabase = getSupabase();
+        if (supabase) {
+          const { data } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', session.user.email)
+            .single();
+          
+          if (data) {
+            session.user.supabaseId = data.id;
+          }
         }
       } catch (error) {
         console.error('Error fetching Supabase user:', error);
