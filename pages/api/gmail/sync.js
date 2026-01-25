@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     oauth2Client.setCredentials({ access_token: user.access_token });
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    let query = 'subject:(nota fiscal OR NF-e OR cupom fiscal OR danfe OR comprovante)';
+    let query = 'subject:(nota fiscal OR NF-e OR NFC-e OR cupom fiscal OR danfe OR comprovante OR recibo OR drogaria OR farmacia OR sua compra OR pedido confirmado OR compra aprovada)';
     
     if (firstSync) {
       query += ' newer_than:30d';
