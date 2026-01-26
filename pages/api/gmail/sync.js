@@ -156,52 +156,187 @@ export default async function handler(req, res) {
         console.log(`📄 Corpo do e-mail extraído: ${emailBody.length} caracteres`);
         console.log('🤖 Enviando para GPT...');
         
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Você é um especialista em extrair informações de notas fiscais brasileiras. Retorne APENAS JSON válido sem markdown:
-{
-  "estabelecimento": "nome da loja",
-  "cnpj": "CNPJ",
-  "endereco": "endereço",
-  "cidade": "cidade",
-  "estado": "UF",
-  "data": "YYYY-MM-DD",
-  "hora": "HH:MM:SS",
-  "total": 0.00,
-  "formaPagamento": "forma",
-  "produtos": [{"codigo": "cod", "descricao": "nome", "quantidade": 0, "unidade": "UN", "valorUnitario": 0.00, "valorTotal": 0.00}],
-  "descontos": 0.00,
-  "subtotal": 0.00,
-  "numeroNota": "numero",
-  "chaveAcesso": "chave"
-}`
-            },
-            { role: "user", content: emailBody.substring(0, 15000) }
-          ],
-          temperature: 0.1
-        });
+        let completion;
+        let result;
+        try {
+          completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Você é um especialista em extrair informações de notas fiscais brasileiras (NF-e, NFC-e, cupons fiscais, recibos).
 
-        const result = completion.choices[0].message.content;
+IMPORTANTE: Retorne APENAS um JSON válido, sem markdown, sem texto adicional antes ou depois.
+
+CAMPOS OBRIGATÓRIOS (não pode faltar):
+- estabelecimento: Nome da loja/empresa (string, obrigatório)
+- total: Valor total da compra (number, obrigatório, sempre > 0)
+
+CAMPOS OPCIONAIS (pode ser null se não encontrar):
+- cnpj, endereco, cidade, estado, data, hora, formaPagamento, descontos, subtotal, numeroNota, chaveAcesso, produtos
+
+FORMATO DO JSON (use null para campos não encontrados):
+{
+  "estabelecimento": "Nome da Loja",
+  "cnpj": "12.345.678/0001-90" ou null,
+  "endereco": "Rua, número" ou null,
+  "cidade": "Cidade" ou null,
+  "estado": "UF" ou null,
+  "data": "YYYY-MM-DD" ou null,
+  "hora": "HH:MM:SS" ou null,
+  "total": 50.99,
+  "formaPagamento": "Cartão/Dinheiro/PIX" ou null,
+  "produtos": [
+    {
+      "codigo": "123" ou null,
+      "descricao": "Nome do produto",
+      "quantidade": 2.0,
+      "unidade": "UN" ou "KG" ou "L",
+      "valorUnitario": 25.50,
+      "valorTotal": 51.00
+    }
+  ] ou [],
+  "descontos": 0.00 ou null,
+  "subtotal": 50.99 ou null,
+  "numeroNota": "123456" ou null,
+  "chaveAcesso": "chave" ou null
+}
+
+Se não conseguir identificar o estabelecimento ou o total, retorne um JSON com esses campos como null e adicione um campo "erro": "mensagem explicando o problema".`
+              },
+              { role: "user", content: `Extraia as informações da seguinte nota fiscal/cupom/recibo:\n\n${emailBody.substring(0, 15000)}` }
+            ],
+            temperature: 0.1,
+            response_format: { type: "json_object" }
+          });
+
+          result = completion.choices[0].message.content;
+        } catch (openaiError) {
+          console.error('❌ Erro ao chamar OpenAI:', openaiError);
+          // Se o erro for por causa do response_format, tenta sem ele
+          if (openaiError.message?.includes('response_format') || openaiError.code === 'invalid_request_error') {
+            console.log('🔄 Tentando novamente sem response_format...');
+            try {
+              completion = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                  {
+                    role: "system",
+                    content: `Você é um especialista em extrair informações de notas fiscais brasileiras. Retorne APENAS JSON válido sem markdown, sem texto adicional. Campos obrigatórios: estabelecimento (string) e total (number > 0).`
+                  },
+                  { role: "user", content: `Extraia as informações da seguinte nota fiscal:\n\n${emailBody.substring(0, 15000)}` }
+                ],
+                temperature: 0.1
+              });
+              result = completion.choices[0].message.content;
+            } catch (retryError) {
+              console.error('❌ Erro na segunda tentativa:', retryError);
+              errors++;
+              continue;
+            }
+          } else {
+            errors++;
+            continue;
+          }
+        }
         console.log('✅ GPT respondeu');
+        console.log('📝 Resposta bruta do GPT (primeiros 500 chars):', result.substring(0, 500));
 
         let notaFiscal;
         try {
-          const jsonStr = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          // Remove markdown code blocks se existirem
+          let jsonStr = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          // Remove possíveis prefixos de texto antes do JSON
+          const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            jsonStr = jsonMatch[0];
+          }
           notaFiscal = JSON.parse(jsonStr);
+          console.log('✅ JSON parseado com sucesso');
+          console.log('📋 Dados extraídos:', {
+            estabelecimento: notaFiscal.estabelecimento || '❌ FALTANDO',
+            total: notaFiscal.total || '❌ FALTANDO',
+            data: notaFiscal.data || '❌ FALTANDO',
+            produtos_count: notaFiscal.produtos?.length || 0
+          });
         } catch (e) {
           console.error('❌ Erro ao parsear JSON:', e);
+          console.error('📄 Conteúdo que falhou ao parsear:', result.substring(0, 1000));
           errors++;
           continue;
         }
 
-        if (!notaFiscal || !notaFiscal.estabelecimento || !notaFiscal.total) {
-          console.log('⚠️  Dados incompletos, pulando...');
+        // Normalização e validação dos dados
+        if (!notaFiscal) {
+          console.log('⚠️  Dados incompletos: objeto notaFiscal é null/undefined');
+          console.log('   Resposta completa do GPT:', result);
           errors++;
           continue;
         }
+
+        // Normaliza o estabelecimento (remove espaços, tenta encontrar em outros campos)
+        if (!notaFiscal.estabelecimento || notaFiscal.estabelecimento.trim() === '') {
+          // Tenta encontrar em outros campos comuns
+          notaFiscal.estabelecimento = notaFiscal.estabelecimento || 
+                                      notaFiscal.loja || 
+                                      notaFiscal.empresa || 
+                                      notaFiscal.razaoSocial ||
+                                      notaFiscal.nomeEstabelecimento ||
+                                      'Estabelecimento Desconhecido';
+        }
+
+        // Normaliza o total (tenta converter de string, remove R$, espaços, etc)
+        let totalValue = null;
+        if (notaFiscal.total !== null && notaFiscal.total !== undefined) {
+          if (typeof notaFiscal.total === 'string') {
+            // Remove R$, espaços, pontos de milhar, mantém apenas vírgula decimal
+            const cleaned = notaFiscal.total.replace(/R\$\s*/gi, '')
+                                            .replace(/\./g, '')
+                                            .replace(',', '.')
+                                            .trim();
+            totalValue = parseFloat(cleaned);
+          } else {
+            totalValue = parseFloat(notaFiscal.total);
+          }
+        }
+
+        // Se ainda não tem total, tenta subtotal
+        if (!totalValue || isNaN(totalValue) || totalValue <= 0) {
+          if (notaFiscal.subtotal) {
+            if (typeof notaFiscal.subtotal === 'string') {
+              const cleaned = notaFiscal.subtotal.replace(/R\$\s*/gi, '')
+                                                  .replace(/\./g, '')
+                                                  .replace(',', '.')
+                                                  .trim();
+              totalValue = parseFloat(cleaned);
+            } else {
+              totalValue = parseFloat(notaFiscal.subtotal);
+            }
+          }
+        }
+
+        // Validação final
+        const camposFaltando = [];
+        const estabelecimentoNormalizado = notaFiscal.estabelecimento?.trim() || '';
+        if (!estabelecimentoNormalizado || estabelecimentoNormalizado.length < 2) {
+          camposFaltando.push('estabelecimento (muito curto ou vazio)');
+        }
+        if (!totalValue || isNaN(totalValue) || totalValue <= 0) {
+          camposFaltando.push(`total (valor: ${totalValue}, inválido ou <= 0)`);
+        }
+
+        if (camposFaltando.length > 0) {
+          console.log('⚠️  Dados incompletos após normalização, pulando...');
+          console.log('   Campos faltando:', camposFaltando.join(', '));
+          console.log('   Estabelecimento tentado:', notaFiscal.estabelecimento);
+          console.log('   Total tentado:', totalValue);
+          console.log('   Dados recebidos (primeiros 1000 chars):', JSON.stringify(notaFiscal, null, 2).substring(0, 1000));
+          errors++;
+          continue;
+        }
+
+        // Atualiza o total normalizado
+        notaFiscal.total = totalValue;
 
         console.log('💾 Salvando no Supabase...');
 

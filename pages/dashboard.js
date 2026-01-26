@@ -35,7 +35,20 @@ export default function Dashboard() {
 
   // Get Supabase user ID from session or localStorage
   useEffect(() => {
+    // Primeiro, tenta usar o localStorage como fallback rápido
+    if (typeof window !== 'undefined') {
+      const storedUserId = localStorage.getItem('user_id');
+      if (storedUserId) {
+        console.log('📦 User ID encontrado no localStorage:', storedUserId);
+        // Só usa o localStorage se não temos sessão ou se a sessão não tem supabaseId
+        if (!session || !session.user?.supabaseId) {
+          setUserId(storedUserId);
+        }
+      }
+    }
+
     if (session?.user?.supabaseId) {
+      console.log('✅ User ID da sessão:', session.user.supabaseId);
       setUserId(session.user.supabaseId);
       localStorage.setItem('user_id', session.user.supabaseId);
     } else if (session?.user?.email) {
@@ -51,21 +64,33 @@ export default function Dashboard() {
         
         const { data, error } = await supabase
           .from('users')
-          .select('id')
+          .select('id, email, name')
           .eq('email', session.user.email)
           .single();
         
         if (error) {
           console.error('❌ Erro ao buscar user_id:', error);
+          console.error('   Código:', error.code);
+          console.error('   Mensagem:', error.message);
+          console.error('   Detalhes:', error.details);
+          
+          // Se for erro de RLS, informa
+          if (error.code === 'PGRST116' || error.message?.includes('permission denied')) {
+            console.error('⚠️ Possível problema de RLS (Row Level Security) ao buscar usuário');
+            console.error('   Verifique as políticas RLS na tabela "users" no Supabase');
+          }
           return;
         }
         
         if (data) {
           console.log('✅ User ID encontrado:', data.id);
+          console.log('   Email:', data.email);
+          console.log('   Nome:', data.name);
           setUserId(data.id);
           localStorage.setItem('user_id', data.id);
         } else {
           console.warn('⚠️ Nenhum usuário encontrado para este email');
+          console.warn('   Isso pode acontecer se o usuário ainda não fez login pela primeira vez');
         }
       };
       fetchUserId();
@@ -85,8 +110,41 @@ export default function Dashboard() {
     }
     
     console.log('📊 Carregando transações para user_id:', uid);
+    console.log('🔍 Verificando configuração do Supabase...');
+    console.log('   URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Configurada' : '❌ Não configurada');
+    console.log('   Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Configurada' : '❌ Não configurada');
+    
     setLoading(true);
     try {
+      // Primeiro, tenta buscar sem o join para verificar se há transações
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('transacoes')
+        .select('id, user_id, estabelecimento, total, data')
+        .eq('user_id', uid)
+        .limit(5);
+
+      if (simpleError) {
+        console.error('❌ Erro ao buscar transações (query simples):', simpleError);
+        console.error('   Código:', simpleError.code);
+        console.error('   Mensagem:', simpleError.message);
+        console.error('   Detalhes:', simpleError.details);
+        console.error('   Hint:', simpleError.hint);
+        
+        // Se for erro de RLS, informa o usuário
+        if (simpleError.code === 'PGRST116' || simpleError.message?.includes('permission denied')) {
+          console.error('⚠️ Possível problema de RLS (Row Level Security) no Supabase');
+          console.error('   Verifique se as políticas RLS permitem leitura para usuários autenticados');
+        }
+        
+        throw simpleError;
+      }
+
+      console.log('📋 Transações encontradas (query simples):', simpleData?.length || 0);
+      if (simpleData && simpleData.length > 0) {
+        console.log('   Primeira transação:', simpleData[0]);
+      }
+
+      // Agora busca com o join completo
       const { data, error } = await supabase
         .from('transacoes')
         .select('*, produtos (*)')
@@ -95,11 +153,41 @@ export default function Dashboard() {
         .order('hora', { ascending: false });
 
       if (error) {
-        console.error('❌ Erro ao carregar transações:', error);
+        console.error('❌ Erro ao carregar transações (query completa):', error);
+        console.error('   Código:', error.code);
+        console.error('   Mensagem:', error.message);
+        console.error('   Detalhes:', error.details);
+        
+        // Se a query simples funcionou mas a completa falhou, pode ser problema com a tabela produtos
+        if (simpleData && simpleData.length > 0) {
+          console.warn('⚠️ Transações existem, mas falha ao buscar produtos. Carregando sem produtos...');
+          // Tenta buscar sem produtos
+          const { data: dataWithoutProducts, error: errorWithoutProducts } = await supabase
+            .from('transacoes')
+            .select('*')
+            .eq('user_id', uid)
+            .order('data', { ascending: false })
+            .order('hora', { ascending: false });
+          
+          if (!errorWithoutProducts) {
+            console.log('✅ Transações carregadas sem produtos:', dataWithoutProducts?.length || 0);
+            setTransactions(Array.isArray(dataWithoutProducts) ? dataWithoutProducts : []);
+            return;
+          }
+        }
+        
         throw error;
       }
       
       console.log('✅ Transações carregadas:', data?.length || 0);
+      if (data && data.length > 0) {
+        console.log('   Primeira transação completa:', {
+          id: data[0].id,
+          estabelecimento: data[0].estabelecimento,
+          total: data[0].total,
+          produtos_count: data[0].produtos?.length || 0
+        });
+      }
       setTransactions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('❌ Erro ao carregar transações:', error);
