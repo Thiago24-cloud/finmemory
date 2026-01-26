@@ -18,11 +18,9 @@ COPY . .
 # Variáveis de ambiente para build
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Variáveis públicas do Supabase (necessárias durante o build para o frontend)
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Variáveis públicas do Supabase (hardcoded - são públicas, vão para o navegador de qualquer forma)
+ENV NEXT_PUBLIC_SUPABASE_URL=https://faxqrkxqfwjdavorxien.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZheHFya3hxZndqZGF2b3J4aWVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NTE4NTYsImV4cCI6MjA4MTQyNzg1Nn0.nXGv3FGwFJWWTRLwEgBRgOmj-RJu-pv7vvZYmyiO_3s
 
 # Build da aplicação
 RUN npm run build
