@@ -55,47 +55,130 @@ export default async function handler(req, res) {
 
   try {
     const { userId, firstSync } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'userId é obrigatório' 
+      });
+    }
+    
     console.log('🔍 Iniciando sync para usuário:', userId);
 
+    // Buscar usuário no banco
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('id', userId)
       .single();
 
-    if (userError || !user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (userError) {
+      console.error('❌ Erro ao buscar usuário:', userError);
+      return res.status(404).json({ 
+        success: false,
+        error: 'Usuário não encontrado',
+        details: userError.message 
+      });
+    }
+
+    if (!user) {
+      console.error('❌ Usuário não encontrado no banco');
+      return res.status(404).json({ 
+        success: false,
+        error: 'Usuário não encontrado no banco de dados' 
+      });
+    }
+
+    // Verificar se o usuário tem tokens
+    if (!user.access_token) {
+      console.error('❌ Usuário não tem access_token');
+      return res.status(401).json({ 
+        success: false,
+        error: 'Usuário não autorizado. Por favor, faça login novamente com o Gmail.',
+        requiresReauth: true
+      });
     }
 
     const tokenExpiry = new Date(user.token_expiry);
     const now = new Date();
     
+    // Renovar token se necessário
     if (tokenExpiry <= now && user.refresh_token) {
       console.log('🔄 Renovando token...');
       
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI // Pode ser múltiplas, separadas por vírgula
-      );
+      try {
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET,
+          process.env.GOOGLE_REDIRECT_URI
+        );
 
-      oauth2Client.setCredentials({ refresh_token: user.refresh_token });
-      const { credentials } = await oauth2Client.refreshAccessToken();
-      
-      await supabase
-        .from('users')
-        .update({
-          access_token: credentials.access_token,
-          token_expiry: new Date(credentials.expiry_date)
-        })
-        .eq('id', userId);
+        oauth2Client.setCredentials({ refresh_token: user.refresh_token });
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        
+        await supabase
+          .from('users')
+          .update({
+            access_token: credentials.access_token,
+            token_expiry: new Date(credentials.expiry_date)
+          })
+          .eq('id', userId);
 
-      user.access_token = credentials.access_token;
+        user.access_token = credentials.access_token;
+        console.log('✅ Token renovado com sucesso');
+      } catch (refreshError) {
+        console.error('❌ Erro ao renovar token:', refreshError);
+        return res.status(401).json({ 
+          success: false,
+          error: 'Erro ao renovar token de acesso. Por favor, faça login novamente.',
+          details: refreshError.message,
+          requiresReauth: true
+        });
+      }
+    } else if (tokenExpiry <= now && !user.refresh_token) {
+      console.error('❌ Token expirado e sem refresh_token');
+      return res.status(401).json({ 
+        success: false,
+        error: 'Sessão expirada. Por favor, faça login novamente com o Gmail.',
+        requiresReauth: true
+      });
     }
 
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token: user.access_token });
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    // Configurar cliente Gmail
+    let gmail;
+    try {
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: user.access_token });
+      gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      
+      // Testar conexão com Gmail
+      await gmail.users.getProfile({ userId: 'me' });
+      console.log('✅ Conexão com Gmail verificada');
+    } catch (gmailError) {
+      console.error('❌ Erro ao conectar com Gmail:', gmailError);
+      
+      // Verificar se é erro de permissão
+      const isPermissionError = gmailError.message?.includes('Insufficient Permission') || 
+                                gmailError.message?.includes('insufficientPermissions') ||
+                                gmailError.code === 403;
+      
+      if (isPermissionError) {
+        return res.status(403).json({ 
+          success: false,
+          error: 'Permissões insuficientes para acessar o Gmail. Por favor, faça login novamente e autorize o acesso aos e-mails.',
+          details: 'O app precisa de permissão para ler seus e-mails do Gmail. Revogue o acesso anterior e conecte novamente.',
+          requiresReauth: true,
+          errorCode: 'INSUFFICIENT_PERMISSIONS'
+        });
+      }
+      
+      return res.status(401).json({ 
+        success: false,
+        error: 'Erro ao acessar Gmail. O token pode estar inválido. Por favor, faça login novamente.',
+        details: gmailError.message,
+        requiresReauth: true
+      });
+    }
 
     // Busca por termos relacionados a notas fiscais (no assunto ou corpo)
     // Inclui busca em todas as pastas (inbox, promoções, etc.)
@@ -103,27 +186,64 @@ export default async function handler(req, res) {
     
     console.log('🔎 Query de busca:', query);
     
-    if (firstSync) {
+    let daysSinceSync;
+    if (firstSync || !user.last_sync) {
+      daysSinceSync = 30;
       query += ' newer_than:30d';
-      console.log('📧 Primeira sync: últimos 30 dias');
+      console.log('📧 Primeira sync (ou sem last_sync): últimos 30 dias');
     } else {
       const lastSync = new Date(user.last_sync);
-      const daysSinceSync = Math.ceil((now - lastSync) / (1000 * 60 * 60 * 24)) + 1;
+      const rawDays = Math.ceil((now - lastSync) / (1000 * 60 * 60 * 24)) + 1;
+      daysSinceSync = Number.isFinite(rawDays) && rawDays > 0
+        ? Math.min(Math.max(1, rawDays), 90)
+        : 30;
       query += ` newer_than:${daysSinceSync}d`;
       console.log(`📧 Sync desde: ${daysSinceSync} dias atrás`);
     }
 
-    const response = await gmail.users.messages.list({
-      userId: 'me',
-      q: query,
-      maxResults: 50
-    });
+    // Buscar e-mails no Gmail
+    let messages = [];
+    try {
+      const response = await gmail.users.messages.list({
+        userId: 'me',
+        q: query,
+        maxResults: 50
+      });
 
-    const messages = response.data.messages || [];
-    console.log(`📨 ${messages.length} e-mails encontrados`);
+      messages = response.data.messages || [];
+      console.log(`📨 ${messages.length} e-mails encontrados`);
+    } catch (gmailListError) {
+      const errMsg = gmailListError?.message ?? String(gmailListError);
+      const errCode = gmailListError?.code ?? gmailListError?.response?.status;
+      console.error('❌ Erro ao listar e-mails do Gmail:', errMsg);
+      console.error('   Code:', errCode, '| Query:', query);
+      if (gmailListError?.stack) console.error('   Stack:', gmailListError.stack);
+      
+      // Verificar se é erro de permissão
+      const isPermissionError = errMsg?.includes('Insufficient Permission') || 
+                                errMsg?.includes('insufficientPermissions') ||
+                                errCode === 403;
+      
+      if (isPermissionError) {
+        return res.status(403).json({ 
+          success: false,
+          error: 'Permissões insuficientes para acessar o Gmail. Por favor, faça login novamente e autorize o acesso aos e-mails.',
+          details: 'O app precisa de permissão para ler seus e-mails do Gmail. Revogue o acesso anterior e conecte novamente.',
+          requiresReauth: true,
+          errorCode: 'INSUFFICIENT_PERMISSIONS'
+        });
+      }
+      
+      return res.status(500).json({ 
+        success: false,
+        error: 'Erro ao buscar e-mails no Gmail',
+        details: errMsg 
+      });
+    }
 
     let processed = 0;
     let errors = 0;
+    let skipped = 0;
 
     for (const message of messages) {
       try {
@@ -253,6 +373,14 @@ Se não conseguir identificar o estabelecimento ou o total, retorne um JSON com 
           }
           notaFiscal = JSON.parse(jsonStr);
           console.log('✅ JSON parseado com sucesso');
+
+          // GPT retornou "erro": não conseguiu identificar estabelecimento/total — pular sem contar como erro
+          if (notaFiscal?.erro && typeof notaFiscal.erro === 'string') {
+            console.log(`⏭️  GPT não conseguiu extrair dados deste e-mail: ${notaFiscal.erro}`);
+            skipped++;
+            continue;
+          }
+
           console.log('📋 Dados extraídos:', {
             estabelecimento: notaFiscal.estabelecimento || '❌ FALTANDO',
             total: notaFiscal.total || '❌ FALTANDO',
@@ -401,13 +529,39 @@ Se não conseguir identificar o estabelecimento ou o total, retorne um JSON com 
 
     await supabase.from('users').update({ last_sync: now }).eq('id', userId);
 
-    console.log(`🎉 Sincronização concluída: ${processed} processadas, ${errors} erros`);
+    console.log(`🎉 Sincronização concluída: ${processed} processadas, ${skipped} ignorados (GPT sem dados), ${errors} erros`);
 
-    res.status(200).json({ success: true, processed, errors, total: messages.length });
+    res.status(200).json({ success: true, processed, skipped, errors, total: messages.length });
 
   } catch (error) {
     console.error('❌ Erro na sincronização:', error);
-    res.status(500).json({ error: 'Erro na sincronização', details: error.message });
+    console.error('   Stack:', error.stack);
+    console.error('   Tipo:', error.constructor.name);
+    
+    // Retornar mensagem de erro mais específica
+    let errorMessage = 'Erro na sincronização';
+    let errorDetails = error.message;
+    
+    if (error.message?.includes('invalid_grant')) {
+      errorMessage = 'Token de acesso inválido. Por favor, faça login novamente.';
+      errorDetails = 'O token do Gmail expirou ou foi revogado.';
+    } else if (error.message?.includes('insufficient_scope') || 
+               error.message?.includes('Insufficient Permission') ||
+               error.message?.includes('insufficientPermissions')) {
+      errorMessage = 'Permissões insuficientes. Por favor, faça login novamente e autorize o acesso aos e-mails do Gmail.';
+      errorDetails = 'O app precisa de permissão para ler seus e-mails. Revogue o acesso anterior em https://myaccount.google.com/permissions e conecte novamente.';
+    } else if (error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
+      errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+      errorDetails = error.message;
+    }
+
+    console.error('📤 Retornando 500:', { error: errorMessage, details: errorDetails });
+    res.status(500).json({ 
+      success: false,
+      error: errorMessage, 
+      details: errorDetails,
+      requiresReauth: error.message?.includes('invalid_grant') || error.message?.includes('insufficient_scope')
+    });
   }
 }
 
@@ -416,12 +570,13 @@ function extractEmailBody(emailData) {
   const parts = emailData.payload.parts || [emailData.payload];
   
   for (const part of parts) {
+    if (!part) continue;
     if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
-      if (part.body.data) {
+      if (part.body?.data) {
         body += Buffer.from(part.body.data, 'base64').toString('utf-8') + '\n';
       }
     }
-    if (part.parts) {
+    if (part.parts?.length) {
       body += extractEmailBody({ payload: { parts: part.parts } });
     }
   }

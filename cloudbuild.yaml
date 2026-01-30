@@ -35,6 +35,14 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--timeout'
+      - '60s'
+      - '--max-instances'
+      - '10'
+      - '--cpu'
+      - '1'
 
 images:
   - 'gcr.io/$PROJECT_ID/finmemory:$COMMIT_SHA'
