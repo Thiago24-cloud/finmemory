@@ -1,6 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { createClient } from '@supabase/supabase-js';
+import { Loader2, Mail, Camera } from 'lucide-react';
+import { Nav } from '../components/Nav';
+import { DashboardHeader } from '../components/dashboard/DashboardHeader';
+import { BalanceCard } from '../components/dashboard/BalanceCard';
+import { QuickActions } from '../components/dashboard/QuickActions';
+import { TransactionList } from '../components/dashboard/TransactionList';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
 let supabaseInstance = null;
@@ -564,168 +570,87 @@ export default function Dashboard() {
   const isAuthenticated = status === 'authenticated' && session;
   const isLoading = status === 'loading';
 
+  const totalBalance = useMemo(() => {
+    return (transactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+  }, [transactions]);
+
   return (
-    <div style={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px',
-      fontFamily: 'system-ui, sans-serif'
-    }}>
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Menu superior com links */}
-        <nav style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          gap: '24px',
-          marginBottom: '12px',
-        }}>
-          <a href="/privacidade" style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
-            Privacidade
-          </a>
-          <a href="/termos" style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}>
-            Termos de Uso
-          </a>
-        </nav>
+    <div className="min-h-screen bg-background text-foreground dark">
+      <div className="max-w-md mx-auto px-5 pb-24 pt-5">
+        <Nav className="text-muted-foreground" />
 
-        {/* Header */}
-        <div style={{ 
-          background: 'white',
-          borderRadius: '16px',
-          padding: '24px',
-          marginBottom: '24px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px'
-        }}>
-          <div>
-            <h1 style={{ 
-              fontSize: '32px', 
-              margin: '0 0 8px 0',
-              background: 'linear-gradient(135deg, #667eea, #764ba2)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
-              🚀 FinMemory
-            </h1>
-            <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
-              {isAuthenticated ? `Olá, ${session.user.name || session.user.email}!` : 'Seu histórico financeiro inteligente'}
-            </p>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-accent" />
+            <p className="text-muted-foreground">Carregando sessão...</p>
           </div>
-          
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            {isLoading ? (
-              <div style={{ padding: '14px 28px', color: '#666' }}>
-                Carregando...
+        ) : !isAuthenticated ? (
+          <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6 text-center px-4">
+            <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center">
+              <Mail className="h-10 w-10 text-accent" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold mb-2">FinMemory</h1>
+              <p className="text-muted-foreground">
+                Conecte seu Gmail para buscar suas notas fiscais automaticamente
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleConnectGmail}
+              className="px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl font-semibold inline-flex items-center gap-2"
+            >
+              <Mail className="h-5 w-5" />
+              Conectar Gmail
+            </button>
+          </div>
+        ) : (
+          <>
+            <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
+            <BalanceCard balance={totalBalance} className="mb-6" />
+            <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} className="mb-8" />
+
+            {loading ? (
+              <div className="space-y-4">
+                <div className="bg-card rounded-[24px] p-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-4 py-4">
+                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-muted rounded animate-pulse" />
+                      </div>
+                      <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
               </div>
-            ) : !isAuthenticated ? (
-              <button
-                onClick={handleConnectGmail}
-                style={{
-                  padding: '14px 28px',
-                  background: 'linear-gradient(135deg, #34A853, #0F9D58)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  fontWeight: 'bold'
-                }}
-              >
-                🔌 Conectar Gmail
-              </button>
             ) : (
-              <>
-                <button
-                  onClick={() => handleSyncEmails(false)}
-                  disabled={syncing}
-                  style={{
-                    padding: '14px 28px',
-                    background: syncing ? '#ccc' : 'linear-gradient(135deg, #667eea, #764ba2)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    cursor: syncing ? 'not-allowed' : 'pointer',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    position: 'relative'
-                  }}
-                >
-                  {syncing ? (
-                    <>
-                      <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span> Buscando...
-                    </>
-                  ) : (
-                    '🔄 Buscar Notas Fiscais'
-                  )}
-                </button>
-                
-                {syncLogs.length > 0 && !showLogs && (
-                  <button
-                    onClick={() => setShowLogs(true)}
-                    style={{
-                      padding: '14px 20px',
-                      background: '#f8f9fa',
-                      color: '#667eea',
-                      border: '2px solid #667eea',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    📋 Ver Logs
-                  </button>
-                )}
-                
-                {isAuthenticated && (
-                  <button
-                    onClick={handleDebugConnection}
-                    style={{
-                      padding: '14px 20px',
-                      background: '#fff3cd',
-                      color: '#856404',
-                      border: '2px solid #ffc107',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold'
-                    }}
-                    title="Testar conexão com Supabase e diagnóstico"
-                  >
-                    🔍 Debug
-                  </button>
-                )}
-                
-                <button
-                  onClick={handleDisconnect}
-                  style={{
-                    padding: '14px 20px',
-                    background: 'white',
-                    color: '#e74c3c',
-                    border: '2px solid #e74c3c',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  🚪 Sair
-                </button>
-              </>
+              <TransactionList transactions={transactions} />
             )}
-          </div>
-        </div>
 
+            {syncLogs.length > 0 && !showLogs && (
+              <button
+                type="button"
+                onClick={() => setShowLogs(true)}
+                className="mt-4 px-4 py-2 bg-muted text-foreground border border-border rounded-xl text-sm font-medium"
+              >
+                📋 Ver Logs
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleDebugConnection}
+              className="mt-2 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-xl text-sm font-medium"
+              title="Testar conexão com Supabase e diagnóstico"
+            >
+              🔍 Debug
+            </button>
+          </>
+        )}
+
+        {isAuthenticated && (
+          <>
         {/* Debug Info Panel */}
         {debugInfo && (
           <div style={{
@@ -975,304 +900,19 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-
-        {/* Content */}
-        {isLoading ? (
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '60px',
-            textAlign: 'center',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-            <p style={{ fontSize: '18px', color: '#666' }}>
-              Carregando sessão...
-            </p>
-          </div>
-        ) : !isAuthenticated ? (
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '60px 40px',
-            textAlign: 'center',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '64px', marginBottom: '24px' }}>📧</div>
-            <h2 style={{ fontSize: '28px', marginBottom: '16px', color: '#333' }}>
-              Conecte seu Gmail
-            </h2>
-            <p style={{ fontSize: '18px', color: '#666', marginBottom: '32px' }}>
-              Busque suas notas fiscais automaticamente!
-            </p>
-            <button
-              onClick={handleConnectGmail}
-              style={{
-                padding: '16px 40px',
-                background: 'linear-gradient(135deg, #34A853, #0F9D58)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '18px',
-                fontWeight: 'bold'
-              }}
-            >
-              🔌 Conectar Gmail Agora
-            </button>
-          </div>
-        ) : loading ? (
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '60px',
-            textAlign: 'center',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-            <p style={{ fontSize: '18px', color: '#666' }}>
-              Carregando transações...
-            </p>
-          </div>
-        ) : transactions.length === 0 ? (
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '60px 40px',
-            textAlign: 'center',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ fontSize: '64px', marginBottom: '24px' }}>📭</div>
-            <h2 style={{ fontSize: '24px', marginBottom: '16px', color: '#333' }}>
-              Nenhuma nota fiscal encontrada
-            </h2>
-            <p style={{ fontSize: '16px', color: '#666', marginBottom: '24px' }}>
-              {lastSyncResult ? (
-                <>
-                  Última sincronização: {lastSyncResult.timestamp.toLocaleString('pt-BR')}
-                  <br />
-                  {lastSyncResult.total > 0 ? (
-                    <>
-                      {lastSyncResult.total} e-mail{lastSyncResult.total > 1 ? 's' : ''} encontrado{lastSyncResult.total > 1 ? 's' : ''}, 
-                      mas nenhuma nota foi processada.
-                      <br />
-                      {lastSyncResult.skipped > 0 && (
-                        <span style={{ color: '#6c757d' }}>
-                          {lastSyncResult.skipped} ignorado{lastSyncResult.skipped > 1 ? 's' : ''} (GPT sem dados).
-                          {lastSyncResult.errors > 0 ? ' ' : ''}
-                        </span>
-                      )}
-                      {lastSyncResult.errors > 0 && (
-                        <span style={{ color: '#dc3545' }}>
-                          {lastSyncResult.errors} erro{lastSyncResult.errors > 1 ? 's' : ''} durante o processamento.
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    'Nenhum e-mail com nota fiscal foi encontrado.'
-                  )}
-                </>
-              ) : (
-                'Você ainda não executou a sincronização.'
-              )}
-            </p>
-            <div style={{
-              background: '#f8f9fa',
-              borderRadius: '12px',
-              padding: '20px',
-              marginTop: '24px',
-              textAlign: 'left',
-              maxWidth: '500px',
-              margin: '24px auto 0'
-            }}>
-              <h3 style={{ fontSize: '18px', marginBottom: '12px', color: '#333' }}>
-                💡 Como começar:
-              </h3>
-              <ol style={{ fontSize: '14px', color: '#666', lineHeight: '1.8', paddingLeft: '20px' }}>
-                <li>Clique no botão <strong>"🔄 Buscar Notas Fiscais"</strong> acima</li>
-                <li>Aguarde a sincronização processar seus e-mails</li>
-                <li>As notas fiscais aparecerão aqui automaticamente</li>
-              </ol>
-              {userId && (
-                <div style={{
-                  marginTop: '16px',
-                  padding: '12px',
-                  background: '#e7f3ff',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: '#0066cc'
-                }}>
-                  <strong>User ID:</strong> {userId}
-                  <br />
-                  <strong>Status:</strong> {isAuthenticated ? '✅ Autenticado' : '❌ Não autenticado'}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '24px',
-              marginBottom: '16px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-            }}>
-              <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', color: '#333' }}>
-                📊 Histórico de Compras
-              </h2>
-              <p style={{ margin: 0, color: '#666' }}>
-                {transactions.length} transação(ões)
-              </p>
-            </div>
-
-            {transactions.map(transaction => (
-              <TransactionCard key={transaction.id} transaction={transaction} />
-            ))}
-          </div>
+          </>
         )}
       </div>
 
-      {/* Botão Flutuante - Adicionar Nota Fiscal */}
-      <div
-        onClick={() => window.location.href = '/add-receipt'}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '60px',
-          height: '60px',
-          background: 'linear-gradient(135deg, #667eea, #764ba2)',
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
-          cursor: 'pointer',
-          zIndex: 1000,
-          transition: 'transform 0.2s, box-shadow 0.2s'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1)';
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
-        }}
-        title="Escanear Nota Fiscal"
-      >
-        <span style={{ fontSize: '28px' }}>📸</span>
-      </div>
-    </div>
-  );
-}
-
-function TransactionCard({ transaction }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div style={{
-      background: 'white',
-      borderRadius: '16px',
-      padding: '24px',
-      marginBottom: '16px',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-    }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        marginBottom: '20px',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
-        <div style={{ flex: 1, minWidth: '250px' }}>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: '22px', color: '#333' }}>
-            🏪 {transaction.estabelecimento}
-          </h3>
-          {transaction.endereco && (
-            <p style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}>
-              📍 {transaction.endereco}
-            </p>
-          )}
-          <p style={{ margin: 0, color: '#999', fontSize: '14px' }}>
-            📅 {new Date(transaction.data + 'T00:00:00').toLocaleDateString('pt-BR')}
-            {transaction.hora && ` às ${transaction.hora.substring(0, 5)}`}
-          </p>
-        </div>
-        
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ 
-            margin: '0 0 8px 0', 
-            fontSize: '32px', 
-            fontWeight: 'bold',
-            color: '#667eea'
-          }}>
-            R$ {(parseFloat(transaction.total) || 0).toFixed(2)}
-          </p>
-        </div>
-      </div>
-
-      {transaction.produtos && transaction.produtos.length > 0 && (
-        <>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: '#f8f9fa',
-              border: '2px solid #e9ecef',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              fontSize: '15px',
-              fontWeight: '600',
-              color: '#495057'
-            }}
-          >
-            {expanded ? '▲ Ocultar Produtos' : `▼ Ver ${transaction.produtos.length} Produto(s)`}
-          </button>
-
-          {expanded && (
-            <div style={{ marginTop: '20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f1f3f5' }}>
-                    <th style={{ padding: '14px', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>
-                      Produto
-                    </th>
-                    <th style={{ padding: '14px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}>
-                      Qtd
-                    </th>
-                    <th style={{ padding: '14px', textAlign: 'right', borderBottom: '2px solid #dee2e6' }}>
-                      Valor Unit.
-                    </th>
-                    <th style={{ padding: '14px', textAlign: 'right', borderBottom: '2px solid #dee2e6' }}>
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transaction.produtos.map((produto, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #e9ecef' }}>
-                      <td style={{ padding: '14px' }}>
-                        <strong>{produto.descricao}</strong>
-                      </td>
-                      <td style={{ padding: '14px', textAlign: 'center' }}>
-                        {(parseFloat(produto.quantidade) || 0).toFixed(0)} {produto.unidade || 'UN'}
-                      </td>
-                      <td style={{ padding: '14px', textAlign: 'right' }}>
-                        R$ {(parseFloat(produto.valor_unitario) || 0).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '14px', textAlign: 'right', fontWeight: 'bold' }}>
-                        R$ {(parseFloat(produto.valor_total) || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
+      {/* Botão Flutuante - Escanear Nota Fiscal */}
+      {isAuthenticated && !isLoading && (
+        <a
+          href="/add-receipt"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-accent hover:bg-accent/90 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform text-accent-foreground z-10"
+          title="Escanear Nota Fiscal"
+        >
+          <Camera className="h-6 w-6" />
+        </a>
       )}
     </div>
   );
