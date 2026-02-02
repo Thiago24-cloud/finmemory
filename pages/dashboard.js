@@ -575,31 +575,31 @@ export default function Dashboard() {
   }, [transactions]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground dark">
+    <div className="min-h-screen bg-[#f8f9fa] text-foreground">
       <div className="max-w-md mx-auto px-5 pb-24 pt-5">
         <h1 className="sr-only">FinMemory - Dashboard</h1>
         <Nav className="text-muted-foreground" />
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-accent" />
-            <p className="text-muted-foreground">Carregando sessão...</p>
+            <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+            <p className="text-[#666]">Carregando sessão...</p>
           </div>
         ) : !isAuthenticated ? (
           <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6 text-center px-4">
-            <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center">
-              <Mail className="h-10 w-10 text-accent" />
+            <div className="w-20 h-20 rounded-full bg-[#e8f5e9] flex items-center justify-center">
+              <Mail className="h-10 w-10 text-[#28a745]" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold mb-2">FinMemory</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-bold mb-2 text-[#333]">FinMemory</h1>
+              <p className="text-[#666]">
                 Conecte seu Gmail para buscar suas notas fiscais automaticamente
               </p>
             </div>
             <button
               type="button"
               onClick={handleConnectGmail}
-              className="px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl font-semibold inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="px-6 py-3 bg-gradient-google text-white hover:opacity-90 rounded-xl font-semibold inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28a745] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa]"
               aria-label="Conectar com Google"
             >
               <Mail className="h-5 w-5" aria-hidden />
@@ -614,15 +614,15 @@ export default function Dashboard() {
 
             {loading ? (
               <div className="space-y-4" aria-live="polite" aria-busy="true">
-                <div className="card-nubank p-4">
+                <div className="card-lovable p-4">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="flex items-center gap-4 py-4">
-                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse shrink-0" />
+                      <div className="h-10 w-10 rounded-full bg-[#e5e7eb] animate-pulse shrink-0" />
                       <div className="flex-1 space-y-2 min-w-0">
-                        <div className="h-4 max-w-[75%] bg-muted rounded animate-pulse" />
-                        <div className="h-3 max-w-[50%] bg-muted rounded animate-pulse" />
+                        <div className="h-4 max-w-[75%] bg-[#e5e7eb] rounded animate-pulse" />
+                        <div className="h-3 max-w-[50%] bg-[#e5e7eb] rounded animate-pulse" />
                       </div>
-                      <div className="h-4 w-20 bg-muted rounded animate-pulse shrink-0" />
+                      <div className="h-4 w-20 bg-[#e5e7eb] rounded animate-pulse shrink-0" />
                     </div>
                   ))}
                 </div>
@@ -635,7 +635,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setShowLogs(true)}
-                className="mt-4 px-4 py-2 bg-muted text-foreground border border-border rounded-xl text-sm font-medium"
+                className="mt-4 px-4 py-2 bg-[#f8f9fa] text-[#333] border border-[#e5e7eb] rounded-xl text-sm font-medium"
               >
                 📋 Ver Logs
               </button>
@@ -655,38 +655,38 @@ export default function Dashboard() {
           <>
         {/* Debug Info Panel */}
         {debugInfo && (
-          <div className="card-nubank mb-6">
+          <div className="card-lovable mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-foreground m-0">
+              <h3 className="text-lg font-semibold text-[#333] m-0">
                 🔍 Diagnóstico de Conexão
               </h3>
               <button
                 type="button"
                 onClick={() => setDebugInfo(null)}
-                className="py-2 px-4 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-semibold transition-colors"
+                className="py-2 px-4 bg-[#f8f9fa] hover:bg-[#e5e7eb] text-[#333] rounded-lg text-sm font-semibold transition-colors"
               >
                 ✕ Fechar
               </button>
             </div>
-            <div className="bg-muted/50 rounded-xl p-4 mb-4 text-sm text-foreground">
+            <div className="bg-[#f8f9fa] rounded-xl p-4 mb-4 text-sm text-[#333]">
               <div><strong>User ID:</strong> {debugInfo.userId || 'Não definido'}</div>
               <div><strong>Supabase Configurado:</strong> {debugInfo.supabaseConfigured ? '✅ Sim' : '❌ Não'}</div>
               <div><strong>Timestamp:</strong> {new Date(debugInfo.timestamp).toLocaleString('pt-BR')}</div>
             </div>
             <div>
-              <h4 className="text-base font-semibold text-foreground mb-3">
+              <h4 className="text-base font-semibold text-[#333] mb-3">
                 Resultados dos Testes:
               </h4>
               {debugInfo.tests.map((test, index) => (
                 <div
                   key={index}
-                  className={`p-3 mb-2 rounded-lg text-sm border-l-4 ${test.success ? 'bg-accent/10 border-accent text-foreground' : 'bg-destructive/10 border-destructive text-foreground'}`}
+                  className={`p-3 mb-2 rounded-lg text-sm border-l-4 ${test.success ? 'bg-[#d4edda] border-[#28a745] text-[#333]' : 'bg-[#f8d7da] border-[#dc3545] text-[#333]'}`}
                 >
                   <div className="font-bold mb-1">
                     {test.success ? '✅' : '❌'} {test.name}
                   </div>
                   {test.error && (
-                    <div className="text-muted-foreground text-xs mt-1">Erro: {test.error}</div>
+                    <div className="text-[#666] text-xs mt-1">Erro: {test.error}</div>
                   )}
                   {test.found !== undefined && (
                     <div className="text-xs mt-1">Encontrado: {test.found} registro(s)</div>
@@ -697,7 +697,7 @@ export default function Dashboard() {
                   {test.data && test.data.length > 0 && (
                     <details className="mt-2">
                       <summary className="cursor-pointer text-xs">Ver dados</summary>
-                      <pre className="bg-muted/50 p-2 rounded text-xs overflow-auto max-h-[200px] mt-2">
+                      <pre className="bg-[#f8f9fa] p-2 rounded text-xs overflow-auto max-h-[200px] mt-2">
                         {JSON.stringify(test.data, null, 2)}
                       </pre>
                     </details>
@@ -708,144 +708,85 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Sync Logs Panel */}
+        {/* Sync Logs Panel – Lovable: card branco, bordas #e5e7eb */}
         {(showLogs && syncLogs.length > 0) && (
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '20px',
-            marginBottom: '24px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            maxHeight: '400px',
-            overflowY: 'auto'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '16px'
-            }}>
-              <h3 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
+          <div className="bg-white rounded-2xl p-5 mb-6 shadow-card-lovable max-h-[400px] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="m-0 text-xl text-[#333]">
                 📋 Logs da Sincronização
               </h3>
               <button
+                type="button"
                 onClick={() => setShowLogs(false)}
-                style={{
-                  background: '#f0f0f0',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: '#666'
-                }}
+                className="bg-[#f0f0f0] border-none rounded-lg py-2 px-4 cursor-pointer text-sm font-bold text-[#666] hover:bg-[#e5e7eb] transition-colors"
               >
                 ✕ Fechar
               </button>
             </div>
-            
+
             {lastSyncResult && (
-              <div style={{
-                background: '#f8f9fa',
-                borderRadius: '12px',
-                padding: '16px',
-                marginBottom: '16px',
-                border: '2px solid #e9ecef'
-              }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#333' }}>
+              <div className="bg-[#f8f9fa] rounded-xl p-4 mb-4 border-2 border-[#e9ecef]">
+                <h4 className="m-0 mb-3 text-base text-[#333]">
                   📊 Resumo da Última Sincronização
                 </h4>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '12px',
-                  fontSize: '14px'
-                }}>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 text-sm">
                   <div>
-                    <strong style={{ color: '#666' }}>E-mails encontrados:</strong>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#667eea' }}>
+                    <strong className="text-[#666]">E-mails encontrados:</strong>
+                    <div className="text-lg font-bold text-[#667eea]">
                       {lastSyncResult.total}
                     </div>
                   </div>
                   <div>
-                    <strong style={{ color: '#666' }}>Notas processadas:</strong>
-                    <div style={{ 
-                      fontSize: '18px', 
-                      fontWeight: 'bold', 
-                      color: lastSyncResult.processed > 0 ? '#28a745' : '#666' 
-                    }}>
+                    <strong className="text-[#666]">Notas processadas:</strong>
+                    <div className={`text-lg font-bold ${lastSyncResult.processed > 0 ? 'text-[#28a745]' : 'text-[#666]'}`}>
                       {lastSyncResult.processed}
                     </div>
                   </div>
                   {lastSyncResult.skipped > 0 && (
                     <div>
-                      <strong style={{ color: '#666' }}>Ignorados (sem dados):</strong>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#6c757d' }}>
+                      <strong className="text-[#666]">Ignorados (sem dados):</strong>
+                      <div className="text-lg font-bold text-[#6c757d]">
                         {lastSyncResult.skipped}
                       </div>
                     </div>
                   )}
                   {lastSyncResult.errors > 0 && (
                     <div>
-                      <strong style={{ color: '#666' }}>Erros:</strong>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#dc3545' }}>
+                      <strong className="text-[#666]">Erros:</strong>
+                      <div className="text-lg font-bold text-[#dc3545]">
                         {lastSyncResult.errors}
                       </div>
                     </div>
                   )}
                   <div>
-                    <strong style={{ color: '#666' }}>Total no banco:</strong>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#667eea' }}>
+                    <strong className="text-[#666]">Total no banco:</strong>
+                    <div className="text-lg font-bold text-[#667eea]">
                       {lastSyncResult.transactionsInDb}
                     </div>
                   </div>
                 </div>
-                <div style={{
-                  marginTop: '12px',
-                  fontSize: '12px',
-                  color: '#999'
-                }}>
+                <div className="mt-3 text-xs text-[#999]">
                   {lastSyncResult.timestamp.toLocaleString('pt-BR')}
                 </div>
               </div>
             )}
 
-            <div style={{
-              fontFamily: 'monospace',
-              fontSize: '13px',
-              lineHeight: '1.6'
-            }}>
+            <div className="font-mono text-[13px] leading-relaxed">
               {syncLogs.map((log, index) => {
-                const colors = {
-                  info: { bg: '#e7f3ff', border: '#b3d9ff', text: '#0066cc' },
-                  success: { bg: '#d4edda', border: '#c3e6cb', text: '#155724' },
-                  warning: { bg: '#fff3cd', border: '#ffeaa7', text: '#856404' },
-                  error: { bg: '#f8d7da', border: '#f5c6cb', text: '#721c24' }
+                const typeStyles = {
+                  info: 'bg-[#e7f3ff] border-l-[#b3d9ff] text-[#0066cc]',
+                  success: 'bg-[#d4edda] border-l-[#c3e6cb] text-[#155724]',
+                  warning: 'bg-[#fff3cd] border-l-[#ffeaa7] text-[#856404]',
+                  error: 'bg-[#f8d7da] border-l-[#f5c6cb] text-[#721c24]'
                 };
-                const color = colors[log.type] || colors.info;
-                
+                const style = typeStyles[log.type] || typeStyles.info;
                 return (
                   <div
                     key={index}
-                    style={{
-                      background: color.bg,
-                      borderLeft: `4px solid ${color.border}`,
-                      padding: '10px 14px',
-                      marginBottom: '8px',
-                      borderRadius: '4px',
-                      color: color.text,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
+                    className={`${style} border-l-4 py-2.5 px-3.5 mb-2 rounded overflow-hidden flex justify-between items-center`}
                   >
                     <span>{log.message}</span>
-                    <span style={{
-                      fontSize: '11px',
-                      color: '#999',
-                      marginLeft: '12px'
-                    }}>
+                    <span className="text-[11px] text-[#999] ml-3">
                       {log.timestamp.toLocaleTimeString('pt-BR')}
                     </span>
                   </div>
@@ -858,11 +799,11 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* FAB – estilo Lovable/Nubank */}
+      {/* FAB – Lovable: círculo 60px, gradiente roxo, canto inferior direito */}
       {isAuthenticated && !isLoading && (
         <a
           href="/add-receipt"
-          className="fixed bottom-6 right-5 w-16 h-16 rounded-full flex items-center justify-center shadow-fab hover:scale-110 active:scale-95 transition-transform z-10 bg-gradient-success text-[#0f0f0f]"
+          className="fixed bottom-6 right-5 w-16 h-16 rounded-full flex items-center justify-center shadow-fab hover:scale-110 active:scale-95 transition-transform z-10 bg-gradient-primary text-white"
           title="Escanear Nota Fiscal"
         >
           <Camera className="h-7 w-7" />

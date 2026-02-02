@@ -308,8 +308,8 @@ export default function AddReceipt() {
   // Loading de sessão
   if (status === 'loading') {
     return (
-      <div style={styles.container}>
-        <div style={styles.loading}>Carregando...</div>
+      <div className="min-h-screen bg-gradient-primary p-5 font-sans">
+        <div className="text-white text-center py-10">Carregando...</div>
       </div>
     );
   }
@@ -321,36 +321,40 @@ export default function AddReceipt() {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
-      <div style={styles.container}>
+      <div className="min-h-screen bg-gradient-primary p-5 font-sans">
         {/* Header */}
-        <div style={styles.header}>
-          <button onClick={() => router.push('/dashboard')} style={styles.backButton}>
+        <div className="flex items-center gap-4 mb-6">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="bg-white/20 border-none text-white py-2 px-4 rounded-lg cursor-pointer text-sm hover:bg-white/30 transition-colors"
+          >
             ← Voltar
           </button>
-          <h1 style={styles.title}>📸 Escanear Nota</h1>
+          <h1 className="text-white text-2xl m-0">📸 Escanear Nota</h1>
         </div>
 
         {/* Erro global */}
         {error && (
-          <div style={styles.errorBox}>
+          <div className="bg-[#fee2e2] border border-[#fecaca] text-[#dc2626] py-3 px-4 rounded-xl mb-5 text-sm">
             ⚠️ {error}
           </div>
         )}
 
         {/* STEP: CAPTURE */}
         {step === STEPS.CAPTURE && (
-          <div style={styles.captureContainer}>
-            <div style={styles.captureIcon}>📄</div>
-            <h2 style={styles.captureTitle}>Tire uma foto da nota fiscal</h2>
-            <p style={styles.captureSubtitle}>
+          <div className="bg-white rounded-[24px] py-10 px-6 text-center card-lovable">
+            <div className="text-6xl mb-4">📄</div>
+            <h2 className="text-xl text-[#333] m-0 mb-2">Tire uma foto da nota fiscal</h2>
+            <p className="text-sm text-[#666] m-0 mb-8">
               Posicione a nota em uma superfície plana com boa iluminação
             </p>
 
-            <div style={styles.buttonGroup}>
-              {/* Botão Câmera */}
+            <div className="flex flex-col gap-3">
               <button
+                type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                style={styles.primaryButton}
+                className="bg-gradient-primary text-white border-none py-4 px-6 rounded-xl text-base font-semibold cursor-pointer transition-transform hover:scale-[1.02]"
               >
                 📷 Tirar Foto
               </button>
@@ -360,13 +364,13 @@ export default function AddReceipt() {
                 accept="image/*"
                 capture="environment"
                 onChange={handleFileSelect}
-                style={{ display: 'none' }}
+                className="hidden"
               />
 
-              {/* Botão Galeria */}
               <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
-                style={styles.secondaryButton}
+                className="bg-[#f3f4f6] text-[#374151] border-none py-4 px-6 rounded-xl text-base cursor-pointer hover:bg-[#e5e7eb] transition-colors"
               >
                 🖼️ Escolher da Galeria
               </button>
@@ -375,11 +379,11 @@ export default function AddReceipt() {
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={handleFileSelect}
-                style={{ display: 'none' }}
+                className="hidden"
               />
             </div>
 
-            <p style={styles.hint}>
+            <p className="text-xs text-[#9ca3af] mt-4">
               Formatos aceitos: JPG, PNG, WebP (máx. 2MB)
             </p>
           </div>
@@ -387,14 +391,25 @@ export default function AddReceipt() {
 
         {/* STEP: PREVIEW */}
         {step === STEPS.PREVIEW && imagePreview && (
-          <div style={styles.previewContainer}>
-            <img src={imagePreview} alt="Preview" style={styles.previewImage} />
-            
-            <div style={styles.buttonGroup}>
-              <button onClick={processImage} style={styles.primaryButton}>
+          <div className="bg-white rounded-[24px] p-6 text-center card-lovable">
+            <img
+              src={imagePreview}
+              alt="Preview"
+              className="max-w-full max-h-[400px] rounded-xl mb-6 shadow-card-lovable"
+            />
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={processImage}
+                className="bg-gradient-primary text-white border-none py-4 px-6 rounded-xl text-base font-semibold cursor-pointer"
+              >
                 ✅ Processar Nota
               </button>
-              <button onClick={reset} style={styles.secondaryButton}>
+              <button
+                type="button"
+                onClick={reset}
+                className="bg-[#f3f4f6] text-[#374151] border-none py-4 px-6 rounded-xl text-base cursor-pointer"
+              >
                 🔄 Tirar Outra Foto
               </button>
             </div>
@@ -403,10 +418,10 @@ export default function AddReceipt() {
 
         {/* STEP: PROCESSING */}
         {step === STEPS.PROCESSING && (
-          <div style={styles.processingContainer}>
-            <div style={styles.spinner}></div>
-            <h2 style={styles.processingTitle}>Lendo sua nota fiscal...</h2>
-            <p style={styles.processingSubtitle}>
+          <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
+            <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#667eea] rounded-full animate-spin mx-auto mb-6" />
+            <h2 className="text-xl text-[#333] m-0 mb-2">Lendo sua nota fiscal...</h2>
+            <p className="text-sm text-[#666] m-0">
               Isso pode levar alguns segundos
             </p>
           </div>
@@ -414,75 +429,73 @@ export default function AddReceipt() {
 
         {/* STEP: EDIT */}
         {step === STEPS.EDIT && (
-          <div style={styles.editContainer}>
-            <h2 style={styles.editTitle}>Confira os dados</h2>
-            <p style={styles.editSubtitle}>
+          <div className="bg-white rounded-[24px] p-6 card-lovable">
+            <h2 className="text-xl text-[#333] m-0 mb-1">Confira os dados</h2>
+            <p className="text-sm text-[#666] m-0 mb-4">
               Corrija se necessário antes de salvar
             </p>
 
-            {/* Preview da imagem pequeno */}
             {imagePreview && (
-              <img src={imagePreview} alt="Nota" style={styles.thumbnailImage} />
+              <img
+                src={imagePreview}
+                alt="Nota"
+                className="w-full max-h-[150px] object-cover rounded-xl mb-5"
+              />
             )}
 
-            {/* Formulário */}
-            <div style={styles.form}>
-              {/* Estabelecimento */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Estabelecimento *</label>
+            <div className="mb-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#374151] mb-1.5">Estabelecimento *</label>
                 <input
                   type="text"
                   value={formData.merchant_name}
                   onChange={(e) => updateField('merchant_name', e.target.value)}
-                  style={styles.input}
+                  className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                   placeholder="Nome da loja"
                 />
               </div>
 
-              {/* CNPJ */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>CNPJ</label>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#374151] mb-1.5">CNPJ</label>
                 <input
                   type="text"
                   value={formData.merchant_cnpj || ''}
                   onChange={(e) => updateField('merchant_cnpj', e.target.value)}
-                  style={styles.input}
+                  className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                   placeholder="00.000.000/0000-00"
                 />
               </div>
 
-              {/* Data e Valor */}
-              <div style={styles.formRow}>
-                <div style={{ ...styles.formGroup, flex: 1 }}>
-                  <label style={styles.label}>Data</label>
+              <div className="flex gap-3 mb-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">Data</label>
                   <input
                     type="date"
                     value={formData.date || ''}
                     onChange={(e) => updateField('date', e.target.value)}
-                    style={styles.input}
+                    className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                   />
                 </div>
-                <div style={{ ...styles.formGroup, flex: 1 }}>
-                  <label style={styles.label}>Valor Total *</label>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">Valor Total *</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.total_amount}
                     onChange={(e) => updateField('total_amount', e.target.value)}
-                    style={styles.input}
+                    className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                     placeholder="0.00"
                   />
                 </div>
               </div>
 
-              {/* Categoria e Pagamento */}
-              <div style={styles.formRow}>
-                <div style={{ ...styles.formGroup, flex: 1 }}>
-                  <label style={styles.label}>Categoria</label>
+              <div className="flex gap-3 mb-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">Categoria</label>
                   <select
                     value={formData.category || ''}
                     onChange={(e) => updateField('category', e.target.value)}
-                    style={styles.input}
+                    className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                   >
                     <option value="">Selecione</option>
                     <option value="Supermercado">Supermercado</option>
@@ -495,12 +508,12 @@ export default function AddReceipt() {
                     <option value="Outros">Outros</option>
                   </select>
                 </div>
-                <div style={{ ...styles.formGroup, flex: 1 }}>
-                  <label style={styles.label}>Pagamento</label>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">Pagamento</label>
                   <select
                     value={formData.payment_method || ''}
                     onChange={(e) => updateField('payment_method', e.target.value)}
-                    style={styles.input}
+                    className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                   >
                     <option value="">Selecione</option>
                     <option value="Cartão de Crédito">Cartão de Crédito</option>
@@ -511,19 +524,17 @@ export default function AddReceipt() {
                 </div>
               </div>
 
-              {/* Itens */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#374151] mb-1.5">
                   Itens ({formData.items?.length || 0})
                 </label>
-                
                 {formData.items?.map((item, index) => (
-                  <div key={index} style={styles.itemRow}>
+                  <div key={index} className="flex gap-2 mb-2 items-center">
                     <input
                       type="text"
                       value={item.name || ''}
                       onChange={(e) => updateItem(index, 'name', e.target.value)}
-                      style={{ ...styles.input, flex: 2 }}
+                      className="flex-[2] py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                       placeholder="Nome do item"
                     />
                     <input
@@ -531,36 +542,47 @@ export default function AddReceipt() {
                       step="0.01"
                       value={item.price || ''}
                       onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
-                      style={{ ...styles.input, flex: 1, minWidth: '80px' }}
+                      className="flex-1 min-w-[80px] py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                       placeholder="0.00"
                     />
                     <button
+                      type="button"
                       onClick={() => removeItem(index)}
-                      style={styles.removeItemButton}
+                      className="bg-[#fee2e2] text-[#dc2626] border-none w-9 h-9 rounded-lg cursor-pointer text-sm hover:bg-[#fecaca]"
                     >
                       ✕
                     </button>
                   </div>
                 ))}
-                
-                <button onClick={addItem} style={styles.addItemButton}>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="bg-[#f3f4f6] text-[#667eea] border-none py-2.5 px-4 rounded-lg text-sm cursor-pointer w-full hover:bg-[#e5e7eb]"
+                >
                   + Adicionar Item
                 </button>
               </div>
             </div>
 
-            {/* Botões de ação */}
-            <div style={styles.buttonGroup}>
-              <button onClick={saveTransaction} style={styles.primaryButton}>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={saveTransaction}
+                className="bg-gradient-primary text-white border-none py-4 px-6 rounded-xl text-base font-semibold cursor-pointer"
+              >
                 💾 Salvar Transação
               </button>
-              <button onClick={reset} style={styles.secondaryButton}>
+              <button
+                type="button"
+                onClick={reset}
+                className="bg-[#f3f4f6] text-[#374151] border-none py-4 px-6 rounded-xl text-base cursor-pointer"
+              >
                 🔄 Escanear Outra
               </button>
             </div>
 
             {remainingRequests !== null && (
-              <p style={styles.hint}>
+              <p className="text-xs text-[#9ca3af] mt-4">
                 {remainingRequests} leituras restantes nesta hora
               </p>
             )}
@@ -569,266 +591,23 @@ export default function AddReceipt() {
 
         {/* STEP: SAVING */}
         {step === STEPS.SAVING && (
-          <div style={styles.processingContainer}>
-            <div style={styles.spinner}></div>
-            <h2 style={styles.processingTitle}>Salvando transação...</h2>
+          <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
+            <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#667eea] rounded-full animate-spin mx-auto mb-6" />
+            <h2 className="text-xl text-[#333] m-0">Salvando transação...</h2>
           </div>
         )}
 
         {/* STEP: SUCCESS */}
         {step === STEPS.SUCCESS && (
-          <div style={styles.successContainer}>
-            <div style={styles.successIcon}>✅</div>
-            <h2 style={styles.successTitle}>Nota fiscal salva!</h2>
-            <p style={styles.successSubtitle}>
+          <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
+            <div className="text-6xl mb-4">✅</div>
+            <h2 className="text-2xl text-[#059669] m-0 mb-2">Nota fiscal salva!</h2>
+            <p className="text-sm text-[#666] m-0">
               Redirecionando para o dashboard...
             </p>
           </div>
         )}
       </div>
-
-      {/* CSS para spinner */}
-      <style jsx global>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </>
   );
 }
-
-// Estilos
-const styles = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '20px',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    marginBottom: '24px'
-  },
-  backButton: {
-    background: 'rgba(255,255,255,0.2)',
-    border: 'none',
-    color: 'white',
-    padding: '8px 16px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px'
-  },
-  title: {
-    color: 'white',
-    fontSize: '24px',
-    margin: 0
-  },
-  errorBox: {
-    background: '#fee2e2',
-    border: '1px solid #fecaca',
-    color: '#dc2626',
-    padding: '12px 16px',
-    borderRadius: '12px',
-    marginBottom: '20px',
-    fontSize: '14px'
-  },
-  loading: {
-    color: 'white',
-    textAlign: 'center',
-    padding: '40px'
-  },
-
-  // Capture step
-  captureContainer: {
-    background: 'white',
-    borderRadius: '24px',
-    padding: '40px 24px',
-    textAlign: 'center'
-  },
-  captureIcon: {
-    fontSize: '64px',
-    marginBottom: '16px'
-  },
-  captureTitle: {
-    fontSize: '20px',
-    color: '#333',
-    margin: '0 0 8px 0'
-  },
-  captureSubtitle: {
-    fontSize: '14px',
-    color: '#666',
-    margin: '0 0 32px 0'
-  },
-  buttonGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
-  },
-  primaryButton: {
-    background: 'linear-gradient(135deg, #667eea, #764ba2)',
-    color: 'white',
-    border: 'none',
-    padding: '16px 24px',
-    borderRadius: '12px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'transform 0.2s'
-  },
-  secondaryButton: {
-    background: '#f3f4f6',
-    color: '#374151',
-    border: 'none',
-    padding: '16px 24px',
-    borderRadius: '12px',
-    fontSize: '16px',
-    cursor: 'pointer'
-  },
-  hint: {
-    fontSize: '12px',
-    color: '#9ca3af',
-    marginTop: '16px'
-  },
-
-  // Preview step
-  previewContainer: {
-    background: 'white',
-    borderRadius: '24px',
-    padding: '24px',
-    textAlign: 'center'
-  },
-  previewImage: {
-    maxWidth: '100%',
-    maxHeight: '400px',
-    borderRadius: '12px',
-    marginBottom: '24px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-  },
-
-  // Processing step
-  processingContainer: {
-    background: 'white',
-    borderRadius: '24px',
-    padding: '60px 24px',
-    textAlign: 'center'
-  },
-  spinner: {
-    width: '48px',
-    height: '48px',
-    border: '4px solid #e5e7eb',
-    borderTop: '4px solid #667eea',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-    margin: '0 auto 24px'
-  },
-  processingTitle: {
-    fontSize: '20px',
-    color: '#333',
-    margin: '0 0 8px 0'
-  },
-  processingSubtitle: {
-    fontSize: '14px',
-    color: '#666',
-    margin: 0
-  },
-
-  // Edit step
-  editContainer: {
-    background: 'white',
-    borderRadius: '24px',
-    padding: '24px'
-  },
-  editTitle: {
-    fontSize: '20px',
-    color: '#333',
-    margin: '0 0 4px 0'
-  },
-  editSubtitle: {
-    fontSize: '14px',
-    color: '#666',
-    margin: '0 0 16px 0'
-  },
-  thumbnailImage: {
-    width: '100%',
-    maxHeight: '150px',
-    objectFit: 'cover',
-    borderRadius: '12px',
-    marginBottom: '20px'
-  },
-  form: {
-    marginBottom: '24px'
-  },
-  formGroup: {
-    marginBottom: '16px'
-  },
-  formRow: {
-    display: 'flex',
-    gap: '12px'
-  },
-  label: {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: '6px'
-  },
-  input: {
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '16px',
-    boxSizing: 'border-box'
-  },
-  itemRow: {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '8px',
-    alignItems: 'center'
-  },
-  removeItemButton: {
-    background: '#fee2e2',
-    color: '#dc2626',
-    border: 'none',
-    width: '36px',
-    height: '36px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px'
-  },
-  addItemButton: {
-    background: '#f3f4f6',
-    color: '#667eea',
-    border: 'none',
-    padding: '10px 16px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    cursor: 'pointer',
-    width: '100%'
-  },
-
-  // Success step
-  successContainer: {
-    background: 'white',
-    borderRadius: '24px',
-    padding: '60px 24px',
-    textAlign: 'center'
-  },
-  successIcon: {
-    fontSize: '64px',
-    marginBottom: '16px'
-  },
-  successTitle: {
-    fontSize: '24px',
-    color: '#059669',
-    margin: '0 0 8px 0'
-  },
-  successSubtitle: {
-    fontSize: '14px',
-    color: '#666',
-    margin: 0
-  }
-};

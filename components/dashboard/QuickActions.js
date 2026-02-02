@@ -64,15 +64,15 @@ export function QuickActions({ onSync, syncing, className }) {
           >
             <div
               className={cn(
-                'w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-dark',
+                'w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable',
                 action.isPositive
-                  ? 'bg-accent/20 text-accent hover:bg-accent/30'
-                  : 'bg-card text-muted-foreground hover:bg-muted'
+                  ? 'bg-[#e8f5e9] text-[#28a745] hover:bg-[#c8e6c9]'
+                  : 'bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]'
               )}
             >
               {action.icon}
             </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
+            <span className="text-xs text-[#666] whitespace-nowrap">
               {action.label}
             </span>
           </button>

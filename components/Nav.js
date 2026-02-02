@@ -16,26 +16,26 @@ export function Nav({ className }) {
     >
       <Link
         href="/dashboard"
-        className="text-foreground font-semibold text-sm hover:text-accent transition-colors"
+        className="text-[#333] font-semibold text-sm hover:text-[#667eea] transition-colors"
       >
         FinMemory
       </Link>
       <div className="flex items-center gap-4">
       <Link
         href="/privacidade"
-        className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+        className="text-[#666] hover:text-[#333] text-sm font-medium transition-colors"
       >
         Privacidade
       </Link>
       <Link
         href="/termos"
-        className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+        className="text-[#666] hover:text-[#333] text-sm font-medium transition-colors"
       >
         Termos de Uso
       </Link>
       <Link
         href="/dashboard"
-        className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+        className="text-[#666] hover:text-[#333] text-sm font-medium transition-colors"
       >
         Dashboard
       </Link>

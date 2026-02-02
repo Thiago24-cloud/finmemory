@@ -59,9 +59,9 @@ export function TransactionList({ transactions, className }) {
   if (!transactions || transactions.length === 0) {
     return (
       <div className={cn('text-center py-12', className)}>
-        <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-        <h3 className="text-lg font-medium text-foreground mb-2">Nenhuma transação ainda</h3>
-        <p className="text-sm text-muted-foreground">
+        <ShoppingBag className="h-16 w-16 mx-auto text-[#999] mb-4" />
+        <h3 className="text-lg font-medium text-[#333] mb-2">Nenhuma transação ainda</h3>
+        <p className="text-sm text-[#666]">
           Sincronize seu Gmail ou escaneie uma nota fiscal
         </p>
       </div>
@@ -71,13 +71,13 @@ export function TransactionList({ transactions, className }) {
   return (
     <div className={cn('space-y-1', className)}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Histórico</h2>
-        <span className="text-sm text-muted-foreground">
+        <h2 className="text-lg font-semibold text-[#333]">Histórico</h2>
+        <span className="text-sm text-[#666]">
           {transactions.length} transação(ões)
         </span>
       </div>
 
-      <div className="card-nubank overflow-hidden">
+      <div className="card-lovable overflow-hidden">
         {transactions.map((transaction, index) => {
           const total = Number(transaction.total) || 0;
           const isIncome = total < 0;
@@ -87,30 +87,30 @@ export function TransactionList({ transactions, className }) {
             <div key={transaction.id}>
               <Link
                 href={`/transaction/${transaction.id}`}
-                className="w-full flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-4 hover:bg-[#f8f9fa] transition-colors text-left"
               >
-                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-[#f8f9fa] flex items-center justify-center text-[#666] shrink-0">
                   {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate text-base">
+                  <p className="font-semibold text-[#333] truncate text-base">
                     {transaction.estabelecimento || 'Estabelecimento'}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-[#666]">
                     {formatDate(transaction.data)}
                   </p>
                 </div>
                 <div
                   className={cn(
                     'text-right font-bold text-base',
-                    isIncome ? 'text-accent' : 'text-foreground'
+                    isIncome ? 'text-[#28a745]' : 'text-[#333]'
                   )}
                 >
                   {isIncome ? '+' : '-'} {formatCurrency(displayValue)}
                 </div>
               </Link>
               {index < transactions.length - 1 && (
-                <div className="h-px bg-border mx-4" />
+                <div className="h-px bg-[#e5e7eb] mx-4" />
               )}
             </div>
           );

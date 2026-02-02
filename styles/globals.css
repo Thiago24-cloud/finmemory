@@ -81,15 +81,19 @@
   }
 }
 
-/* Cards estilo Nubank – arredondados 24px */
+/* Cards – Lovable: 16px radius, shadow 0 4px 6px rgba(0,0,0,0.1) */
 @layer components {
+  .card-lovable {
+    @apply rounded-2xl p-5 bg-white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
   .card-nubank {
-    @apply rounded-[24px] p-5 bg-card;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    @apply rounded-2xl p-5 bg-card;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
   .card-nubank-light {
     @apply rounded-[20px] p-5 bg-white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
 }
 

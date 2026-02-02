@@ -10,9 +10,9 @@ export function DashboardHeader({ user, onSignOut, className }) {
   const initials = userName.slice(0, 2).toUpperCase();
 
   return (
-    <header className={cn('bg-card rounded-b-[24px] px-5 py-5 shadow-card-dark flex items-center justify-between', className)}>
+    <header className={cn('bg-white rounded-b-2xl px-5 py-5 shadow-card-lovable flex items-center justify-between', className)}>
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-full border-2 border-accent overflow-hidden bg-muted flex items-center justify-center text-foreground text-sm flex-shrink-0">
+        <div className="h-12 w-12 rounded-full border-2 border-[#667eea] overflow-hidden bg-[#f8f9fa] flex items-center justify-center text-[#333] text-sm flex-shrink-0">
           {avatarUrl ? (
             <img src={avatarUrl} alt={userName} className="h-full w-full object-cover" />
           ) : (
@@ -20,26 +20,26 @@ export function DashboardHeader({ user, onSignOut, className }) {
           )}
         </div>
         <div>
-          <p className="text-muted-foreground text-sm">Olá,</p>
-          <p className="text-foreground font-bold text-lg">{userName}</p>
+          <p className="text-[#666] text-sm">Olá,</p>
+          <p className="text-[#333] font-bold text-lg">{userName}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="p-2 rounded-full hover:bg-muted transition-colors"
+          className="p-2 rounded-full hover:bg-[#f8f9fa] transition-colors"
           aria-label="Notificações"
         >
-          <Bell className="h-5 w-5 text-muted-foreground" />
+          <Bell className="h-5 w-5 text-[#666]" />
         </button>
         <button
           type="button"
           onClick={onSignOut}
-          className="p-2 rounded-full hover:bg-muted transition-colors"
+          className="p-2 rounded-full hover:bg-[#f8f9fa] transition-colors"
           aria-label="Sair"
         >
-          <LogOut className="h-5 w-5 text-muted-foreground" />
+          <LogOut className="h-5 w-5 text-[#666]" />
         </button>
       </div>
     </header>

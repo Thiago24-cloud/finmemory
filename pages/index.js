@@ -20,7 +20,7 @@ export default function Home() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-primary p-5">
-        <div className="bg-white dark:bg-card rounded-[20px] p-10 text-center shadow-card-light dark:shadow-card-dark">
+        <div className="bg-white rounded-[20px] p-10 text-center shadow-card-lovable">
           <div className="text-4xl mb-4 animate-pulse">⏳</div>
           <p className="text-muted-foreground">Carregando...</p>
         </div>
@@ -30,11 +30,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-5 bg-gradient-primary font-sans">
-      <div className="bg-white dark:bg-card rounded-[20px] p-8 md:p-10 text-center shadow-card-light dark:shadow-card-dark max-w-[600px] w-full">
+      <div className="bg-white rounded-[20px] p-8 md:p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-[600px] w-full">
         <h1 className="text-4xl md:text-5xl font-bold mb-5 text-gradient-primary">
           🚀 FinMemory
         </h1>
-        <p className="text-lg md:text-xl text-muted-foreground dark:text-muted-foreground mb-10 leading-relaxed">
+        <p className="text-lg md:text-xl text-[#666] mb-10 leading-relaxed">
           Seu assistente financeiro inteligente que organiza suas notas fiscais automaticamente do Gmail
         </p>
 
@@ -56,15 +56,15 @@ export default function Home() {
 
           <Link
             href="/dashboard"
-            className="w-full max-w-[400px] inline-flex justify-center py-3.5 px-6 bg-transparent text-primary dark:text-accent border-2 border-primary dark:border-accent rounded-xl font-semibold text-base hover:bg-primary/10 dark:hover:bg-accent/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="w-full max-w-[400px] inline-flex justify-center py-3.5 px-6 bg-transparent text-[#667eea] border-2 border-[#667eea] rounded-lg font-semibold text-base hover:bg-[#667eea] hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#667eea] focus-visible:ring-offset-2"
           >
             Ver Dashboard
           </Link>
         </div>
 
-        <div className="mt-10 p-6 bg-muted/50 dark:bg-muted/30 rounded-xl text-left">
-          <h2 className="text-lg font-semibold text-foreground mb-4">✨ Como funciona:</h2>
-          <ul className="list-none p-0 m-0 text-muted-foreground text-sm leading-loose space-y-1">
+        <div className="mt-10 p-6 bg-[#f8f9fa] rounded-xl text-left">
+          <h2 className="text-lg font-semibold text-[#333] mb-4">✨ Como funciona:</h2>
+          <ul className="list-none p-0 m-0 text-[#666] text-sm leading-loose space-y-1">
             <li>📧 Conecte seu Gmail</li>
             <li>🤖 IA processa suas notas fiscais</li>
             <li>📊 Visualize gastos organizados</li>
