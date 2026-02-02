@@ -2,13 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* FinMemory Design System - same as finmemory-import */
+/* FinMemory Design System – Lovable/Nubank style */
 @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 20%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 20%;
+    /* Primary gradient: #667eea → #764ba2 */
     --primary: 231 77% 66%;
     --primary-foreground: 0 0% 100%;
     --secondary: 273 38% 46%;
@@ -25,6 +26,7 @@
     --radius: 0.5rem;
   }
 
+  /* Dark mode – estilo Nubank: #0f0f0f fundo, #1c1c1c cards, #00D9A3 verde neon */
   .dark {
     --background: 0 0% 6%;
     --foreground: 0 0% 95%;
@@ -36,13 +38,13 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 55%;
-    --accent: 145 100% 50%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 160 100% 43%;
+    --accent-foreground: 0 0% 6%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 18%;
     --input: 0 0% 15%;
-    --ring: 145 100% 50%;
+    --ring: 160 100% 43%;
   }
 }
 
@@ -54,13 +56,48 @@
     @apply bg-background text-foreground;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
+  /* Acessibilidade: foco visível para teclado */
+  a:focus-visible,
+  button:focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-background;
+  }
 }
 
 @layer utilities {
   .bg-gradient-primary {
-    background: linear-gradient(135deg, hsl(231, 77%, 66%) 0%, hsl(273, 38%, 46%) 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   }
   .bg-gradient-google {
     background: linear-gradient(135deg, hsl(137, 52%, 43%) 0%, hsl(152, 59%, 32%) 100%);
   }
+  .bg-gradient-success {
+    background: linear-gradient(135deg, #00d9a3 0%, #00b386 100%);
+  }
+  .text-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Cards estilo Nubank – arredondados 24px */
+@layer components {
+  .card-nubank {
+    @apply rounded-[24px] p-5 bg-card;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  }
+  .card-nubank-light {
+    @apply rounded-[20px] p-5 bg-white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Carousel / scroll horizontal sem barra */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

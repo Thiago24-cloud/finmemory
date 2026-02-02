@@ -577,6 +577,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground dark">
       <div className="max-w-md mx-auto px-5 pb-24 pt-5">
+        <h1 className="sr-only">FinMemory - Dashboard</h1>
         <Nav className="text-muted-foreground" />
 
         {isLoading ? (
@@ -598,9 +599,10 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={handleConnectGmail}
-              className="px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl font-semibold inline-flex items-center gap-2"
+              className="px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl font-semibold inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label="Conectar com Google"
             >
-              <Mail className="h-5 w-5" />
+              <Mail className="h-5 w-5" aria-hidden />
               Conectar Gmail
             </button>
           </div>
@@ -611,16 +613,16 @@ export default function Dashboard() {
             <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} className="mb-8" />
 
             {loading ? (
-              <div className="space-y-4">
-                <div className="bg-card rounded-[24px] p-4">
+              <div className="space-y-4" aria-live="polite" aria-busy="true">
+                <div className="card-nubank p-4">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="flex items-center gap-4 py-4">
-                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
-                        <div className="h-3 w-1/2 bg-muted rounded animate-pulse" />
+                      <div className="h-10 w-10 rounded-full bg-muted animate-pulse shrink-0" />
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <div className="h-4 max-w-[75%] bg-muted rounded animate-pulse" />
+                        <div className="h-3 max-w-[50%] bg-muted rounded animate-pulse" />
                       </div>
-                      <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                      <div className="h-4 w-20 bg-muted rounded animate-pulse shrink-0" />
                     </div>
                   ))}
                 </div>
@@ -653,97 +655,49 @@ export default function Dashboard() {
           <>
         {/* Debug Info Panel */}
         {debugInfo && (
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '20px',
-            marginBottom: '24px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '16px'
-            }}>
-              <h3 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
+          <div className="card-nubank mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-foreground m-0">
                 🔍 Diagnóstico de Conexão
               </h3>
               <button
+                type="button"
                 onClick={() => setDebugInfo(null)}
-                style={{
-                  background: '#f0f0f0',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: '#666'
-                }}
+                className="py-2 px-4 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-semibold transition-colors"
               >
                 ✕ Fechar
               </button>
             </div>
-            
-            <div style={{
-              background: '#f8f9fa',
-              borderRadius: '12px',
-              padding: '16px',
-              marginBottom: '16px',
-              fontSize: '14px'
-            }}>
+            <div className="bg-muted/50 rounded-xl p-4 mb-4 text-sm text-foreground">
               <div><strong>User ID:</strong> {debugInfo.userId || 'Não definido'}</div>
               <div><strong>Supabase Configurado:</strong> {debugInfo.supabaseConfigured ? '✅ Sim' : '❌ Não'}</div>
               <div><strong>Timestamp:</strong> {new Date(debugInfo.timestamp).toLocaleString('pt-BR')}</div>
             </div>
-
             <div>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#333' }}>
+              <h4 className="text-base font-semibold text-foreground mb-3">
                 Resultados dos Testes:
               </h4>
               {debugInfo.tests.map((test, index) => (
                 <div
                   key={index}
-                  style={{
-                    background: test.success ? '#d4edda' : '#f8d7da',
-                    borderLeft: `4px solid ${test.success ? '#28a745' : '#dc3545'}`,
-                    padding: '12px',
-                    marginBottom: '8px',
-                    borderRadius: '4px',
-                    fontSize: '13px'
-                  }}
+                  className={`p-3 mb-2 rounded-lg text-sm border-l-4 ${test.success ? 'bg-accent/10 border-accent text-foreground' : 'bg-destructive/10 border-destructive text-foreground'}`}
                 >
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                  <div className="font-bold mb-1">
                     {test.success ? '✅' : '❌'} {test.name}
                   </div>
                   {test.error && (
-                    <div style={{ color: '#721c24', fontSize: '12px', marginTop: '4px' }}>
-                      Erro: {test.error}
-                    </div>
+                    <div className="text-muted-foreground text-xs mt-1">Erro: {test.error}</div>
                   )}
                   {test.found !== undefined && (
-                    <div style={{ color: '#155724', fontSize: '12px', marginTop: '4px' }}>
-                      Encontrado: {test.found} registro(s)
-                    </div>
+                    <div className="text-xs mt-1">Encontrado: {test.found} registro(s)</div>
                   )}
                   {test.sampleUserIds && test.sampleUserIds.length > 0 && (
-                    <div style={{ color: '#155724', fontSize: '12px', marginTop: '4px' }}>
-                      User IDs encontrados: {test.sampleUserIds.join(', ')}
-                    </div>
+                    <div className="text-xs mt-1">User IDs: {test.sampleUserIds.join(', ')}</div>
                   )}
                   {test.data && test.data.length > 0 && (
-                    <details style={{ marginTop: '8px' }}>
-                      <summary style={{ cursor: 'pointer', fontSize: '12px' }}>Ver dados</summary>
-                      <pre style={{
-                        background: '#fff',
-                        padding: '8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        overflow: 'auto',
-                        maxHeight: '200px',
-                        marginTop: '8px'
-                      }}>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs">Ver dados</summary>
+                      <pre className="bg-muted/50 p-2 rounded text-xs overflow-auto max-h-[200px] mt-2">
                         {JSON.stringify(test.data, null, 2)}
                       </pre>
                     </details>
@@ -904,14 +858,14 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Botão Flutuante - Escanear Nota Fiscal */}
+      {/* FAB – estilo Lovable/Nubank */}
       {isAuthenticated && !isLoading && (
         <a
           href="/add-receipt"
-          className="fixed bottom-6 right-6 w-14 h-14 bg-accent hover:bg-accent/90 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform text-accent-foreground z-10"
+          className="fixed bottom-6 right-5 w-16 h-16 rounded-full flex items-center justify-center shadow-fab hover:scale-110 active:scale-95 transition-transform z-10 bg-gradient-success text-[#0f0f0f]"
           title="Escanear Nota Fiscal"
         >
-          <Camera className="h-6 w-6" />
+          <Camera className="h-7 w-7" />
         </a>
       )}
     </div>

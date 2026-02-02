@@ -10,9 +10,9 @@ export function DashboardHeader({ user, onSignOut, className }) {
   const initials = userName.slice(0, 2).toUpperCase();
 
   return (
-    <header className={cn('flex items-center justify-between py-4', className)}>
+    <header className={cn('bg-card rounded-b-[24px] px-5 py-5 shadow-card-dark flex items-center justify-between', className)}>
       <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full border-2 border-accent overflow-hidden bg-muted flex items-center justify-center text-foreground text-sm flex-shrink-0">
+        <div className="h-12 w-12 rounded-full border-2 border-accent overflow-hidden bg-muted flex items-center justify-center text-foreground text-sm flex-shrink-0">
           {avatarUrl ? (
             <img src={avatarUrl} alt={userName} className="h-full w-full object-cover" />
           ) : (
@@ -21,7 +21,7 @@ export function DashboardHeader({ user, onSignOut, className }) {
         </div>
         <div>
           <p className="text-muted-foreground text-sm">Olá,</p>
-          <p className="text-foreground font-semibold">{userName}</p>
+          <p className="text-foreground font-bold text-lg">{userName}</p>
         </div>
       </div>
 

@@ -77,7 +77,7 @@ export function TransactionList({ transactions, className }) {
         </span>
       </div>
 
-      <div className="bg-card rounded-[24px] overflow-hidden">
+      <div className="card-nubank overflow-hidden">
         {transactions.map((transaction, index) => {
           const total = Number(transaction.total) || 0;
           const isIncome = total < 0;
@@ -89,11 +89,11 @@ export function TransactionList({ transactions, className }) {
                 href={`/transaction/${transaction.id}`}
                 className="w-full flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors text-left"
               >
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
                   {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">
+                  <p className="font-semibold text-foreground truncate text-base">
                     {transaction.estabelecimento || 'Estabelecimento'}
                   </p>
                   <p className="text-sm text-muted-foreground">
@@ -102,7 +102,7 @@ export function TransactionList({ transactions, className }) {
                 </div>
                 <div
                   className={cn(
-                    'text-right font-medium',
+                    'text-right font-bold text-base',
                     isIncome ? 'text-accent' : 'text-foreground'
                   )}
                 >

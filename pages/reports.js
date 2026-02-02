@@ -94,14 +94,14 @@ export default function ReportsPage() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-card rounded-[24px] p-5">
+          <div className="card-nubank">
             <p className="text-muted-foreground text-sm">Total em transações</p>
             <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.total)}</p>
             <p className="text-muted-foreground text-xs mt-1">{summary.count} transação(ões)</p>
           </div>
 
           {summary.categories.length > 0 && (
-            <div className="bg-card rounded-[24px] p-5">
+            <div className="card-nubank">
               <h2 className="text-lg font-semibold text-foreground mb-3">Por categoria</h2>
               <ul className="space-y-2">
                 {summary.categories.slice(0, 10).map(({ name, value }) => (
@@ -115,7 +115,7 @@ export default function ReportsPage() {
           )}
 
           {summary.count === 0 && (
-            <div className="bg-card rounded-[24px] p-6 text-center">
+            <div className="card-nubank p-6 text-center">
               <p className="text-muted-foreground">Nenhuma transação ainda. Sincronize o Gmail ou escaneie uma nota fiscal no Dashboard.</p>
             </div>
           )}

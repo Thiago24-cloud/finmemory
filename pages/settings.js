@@ -36,7 +36,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="bg-card rounded-[24px] overflow-hidden">
+        <div className="card-nubank overflow-hidden">
           <Link href="/privacidade" className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors border-b border-border">
             <Shield className="h-5 w-5 text-muted-foreground" />
             <span className="text-foreground font-medium">Política de Privacidade</span>
@@ -49,10 +49,10 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleDisconnect}
-              className="w-full flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors text-left text-destructive"
+              className="w-full flex items-center gap-4 p-4 hover:bg-destructive/10 transition-colors text-left text-destructive font-semibold"
             >
               <LogOut className="h-5 w-5" />
-              <span className="font-medium">Sair da conta</span>
+              <span>Sair da conta</span>
             </button>
           )}
         </div>

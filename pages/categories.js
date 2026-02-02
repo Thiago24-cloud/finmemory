@@ -95,21 +95,21 @@ export default function CategoriesPage() {
         </div>
 
         {byCategory.length > 0 ? (
-          <div className="bg-card rounded-[24px] overflow-hidden">
+          <div className="card-nubank overflow-hidden">
             <ul className="divide-y divide-border">
               {byCategory.map(({ name, total, count }) => (
-                <li key={name} className="flex justify-between items-center p-4">
+                <li key={name} className="flex justify-between items-center p-4 hover:bg-muted/30 transition-colors">
                   <div>
-                    <p className="font-medium text-foreground">{name}</p>
+                    <p className="font-semibold text-foreground">{name}</p>
                     <p className="text-xs text-muted-foreground">{count} transação(ões)</p>
                   </div>
-                  <p className="font-semibold text-foreground">{formatCurrency(total)}</p>
+                  <p className="font-bold text-accent">{formatCurrency(total)}</p>
                 </li>
               ))}
             </ul>
           </div>
         ) : (
-          <div className="bg-card rounded-[24px] p-6 text-center">
+          <div className="card-nubank p-6 text-center">
             <p className="text-muted-foreground">Nenhuma categoria ainda. Sincronize ou escaneie notas no Dashboard.</p>
           </div>
         )}

@@ -112,11 +112,11 @@ export default function TransactionDetailPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar ao Dashboard
         </Link>
 
-        <div className="bg-card rounded-[24px] overflow-hidden">
+        <div className="card-nubank overflow-hidden">
           <div className="p-6">
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
-                <Store className="h-6 w-6" />
+              <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
+                <Store className="h-7 w-7" />
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl font-semibold text-foreground truncate">
@@ -141,7 +141,7 @@ export default function TransactionDetailPage() {
               </div>
             </div>
 
-            <div className="text-2xl font-bold text-foreground pt-2 border-t border-border">
+            <div className="text-2xl font-bold text-accent pt-2 border-t border-border">
               Total: {formatCurrency(total)}
             </div>
           </div>
@@ -149,10 +149,10 @@ export default function TransactionDetailPage() {
           {produtos.length > 0 && (
             <div className="border-t border-border px-6 py-4">
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Receipt className="h-5 w-5" />
+                <Receipt className="h-5 w-5 text-accent" />
                 Produtos ({produtos.length})
               </h2>
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/50">

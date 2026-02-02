@@ -1,12 +1,12 @@
 import { useSession, signIn } from 'next-auth/react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Redirect to dashboard if already logged in
   useEffect(() => {
     if (status === 'authenticated') {
       router.push('/dashboard?success=true');
@@ -19,101 +19,33 @@ export default function Home() {
 
   if (status === 'loading') {
     return (
-      <div style={{ 
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-      }}>
-        <div style={{
-          background: 'white',
-          padding: '40px',
-          borderRadius: '20px',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <p style={{ fontSize: '18px', color: '#666' }}>Carregando...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-primary p-5">
+        <div className="bg-white dark:bg-card rounded-[20px] p-10 text-center shadow-card-light dark:shadow-card-dark">
+          <div className="text-4xl mb-4 animate-pulse">⏳</div>
+          <p className="text-muted-foreground">Carregando...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ 
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '50px',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-    }}>
-      <div style={{
-        background: 'white',
-        padding: '60px 40px',
-        borderRadius: '20px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        textAlign: 'center',
-        maxWidth: '600px',
-        width: '100%'
-      }}>
-        <h1 style={{ 
-          fontSize: '48px', 
-          marginBottom: '20px',
-          background: 'linear-gradient(135deg, #667eea, #764ba2)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          fontWeight: 'bold'
-        }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-5 bg-gradient-primary font-sans">
+      <div className="bg-white dark:bg-card rounded-[20px] p-8 md:p-10 text-center shadow-card-light dark:shadow-card-dark max-w-[600px] w-full">
+        <h1 className="text-4xl md:text-5xl font-bold mb-5 text-gradient-primary">
           🚀 FinMemory
         </h1>
-        <p style={{ 
-          fontSize: '20px', 
-          color: '#666', 
-          marginBottom: '40px',
-          lineHeight: '1.6'
-        }}>
+        <p className="text-lg md:text-xl text-muted-foreground dark:text-muted-foreground mb-10 leading-relaxed">
           Seu assistente financeiro inteligente que organiza suas notas fiscais automaticamente do Gmail
         </p>
-        
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          alignItems: 'center'
-        }}>
-          <button 
+
+        <div className="flex flex-col gap-4 items-center">
+          <button
+            type="button"
             onClick={handleSignIn}
-            style={{ 
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              padding: '16px 40px',
-              background: 'linear-gradient(135deg, #34A853, #0F9D58)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)',
-              width: '100%',
-              maxWidth: '400px'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 6px 20px rgba(52, 168, 83, 0.4)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = '0 4px 12px rgba(52, 168, 83, 0.3)';
-            }}
+            className="w-full max-w-[400px] flex items-center justify-center gap-3 py-4 px-6 bg-gradient-google text-white rounded-xl font-bold text-lg shadow-fab hover:scale-[1.02] active:scale-[0.98] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            aria-label="Entrar com Google"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -121,59 +53,18 @@ export default function Home() {
             </svg>
             Entrar com Google
           </button>
-          
-          <a 
-            href="/dashboard" 
-            style={{ 
-              display: 'inline-block',
-              padding: '14px 40px',
-              background: 'transparent',
-              color: '#667eea',
-              textDecoration: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              fontWeight: '600',
-              border: '2px solid #667eea',
-              transition: 'all 0.2s',
-              width: '100%',
-              maxWidth: '400px',
-              textAlign: 'center'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.background = '#667eea';
-              e.target.style.color = 'white';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = 'transparent';
-              e.target.style.color = '#667eea';
-            }}
+
+          <Link
+            href="/dashboard"
+            className="w-full max-w-[400px] inline-flex justify-center py-3.5 px-6 bg-transparent text-primary dark:text-accent border-2 border-primary dark:border-accent rounded-xl font-semibold text-base hover:bg-primary/10 dark:hover:bg-accent/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             Ver Dashboard
-          </a>
+          </Link>
         </div>
-        
-        <div style={{
-          marginTop: '40px',
-          padding: '24px',
-          background: '#f8f9fa',
-          borderRadius: '12px',
-          textAlign: 'left'
-        }}>
-          <h3 style={{ 
-            fontSize: '18px', 
-            marginBottom: '16px',
-            color: '#333'
-          }}>
-            ✨ Como funciona:
-          </h3>
-          <ul style={{ 
-            listStyle: 'none', 
-            padding: 0,
-            margin: 0,
-            color: '#666',
-            fontSize: '14px',
-            lineHeight: '2'
-          }}>
+
+        <div className="mt-10 p-6 bg-muted/50 dark:bg-muted/30 rounded-xl text-left">
+          <h2 className="text-lg font-semibold text-foreground mb-4">✨ Como funciona:</h2>
+          <ul className="list-none p-0 m-0 text-muted-foreground text-sm leading-loose space-y-1">
             <li>📧 Conecte seu Gmail</li>
             <li>🤖 IA processa suas notas fiscais</li>
             <li>📊 Visualize gastos organizados</li>

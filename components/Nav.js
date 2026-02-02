@@ -8,11 +8,19 @@ import { cn } from '../lib/utils';
 export function Nav({ className }) {
   return (
     <nav
+      aria-label="Navegação principal"
       className={cn(
-        'flex justify-end items-center gap-6 mb-3',
+        'flex justify-between items-center gap-4 mb-3',
         className
       )}
     >
+      <Link
+        href="/dashboard"
+        className="text-foreground font-semibold text-sm hover:text-accent transition-colors"
+      >
+        FinMemory
+      </Link>
+      <div className="flex items-center gap-4">
       <Link
         href="/privacidade"
         className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
@@ -31,6 +39,7 @@ export function Nav({ className }) {
       >
         Dashboard
       </Link>
+      </div>
     </nav>
   );
 }

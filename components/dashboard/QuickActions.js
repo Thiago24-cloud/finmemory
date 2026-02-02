@@ -53,21 +53,21 @@ export function QuickActions({ onSync, syncing, className }) {
 
   return (
     <div className={cn('overflow-x-auto scrollbar-hide -mx-5 px-5', className)}>
-      <div className="flex gap-4 pb-2">
+      <div className="flex gap-4 pb-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
         {actions.map((action, index) => (
           <button
             key={index}
             type="button"
             onClick={action.onClick}
             disabled={syncing && action.label === 'Sincronizar'}
-            className="flex flex-col items-center gap-2 min-w-[72px]"
+            className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform"
           >
             <div
               className={cn(
-                'w-14 h-14 rounded-full flex items-center justify-center transition-all',
+                'w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-dark',
                 action.isPositive
                   ? 'bg-accent/20 text-accent hover:bg-accent/30'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  : 'bg-card text-muted-foreground hover:bg-muted'
               )}
             >
               {action.icon}
