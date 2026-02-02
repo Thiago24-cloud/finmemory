@@ -13,8 +13,9 @@ import { cn } from '../../lib/utils';
  * Ações rápidas – Sincronizar (dados reais), Escanear, Relatórios, Categorias, Extratos, Ajustes.
  * Navegação via Next.js router.
  */
-export function QuickActions({ onSync, syncing, className }) {
+export function QuickActions({ onSync, syncing, userIdReady = true, className }) {
   const router = useRouter();
+  const syncDisabled = syncing || !userIdReady;
 
   const actions = [
     {
@@ -22,6 +23,7 @@ export function QuickActions({ onSync, syncing, className }) {
       label: 'Sincronizar',
       onClick: onSync,
       isPositive: true,
+      disabled: syncDisabled,
     },
     {
       icon: <Camera className="h-6 w-6" />,
@@ -58,9 +60,10 @@ export function QuickActions({ onSync, syncing, className }) {
           <button
             key={index}
             type="button"
-            onClick={action.onClick}
-            disabled={syncing && action.label === 'Sincronizar'}
-            className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform"
+            onClick={action.disabled ? undefined : action.onClick}
+            disabled={action.disabled}
+            title={action.label === 'Sincronizar' && !userIdReady ? 'Preparando sua conta...' : undefined}
+            className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           >
             <div
               className={cn(

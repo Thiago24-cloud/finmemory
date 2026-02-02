@@ -263,7 +263,11 @@ export default function Dashboard() {
 
   const handleSyncEmails = useCallback(async (isFirstSync = false) => {
     if (!userId) {
-      alert('⚠️ Você precisa conectar o Gmail primeiro!');
+      if (session?.user) {
+        alert('⏳ Sua conta ainda está sendo preparada. Aguarde alguns segundos e clique em "Buscar Notas Fiscais" novamente.');
+      } else {
+        alert('⚠️ Você precisa conectar o Gmail primeiro!');
+      }
       return;
     }
 
@@ -424,7 +428,7 @@ export default function Dashboard() {
     } finally {
       setSyncing(false);
     }
-  }, [userId, loadTransactions, syncing]);
+  }, [userId, session?.user, loadTransactions, syncing]);
 
   // Load transactions when userId changes
   useEffect(() => {
@@ -610,7 +614,7 @@ export default function Dashboard() {
           <>
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
             <BalanceCard balance={totalBalance} className="mb-6" />
-            <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} className="mb-8" />
+            <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} userIdReady={!!userId} className="mb-8" />
 
             {loading ? (
               <div className="space-y-4" aria-live="polite" aria-busy="true">
