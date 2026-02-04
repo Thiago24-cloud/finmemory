@@ -264,9 +264,15 @@ export default function Dashboard() {
   const handleSyncEmails = useCallback(async (isFirstSync = false) => {
     if (!userId) {
       if (session?.user) {
-        alert('⏳ Sua conta ainda está sendo preparada. Aguarde alguns segundos e clique em "Buscar Notas Fiscais" novamente.');
+        alert(
+          '⏳ Sua conta ainda não está vinculada ao servidor.\n\n' +
+          'Isso costuma acontecer quando as variáveis do Supabase não estão configuradas no Cloud Run.\n\n' +
+          '• Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no serviço Cloud Run (Variáveis e segredos).\n' +
+          '• Depois, faça logout e login de novo, e tente sincronizar outra vez.\n\n' +
+          'Veja o arquivo DEPLOY-CLOUD-RUN.md no projeto.'
+        );
       } else {
-        alert('⚠️ Você precisa conectar o Gmail primeiro!');
+        alert('⚠️ Você precisa conectar o Gmail primeiro!\n\nClique em "Conectar Gmail" ou faça login com Google na página inicial.');
       }
       return;
     }
@@ -615,6 +621,18 @@ export default function Dashboard() {
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
             <BalanceCard balance={totalBalance} className="mb-6" />
             <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} userIdReady={!!userId} className="mb-8" />
+
+            {isAuthenticated && !userId && (
+              <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                <p className="font-semibold mb-1">📧 Gmail não consegue sincronizar</p>
+                <p className="mb-2">Sua conta ainda não está vinculada no servidor. Para o app ler o Gmail, configure as variáveis do Supabase no Cloud Run:</p>
+                <ul className="list-disc list-inside text-xs space-y-0.5 mb-2">
+                  <li>NEXT_PUBLIC_SUPABASE_URL</li>
+                  <li>SUPABASE_SERVICE_ROLE_KEY</li>
+                </ul>
+                <p className="text-xs">Cloud Run → finmemory → Editar e implantar nova revisão → Variáveis e segredos. Depois faça logout e login de novo.</p>
+              </div>
+            )}
 
             {loading ? (
               <div className="space-y-4" aria-live="polite" aria-busy="true">
