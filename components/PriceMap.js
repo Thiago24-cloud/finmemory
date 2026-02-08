@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-if (token) mapboxgl.accessToken = token;
+const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+mapboxgl.accessToken = token;
 
 export default function PriceMap() {
   const mapContainer = useRef(null);
@@ -55,8 +55,12 @@ export default function PriceMap() {
 
   if (!token) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg text-gray-600">
-        <p>Configure NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN no .env.local para ver o mapa.</p>
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 p-6 text-center">
+        <div>
+          <p className="font-medium mb-1">Configure o token do Mapbox no .env.local:</p>
+          <p className="text-sm mb-2">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.eyJ...</p>
+          <p className="text-xs">Depois reinicie o servidor (Ctrl+C e <code>npm run dev</code>).</p>
+        </div>
       </div>
     );
   }

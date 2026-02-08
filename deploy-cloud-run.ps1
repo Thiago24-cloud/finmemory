@@ -50,11 +50,25 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "`n📦 Tag da imagem: $COMMIT_SHA" -ForegroundColor Cyan
 
+# Ler token Mapbox do .env.local (para o mapa funcionar no Cloud Run)
+$MAPBOX_TOKEN = ""
+if (Test-Path ".env.local") {
+    $line = Get-Content ".env.local" | Where-Object { $_ -match '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=(.+)$' } | Select-Object -First 1
+    if ($line) {
+        $MAPBOX_TOKEN = $line -replace '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=', '' -replace '^["'']|["'']$', ''
+        if ($MAPBOX_TOKEN) { Write-Host "   🗺️  Token Mapbox encontrado no .env.local" -ForegroundColor Green }
+    }
+}
+if (-not $MAPBOX_TOKEN) {
+    Write-Host "   ⚠️  NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN não encontrado no .env.local - mapa ficará desabilitado no deploy" -ForegroundColor Yellow
+}
+
 # Opção 1: Cloud Build (recomendado - não precisa Docker local)
 Write-Host "`n🔨 Iniciando build via Cloud Build..." -ForegroundColor Cyan
 Write-Host "   Isso pode levar alguns minutos..." -ForegroundColor Yellow
 
-$buildCmd = "gcloud builds submit --config cloudbuild.yaml --substitutions=_COMMIT_SHA=$COMMIT_SHA"
+$subs = "_COMMIT_SHA=$COMMIT_SHA,_MAPBOX_ACCESS_TOKEN=$MAPBOX_TOKEN"
+$buildCmd = "gcloud builds submit --config cloudbuild.yaml --substitutions=$subs"
 Write-Host "`nExecutando: $buildCmd" -ForegroundColor Gray
 
 try {

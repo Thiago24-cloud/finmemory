@@ -139,8 +139,8 @@ export default function AddReceipt() {
 
     setError(null);
 
-    // Validar tipo
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    // Validar tipo (inclui HEIC para iOS)
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/heic'];
     if (!validTypes.includes(file.type)) {
       setError('Formato não suportado. Use JPG, PNG ou WebP.');
       return;
@@ -160,14 +160,25 @@ export default function AddReceipt() {
       setStep(STEPS.PREVIEW);
     } catch (err) {
       console.error('Erro ao processar imagem:', err);
-      setError('Erro ao processar imagem. Tente outra.');
+      setError(
+        file.type === 'image/heic' 
+          ? 'Formato HEIC não suportado. Use JPG ou PNG, ou altere as configurações da câmera.'
+          : 'Erro ao processar imagem. Tente outra.'
+      );
+    } finally {
+      // Limpar input para permitir selecionar o mesmo arquivo de novo (fix iOS)
+      e.target.value = '';
     }
   };
 
   // Processar imagem via OCR
   const processImage = async () => {
-    if (!imageBase64 || !userId) {
-      setError('Dados incompletos para processar');
+    if (!imageBase64) {
+      setError('Imagem não carregada. Tente novamente.');
+      return;
+    }
+    if (!userId) {
+      setError('Usuário não identificado. Faça login novamente ou conecte o Gmail no dashboard primeiro.');
       return;
     }
 
@@ -187,7 +198,7 @@ export default function AddReceipt() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Erro ao processar nota fiscal');
+        throw new Error(result.error || result.details || 'Erro ao processar nota fiscal');
       }
 
       // Salvar dados extraídos
@@ -210,7 +221,8 @@ export default function AddReceipt() {
 
     } catch (err) {
       console.error('Erro no OCR:', err);
-      setError(err.message);
+      const msg = err.message || 'Erro ao processar. Verifique sua conexão e tente novamente.';
+      setError(msg);
       setStep(STEPS.PREVIEW);
     }
   };
@@ -365,6 +377,7 @@ export default function AddReceipt() {
                 capture="environment"
                 onChange={handleFileSelect}
                 className="hidden"
+                aria-label="Tirar foto da nota fiscal"
               />
 
               <button
@@ -397,11 +410,21 @@ export default function AddReceipt() {
               alt="Preview"
               className="max-w-full max-h-[400px] rounded-xl mb-6 shadow-card-lovable"
             />
+            {!userId && (
+              <p className="text-amber-600 text-sm mb-3">
+                Aguardando identificação... Se demorar, faça login novamente ou conecte o Gmail no dashboard.
+              </p>
+            )}
             <div className="flex flex-col gap-3">
               <button
                 type="button"
                 onClick={processImage}
-                className="bg-gradient-primary text-white border-none py-4 px-6 rounded-xl text-base font-semibold cursor-pointer"
+                disabled={!userId}
+                className={`py-4 px-6 rounded-xl text-base font-semibold cursor-pointer border-none ${
+                  userId 
+                    ? 'bg-gradient-primary text-white hover:opacity-90' 
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
               >
                 ✅ Processar Nota
               </button>

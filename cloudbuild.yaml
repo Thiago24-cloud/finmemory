@@ -1,10 +1,12 @@
 steps:
-  # Build da imagem Docker (sem build-args - Dockerfile usa valores hardcoded para NEXT_PUBLIC_*)
+  # Build da imagem Docker (Mapbox token via _MAPBOX_ACCESS_TOKEN)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${_MAPBOX_ACCESS_TOKEN}'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/finmemory:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finmemory:$_COMMIT_SHA'
       - '-t'
       - 'gcr.io/$PROJECT_ID/finmemory:latest'
       - '.'
@@ -12,7 +14,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/finmemory:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finmemory:$_COMMIT_SHA'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -26,7 +28,7 @@ steps:
       - 'deploy'
       - 'finmemory'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/finmemory:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finmemory:$_COMMIT_SHA'
       - '--region'
       - 'southamerica-east1'
       - '--platform'
@@ -42,9 +44,10 @@ steps:
       - '1'
 
 images:
-  - 'gcr.io/$PROJECT_ID/finmemory:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/finmemory:$_COMMIT_SHA'
   - 'gcr.io/$PROJECT_ID/finmemory:latest'
 
-# COMMIT_SHA: obrigatório para a tag da imagem. Em build manual, use 'manual' se vazio.
+# Substitutions: _COMMIT_SHA obrigatório. _MAPBOX_ACCESS_TOKEN = token Mapbox (pk.ey...) para o mapa.
 substitutions:
-  COMMIT_SHA: 'manual'
+  _COMMIT_SHA: 'manual'
+  _MAPBOX_ACCESS_TOKEN: ''
