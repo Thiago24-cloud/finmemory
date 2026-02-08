@@ -14,9 +14,11 @@
     "verify-build": "node scripts/verify-build.mjs"
   },
   "dependencies": {
+    "@next/third-parties": "^16.1.6",
     "@supabase/supabase-js": "^2.45.4",
     "googleapis": "^144.0.0",
     "lucide-react": "^0.462.0",
+    "mapbox-gl": "^3.18.1",
     "next": "^14.2.22",
     "next-auth": "^4.24.13",
     "openai": "^4.77.3",

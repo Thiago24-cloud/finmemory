@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário
 let supabaseInstance = null;
+let supabaseConfigWarned = false;
 
 function getSupabase() {
   if (!supabaseInstance) {
@@ -11,7 +12,10 @@ function getSupabase() {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
     if (!url || !key) {
-      console.warn('⚠️ Variáveis do Supabase não configuradas no servidor');
+      if (!supabaseConfigWarned) {
+        supabaseConfigWarned = true;
+        console.warn('⚠️ Variáveis do Supabase não configuradas no servidor. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Cloud Run. Ver DEPLOY-CLOUD-RUN.md');
+      }
       return null;
     }
     
@@ -27,9 +31,10 @@ export const authOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
-          prompt: 'consent',
+          prompt: 'consent', // força tela de consentimento para pedir permissão de e-mail
           access_type: 'offline',
           response_type: 'code',
+          // Permissão para LER e-mails do Gmail (obrigatório no Google Cloud Console)
           scope: 'openid email profile https://www.googleapis.com/auth/gmail.readonly'
         }
       }
@@ -108,12 +113,13 @@ export const authOptions = {
         if (supabase) {
           const { data } = await supabase
             .from('users')
-            .select('id')
+            .select('id, created_at')
             .eq('email', session.user.email)
             .single();
           
           if (data) {
             session.user.supabaseId = data.id;
+            session.user.created_at = data.created_at;
           }
         }
       } catch (error) {

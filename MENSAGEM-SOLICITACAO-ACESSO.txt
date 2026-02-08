@@ -1,0 +1,1 @@
+Preciso de acesso ao Cloud Build para fazer deploy da aplicação FinMemory no Cloud Run. Sou o desenvolvedor responsável pelo projeto e preciso visualizar e executar builds para atualizar a aplicação em produção.

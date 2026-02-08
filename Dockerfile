@@ -25,6 +25,9 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 # Build da aplicação
 RUN npm run build
 
+# Verificar se o build standalone foi criado corretamente
+RUN node scripts/verify-build.mjs || (echo "❌ Verificação do build falhou!" && exit 1)
+
 # Estágio 3: Runner (Produção)
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -37,20 +40,29 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copiar arquivos necessários
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Primeiro copiar o standalone (que já inclui node_modules necessários)
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Copiar arquivos estáticos
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copiar pasta public
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Ajustar permissões
-RUN chown -R nextjs:nodejs /app
+# Verificar se os arquivos críticos foram copiados
+RUN test -f server.js || (echo "❌ server.js não encontrado!" && exit 1) && \
+    test -d .next/static || (echo "⚠️  .next/static não encontrado" && exit 1) && \
+    echo "✅ Arquivos críticos verificados"
 
 USER nextjs
 
-# Expor porta
-EXPOSE 3000
+# Expor porta (Cloud Run usa 8080 por padrão)
+# Cloud Run define PORT automaticamente via variável de ambiente
+EXPOSE 8080
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+# HOSTNAME para aceitar conexões de qualquer interface
+ENV HOSTNAME="0.0.0.0"
+# PORT será definido automaticamente pelo Cloud Run (padrão: 8080)
+# Next.js standalone server.js usa process.env.PORT automaticamente
 
 # Comando para iniciar
+# Next.js standalone server.js usa automaticamente a variável PORT
 CMD ["node", "server.js"]

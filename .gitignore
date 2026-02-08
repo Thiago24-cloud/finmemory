@@ -68,3 +68,10 @@ reports/
 # Backups locais
 *.backup
 teste-pre-deploy.md
+
+# Mídia temporária na raiz (downloads, referências)
+/*.jpeg
+/*.jpg
+/*.mp4
+/*.mov
+/*.avi

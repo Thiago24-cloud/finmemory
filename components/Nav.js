@@ -34,6 +34,12 @@ export function Nav({ className }) {
         Termos de Uso
       </Link>
       <Link
+        href="/mapa"
+        className="text-[#666] hover:text-[#333] text-sm font-medium transition-colors"
+      >
+        Mapa
+      </Link>
+      <Link
         href="/dashboard"
         className="text-[#666] hover:text-[#333] text-sm font-medium transition-colors"
       >

@@ -1,0 +1,2510 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>FinMemory - Arquivos para Lovable</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; line-height: 1.5; color: #333; max-width: 900px; margin: 0 auto; padding: 40px; font-size: 13px; }
+    h1 { font-size: 24px; color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 8px; }
+    h2 { font-size: 18px; color: #764ba2; margin-top: 36px; page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; margin-top: 24px; }
+    .file-path { background: #e7f3ff; padding: 8px 12px; border-radius: 6px; font-family: monospace; margin: 12px 0; }
+    pre { background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 11px; line-height: 1.4; white-space: pre-wrap; }
+    @media print { h2 { page-break-before: always; } h2:first-of-type { page-break-before: avoid; } }
+  </style>
+</head>
+<body>
+  <h1>FinMemory - Arquivos para Lovable (React/Vite)</h1>
+  <p><strong>Projeto:</strong> Assistente financeiro - notas fiscais via Gmail + OCR por foto</p>
+  <p><strong>Stack:</strong> Next.js 14, React, Supabase, NextAuth, OpenAI GPT-4 Vision</p>
+
+  <h2>Resumo para Lovable</h2>
+  <div class="file-path">LOVABLE-LAYOUT-RESUMO.md</div>
+  <pre><code># FinMemory - Resumo para Lovable (React/Vite)
+
+Resumo do projeto para adaptar o layout no Lovable. O projeto atual usa **Next.js 14** com **estilos inline** (sem Tailwind nem CSS separado).
+
+---
+
+## 📁 Estrutura de Arquivos
+
+```
+pages/
+├── index.js          → Landing + botão "Entrar com Google"
+├── dashboard.js      → Dashboard principal (transações, sync Gmail, botão OCR)
+├── add-receipt.js    → Captura de nota fiscal via foto (OCR)
+├── login.js          → Mínimo (pouco usado)
+├── _app.js           → SessionProvider (NextAuth)
+├── auth-error.js
+├── privacidade.js
+├── termos.js
+└── api/
+    ├── auth/[...nextauth].js   → Google OAuth
+    ├── gmail/sync.js           → Sincronizar emails do Gmail
+    ├── health.js
+    └── ocr/
+        ├── process-receipt.js  → Processar imagem com GPT-4 Vision
+        └── save-transaction.js → Salvar transação confirmada
+```
+
+**Não há pasta `components/`** - tudo está nas páginas.
+
+---
+
+## 🎨 Design System (para Lovable)
+
+### Cores principais
+- **Gradiente roxo:** `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`
+- **Botão Google:** `#34A853` (verde)
+- **Texto em gradiente:** `#667eea` → `#764ba2`
+- **Background claro:** `#f8f9fa`
+- **Bordas:** `#e5e7eb`, `#dee2e6`
+- **Texto:** `#333`, `#666`, `#999`
+- **Erro:** `#dc3545`
+- **Sucesso:** `#28a745`, `#059669`
+
+### Tipografia
+- **Fonte:** `system-ui, -apple-system, sans-serif`
+- **Títulos:** 24–48px, bold
+- **Corpo:** 14–18px
+
+### Componentes visuais
+- **Cards:** `background: white`, `borderRadius: 16px`, `boxShadow: 0 4px 6px rgba(0,0,0,0.1)`
+- **Botões primários:** gradiente roxo, `borderRadius: 8px`, `padding: 16px 24px`
+- **Botão flutuante:** círculo 60px, gradiente roxo, canto inferior direito
+
+---
+
+## 📄 Páginas - Conteúdo e Layout
+
+### 1. **index.js** (Landing)
+- **Layout:** Centralizado, fundo gradiente roxo
+- **Card branco:** padding 60px, borderRadius 20px, maxWidth 600px
+- **Título:** "🚀 FinMemory" com gradiente no texto
+- **Subtítulo:** "Seu assistente financeiro inteligente que organiza suas notas fiscais automaticamente do Gmail"
+- **Botões:** 
+  - "Entrar com Google" (verde, ícone SVG Google)
+  - "Ver Dashboard" (outline roxo)
+- **Seção "Como funciona":** Lista com ícones (📧 Conecte Gmail, 🤖 IA processa, 📊 Visualize gastos, 💰 Controle finanças)
+
+### 2. **dashboard.js** (Principal)
+- **Header:** Nome do usuário, botão "Desconectar"
+- **Seção sync:** Botão "🔄 Buscar Notas Fiscais"
+- **Lista de transações:** Cards com estabelecimento, data, valor total, produtos expansíveis
+- **Botão flutuante:** 📸 (60px, canto inferior direito) → leva para /add-receipt
+- **Estado vazio:** Mensagem "Nenhuma nota fiscal encontrada"
+- **Logs:** Área colapsável com logs da sincronização
+
+### 3. **add-receipt.js** (Captura OCR)
+- **Fluxo em steps:** Captura → Preview → Processando → Editar → Salvo
+- **Captura:** Botões "Tirar Foto" e "Escolher da Galeria"
+- **Preview:** Imagem + botões "Processar Nota" / "Tirar Outra"
+- **Processando:** Spinner + "Lendo sua nota fiscal..."
+- **Editar:** Formulário (estabelecimento, CNPJ, data, valor, categoria, pagamento, itens)
+- **Sucesso:** "Nota fiscal salva!" + redireciona para dashboard
+
+---
+
+## 🔌 APIs (para backend no Lovable)
+
+O Lovable pode precisar de um backend separado. Resumo das rotas:
+
+| Rota | Método | Body | Retorno |
+|------|--------|------|---------|
+| `/api/auth/[...nextauth]` | GET/POST | - | NextAuth (Google OAuth) |
+| `/api/gmail/sync` | POST | `{ userId, firstSync }` | `{ success, processed, skipped, errors, total }` |
+| `/api/ocr/process-receipt` | POST | `{ imageBase64, userId }` | `{ success, data: { date, merchant_name, total_amount, items, ... } }` |
+| `/api/ocr/save-transaction` | POST | `{ userId, merchant_name, total_amount, ... }` | `{ success, transaction }` |
+
+---
+
+## 📊 Supabase - Schema
+
+### Tabelas
+- **users:** id, email, name, google_id, access_token, refresh_token, token_expiry, last_sync
+- **transacoes:** id, user_id, estabelecimento, cnpj, data, hora, total, forma_pagamento, source, receipt_image_url, items (JSONB), categoria
+- **produtos:** id, transacao_id, descricao, quantidade, valor_unitario, valor_total
+
+### Storage
+- **Bucket:** `receipts` (privado, imagens de notas fiscais)
+
+---
+
+## 🔑 Variáveis de Ambiente
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+NEXTAUTH_URL
+NEXTAUTH_SECRET
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+OPENAI_API_KEY
+```
+
+---
+
+## 📦 Dependências
+
+- `@supabase/supabase-js`
+- `next-auth`
+- `openai`
+- `googleapis` (apenas backend)
+- `react`, `react-dom`
+
+---
+
+## 🎯 O que adaptar no Lovable
+
+1. **Trocar Next.js por React/Vite** – rotas para React Router
+2. **Trocar estilos inline por Tailwind/CSS** – usar as cores e espaçamentos acima
+3. **Manter lógica de negócio** – fetch de transações, fluxo de OCR, etc.
+4. **Backend:** Lovable pode precisar de APIs hospedadas separadamente (ou usar Supabase Edge Functions)
+
+---
+
+## 📎 Arquivos Completos para Copiar
+
+Os arquivos principais estão em:
+- `pages/index.js`
+- `pages/dashboard.js`
+- `pages/add-receipt.js`
+- `pages/_app.js`
+</code></pre>
+
+  <h2>pages/_app.js</h2>
+  <div class="file-path">pages/_app.js</div>
+  <pre><code>import { SessionProvider } from 'next-auth/react';
+
+export default function App({ Component, pageProps: { session, ...pageProps } }) {
+  return (
+    &lt;SessionProvider session={session}&gt;
+      &lt;Component {...pageProps} /&gt;
+    &lt;/SessionProvider&gt;
+  );
+}
+</code></pre>
+
+  <h2>pages/index.js</h2>
+  <div class="file-path">pages/index.js</div>
+  <pre><code>import { useSession, signIn } from 'next-auth/react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+
+export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Redirect to dashboard if already logged in
+  useEffect(() =&gt; {
+    if (status === 'authenticated') {
+      router.push('/dashboard?success=true');
+    }
+  }, [status, router]);
+
+  const handleSignIn = () =&gt; {
+    signIn('google', { callbackUrl: '/dashboard?success=true' });
+  };
+
+  if (status === 'loading') {
+    return (
+      &lt;div style={{ 
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}&gt;
+        &lt;div style={{
+          background: 'white',
+          padding: '40px',
+          borderRadius: '20px',
+          textAlign: 'center'
+        }}&gt;
+          &lt;div style={{ fontSize: '48px', marginBottom: '16px' }}&gt;⏳&lt;/div&gt;
+          &lt;p style={{ fontSize: '18px', color: '#666' }}&gt;Carregando...&lt;/p&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  }
+
+  return (
+    &lt;div style={{ 
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '50px',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+    }}&gt;
+      &lt;div style={{
+        background: 'white',
+        padding: '60px 40px',
+        borderRadius: '20px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        textAlign: 'center',
+        maxWidth: '600px',
+        width: '100%'
+      }}&gt;
+        &lt;h1 style={{ 
+          fontSize: '48px', 
+          marginBottom: '20px',
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          fontWeight: 'bold'
+        }}&gt;
+          🚀 FinMemory
+        &lt;/h1&gt;
+        &lt;p style={{ 
+          fontSize: '20px', 
+          color: '#666', 
+          marginBottom: '40px',
+          lineHeight: '1.6'
+        }}&gt;
+          Seu assistente financeiro inteligente que organiza suas notas fiscais automaticamente do Gmail
+        &lt;/p&gt;
+        
+        &lt;div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          alignItems: 'center'
+        }}&gt;
+          &lt;button 
+            onClick={handleSignIn}
+            style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              padding: '16px 40px',
+              background: 'linear-gradient(135deg, #34A853, #0F9D58)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)',
+              width: '100%',
+              maxWidth: '400px'
+            }}
+            onMouseOver={(e) =&gt; {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 6px 20px rgba(52, 168, 83, 0.4)';
+            }}
+            onMouseOut={(e) =&gt; {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 4px 12px rgba(52, 168, 83, 0.3)';
+            }}
+          &gt;
+            &lt;svg width=&quot;20&quot; height=&quot;20&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;white&quot;&gt;
+              &lt;path d=&quot;M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z&quot;/&gt;
+              &lt;path d=&quot;M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z&quot;/&gt;
+              &lt;path d=&quot;M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z&quot;/&gt;
+              &lt;path d=&quot;M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z&quot;/&gt;
+            &lt;/svg&gt;
+            Entrar com Google
+          &lt;/button&gt;
+          
+          &lt;a 
+            href=&quot;/dashboard&quot; 
+            style={{ 
+              display: 'inline-block',
+              padding: '14px 40px',
+              background: 'transparent',
+              color: '#667eea',
+              textDecoration: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              border: '2px solid #667eea',
+              transition: 'all 0.2s',
+              width: '100%',
+              maxWidth: '400px',
+              textAlign: 'center'
+            }}
+            onMouseOver={(e) =&gt; {
+              e.target.style.background = '#667eea';
+              e.target.style.color = 'white';
+            }}
+            onMouseOut={(e) =&gt; {
+              e.target.style.background = 'transparent';
+              e.target.style.color = '#667eea';
+            }}
+          &gt;
+            Ver Dashboard
+          &lt;/a&gt;
+        &lt;/div&gt;
+        
+        &lt;div style={{
+          marginTop: '40px',
+          padding: '24px',
+          background: '#f8f9fa',
+          borderRadius: '12px',
+          textAlign: 'left'
+        }}&gt;
+          &lt;h3 style={{ 
+            fontSize: '18px', 
+            marginBottom: '16px',
+            color: '#333'
+          }}&gt;
+            ✨ Como funciona:
+          &lt;/h3&gt;
+          &lt;ul style={{ 
+            listStyle: 'none', 
+            padding: 0,
+            margin: 0,
+            color: '#666',
+            fontSize: '14px',
+            lineHeight: '2'
+          }}&gt;
+            &lt;li&gt;📧 Conecte seu Gmail&lt;/li&gt;
+            &lt;li&gt;🤖 IA processa suas notas fiscais&lt;/li&gt;
+            &lt;li&gt;📊 Visualize gastos organizados&lt;/li&gt;
+            &lt;li&gt;💰 Controle total de suas finanças&lt;/li&gt;
+          &lt;/ul&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+</code></pre>
+
+  <h2>pages/dashboard.js</h2>
+  <div class="file-path">pages/dashboard.js</div>
+  <pre><code>import { useEffect, useState, useCallback } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import { createClient } from '@supabase/supabase-js';
+
+// Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
+let supabaseInstance = null;
+
+function getSupabase() {
+  if (typeof window === 'undefined') {
+    // Durante SSR/build, retorna null
+    return null;
+  }
+  
+  if (!supabaseInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('⚠️ Variáveis de ambiente do Supabase não configuradas');
+      return null;
+    }
+    
+    supabaseInstance = createClient(supabaseUrl, supabaseKey);
+  }
+  
+  return supabaseInstance;
+}
+
+export default function Dashboard() {
+  const { data: session, status } = useSession();
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [syncLogs, setSyncLogs] = useState([]);
+  const [lastSyncResult, setLastSyncResult] = useState(null);
+  const [showLogs, setShowLogs] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(null);
+
+  // Debug: Log quando transactions mudar
+  useEffect(() =&gt; {
+    console.log('🔄 Estado transactions atualizado:', {
+      count: transactions.length,
+      transactions: transactions.length &gt; 0 ? transactions.map(t =&gt; ({
+        id: t.id,
+        estabelecimento: t.estabelecimento,
+        total: t.total
+      })) : []
+    });
+  }, [transactions]);
+
+  // Get Supabase user ID from session or localStorage
+  useEffect(() =&gt; {
+    // Se já temos userId e ele corresponde à sessão, não precisa fazer nada
+    if (userId &amp;&amp; session?.user?.supabaseId &amp;&amp; userId === session.user.supabaseId) {
+      return;
+    }
+
+    // Primeiro, tenta usar o localStorage como fallback rápido
+    if (typeof window !== 'undefined' &amp;&amp; !userId) {
+      const storedUserId = localStorage.getItem('user_id');
+      if (storedUserId) {
+        console.log('📦 User ID encontrado no localStorage:', storedUserId);
+        // Só usa o localStorage se não temos sessão ou se a sessão não tem supabaseId
+        if (!session || !session.user?.supabaseId) {
+          setUserId(storedUserId);
+          return;
+        }
+      }
+    }
+
+    if (session?.user?.supabaseId) {
+      // Só atualiza se for diferente do atual
+      if (userId !== session.user.supabaseId) {
+        console.log('✅ User ID da sessão:', session.user.supabaseId);
+        setUserId(session.user.supabaseId);
+        localStorage.setItem('user_id', session.user.supabaseId);
+      }
+    } else if (session?.user?.email &amp;&amp; !userId) {
+      // Fetch user ID from Supabase if not in session
+      const fetchUserId = async () =&gt; {
+        const supabase = getSupabase();
+        if (!supabase) {
+          console.error('❌ Supabase não disponível');
+          return;
+        }
+        
+        console.log('🔍 Buscando user_id para email:', session.user.email);
+        
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, email, name')
+          .eq('email', session.user.email)
+          .single();
+        
+        if (error) {
+          console.error('❌ Erro ao buscar user_id:', error);
+          console.error('   Código:', error.code);
+          console.error('   Mensagem:', error.message);
+          console.error('   Detalhes:', error.details);
+          
+          // Se for erro de RLS, informa
+          if (error.code === 'PGRST116' || error.message?.includes('permission denied')) {
+            console.error('⚠️ Possível problema de RLS (Row Level Security) ao buscar usuário');
+            console.error('   Verifique as políticas RLS na tabela &quot;users&quot; no Supabase');
+          }
+          return;
+        }
+        
+        if (data) {
+          console.log('✅ User ID encontrado:', data.id);
+          console.log('   Email:', data.email);
+          console.log('   Nome:', data.name);
+          setUserId(data.id);
+          localStorage.setItem('user_id', data.id);
+        } else {
+          console.warn('⚠️ Nenhum usuário encontrado para este email');
+          console.warn('   Isso pode acontecer se o usuário ainda não fez login pela primeira vez');
+        }
+      };
+      fetchUserId();
+    }
+  }, [session]);
+
+  const loadTransactions = useCallback(async (uid) =&gt; {
+    if (!uid) {
+      console.warn('loadTransactions: userId não fornecido');
+      return;
+    }
+    
+    const supabase = getSupabase();
+    if (!supabase) {
+      console.warn('loadTransactions: Supabase não disponível');
+      return;
+    }
+    
+    console.log('📊 Carregando transações para user_id:', uid);
+    console.log('🔍 Verificando configuração do Supabase...');
+    console.log('   URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Configurada' : '❌ Não configurada');
+    console.log('   Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Configurada' : '❌ Não configurada');
+    
+    setLoading(true);
+    try {
+      // Primeiro, tenta buscar sem o join para verificar se há transações
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('transacoes')
+        .select('id, user_id, estabelecimento, total, data')
+        .eq('user_id', uid)
+        .limit(5);
+
+      if (simpleError) {
+        console.error('❌ Erro ao buscar transações (query simples):', simpleError);
+        console.error('   Código:', simpleError.code);
+        console.error('   Mensagem:', simpleError.message);
+        console.error('   Detalhes:', simpleError.details);
+        console.error('   Hint:', simpleError.hint);
+        
+        // Se for erro de RLS, informa o usuário
+        if (simpleError.code === 'PGRST116' || simpleError.message?.includes('permission denied')) {
+          console.error('⚠️ Possível problema de RLS (Row Level Security) no Supabase');
+          console.error('   Verifique se as políticas RLS permitem leitura para usuários autenticados');
+        }
+        
+        throw simpleError;
+      }
+
+      console.log('📋 Transações encontradas (query simples):', simpleData?.length || 0);
+      if (simpleData &amp;&amp; simpleData.length &gt; 0) {
+        console.log('   Primeira transação:', simpleData[0]);
+      } else {
+        console.log('   ⚠️ Nenhuma transação encontrada para este user_id');
+        console.log('   Verificando se há transações com outros user_ids...');
+        
+        // Verifica se há transações no banco (de qualquer usuário) para debug
+        const { data: anyTransactions, error: anyError } = await supabase
+          .from('transacoes')
+          .select('id, user_id, estabelecimento')
+          .limit(5);
+        
+        if (!anyError &amp;&amp; anyTransactions &amp;&amp; anyTransactions.length &gt; 0) {
+          console.log(`   ℹ️ Existem ${anyTransactions.length} transação(ões) no banco (de outros usuários)`);
+          console.log('   Primeira transação encontrada:', {
+            id: anyTransactions[0].id,
+            user_id: anyTransactions[0].user_id,
+            estabelecimento: anyTransactions[0].estabelecimento
+          });
+          console.log(`   ⚠️ Seu user_id (${uid}) não corresponde ao user_id das transações existentes`);
+        } else {
+          console.log('   ℹ️ Não há transações no banco de dados ainda');
+          console.log('   💡 Execute a sincronização clicando em &quot;Buscar Notas Fiscais&quot;');
+        }
+      }
+
+      // Agora busca com o join completo
+      const { data, error } = await supabase
+        .from('transacoes')
+        .select('*, produtos (*)')
+        .eq('user_id', uid)
+        .order('data', { ascending: false })
+        .order('hora', { ascending: false });
+
+      if (error) {
+        console.error('❌ Erro ao carregar transações (query completa):', error);
+        console.error('   Código:', error.code);
+        console.error('   Mensagem:', error.message);
+        console.error('   Detalhes:', error.details);
+        
+        // Se a query simples funcionou mas a completa falhou, pode ser problema com a tabela produtos
+        if (simpleData &amp;&amp; simpleData.length &gt; 0) {
+          console.warn('⚠️ Transações existem, mas falha ao buscar produtos. Carregando sem produtos...');
+          // Tenta buscar sem produtos
+          const { data: dataWithoutProducts, error: errorWithoutProducts } = await supabase
+            .from('transacoes')
+            .select('*')
+            .eq('user_id', uid)
+            .order('data', { ascending: false })
+            .order('hora', { ascending: false });
+          
+          if (!errorWithoutProducts) {
+            console.log('✅ Transações carregadas sem produtos:', dataWithoutProducts?.length || 0);
+            setTransactions(Array.isArray(dataWithoutProducts) ? dataWithoutProducts : []);
+            return;
+          }
+        }
+        
+        throw error;
+      }
+      
+      console.log('✅ Transações carregadas:', data?.length || 0);
+      if (data &amp;&amp; data.length &gt; 0) {
+        console.log('   Primeira transação completa:', {
+          id: data[0].id,
+          estabelecimento: data[0].estabelecimento,
+          total: data[0].total,
+          produtos_count: data[0].produtos?.length || 0
+        });
+        console.log('   Todas as transações:', data);
+      } else {
+        console.log('   ⚠️ Nenhuma transação retornada da query');
+      }
+      
+      const transactionsArray = Array.isArray(data) ? data : [];
+      console.log('   Definindo transações no estado:', transactionsArray.length, 'transação(ões)');
+      setTransactions(transactionsArray);
+      
+      // Verifica se o estado foi atualizado
+      setTimeout(() =&gt; {
+        console.log('   Estado atualizado - transactions.length:', transactionsArray.length);
+      }, 100);
+    } catch (error) {
+      console.error('❌ Erro ao carregar transações:', error);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSyncEmails = useCallback(async (isFirstSync = false) =&gt; {
+    if (!userId) {
+      alert('⚠️ Você precisa conectar o Gmail primeiro!');
+      return;
+    }
+
+    if (syncing) {
+      console.warn('Sincronização já em andamento');
+      return;
+    }
+
+    setSyncing(true);
+    setSyncLogs([{ type: 'info', message: '🔄 Iniciando sincronização...', timestamp: new Date() }]);
+    setShowLogs(true);
+
+    try {
+      setSyncLogs(prev =&gt; [...prev, { type: 'info', message: '📧 Buscando e-mails no Gmail...', timestamp: new Date() }]);
+      
+      const response = await fetch('/api/gmail/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId,
+          firstSync: Boolean(isFirstSync)
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() =&gt; ({}));
+        const errorMsg = errorData.error || `HTTP error! status: ${response.status}`;
+        const errorDetails = errorData.details || '';
+        
+        // Se o erro indicar que precisa reautenticar
+        if (errorData.requiresReauth) {
+          setSyncLogs(prev =&gt; [...prev, { 
+            type: 'error', 
+            message: `❌ ${errorMsg}`, 
+            timestamp: new Date() 
+          }]);
+          
+          let reauthMessage = `❌ ${errorMsg}`;
+          if (errorData.errorCode === 'INSUFFICIENT_PERMISSIONS') {
+            reauthMessage += '\n\n🔧 Solução:\n';
+            reauthMessage += '1. Acesse: https://myaccount.google.com/permissions\n';
+            reauthMessage += '2. Revogue o acesso do FinMemory\n';
+            reauthMessage += '3. Clique em &quot;Sair&quot; aqui no app\n';
+            reauthMessage += '4. Faça login novamente e autorize o acesso aos e-mails';
+          } else {
+            reauthMessage += '\n\nPor favor, desconecte e conecte o Gmail novamente.';
+          }
+          
+          alert(reauthMessage);
+          return;
+        }
+        
+        throw new Error(`${errorMsg}${errorDetails ? `: ${errorDetails}` : ''}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const processed = parseInt(data.processed) || 0;
+        const skipped = parseInt(data.skipped) || 0;
+        const errors = parseInt(data.errors) || 0;
+        const total = parseInt(data.total) || 0;
+        const transactionsInDb = parseInt(data.transactionsInDb) || 0;
+        
+        const result = {
+          processed,
+          skipped,
+          errors,
+          total,
+          transactionsInDb,
+          timestamp: new Date()
+        };
+        
+        setLastSyncResult(result);
+        
+        setSyncLogs(prev =&gt; [
+          ...prev,
+          { type: 'success', message: `✅ Sincronização concluída!`, timestamp: new Date() },
+          { type: 'info', message: `📧 E-mails encontrados: ${total}`, timestamp: new Date() },
+          { type: processed &gt; 0 ? 'success' : 'info', message: `📄 Notas processadas: ${processed}`, timestamp: new Date() },
+          ...(skipped &gt; 0 ? [{ type: 'info', message: `⏭️ Ignorados (GPT sem dados): ${skipped}`, timestamp: new Date() }] : []),
+          ...(errors &gt; 0 ? [{ type: 'warning', message: `⚠️ Erros: ${errors}`, timestamp: new Date() }] : []),
+          { type: 'info', message: `💾 Total de transações no banco: ${transactionsInDb}`, timestamp: new Date() }
+        ]);
+        
+        console.log('📊 Resultado da sincronização:', result);
+
+        let message = '';
+        if (processed &gt; 0) {
+          message = `✅ ${processed} nota${processed &gt; 1 ? 's' : ''} fiscal${processed &gt; 1 ? 'is' : ''} processada${processed &gt; 1 ? 's' : ''}!`;
+          if (skipped &gt; 0) {
+            message += `\n⏭️ ${skipped} ignorado${skipped &gt; 1 ? 's' : ''} (GPT não conseguiu extrair dados).`;
+          }
+          if (errors &gt; 0) {
+            message += `\n⚠️ ${errors} erro${errors &gt; 1 ? 's' : ''} durante o processamento.`;
+          }
+          if (transactionsInDb &gt; 0) {
+            message += `\n📊 Total de transações no banco: ${transactionsInDb}`;
+          }
+        } else if (total &gt; 0) {
+          message = `ℹ️ ${total} e-mail${total &gt; 1 ? 's' : ''} encontrado${total &gt; 1 ? 's' : ''}, mas nenhuma nota fiscal nova foi processada.`;
+          if (skipped &gt; 0) {
+            message += `\n⏭️ ${skipped} ignorado${skipped &gt; 1 ? 's' : ''} (GPT não conseguiu extrair dados).`;
+          }
+          if (errors &gt; 0) {
+            message += `\n⚠️ ${errors} erro${errors &gt; 1 ? 's' : ''} durante o processamento.`;
+          }
+        } else {
+          message = 'ℹ️ Nenhum e-mail com nota fiscal encontrado.';
+        }
+        
+        alert(message);
+        
+        // Recarrega as transações após um pequeno delay para garantir que foram salvas
+        setTimeout(async () =&gt; {
+          setSyncLogs(prev =&gt; [...prev, { type: 'info', message: '🔄 Recarregando transações...', timestamp: new Date() }]);
+          await loadTransactions(userId);
+          setSyncLogs(prev =&gt; [...prev, { type: 'success', message: '✅ Transações recarregadas!', timestamp: new Date() }]);
+        }, 1000);
+      } else {
+        const errorMsg = data.error || 'Erro desconhecido';
+        const errorDetails = data.details || '';
+        const requiresReauth = data.requiresReauth || false;
+        
+        console.error('Erro ao sincronizar:', errorMsg, errorDetails);
+        setSyncLogs(prev =&gt; [...prev, { 
+          type: 'error', 
+          message: `❌ Erro: ${errorMsg}${errorDetails ? ` (${errorDetails})` : ''}`, 
+          timestamp: new Date() 
+        }]);
+        
+        let alertMessage = `❌ Erro ao sincronizar: ${errorMsg}`;
+        if (errorDetails) {
+          alertMessage += `\n\nDetalhes: ${errorDetails}`;
+        }
+        if (requiresReauth) {
+          alertMessage += `\n\n⚠️ Solução: Desconecte e conecte o Gmail novamente.`;
+        }
+        
+        alert(alertMessage);
+      }
+    } catch (error) {
+      console.error('Erro na sincronização:', error);
+      
+      let errorMessage = error.message || 'Erro desconhecido';
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+      } else if (error.message?.includes('500')) {
+        errorMessage = 'Erro no servidor. Tente novamente em alguns instantes.';
+      }
+      
+      setSyncLogs(prev =&gt; [...prev, { 
+        type: 'error', 
+        message: `❌ Erro: ${errorMessage}`, 
+        timestamp: new Date() 
+      }]);
+      alert(`❌ Erro ao sincronizar: ${errorMessage}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [userId, loadTransactions, syncing]);
+
+  // Load transactions when userId changes
+  useEffect(() =&gt; {
+    if (userId) {
+      loadTransactions(userId);
+    }
+  }, [userId, loadTransactions]);
+
+  // Check URL params for first sync
+  useEffect(() =&gt; {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+    
+    if (error) {
+      // Erros de autenticação agora são tratados pela página /auth-error
+      // Mas caso chegue aqui diretamente, mostra mensagem genérica
+      console.error('Erro de autenticação:', error);
+      window.history.replaceState({}, '', '/dashboard');
+      return;
+    }
+    
+    if (success === 'true' &amp;&amp; userId) {
+      window.history.replaceState({}, '', '/dashboard');
+      setTimeout(() =&gt; {
+        handleSyncEmails(true);
+      }, 1000);
+    }
+  }, [userId, handleSyncEmails]);
+
+  const handleConnectGmail = () =&gt; {
+    signIn('google', { callbackUrl: '/dashboard?success=true' });
+  };
+
+  const handleDisconnect = async () =&gt; {
+    if (confirm('⚠️ Deseja realmente desconectar? Suas transações não serão perdidas.')) {
+      try {
+        localStorage.removeItem('user_id');
+        setUserId(null);
+        setTransactions([]);
+        await signOut({ callbackUrl: '/dashboard' });
+      } catch (error) {
+        console.error('Erro ao desconectar:', error);
+        alert('❌ Erro ao desconectar. Tente novamente.');
+      }
+    }
+  };
+
+  const handleDebugConnection = async () =&gt; {
+    console.log('🔍 Iniciando diagnóstico de conexão...');
+    const supabase = getSupabase();
+    
+    if (!supabase) {
+      alert('❌ Supabase não está disponível. Verifique as variáveis de ambiente.');
+      return;
+    }
+
+    const debug = {
+      supabaseConfigured: !!supabase,
+      userId: userId,
+      timestamp: new Date().toISOString(),
+      tests: []
+    };
+
+    // Teste 1: Verificar se consegue acessar a tabela transacoes
+    try {
+      const { data, error, count } = await supabase
+        .from('transacoes')
+        .select('*', { count: 'exact', head: true });
+      
+      debug.tests.push({
+        name: 'Acesso à tabela transacoes',
+        success: !error,
+        error: error?.message,
+        count: count
+      });
+    } catch (e) {
+      debug.tests.push({
+        name: 'Acesso à tabela transacoes',
+        success: false,
+        error: e.message
+      });
+    }
+
+    // Teste 2: Buscar transações do usuário atual
+    if (userId) {
+      try {
+        const { data, error } = await supabase
+          .from('transacoes')
+          .select('id, user_id, estabelecimento, total')
+          .eq('user_id', userId)
+          .limit(5);
+        
+        debug.tests.push({
+          name: `Buscar transações do user_id: ${userId}`,
+          success: !error,
+          error: error?.message,
+          found: data?.length || 0,
+          data: data
+        });
+      } catch (e) {
+        debug.tests.push({
+          name: `Buscar transações do user_id: ${userId}`,
+          success: false,
+          error: e.message
+        });
+      }
+    }
+
+    // Teste 3: Buscar todas as transações (sem filtro)
+    try {
+      const { data, error } = await supabase
+        .from('transacoes')
+        .select('id, user_id, estabelecimento')
+        .limit(5);
+      
+      debug.tests.push({
+        name: 'Buscar todas as transações (sem filtro)',
+        success: !error,
+        error: error?.message,
+        found: data?.length || 0,
+        sampleUserIds: data?.map(t =&gt; t.user_id) || []
+      });
+    } catch (e) {
+      debug.tests.push({
+        name: 'Buscar todas as transações (sem filtro)',
+        success: false,
+        error: e.message
+      });
+    }
+
+    setDebugInfo(debug);
+    console.log('📊 Resultado do diagnóstico:', debug);
+    
+    const successCount = debug.tests.filter(t =&gt; t.success).length;
+    const totalTests = debug.tests.length;
+    
+    alert(`🔍 Diagnóstico concluído!\n\nTestes passados: ${successCount}/${totalTests}\n\nVerifique o console para mais detalhes.`);
+  };
+
+  const isAuthenticated = status === 'authenticated' &amp;&amp; session;
+  const isLoading = status === 'loading';
+
+  return (
+    &lt;div style={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px',
+      fontFamily: 'system-ui, sans-serif'
+    }}&gt;
+      &lt;style&gt;{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}&lt;/style&gt;
+      &lt;div style={{ maxWidth: '1200px', margin: '0 auto' }}&gt;
+        {/* Menu superior com links */}
+        &lt;nav style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: '24px',
+          marginBottom: '12px',
+        }}&gt;
+          &lt;a href=&quot;/privacidade&quot; style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}&gt;
+            Privacidade
+          &lt;/a&gt;
+          &lt;a href=&quot;/termos&quot; style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px' }}&gt;
+            Termos de Uso
+          &lt;/a&gt;
+        &lt;/nav&gt;
+
+        {/* Header */}
+        &lt;div style={{ 
+          background: 'white',
+          borderRadius: '16px',
+          padding: '24px',
+          marginBottom: '24px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}&gt;
+          &lt;div&gt;
+            &lt;h1 style={{ 
+              fontSize: '32px', 
+              margin: '0 0 8px 0',
+              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}&gt;
+              🚀 FinMemory
+            &lt;/h1&gt;
+            &lt;p style={{ margin: 0, color: '#666', fontSize: '14px' }}&gt;
+              {isAuthenticated ? `Olá, ${session.user.name || session.user.email}!` : 'Seu histórico financeiro inteligente'}
+            &lt;/p&gt;
+          &lt;/div&gt;
+          
+          &lt;div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}&gt;
+            {isLoading ? (
+              &lt;div style={{ padding: '14px 28px', color: '#666' }}&gt;
+                Carregando...
+              &lt;/div&gt;
+            ) : !isAuthenticated ? (
+              &lt;button
+                onClick={handleConnectGmail}
+                style={{
+                  padding: '14px 28px',
+                  background: 'linear-gradient(135deg, #34A853, #0F9D58)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold'
+                }}
+              &gt;
+                🔌 Conectar Gmail
+              &lt;/button&gt;
+            ) : (
+              &lt;&gt;
+                &lt;button
+                  onClick={() =&gt; handleSyncEmails(false)}
+                  disabled={syncing}
+                  style={{
+                    padding: '14px 28px',
+                    background: syncing ? '#ccc' : 'linear-gradient(135deg, #667eea, #764ba2)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: syncing ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    position: 'relative'
+                  }}
+                &gt;
+                  {syncing ? (
+                    &lt;&gt;
+                      &lt;span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}&gt;⏳&lt;/span&gt; Buscando...
+                    &lt;/&gt;
+                  ) : (
+                    '🔄 Buscar Notas Fiscais'
+                  )}
+                &lt;/button&gt;
+                
+                {syncLogs.length &gt; 0 &amp;&amp; !showLogs &amp;&amp; (
+                  &lt;button
+                    onClick={() =&gt; setShowLogs(true)}
+                    style={{
+                      padding: '14px 20px',
+                      background: '#f8f9fa',
+                      color: '#667eea',
+                      border: '2px solid #667eea',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                  &gt;
+                    📋 Ver Logs
+                  &lt;/button&gt;
+                )}
+                
+                {isAuthenticated &amp;&amp; (
+                  &lt;button
+                    onClick={handleDebugConnection}
+                    style={{
+                      padding: '14px 20px',
+                      background: '#fff3cd',
+                      color: '#856404',
+                      border: '2px solid #ffc107',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                    title=&quot;Testar conexão com Supabase e diagnóstico&quot;
+                  &gt;
+                    🔍 Debug
+                  &lt;/button&gt;
+                )}
+                
+                &lt;button
+                  onClick={handleDisconnect}
+                  style={{
+                    padding: '14px 20px',
+                    background: 'white',
+                    color: '#e74c3c',
+                    border: '2px solid #e74c3c',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                &gt;
+                  🚪 Sair
+                &lt;/button&gt;
+              &lt;/&gt;
+            )}
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        {/* Debug Info Panel */}
+        {debugInfo &amp;&amp; (
+          &lt;div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '20px',
+            marginBottom: '24px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}&gt;
+            &lt;div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}&gt;
+              &lt;h3 style={{ margin: 0, fontSize: '20px', color: '#333' }}&gt;
+                🔍 Diagnóstico de Conexão
+              &lt;/h3&gt;
+              &lt;button
+                onClick={() =&gt; setDebugInfo(null)}
+                style={{
+                  background: '#f0f0f0',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#666'
+                }}
+              &gt;
+                ✕ Fechar
+              &lt;/button&gt;
+            &lt;/div&gt;
+            
+            &lt;div style={{
+              background: '#f8f9fa',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}&gt;
+              &lt;div&gt;&lt;strong&gt;User ID:&lt;/strong&gt; {debugInfo.userId || 'Não definido'}&lt;/div&gt;
+              &lt;div&gt;&lt;strong&gt;Supabase Configurado:&lt;/strong&gt; {debugInfo.supabaseConfigured ? '✅ Sim' : '❌ Não'}&lt;/div&gt;
+              &lt;div&gt;&lt;strong&gt;Timestamp:&lt;/strong&gt; {new Date(debugInfo.timestamp).toLocaleString('pt-BR')}&lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;div&gt;
+              &lt;h4 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#333' }}&gt;
+                Resultados dos Testes:
+              &lt;/h4&gt;
+              {debugInfo.tests.map((test, index) =&gt; (
+                &lt;div
+                  key={index}
+                  style={{
+                    background: test.success ? '#d4edda' : '#f8d7da',
+                    borderLeft: `4px solid ${test.success ? '#28a745' : '#dc3545'}`,
+                    padding: '12px',
+                    marginBottom: '8px',
+                    borderRadius: '4px',
+                    fontSize: '13px'
+                  }}
+                &gt;
+                  &lt;div style={{ fontWeight: 'bold', marginBottom: '4px' }}&gt;
+                    {test.success ? '✅' : '❌'} {test.name}
+                  &lt;/div&gt;
+                  {test.error &amp;&amp; (
+                    &lt;div style={{ color: '#721c24', fontSize: '12px', marginTop: '4px' }}&gt;
+                      Erro: {test.error}
+                    &lt;/div&gt;
+                  )}
+                  {test.found !== undefined &amp;&amp; (
+                    &lt;div style={{ color: '#155724', fontSize: '12px', marginTop: '4px' }}&gt;
+                      Encontrado: {test.found} registro(s)
+                    &lt;/div&gt;
+                  )}
+                  {test.sampleUserIds &amp;&amp; test.sampleUserIds.length &gt; 0 &amp;&amp; (
+                    &lt;div style={{ color: '#155724', fontSize: '12px', marginTop: '4px' }}&gt;
+                      User IDs encontrados: {test.sampleUserIds.join(', ')}
+                    &lt;/div&gt;
+                  )}
+                  {test.data &amp;&amp; test.data.length &gt; 0 &amp;&amp; (
+                    &lt;details style={{ marginTop: '8px' }}&gt;
+                      &lt;summary style={{ cursor: 'pointer', fontSize: '12px' }}&gt;Ver dados&lt;/summary&gt;
+                      &lt;pre style={{
+                        background: '#fff',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        overflow: 'auto',
+                        maxHeight: '200px',
+                        marginTop: '8px'
+                      }}&gt;
+                        {JSON.stringify(test.data, null, 2)}
+                      &lt;/pre&gt;
+                    &lt;/details&gt;
+                  )}
+                &lt;/div&gt;
+              ))}
+            &lt;/div&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* Sync Logs Panel */}
+        {(showLogs &amp;&amp; syncLogs.length &gt; 0) &amp;&amp; (
+          &lt;div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '20px',
+            marginBottom: '24px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            maxHeight: '400px',
+            overflowY: 'auto'
+          }}&gt;
+            &lt;div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px'
+            }}&gt;
+              &lt;h3 style={{ margin: 0, fontSize: '20px', color: '#333' }}&gt;
+                📋 Logs da Sincronização
+              &lt;/h3&gt;
+              &lt;button
+                onClick={() =&gt; setShowLogs(false)}
+                style={{
+                  background: '#f0f0f0',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#666'
+                }}
+              &gt;
+                ✕ Fechar
+              &lt;/button&gt;
+            &lt;/div&gt;
+            
+            {lastSyncResult &amp;&amp; (
+              &lt;div style={{
+                background: '#f8f9fa',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '16px',
+                border: '2px solid #e9ecef'
+              }}&gt;
+                &lt;h4 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#333' }}&gt;
+                  📊 Resumo da Última Sincronização
+                &lt;/h4&gt;
+                &lt;div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                  gap: '12px',
+                  fontSize: '14px'
+                }}&gt;
+                  &lt;div&gt;
+                    &lt;strong style={{ color: '#666' }}&gt;E-mails encontrados:&lt;/strong&gt;
+                    &lt;div style={{ fontSize: '18px', fontWeight: 'bold', color: '#667eea' }}&gt;
+                      {lastSyncResult.total}
+                    &lt;/div&gt;
+                  &lt;/div&gt;
+                  &lt;div&gt;
+                    &lt;strong style={{ color: '#666' }}&gt;Notas processadas:&lt;/strong&gt;
+                    &lt;div style={{ 
+                      fontSize: '18px', 
+                      fontWeight: 'bold', 
+                      color: lastSyncResult.processed &gt; 0 ? '#28a745' : '#666' 
+                    }}&gt;
+                      {lastSyncResult.processed}
+                    &lt;/div&gt;
+                  &lt;/div&gt;
+                  {lastSyncResult.skipped &gt; 0 &amp;&amp; (
+                    &lt;div&gt;
+                      &lt;strong style={{ color: '#666' }}&gt;Ignorados (sem dados):&lt;/strong&gt;
+                      &lt;div style={{ fontSize: '18px', fontWeight: 'bold', color: '#6c757d' }}&gt;
+                        {lastSyncResult.skipped}
+                      &lt;/div&gt;
+                    &lt;/div&gt;
+                  )}
+                  {lastSyncResult.errors &gt; 0 &amp;&amp; (
+                    &lt;div&gt;
+                      &lt;strong style={{ color: '#666' }}&gt;Erros:&lt;/strong&gt;
+                      &lt;div style={{ fontSize: '18px', fontWeight: 'bold', color: '#dc3545' }}&gt;
+                        {lastSyncResult.errors}
+                      &lt;/div&gt;
+                    &lt;/div&gt;
+                  )}
+                  &lt;div&gt;
+                    &lt;strong style={{ color: '#666' }}&gt;Total no banco:&lt;/strong&gt;
+                    &lt;div style={{ fontSize: '18px', fontWeight: 'bold', color: '#667eea' }}&gt;
+                      {lastSyncResult.transactionsInDb}
+                    &lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div style={{
+                  marginTop: '12px',
+                  fontSize: '12px',
+                  color: '#999'
+                }}&gt;
+                  {lastSyncResult.timestamp.toLocaleString('pt-BR')}
+                &lt;/div&gt;
+              &lt;/div&gt;
+            )}
+
+            &lt;div style={{
+              fontFamily: 'monospace',
+              fontSize: '13px',
+              lineHeight: '1.6'
+            }}&gt;
+              {syncLogs.map((log, index) =&gt; {
+                const colors = {
+                  info: { bg: '#e7f3ff', border: '#b3d9ff', text: '#0066cc' },
+                  success: { bg: '#d4edda', border: '#c3e6cb', text: '#155724' },
+                  warning: { bg: '#fff3cd', border: '#ffeaa7', text: '#856404' },
+                  error: { bg: '#f8d7da', border: '#f5c6cb', text: '#721c24' }
+                };
+                const color = colors[log.type] || colors.info;
+                
+                return (
+                  &lt;div
+                    key={index}
+                    style={{
+                      background: color.bg,
+                      borderLeft: `4px solid ${color.border}`,
+                      padding: '10px 14px',
+                      marginBottom: '8px',
+                      borderRadius: '4px',
+                      color: color.text,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  &gt;
+                    &lt;span&gt;{log.message}&lt;/span&gt;
+                    &lt;span style={{
+                      fontSize: '11px',
+                      color: '#999',
+                      marginLeft: '12px'
+                    }}&gt;
+                      {log.timestamp.toLocaleTimeString('pt-BR')}
+                    &lt;/span&gt;
+                  &lt;/div&gt;
+                );
+              })}
+            &lt;/div&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* Content */}
+        {isLoading ? (
+          &lt;div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '60px',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}&gt;
+            &lt;div style={{ fontSize: '48px', marginBottom: '16px' }}&gt;⏳&lt;/div&gt;
+            &lt;p style={{ fontSize: '18px', color: '#666' }}&gt;
+              Carregando sessão...
+            &lt;/p&gt;
+          &lt;/div&gt;
+        ) : !isAuthenticated ? (
+          &lt;div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '60px 40px',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}&gt;
+            &lt;div style={{ fontSize: '64px', marginBottom: '24px' }}&gt;📧&lt;/div&gt;
+            &lt;h2 style={{ fontSize: '28px', marginBottom: '16px', color: '#333' }}&gt;
+              Conecte seu Gmail
+            &lt;/h2&gt;
+            &lt;p style={{ fontSize: '18px', color: '#666', marginBottom: '32px' }}&gt;
+              Busque suas notas fiscais automaticamente!
+            &lt;/p&gt;
+            &lt;button
+              onClick={handleConnectGmail}
+              style={{
+                padding: '16px 40px',
+                background: 'linear-gradient(135deg, #34A853, #0F9D58)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '18px',
+                fontWeight: 'bold'
+              }}
+            &gt;
+              🔌 Conectar Gmail Agora
+            &lt;/button&gt;
+          &lt;/div&gt;
+        ) : loading ? (
+          &lt;div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '60px',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}&gt;
+            &lt;div style={{ fontSize: '48px', marginBottom: '16px' }}&gt;⏳&lt;/div&gt;
+            &lt;p style={{ fontSize: '18px', color: '#666' }}&gt;
+              Carregando transações...
+            &lt;/p&gt;
+          &lt;/div&gt;
+        ) : transactions.length === 0 ? (
+          &lt;div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '60px 40px',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}&gt;
+            &lt;div style={{ fontSize: '64px', marginBottom: '24px' }}&gt;📭&lt;/div&gt;
+            &lt;h2 style={{ fontSize: '24px', marginBottom: '16px', color: '#333' }}&gt;
+              Nenhuma nota fiscal encontrada
+            &lt;/h2&gt;
+            &lt;p style={{ fontSize: '16px', color: '#666', marginBottom: '24px' }}&gt;
+              {lastSyncResult ? (
+                &lt;&gt;
+                  Última sincronização: {lastSyncResult.timestamp.toLocaleString('pt-BR')}
+                  &lt;br /&gt;
+                  {lastSyncResult.total &gt; 0 ? (
+                    &lt;&gt;
+                      {lastSyncResult.total} e-mail{lastSyncResult.total &gt; 1 ? 's' : ''} encontrado{lastSyncResult.total &gt; 1 ? 's' : ''}, 
+                      mas nenhuma nota foi processada.
+                      &lt;br /&gt;
+                      {lastSyncResult.skipped &gt; 0 &amp;&amp; (
+                        &lt;span style={{ color: '#6c757d' }}&gt;
+                          {lastSyncResult.skipped} ignorado{lastSyncResult.skipped &gt; 1 ? 's' : ''} (GPT sem dados).
+                          {lastSyncResult.errors &gt; 0 ? ' ' : ''}
+                        &lt;/span&gt;
+                      )}
+                      {lastSyncResult.errors &gt; 0 &amp;&amp; (
+                        &lt;span style={{ color: '#dc3545' }}&gt;
+                          {lastSyncResult.errors} erro{lastSyncResult.errors &gt; 1 ? 's' : ''} durante o processamento.
+                        &lt;/span&gt;
+                      )}
+                    &lt;/&gt;
+                  ) : (
+                    'Nenhum e-mail com nota fiscal foi encontrado.'
+                  )}
+                &lt;/&gt;
+              ) : (
+                'Você ainda não executou a sincronização.'
+              )}
+            &lt;/p&gt;
+            &lt;div style={{
+              background: '#f8f9fa',
+              borderRadius: '12px',
+              padding: '20px',
+              marginTop: '24px',
+              textAlign: 'left',
+              maxWidth: '500px',
+              margin: '24px auto 0'
+            }}&gt;
+              &lt;h3 style={{ fontSize: '18px', marginBottom: '12px', color: '#333' }}&gt;
+                💡 Como começar:
+              &lt;/h3&gt;
+              &lt;ol style={{ fontSize: '14px', color: '#666', lineHeight: '1.8', paddingLeft: '20px' }}&gt;
+                &lt;li&gt;Clique no botão &lt;strong&gt;&quot;🔄 Buscar Notas Fiscais&quot;&lt;/strong&gt; acima&lt;/li&gt;
+                &lt;li&gt;Aguarde a sincronização processar seus e-mails&lt;/li&gt;
+                &lt;li&gt;As notas fiscais aparecerão aqui automaticamente&lt;/li&gt;
+              &lt;/ol&gt;
+              {userId &amp;&amp; (
+                &lt;div style={{
+                  marginTop: '16px',
+                  padding: '12px',
+                  background: '#e7f3ff',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#0066cc'
+                }}&gt;
+                  &lt;strong&gt;User ID:&lt;/strong&gt; {userId}
+                  &lt;br /&gt;
+                  &lt;strong&gt;Status:&lt;/strong&gt; {isAuthenticated ? '✅ Autenticado' : '❌ Não autenticado'}
+                &lt;/div&gt;
+              )}
+            &lt;/div&gt;
+          &lt;/div&gt;
+        ) : (
+          &lt;div&gt;
+            &lt;div style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '24px',
+              marginBottom: '16px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}&gt;
+              &lt;h2 style={{ margin: '0 0 8px 0', fontSize: '24px', color: '#333' }}&gt;
+                📊 Histórico de Compras
+              &lt;/h2&gt;
+              &lt;p style={{ margin: 0, color: '#666' }}&gt;
+                {transactions.length} transação(ões)
+              &lt;/p&gt;
+            &lt;/div&gt;
+
+            {transactions.map(transaction =&gt; (
+              &lt;TransactionCard key={transaction.id} transaction={transaction} /&gt;
+            ))}
+          &lt;/div&gt;
+        )}
+      &lt;/div&gt;
+
+      {/* Botão Flutuante - Adicionar Nota Fiscal */}
+      &lt;div
+        onClick={() =&gt; window.location.href = '/add-receipt'}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '60px',
+          height: '60px',
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+          cursor: 'pointer',
+          zIndex: 1000,
+          transition: 'transform 0.2s, box-shadow 0.2s'
+        }}
+        onMouseEnter={(e) =&gt; {
+          e.currentTarget.style.transform = 'scale(1.1)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+        }}
+        onMouseLeave={(e) =&gt; {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+        }}
+        title=&quot;Escanear Nota Fiscal&quot;
+      &gt;
+        &lt;span style={{ fontSize: '28px' }}&gt;📸&lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+function TransactionCard({ transaction }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    &lt;div style={{
+      background: 'white',
+      borderRadius: '16px',
+      padding: '24px',
+      marginBottom: '16px',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+    }}&gt;
+      &lt;div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+        gap: '16px'
+      }}&gt;
+        &lt;div style={{ flex: 1, minWidth: '250px' }}&gt;
+          &lt;h3 style={{ margin: '0 0 12px 0', fontSize: '22px', color: '#333' }}&gt;
+            🏪 {transaction.estabelecimento}
+          &lt;/h3&gt;
+          {transaction.endereco &amp;&amp; (
+            &lt;p style={{ margin: '0 0 8px 0', color: '#666', fontSize: '14px' }}&gt;
+              📍 {transaction.endereco}
+            &lt;/p&gt;
+          )}
+          &lt;p style={{ margin: 0, color: '#999', fontSize: '14px' }}&gt;
+            📅 {new Date(transaction.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+            {transaction.hora &amp;&amp; ` às ${transaction.hora.substring(0, 5)}`}
+          &lt;/p&gt;
+        &lt;/div&gt;
+        
+        &lt;div style={{ textAlign: 'right' }}&gt;
+          &lt;p style={{ 
+            margin: '0 0 8px 0', 
+            fontSize: '32px', 
+            fontWeight: 'bold',
+            color: '#667eea'
+          }}&gt;
+            R$ {(parseFloat(transaction.total) || 0).toFixed(2)}
+          &lt;/p&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      {transaction.produtos &amp;&amp; transaction.produtos.length &gt; 0 &amp;&amp; (
+        &lt;&gt;
+          &lt;button
+            onClick={() =&gt; setExpanded(!expanded)}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: '#f8f9fa',
+              border: '2px solid #e9ecef',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '600',
+              color: '#495057'
+            }}
+          &gt;
+            {expanded ? '▲ Ocultar Produtos' : `▼ Ver ${transaction.produtos.length} Produto(s)`}
+          &lt;/button&gt;
+
+          {expanded &amp;&amp; (
+            &lt;div style={{ marginTop: '20px' }}&gt;
+              &lt;table style={{ width: '100%', borderCollapse: 'collapse' }}&gt;
+                &lt;thead&gt;
+                  &lt;tr style={{ background: '#f1f3f5' }}&gt;
+                    &lt;th style={{ padding: '14px', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}&gt;
+                      Produto
+                    &lt;/th&gt;
+                    &lt;th style={{ padding: '14px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}&gt;
+                      Qtd
+                    &lt;/th&gt;
+                    &lt;th style={{ padding: '14px', textAlign: 'right', borderBottom: '2px solid #dee2e6' }}&gt;
+                      Valor Unit.
+                    &lt;/th&gt;
+                    &lt;th style={{ padding: '14px', textAlign: 'right', borderBottom: '2px solid #dee2e6' }}&gt;
+                      Total
+                    &lt;/th&gt;
+                  &lt;/tr&gt;
+                &lt;/thead&gt;
+                &lt;tbody&gt;
+                  {transaction.produtos.map((produto, idx) =&gt; (
+                    &lt;tr key={idx} style={{ borderBottom: '1px solid #e9ecef' }}&gt;
+                      &lt;td style={{ padding: '14px' }}&gt;
+                        &lt;strong&gt;{produto.descricao}&lt;/strong&gt;
+                      &lt;/td&gt;
+                      &lt;td style={{ padding: '14px', textAlign: 'center' }}&gt;
+                        {(parseFloat(produto.quantidade) || 0).toFixed(0)} {produto.unidade || 'UN'}
+                      &lt;/td&gt;
+                      &lt;td style={{ padding: '14px', textAlign: 'right' }}&gt;
+                        R$ {(parseFloat(produto.valor_unitario) || 0).toFixed(2)}
+                      &lt;/td&gt;
+                      &lt;td style={{ padding: '14px', textAlign: 'right', fontWeight: 'bold' }}&gt;
+                        R$ {(parseFloat(produto.valor_total) || 0).toFixed(2)}
+                      &lt;/td&gt;
+                    &lt;/tr&gt;
+                  ))}
+                &lt;/tbody&gt;
+              &lt;/table&gt;
+            &lt;/div&gt;
+          )}
+        &lt;/&gt;
+      )}
+    &lt;/div&gt;
+  );
+}
+</code></pre>
+
+  <h2>pages/add-receipt.js</h2>
+  <div class="file-path">pages/add-receipt.js</div>
+  <pre><code>import { useState, useRef, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
+import { createClient } from '@supabase/supabase-js';
+import Head from 'next/head';
+
+/**
+ * Página de captura e processamento de nota fiscal via OCR.
+ * Mobile-first design.
+ */
+
+// Supabase client (apenas para buscar user_id)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl &amp;&amp; supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey) 
+  : null;
+
+// Comprimir imagem para max 2MB
+async function compressImage(file, maxSizeMB = 1.5) {
+  return new Promise((resolve, reject) =&gt; {
+    const reader = new FileReader();
+    reader.onload = (e) =&gt; {
+      const img = new Image();
+      img.onload = () =&gt; {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        
+        // Redimensionar se muito grande
+        const maxDimension = 2000;
+        if (width &gt; maxDimension || height &gt; maxDimension) {
+          if (width &gt; height) {
+            height = (height / width) * maxDimension;
+            width = maxDimension;
+          } else {
+            width = (width / height) * maxDimension;
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Tentar diferentes qualidades até ficar abaixo do limite
+        let quality = 0.8;
+        let base64 = canvas.toDataURL('image/jpeg', quality);
+        
+        while (base64.length &gt; maxSizeMB * 1024 * 1024 * 1.37 &amp;&amp; quality &gt; 0.1) {
+          quality -= 0.1;
+          base64 = canvas.toDataURL('image/jpeg', quality);
+        }
+        
+        resolve(base64);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Estados do fluxo
+const STEPS = {
+  CAPTURE: 'capture',
+  PREVIEW: 'preview',
+  PROCESSING: 'processing',
+  EDIT: 'edit',
+  SAVING: 'saving',
+  SUCCESS: 'success'
+};
+
+export default function AddReceipt() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  
+  // Estados
+  const [step, setStep] = useState(STEPS.CAPTURE);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
+  const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [extractedData, setExtractedData] = useState(null);
+  const [remainingRequests, setRemainingRequests] = useState(null);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    date: '',
+    merchant_name: '',
+    merchant_cnpj: '',
+    total_amount: '',
+    items: [],
+    category: '',
+    payment_method: '',
+    receipt_image_url: ''
+  });
+
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+
+  // Buscar user_id
+  useEffect(() =&gt; {
+    async function fetchUserId() {
+      if (session?.user?.email &amp;&amp; supabase) {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', session.user.email)
+            .single();
+          
+          if (data) {
+            setUserId(data.id);
+          }
+        } catch (err) {
+          console.error('Erro ao buscar user_id:', err);
+        }
+      }
+    }
+    fetchUserId();
+  }, [session]);
+
+  // Redirect se não autenticado
+  useEffect(() =&gt; {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+
+  // Processar arquivo selecionado
+  const handleFileSelect = async (e) =&gt; {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+
+    // Validar tipo
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setError('Formato não suportado. Use JPG, PNG ou WebP.');
+      return;
+    }
+
+    // Validar tamanho inicial (antes de comprimir)
+    if (file.size &gt; 10 * 1024 * 1024) { // 10MB limite inicial
+      setError('Imagem muito grande. Máximo 10MB.');
+      return;
+    }
+
+    try {
+      // Comprimir imagem
+      const compressed = await compressImage(file);
+      setImageBase64(compressed);
+      setImagePreview(compressed);
+      setStep(STEPS.PREVIEW);
+    } catch (err) {
+      console.error('Erro ao processar imagem:', err);
+      setError('Erro ao processar imagem. Tente outra.');
+    }
+  };
+
+  // Processar imagem via OCR
+  const processImage = async () =&gt; {
+    if (!imageBase64 || !userId) {
+      setError('Dados incompletos para processar');
+      return;
+    }
+
+    setStep(STEPS.PROCESSING);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/ocr/process-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: imageBase64,
+          userId: userId
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao processar nota fiscal');
+      }
+
+      // Salvar dados extraídos
+      setExtractedData(result.data);
+      setRemainingRequests(result.remaining_requests);
+      
+      // Preencher formulário
+      setFormData({
+        date: result.data.date || '',
+        merchant_name: result.data.merchant_name || '',
+        merchant_cnpj: result.data.merchant_cnpj || '',
+        total_amount: result.data.total_amount?.toString() || '',
+        items: result.data.items || [],
+        category: result.data.category || '',
+        payment_method: result.data.payment_method || '',
+        receipt_image_url: result.data.receipt_image_url || ''
+      });
+
+      setStep(STEPS.EDIT);
+
+    } catch (err) {
+      console.error('Erro no OCR:', err);
+      setError(err.message);
+      setStep(STEPS.PREVIEW);
+    }
+  };
+
+  // Salvar transação
+  const saveTransaction = async () =&gt; {
+    if (!userId) {
+      setError('Usuário não identificado');
+      return;
+    }
+
+    setStep(STEPS.SAVING);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/ocr/save-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          ...formData,
+          total_amount: parseFloat(formData.total_amount) || 0
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao salvar transação');
+      }
+
+      setStep(STEPS.SUCCESS);
+      
+      // Redirecionar após 2 segundos
+      setTimeout(() =&gt; {
+        router.push('/dashboard');
+      }, 2000);
+
+    } catch (err) {
+      console.error('Erro ao salvar:', err);
+      setError(err.message);
+      setStep(STEPS.EDIT);
+    }
+  };
+
+  // Atualizar campo do formulário
+  const updateField = (field, value) =&gt; {
+    setFormData(prev =&gt; ({ ...prev, [field]: value }));
+  };
+
+  // Atualizar item
+  const updateItem = (index, field, value) =&gt; {
+    setFormData(prev =&gt; {
+      const newItems = [...prev.items];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return { ...prev, items: newItems };
+    });
+  };
+
+  // Adicionar item
+  const addItem = () =&gt; {
+    setFormData(prev =&gt; ({
+      ...prev,
+      items: [...prev.items, { name: '', price: 0 }]
+    }));
+  };
+
+  // Remover item
+  const removeItem = (index) =&gt; {
+    setFormData(prev =&gt; ({
+      ...prev,
+      items: prev.items.filter((_, i) =&gt; i !== index)
+    }));
+  };
+
+  // Reiniciar
+  const reset = () =&gt; {
+    setStep(STEPS.CAPTURE);
+    setImagePreview(null);
+    setImageBase64(null);
+    setExtractedData(null);
+    setError(null);
+    setFormData({
+      date: '',
+      merchant_name: '',
+      merchant_cnpj: '',
+      total_amount: '',
+      items: [],
+      category: '',
+      payment_method: '',
+      receipt_image_url: ''
+    });
+  };
+
+  // Loading de sessão
+  if (status === 'loading') {
+    return (
+      &lt;div style={styles.container}&gt;
+        &lt;div style={styles.loading}&gt;Carregando...&lt;/div&gt;
+      &lt;/div&gt;
+    );
+  }
+
+  return (
+    &lt;&gt;
+      &lt;Head&gt;
+        &lt;title&gt;Adicionar Nota Fiscal | FinMemory&lt;/title&gt;
+        &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1, maximum-scale=1&quot; /&gt;
+      &lt;/Head&gt;
+
+      &lt;div style={styles.container}&gt;
+        {/* Header */}
+        &lt;div style={styles.header}&gt;
+          &lt;button onClick={() =&gt; router.push('/dashboard')} style={styles.backButton}&gt;
+            ← Voltar
+          &lt;/button&gt;
+          &lt;h1 style={styles.title}&gt;📸 Escanear Nota&lt;/h1&gt;
+        &lt;/div&gt;
+
+        {/* Erro global */}
+        {error &amp;&amp; (
+          &lt;div style={styles.errorBox}&gt;
+            ⚠️ {error}
+          &lt;/div&gt;
+        )}
+
+        {/* STEP: CAPTURE */}
+        {step === STEPS.CAPTURE &amp;&amp; (
+          &lt;div style={styles.captureContainer}&gt;
+            &lt;div style={styles.captureIcon}&gt;📄&lt;/div&gt;
+            &lt;h2 style={styles.captureTitle}&gt;Tire uma foto da nota fiscal&lt;/h2&gt;
+            &lt;p style={styles.captureSubtitle}&gt;
+              Posicione a nota em uma superfície plana com boa iluminação
+            &lt;/p&gt;
+
+            &lt;div style={styles.buttonGroup}&gt;
+              {/* Botão Câmera */}
+              &lt;button
+                onClick={() =&gt; cameraInputRef.current?.click()}
+                style={styles.primaryButton}
+              &gt;
+                📷 Tirar Foto
+              &lt;/button&gt;
+              &lt;input
+                ref={cameraInputRef}
+                type=&quot;file&quot;
+                accept=&quot;image/*&quot;
+                capture=&quot;environment&quot;
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              /&gt;
+
+              {/* Botão Galeria */}
+              &lt;button
+                onClick={() =&gt; fileInputRef.current?.click()}
+                style={styles.secondaryButton}
+              &gt;
+                🖼️ Escolher da Galeria
+              &lt;/button&gt;
+              &lt;input
+                ref={fileInputRef}
+                type=&quot;file&quot;
+                accept=&quot;image/jpeg,image/png,image/webp&quot;
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              /&gt;
+            &lt;/div&gt;
+
+            &lt;p style={styles.hint}&gt;
+              Formatos aceitos: JPG, PNG, WebP (máx. 2MB)
+            &lt;/p&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* STEP: PREVIEW */}
+        {step === STEPS.PREVIEW &amp;&amp; imagePreview &amp;&amp; (
+          &lt;div style={styles.previewContainer}&gt;
+            &lt;img src={imagePreview} alt=&quot;Preview&quot; style={styles.previewImage} /&gt;
+            
+            &lt;div style={styles.buttonGroup}&gt;
+              &lt;button onClick={processImage} style={styles.primaryButton}&gt;
+                ✅ Processar Nota
+              &lt;/button&gt;
+              &lt;button onClick={reset} style={styles.secondaryButton}&gt;
+                🔄 Tirar Outra Foto
+              &lt;/button&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* STEP: PROCESSING */}
+        {step === STEPS.PROCESSING &amp;&amp; (
+          &lt;div style={styles.processingContainer}&gt;
+            &lt;div style={styles.spinner}&gt;&lt;/div&gt;
+            &lt;h2 style={styles.processingTitle}&gt;Lendo sua nota fiscal...&lt;/h2&gt;
+            &lt;p style={styles.processingSubtitle}&gt;
+              Isso pode levar alguns segundos
+            &lt;/p&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* STEP: EDIT */}
+        {step === STEPS.EDIT &amp;&amp; (
+          &lt;div style={styles.editContainer}&gt;
+            &lt;h2 style={styles.editTitle}&gt;Confira os dados&lt;/h2&gt;
+            &lt;p style={styles.editSubtitle}&gt;
+              Corrija se necessário antes de salvar
+            &lt;/p&gt;
+
+            {/* Preview da imagem pequeno */}
+            {imagePreview &amp;&amp; (
+              &lt;img src={imagePreview} alt=&quot;Nota&quot; style={styles.thumbnailImage} /&gt;
+            )}
+
+            {/* Formulário */}
+            &lt;div style={styles.form}&gt;
+              {/* Estabelecimento */}
+              &lt;div style={styles.formGroup}&gt;
+                &lt;label style={styles.label}&gt;Estabelecimento *&lt;/label&gt;
+                &lt;input
+                  type=&quot;text&quot;
+                  value={formData.merchant_name}
+                  onChange={(e) =&gt; updateField('merchant_name', e.target.value)}
+                  style={styles.input}
+                  placeholder=&quot;Nome da loja&quot;
+                /&gt;
+              &lt;/div&gt;
+
+              {/* CNPJ */}
+              &lt;div style={styles.formGroup}&gt;
+                &lt;label style={styles.label}&gt;CNPJ&lt;/label&gt;
+                &lt;input
+                  type=&quot;text&quot;
+                  value={formData.merchant_cnpj || ''}
+                  onChange={(e) =&gt; updateField('merchant_cnpj', e.target.value)}
+                  style={styles.input}
+                  placeholder=&quot;00.000.000/0000-00&quot;
+                /&gt;
+              &lt;/div&gt;
+
+              {/* Data e Valor */}
+              &lt;div style={styles.formRow}&gt;
+                &lt;div style={{ ...styles.formGroup, flex: 1 }}&gt;
+                  &lt;label style={styles.label}&gt;Data&lt;/label&gt;
+                  &lt;input
+                    type=&quot;date&quot;
+                    value={formData.date || ''}
+                    onChange={(e) =&gt; updateField('date', e.target.value)}
+                    style={styles.input}
+                  /&gt;
+                &lt;/div&gt;
+                &lt;div style={{ ...styles.formGroup, flex: 1 }}&gt;
+                  &lt;label style={styles.label}&gt;Valor Total *&lt;/label&gt;
+                  &lt;input
+                    type=&quot;number&quot;
+                    step=&quot;0.01&quot;
+                    value={formData.total_amount}
+                    onChange={(e) =&gt; updateField('total_amount', e.target.value)}
+                    style={styles.input}
+                    placeholder=&quot;0.00&quot;
+                  /&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+
+              {/* Categoria e Pagamento */}
+              &lt;div style={styles.formRow}&gt;
+                &lt;div style={{ ...styles.formGroup, flex: 1 }}&gt;
+                  &lt;label style={styles.label}&gt;Categoria&lt;/label&gt;
+                  &lt;select
+                    value={formData.category || ''}
+                    onChange={(e) =&gt; updateField('category', e.target.value)}
+                    style={styles.input}
+                  &gt;
+                    &lt;option value=&quot;&quot;&gt;Selecione&lt;/option&gt;
+                    &lt;option value=&quot;Supermercado&quot;&gt;Supermercado&lt;/option&gt;
+                    &lt;option value=&quot;Restaurante&quot;&gt;Restaurante&lt;/option&gt;
+                    &lt;option value=&quot;Farmácia&quot;&gt;Farmácia&lt;/option&gt;
+                    &lt;option value=&quot;Combustível&quot;&gt;Combustível&lt;/option&gt;
+                    &lt;option value=&quot;Eletrônicos&quot;&gt;Eletrônicos&lt;/option&gt;
+                    &lt;option value=&quot;Vestuário&quot;&gt;Vestuário&lt;/option&gt;
+                    &lt;option value=&quot;Serviços&quot;&gt;Serviços&lt;/option&gt;
+                    &lt;option value=&quot;Outros&quot;&gt;Outros&lt;/option&gt;
+                  &lt;/select&gt;
+                &lt;/div&gt;
+                &lt;div style={{ ...styles.formGroup, flex: 1 }}&gt;
+                  &lt;label style={styles.label}&gt;Pagamento&lt;/label&gt;
+                  &lt;select
+                    value={formData.payment_method || ''}
+                    onChange={(e) =&gt; updateField('payment_method', e.target.value)}
+                    style={styles.input}
+                  &gt;
+                    &lt;option value=&quot;&quot;&gt;Selecione&lt;/option&gt;
+                    &lt;option value=&quot;Cartão de Crédito&quot;&gt;Cartão de Crédito&lt;/option&gt;
+                    &lt;option value=&quot;Débito&quot;&gt;Débito&lt;/option&gt;
+                    &lt;option value=&quot;Dinheiro&quot;&gt;Dinheiro&lt;/option&gt;
+                    &lt;option value=&quot;PIX&quot;&gt;PIX&lt;/option&gt;
+                  &lt;/select&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+
+              {/* Itens */}
+              &lt;div style={styles.formGroup}&gt;
+                &lt;label style={styles.label}&gt;
+                  Itens ({formData.items?.length || 0})
+                &lt;/label&gt;
+                
+                {formData.items?.map((item, index) =&gt; (
+                  &lt;div key={index} style={styles.itemRow}&gt;
+                    &lt;input
+                      type=&quot;text&quot;
+                      value={item.name || ''}
+                      onChange={(e) =&gt; updateItem(index, 'name', e.target.value)}
+                      style={{ ...styles.input, flex: 2 }}
+                      placeholder=&quot;Nome do item&quot;
+                    /&gt;
+                    &lt;input
+                      type=&quot;number&quot;
+                      step=&quot;0.01&quot;
+                      value={item.price || ''}
+                      onChange={(e) =&gt; updateItem(index, 'price', parseFloat(e.target.value) || 0)}
+                      style={{ ...styles.input, flex: 1, minWidth: '80px' }}
+                      placeholder=&quot;0.00&quot;
+                    /&gt;
+                    &lt;button
+                      onClick={() =&gt; removeItem(index)}
+                      style={styles.removeItemButton}
+                    &gt;
+                      ✕
+                    &lt;/button&gt;
+                  &lt;/div&gt;
+                ))}
+                
+                &lt;button onClick={addItem} style={styles.addItemButton}&gt;
+                  + Adicionar Item
+                &lt;/button&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+
+            {/* Botões de ação */}
+            &lt;div style={styles.buttonGroup}&gt;
+              &lt;button onClick={saveTransaction} style={styles.primaryButton}&gt;
+                💾 Salvar Transação
+              &lt;/button&gt;
+              &lt;button onClick={reset} style={styles.secondaryButton}&gt;
+                🔄 Escanear Outra
+              &lt;/button&gt;
+            &lt;/div&gt;
+
+            {remainingRequests !== null &amp;&amp; (
+              &lt;p style={styles.hint}&gt;
+                {remainingRequests} leituras restantes nesta hora
+              &lt;/p&gt;
+            )}
+          &lt;/div&gt;
+        )}
+
+        {/* STEP: SAVING */}
+        {step === STEPS.SAVING &amp;&amp; (
+          &lt;div style={styles.processingContainer}&gt;
+            &lt;div style={styles.spinner}&gt;&lt;/div&gt;
+            &lt;h2 style={styles.processingTitle}&gt;Salvando transação...&lt;/h2&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* STEP: SUCCESS */}
+        {step === STEPS.SUCCESS &amp;&amp; (
+          &lt;div style={styles.successContainer}&gt;
+            &lt;div style={styles.successIcon}&gt;✅&lt;/div&gt;
+            &lt;h2 style={styles.successTitle}&gt;Nota fiscal salva!&lt;/h2&gt;
+            &lt;p style={styles.successSubtitle}&gt;
+              Redirecionando para o dashboard...
+            &lt;/p&gt;
+          &lt;/div&gt;
+        )}
+      &lt;/div&gt;
+
+      {/* CSS para spinner */}
+      &lt;style jsx global&gt;{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}&lt;/style&gt;
+    &lt;/&gt;
+  );
+}
+
+// Estilos
+const styles = {
+  container: {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '20px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif'
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: '24px'
+  },
+  backButton: {
+    background: 'rgba(255,255,255,0.2)',
+    border: 'none',
+    color: 'white',
+    padding: '8px 16px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px'
+  },
+  title: {
+    color: 'white',
+    fontSize: '24px',
+    margin: 0
+  },
+  errorBox: {
+    background: '#fee2e2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+    padding: '12px 16px',
+    borderRadius: '12px',
+    marginBottom: '20px',
+    fontSize: '14px'
+  },
+  loading: {
+    color: 'white',
+    textAlign: 'center',
+    padding: '40px'
+  },
+
+  // Capture step
+  captureContainer: {
+    background: 'white',
+    borderRadius: '24px',
+    padding: '40px 24px',
+    textAlign: 'center'
+  },
+  captureIcon: {
+    fontSize: '64px',
+    marginBottom: '16px'
+  },
+  captureTitle: {
+    fontSize: '20px',
+    color: '#333',
+    margin: '0 0 8px 0'
+  },
+  captureSubtitle: {
+    fontSize: '14px',
+    color: '#666',
+    margin: '0 0 32px 0'
+  },
+  buttonGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  },
+  primaryButton: {
+    background: 'linear-gradient(135deg, #667eea, #764ba2)',
+    color: 'white',
+    border: 'none',
+    padding: '16px 24px',
+    borderRadius: '12px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'transform 0.2s'
+  },
+  secondaryButton: {
+    background: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+    padding: '16px 24px',
+    borderRadius: '12px',
+    fontSize: '16px',
+    cursor: 'pointer'
+  },
+  hint: {
+    fontSize: '12px',
+    color: '#9ca3af',
+    marginTop: '16px'
+  },
+
+  // Preview step
+  previewContainer: {
+    background: 'white',
+    borderRadius: '24px',
+    padding: '24px',
+    textAlign: 'center'
+  },
+  previewImage: {
+    maxWidth: '100%',
+    maxHeight: '400px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+  },
+
+  // Processing step
+  processingContainer: {
+    background: 'white',
+    borderRadius: '24px',
+    padding: '60px 24px',
+    textAlign: 'center'
+  },
+  spinner: {
+    width: '48px',
+    height: '48px',
+    border: '4px solid #e5e7eb',
+    borderTop: '4px solid #667eea',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    margin: '0 auto 24px'
+  },
+  processingTitle: {
+    fontSize: '20px',
+    color: '#333',
+    margin: '0 0 8px 0'
+  },
+  processingSubtitle: {
+    fontSize: '14px',
+    color: '#666',
+    margin: 0
+  },
+
+  // Edit step
+  editContainer: {
+    background: 'white',
+    borderRadius: '24px',
+    padding: '24px'
+  },
+  editTitle: {
+    fontSize: '20px',
+    color: '#333',
+    margin: '0 0 4px 0'
+  },
+  editSubtitle: {
+    fontSize: '14px',
+    color: '#666',
+    margin: '0 0 16px 0'
+  },
+  thumbnailImage: {
+    width: '100%',
+    maxHeight: '150px',
+    objectFit: 'cover',
+    borderRadius: '12px',
+    marginBottom: '20px'
+  },
+  form: {
+    marginBottom: '24px'
+  },
+  formGroup: {
+    marginBottom: '16px'
+  },
+  formRow: {
+    display: 'flex',
+    gap: '12px'
+  },
+  label: {
+    display: 'block',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: '6px'
+  },
+  input: {
+    width: '100%',
+    padding: '12px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    fontSize: '16px',
+    boxSizing: 'border-box'
+  },
+  itemRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '8px',
+    alignItems: 'center'
+  },
+  removeItemButton: {
+    background: '#fee2e2',
+    color: '#dc2626',
+    border: 'none',
+    width: '36px',
+    height: '36px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px'
+  },
+  addItemButton: {
+    background: '#f3f4f6',
+    color: '#667eea',
+    border: 'none',
+    padding: '10px 16px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    width: '100%'
+  },
+
+  // Success step
+  successContainer: {
+    background: 'white',
+    borderRadius: '24px',
+    padding: '60px 24px',
+    textAlign: 'center'
+  },
+  successIcon: {
+    fontSize: '64px',
+    marginBottom: '16px'
+  },
+  successTitle: {
+    fontSize: '24px',
+    color: '#059669',
+    margin: '0 0 8px 0'
+  },
+  successSubtitle: {
+    fontSize: '14px',
+    color: '#666',
+    margin: 0
+  }
+};
+</code></pre>
+
+  <div style="margin-top: 48px; padding: 24px; background: #f8f9fa; border-radius: 12px;">
+    <h3>Como gerar o PDF</h3>
+    <ol>
+      <li>Abra este arquivo HTML no navegador (Chrome, Edge, etc.)</li>
+      <li>Ctrl+P (ou Cmd+P no Mac)</li>
+      <li>Destino: <strong>Salvar como PDF</strong></li>
+      <li>Clique em Salvar</li>
+    </ol>
+  </div>
+</body>
+</html>
