@@ -468,6 +468,23 @@ Se não conseguir identificar o estabelecimento ou o total, retorne um JSON com 
 
         console.log('💾 Salvando no Supabase...');
 
+        // data é NOT NULL na tabela transacoes: usa data do GPT, ou data do e-mail, ou hoje
+        let dataTransacao = notaFiscal.data;
+        if (!dataTransacao || (typeof dataTransacao === 'string' && dataTransacao.trim() === '')) {
+          const emailDate = emailData?.data?.internalDate;
+          if (emailDate) {
+            const d = new Date(parseInt(emailDate, 10));
+            dataTransacao = d.toISOString().slice(0, 10); // YYYY-MM-DD
+          } else {
+            dataTransacao = new Date().toISOString().slice(0, 10);
+          }
+        }
+        if (typeof dataTransacao === 'object' && dataTransacao instanceof Date) {
+          dataTransacao = dataTransacao.toISOString().slice(0, 10);
+        } else if (typeof dataTransacao === 'string' && dataTransacao.length > 10) {
+          dataTransacao = dataTransacao.slice(0, 10);
+        }
+
         const { data: transaction, error: transError } = await supabase
           .from('transacoes')
           .insert({
@@ -477,7 +494,7 @@ Se não conseguir identificar o estabelecimento ou o total, retorne um JSON com 
             endereco: notaFiscal.endereco || null,
             cidade: notaFiscal.cidade || null,
             estado: notaFiscal.estado || null,
-            data: notaFiscal.data || null,
+            data: dataTransacao,
             hora: notaFiscal.hora || null,
             total: parseFloat(notaFiscal.total) || 0,
             forma_pagamento: notaFiscal.formaPagamento || null,

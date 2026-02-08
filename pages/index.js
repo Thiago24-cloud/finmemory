@@ -60,6 +60,12 @@ export default function Home() {
           >
             Ver Dashboard
           </Link>
+          <Link
+            href="/mapa"
+            className="w-full max-w-[400px] inline-flex justify-center gap-2 py-3.5 px-6 bg-transparent text-[#22c55e] border-2 border-[#22c55e] rounded-lg font-semibold text-base hover:bg-[#22c55e] hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e] focus-visible:ring-offset-2"
+          >
+            🗺️ Ver Mapa de Preços
+          </Link>
         </div>
 
         <div className="mt-10 p-6 bg-[#f8f9fa] rounded-xl text-left">

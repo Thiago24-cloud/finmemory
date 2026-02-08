@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
-mapboxgl.accessToken = token;
+export default function PriceMap({ mapboxToken: tokenProp }) {
+  const token = tokenProp || (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) || '';
+  if (token) mapboxgl.accessToken = token;
 
-export default function PriceMap() {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const [lng] = useState(-46.6333);
@@ -51,7 +51,7 @@ export default function PriceMap() {
         )
       )
       .addTo(map.current);
-  }, [lng, lat, zoom]);
+  }, [token, lng, lat, zoom]);
 
   if (!token) {
     return (

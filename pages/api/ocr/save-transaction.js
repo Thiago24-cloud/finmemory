@@ -85,13 +85,16 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
     }
 
+    // data é NOT NULL na tabela transacoes: usa data extraída ou hoje
+    const dataTransacao = (date && String(date).trim()) ? date.trim().slice(0, 10) : new Date().toISOString().slice(0, 10);
+
     // Preparar dados para inserção
     // Adaptado para a estrutura existente da tabela transacoes
     const transactionData = {
       user_id: userId,
       estabelecimento: merchant_name.trim(),
       cnpj: merchant_cnpj || null,
-      data: date || null,
+      data: dataTransacao,
       total: parseFloat(total_amount),
       forma_pagamento: payment_method || null,
       categoria: category || null,

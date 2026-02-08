@@ -55,7 +55,8 @@ $MAPBOX_TOKEN = ""
 if (Test-Path ".env.local") {
     $line = Get-Content ".env.local" | Where-Object { $_ -match '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=(.+)$' } | Select-Object -First 1
     if ($line) {
-        $MAPBOX_TOKEN = $line -replace '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=', '' -replace '^["'']|["'']$', ''
+        $MAPBOX_TOKEN = $line -replace '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=', ''
+        $MAPBOX_TOKEN = $MAPBOX_TOKEN.Trim().Trim('"').Trim("'")
         if ($MAPBOX_TOKEN) { Write-Host "   🗺️  Token Mapbox encontrado no .env.local" -ForegroundColor Green }
     }
 }
@@ -68,11 +69,10 @@ Write-Host "`n🔨 Iniciando build via Cloud Build..." -ForegroundColor Cyan
 Write-Host "   Isso pode levar alguns minutos..." -ForegroundColor Yellow
 
 $subs = "_COMMIT_SHA=$COMMIT_SHA,_MAPBOX_ACCESS_TOKEN=$MAPBOX_TOKEN"
-$buildCmd = "gcloud builds submit --config cloudbuild.yaml --substitutions=$subs"
-Write-Host "`nExecutando: $buildCmd" -ForegroundColor Gray
+Write-Host "`nExecutando: gcloud builds submit --config cloudbuild.yaml --substitutions=..." -ForegroundColor Gray
 
 try {
-    Invoke-Expression $buildCmd
+    & gcloud builds submit --config cloudbuild.yaml "--substitutions=$subs"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✅ Deploy concluído com sucesso!" -ForegroundColor Green
         Write-Host "`n🌐 Sua aplicação está disponível em:" -ForegroundColor Cyan

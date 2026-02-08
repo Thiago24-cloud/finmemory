@@ -3,7 +3,12 @@ import Head from 'next/head';
 
 const PriceMap = dynamic(() => import('../components/PriceMap'), { ssr: false });
 
-export default function MapaPage() {
+export async function getServerSideProps() {
+  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+  return { props: { mapboxToken: token } };
+}
+
+export default function MapaPage({ mapboxToken }) {
   return (
     <>
       <Head>
@@ -26,7 +31,7 @@ export default function MapaPage() {
 
         <div className="flex-1 p-4 min-h-0">
           <div className="max-w-7xl mx-auto h-full">
-            <PriceMap />
+            <PriceMap mapboxToken={mapboxToken} />
           </div>
         </div>
       </div>
