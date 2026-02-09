@@ -105,3 +105,20 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Mapa FinMemory – popups com identidade da marca */
+.finmemory-popup .mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.finmemory-popup .mapboxgl-popup-close-button {
+  font-size: 18px;
+  padding: 6px 10px;
+  color: #6b7280;
+}
+.finmemory-popup .mapboxgl-popup-close-button:hover {
+  color: #1a1a1a;
+}
