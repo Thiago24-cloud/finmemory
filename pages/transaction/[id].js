@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { useState } from 'react';
 import { ArrowLeft, Store, MapPin, Calendar, Loader2, Receipt, Pencil, Trash2 } from 'lucide-react';
 import { getSupabase } from '../../lib/supabase';
 
