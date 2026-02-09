@@ -184,16 +184,16 @@ export default function PriceMap({ mapboxToken: tokenProp }) {
   }
 
   return (
-    <div className="w-full h-full relative">
-      <div ref={mapContainer} className="absolute inset-0" />
-      {/* Estilo do mapa no canto inferior direito, sem atrapalhar a busca */}
-      <div className="absolute bottom-3 right-3 flex flex-wrap gap-1.5 justify-end max-w-[calc(100%-1rem)]">
+    <div className="w-full h-full min-h-0 relative" style={{ height: '100%' }}>
+      <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ minHeight: 0 }} />
+      {/* Estilo do mapa: canto inferior direito, compacto (referência Google) */}
+      <div className="absolute bottom-2 right-2 flex flex-wrap gap-1 justify-end max-w-[calc(100%-0.5rem)]">
         {MAP_STYLES.map((style) => (
           <button
             key={style.id}
             type="button"
             onClick={() => handleStyleChange(style)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm ${
+            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors shadow-sm ${
               mapStyle.id === style.id
                 ? 'text-white border-0'
                 : 'bg-white/95 backdrop-blur border border-gray-200 text-gray-700 hover:bg-white'
