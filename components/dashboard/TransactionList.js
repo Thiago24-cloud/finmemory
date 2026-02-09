@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   Car,
@@ -9,6 +10,8 @@ import {
   Shirt,
   Wrench,
   Receipt,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -53,9 +56,33 @@ function formatCurrency(value) {
 
 /**
  * Lista de transações – dados reais do Supabase (transacoes + produtos).
- * Clique leva ao detalhe da transação quando a rota existir.
+ * Editar: link para /transaction/[id]/edit. Deletar: botão com confirmação, chama onDeleted após sucesso.
  */
-export function TransactionList({ transactions, className }) {
+export function TransactionList({ transactions, userId, onDeleted, className }) {
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
+
+  const handleDelete = async (id) => {
+    if (!userId || !onDeleted) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/transactions/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setConfirmId(null);
+        onDeleted();
+      }
+    } catch (e) {
+      console.error('Erro ao deletar:', e);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (!transactions || transactions.length === 0) {
     return (
       <div className={cn('text-center py-12', className)}>
@@ -83,32 +110,74 @@ export function TransactionList({ transactions, className }) {
           const isIncome = total < 0;
           const displayValue = Math.abs(total);
 
+          const showConfirm = confirmId === transaction.id;
+          const isDeleting = deletingId === transaction.id;
+
           return (
             <div key={transaction.id}>
-              <Link
-                href={`/transaction/${transaction.id}`}
-                className="w-full flex items-center gap-4 p-4 hover:bg-[#f8f9fa] transition-colors text-left"
-              >
-                <div className="w-12 h-12 rounded-xl bg-[#f8f9fa] flex items-center justify-center text-[#666] shrink-0">
-                  {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-[#333] truncate text-base">
-                    {transaction.estabelecimento || 'Estabelecimento'}
-                  </p>
-                  <p className="text-sm text-[#666]">
-                    {formatDate(transaction.data)}
-                  </p>
-                </div>
-                <div
-                  className={cn(
-                    'text-right font-bold text-base',
-                    isIncome ? 'text-[#28a745]' : 'text-[#333]'
-                  )}
-                >
-                  {isIncome ? '+' : '-'} {formatCurrency(displayValue)}
-                </div>
-              </Link>
+              <div className="w-full flex items-center gap-2 p-4 hover:bg-[#f8f9fa] transition-colors">
+                <Link href={`/transaction/${transaction.id}`} className="flex-1 flex items-center gap-4 min-w-0 text-left">
+                  <div className="w-12 h-12 rounded-xl bg-[#f8f9fa] flex items-center justify-center text-[#666] shrink-0">
+                    {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#333] truncate text-base">
+                      {transaction.estabelecimento || 'Estabelecimento'}
+                    </p>
+                    <p className="text-sm text-[#666]">
+                      {formatDate(transaction.data)}
+                    </p>
+                  </div>
+                  <div
+                    className={cn(
+                      'text-right font-bold text-base shrink-0',
+                      isIncome ? 'text-[#28a745]' : 'text-[#333]'
+                    )}
+                  >
+                    {isIncome ? '+' : '-'} {formatCurrency(displayValue)}
+                  </div>
+                </Link>
+                {userId && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Link
+                      href={`/transaction/${transaction.id}/edit`}
+                      className="p-2 rounded-lg text-[#666] hover:bg-[#e5e7eb] hover:text-[#333]"
+                      title="Editar"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                    {!showConfirm ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); setConfirmId(transaction.id); }}
+                        className="p-2 rounded-lg text-[#666] hover:bg-red-50 hover:text-red-600"
+                        title="Deletar"
+                        disabled={isDeleting}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(transaction.id)}
+                          className="px-2 py-1 bg-red-600 text-white rounded font-medium"
+                        >
+                          {isDeleting ? '...' : 'Sim'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmId(null)}
+                          className="px-2 py-1 bg-gray-200 text-gray-800 rounded font-medium"
+                        >
+                          Não
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               {index < transactions.length - 1 && (
                 <div className="h-px bg-[#e5e7eb] mx-4" />
               )}

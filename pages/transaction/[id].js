@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Store, MapPin, Calendar, Loader2, Receipt } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Store, MapPin, Calendar, Loader2, Receipt, Pencil, Trash2 } from 'lucide-react';
 import { getSupabase } from '../../lib/supabase';
 
 function formatCurrency(value) {
@@ -105,12 +106,45 @@ export default function TransactionDetailPage() {
   const total = Number(transaction.total) || 0;
   const produtos = transaction.produtos || [];
 
+  const [removingPhoto, setRemovingPhoto] = useState(false);
+  const [receiptImageUrl, setReceiptImageUrl] = useState(transaction.receipt_image_url || null);
+
+  const hasReceiptImage = receiptImageUrl && receiptImageUrl.trim();
+
+  const handleRemovePhoto = async () => {
+    if (!confirm('Remover a foto desta nota fiscal? A transação continuará, apenas a imagem será desvinculada.')) return;
+    const uid = session?.user?.supabaseId || (typeof window !== 'undefined' && localStorage.getItem('user_id'));
+    if (!uid) return;
+    setRemovingPhoto(true);
+    try {
+      const res = await fetch(`/api/transactions/${transaction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid, receipt_image_url: null })
+      });
+      const json = await res.json();
+      if (json.success) setReceiptImageUrl(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRemovingPhoto(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground dark">
       <div className="max-w-md mx-auto px-5 py-6 pb-24">
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm mb-6">
-          <ArrowLeft className="h-4 w-4" /> Voltar ao Dashboard
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm">
+            <ArrowLeft className="h-4 w-4" /> Voltar ao Dashboard
+          </Link>
+          <Link
+            href={`/transaction/${transaction.id}/edit`}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-sm font-medium"
+          >
+            <Pencil className="h-4 w-4" /> Editar
+          </Link>
+        </div>
 
         <div className="card-nubank overflow-hidden">
           <div className="p-6">
@@ -145,6 +179,33 @@ export default function TransactionDetailPage() {
               Total: {formatCurrency(total)}
             </div>
           </div>
+
+          {hasReceiptImage && (
+            <div className="border-t border-border px-6 py-4">
+              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-accent" />
+                Foto da nota fiscal
+              </h2>
+              <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
+                <img
+                  src={receiptImageUrl}
+                  alt="Nota fiscal"
+                  className="w-full max-h-80 object-contain bg-white"
+                />
+                <div className="p-3 bg-muted/50 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    disabled={removingPhoto}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 font-medium text-sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {removingPhoto ? 'Removendo...' : 'Remover foto'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {produtos.length > 0 && (
             <div className="border-t border-border px-6 py-4">

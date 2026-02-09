@@ -650,7 +650,11 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <TransactionList transactions={transactions} />
+              <TransactionList
+                transactions={transactions}
+                userId={userId}
+                onDeleted={() => loadTransactions(userId)}
+              />
             )}
 
             {syncLogs.length > 0 && !showLogs && (
