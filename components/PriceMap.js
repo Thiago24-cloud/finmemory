@@ -186,17 +186,24 @@ export default function PriceMap({ mapboxToken: tokenProp }) {
   return (
     <div className="w-full h-full min-h-0 relative" style={{ height: '100%' }}>
       <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ minHeight: 0 }} />
-      {/* Estilo do mapa: canto inferior direito, compacto (referência Google) */}
-      <div className="absolute bottom-2 right-2 flex flex-wrap gap-1 justify-end max-w-[calc(100%-0.5rem)]">
+      {/* Estilo do mapa: acima do canvas (z-index), área de toque maior para clicar */}
+      <div
+        className="absolute bottom-3 right-3 flex flex-wrap gap-2 justify-end max-w-[calc(100%-1rem)] z-[10]"
+        style={{ pointerEvents: 'auto' }}
+      >
         {MAP_STYLES.map((style) => (
           <button
             key={style.id}
             type="button"
-            onClick={() => handleStyleChange(style)}
-            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors shadow-sm ${
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleStyleChange(style);
+            }}
+            className={`min-h-[36px] px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-md border select-none ${
               mapStyle.id === style.id
-                ? 'text-white border-0'
-                : 'bg-white/95 backdrop-blur border border-gray-200 text-gray-700 hover:bg-white'
+                ? 'text-white border-transparent'
+                : 'bg-white/98 hover:bg-white border-gray-200 text-gray-700'
             }`}
             style={mapStyle.id === style.id ? { backgroundColor: BRAND.green } : undefined}
           >
