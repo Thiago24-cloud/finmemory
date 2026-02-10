@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { getSupabase } from '../lib/supabase';
 
 // Cores da marca FinMemory (logo: verde #2ECC49, preto, branco)
 const BRAND = {
@@ -109,23 +110,37 @@ function popupHTML(store, product, price, timeAgo, userName) {
   `;
 }
 
-const MARKERS_DATA = [
+/** Dados de teste quando não houver pontos reais no Supabase */
+const FALLBACK_MARKERS = [
   { lng: -46.6555, lat: -23.5629, store: 'Drogasil Paulista', product: 'Dipirona 500mg', price: 'R$ 12,90', timeAgo: 'Há 2 horas · Caçador #4521' },
   { lng: -46.6433, lat: -23.5505, store: 'Pão de Açúcar', product: 'Leite Integral 1L', price: 'R$ 5,90', timeAgo: 'Há 5 horas · Explorador #1234' },
 ];
 
-function addMarkers(map) {
-  if (!map) return;
-  MARKERS_DATA.forEach(({ lng, lat, store, product, price, timeAgo }) => {
-    const el = createCustomMarkerElement();
-    const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-      .setLngLat([lng, lat])
-      .setPopup(
-        new mapboxgl.Popup({ offset: 20, className: 'finmemory-popup' })
-          .setHTML(popupHTML(store, product, price, timeAgo))
-      )
-      .addTo(map);
-  });
+function formatPrice(value) {
+  if (value == null || value === '') return 'R$ 0,00';
+  const n = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(isNaN(n) ? 0 : n);
+}
+
+/** Busca pontos do mapa: API (dados reais) ou fallback */
+async function fetchMapPoints() {
+  try {
+    const res = await fetch('/api/map/points');
+    if (!res.ok) return null;
+    const json = await res.json();
+    const raw = json.points || [];
+    return raw.map((p) => ({
+      lng: p.lng,
+      lat: p.lat,
+      store: p.store_name,
+      product: p.product_name,
+      price: p.price,
+      timeAgo: [p.time_ago, p.user_label].filter(Boolean).join(' · ')
+    }));
+  } catch (e) {
+    console.warn('Map points fetch failed:', e);
+    return null;
+  }
 }
 
 export default function PriceMap({ mapboxToken: tokenProp }) {
@@ -134,10 +149,35 @@ export default function PriceMap({ mapboxToken: tokenProp }) {
 
   const mapContainer = useRef(null);
   const map = useRef(null);
+  const markersRef = useRef([]);
+  const mapPointsRef = useRef(null);
   const [lng] = useState(-46.6333);
   const [lat] = useState(-23.5505);
   const [zoom] = useState(12);
   const [mapStyle, setMapStyle] = useState(MAP_STYLES[0]);
+
+  const clearMarkers = () => {
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+  };
+
+  const addMarkersToMap = (mapInstance, points) => {
+    if (!mapInstance) return;
+    clearMarkers();
+    const data = Array.isArray(points) && points.length > 0 ? points : FALLBACK_MARKERS;
+    data.forEach(({ lng: l, lat: la, store, product, price, timeAgo }) => {
+      const priceStr = typeof price === 'number' || (typeof price === 'string' && price.trim() && !String(price).startsWith('R$')) ? formatPrice(price) : (price || 'R$ 0,00');
+      const el = createCustomMarkerElement();
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([l, la])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 20, className: 'finmemory-popup' })
+            .setHTML(popupHTML(store || '', product || '', priceStr, timeAgo || ''))
+        )
+        .addTo(mapInstance);
+      markersRef.current.push(marker);
+    });
+  };
 
   useEffect(() => {
     if (!token || map.current || !mapContainer.current) return;
@@ -151,9 +191,29 @@ export default function PriceMap({ mapboxToken: tokenProp }) {
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    map.current.on('load', () => addMarkers(map.current));
+    map.current.on('load', async () => {
+      const points = mapPointsRef.current ?? (await fetchMapPoints());
+      mapPointsRef.current = points;
+      addMarkersToMap(map.current, points);
+    });
+
+    // Realtime: quando um novo ponto for inserido, atualiza o mapa
+    const supabase = getSupabase();
+    let channel;
+    if (supabase) {
+      channel = supabase
+        .channel('price_points_changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'price_points' }, async () => {
+          const points = await fetchMapPoints();
+          mapPointsRef.current = points;
+          if (map.current) addMarkersToMap(map.current, points);
+        })
+        .subscribe();
+    }
 
     return () => {
+      if (channel && supabase) supabase.removeChannel(channel);
+      clearMarkers();
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -164,7 +224,7 @@ export default function PriceMap({ mapboxToken: tokenProp }) {
   useEffect(() => {
     if (!map.current || !token) return;
     map.current.setStyle(mapStyle.url);
-    map.current.once('style.load', () => addMarkers(map.current));
+    map.current.once('style.load', () => addMarkersToMap(map.current, mapPointsRef.current));
   }, [mapStyle, token]);
 
   const handleStyleChange = (style) => {
