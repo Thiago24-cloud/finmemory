@@ -21,10 +21,11 @@ export default function MapaPage({ mapboxToken }) {
         <header className="flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-2.5 bg-white/98 backdrop-blur-sm border-b border-gray-200 z-20 shrink-0">
           <Link
             href="/dashboard"
-            className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 text-gray-600 transition-colors shrink-0"
-            aria-label="Voltar"
+            className="inline-flex items-center gap-1.5 sm:gap-2 min-h-[44px] min-w-[44px] py-2 px-3 rounded-full hover:bg-gray-100 text-gray-700 transition-colors shrink-0 font-medium text-sm"
+            aria-label="Voltar ao Dashboard"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 shrink-0" />
+            <span className="sm:hidden">Voltar</span>
           </Link>
           <div className="flex-1 flex items-center min-w-0">
             <div className="w-full max-w-xl flex items-center bg-gray-100 rounded-full border border-gray-200 pl-3 pr-3 py-2 focus-within:bg-white focus-within:ring-1 focus-within:ring-[#2ECC49] focus-within:border-[#2ECC49] transition-all">

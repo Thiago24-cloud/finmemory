@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
 
@@ -333,19 +334,19 @@ export default function AddReceipt() {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-primary p-5 font-sans">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard')}
-            className="bg-white/20 border-none text-white py-2 px-4 rounded-lg cursor-pointer text-sm hover:bg-white/30 transition-colors"
+      <div className="min-h-screen bg-gradient-primary font-sans">
+        {/* Header fixo – Voltar sempre visível (não some ao rolar) */}
+        <div className="sticky top-0 z-20 flex items-center gap-4 p-5 pb-4 bg-gradient-primary">
+          <Link
+            href="/dashboard"
+            className="min-h-[44px] inline-flex items-center gap-2 bg-white/20 text-white py-2.5 px-4 rounded-xl text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors no-underline"
           >
-            ← Voltar
-          </button>
-          <h1 className="text-white text-2xl m-0">📸 Escanear Nota</h1>
+            <span aria-hidden>←</span> Voltar
+          </Link>
+          <h1 className="text-white text-2xl m-0 flex-1">📸 Escanear Nota</h1>
         </div>
 
+        <div className="px-5 pb-8">
         {/* Erro global */}
         {error && (
           <div className="bg-[#fee2e2] border border-[#fecaca] text-[#dc2626] py-3 px-4 rounded-xl mb-5 text-sm">
@@ -630,6 +631,7 @@ export default function AddReceipt() {
             </p>
           </div>
         )}
+        </div>
       </div>
     </>
   );
