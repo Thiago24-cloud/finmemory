@@ -20,7 +20,13 @@ export default function EditTransactionPage() {
   const userId = session?.user?.supabaseId || (typeof window !== 'undefined' && localStorage.getItem('user_id'));
 
   useEffect(() => {
-    if (!id || !userId || status === 'loading') return;
+    if (status === 'loading') return;
+    if (!id) return;
+    if (!userId) {
+      setLoading(false);
+      setError('Faça login para editar.');
+      return;
+    }
 
     const supabase = getSupabase();
     if (!supabase) {
@@ -105,7 +111,9 @@ export default function EditTransactionPage() {
         setError(json.error || 'Erro ao salvar.');
         return;
       }
-      router.push(`/transaction/${id}`);
+      const targetId = transaction?.id ?? id;
+      if (targetId) router.push(`/transaction/${targetId}`);
+      else router.push('/dashboard');
     } catch (e) {
       setError(e.message || 'Erro ao salvar.');
     } finally {
@@ -139,10 +147,24 @@ export default function EditTransactionPage() {
     );
   }
 
+  // Evita renderizar o formulário sem dados (ex.: id undefined durante transição do router)
+  if (!transaction || !transaction.id) {
+    return (
+      <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+          <p className="text-[#666]">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const safeId = transaction.id;
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] p-5">
       <div className="max-w-md mx-auto">
-        <Link href={`/transaction/${id}`} className="inline-flex items-center gap-2 text-[#666] hover:text-[#333] text-sm mb-6">
+        <Link href={`/transaction/${safeId}`} className="inline-flex items-center gap-2 text-[#666] hover:text-[#333] text-sm mb-6">
           <ArrowLeft className="h-4 w-4" /> Voltar à transação
         </Link>
 
@@ -190,11 +212,11 @@ export default function EditTransactionPage() {
             />
           </div>
 
-          {receiptImageUrl && receiptImageUrl.trim() && (
+          {(typeof receiptImageUrl === 'string' && receiptImageUrl.trim()) ? (
             <div className="border-t border-gray-200 pt-4">
               <p className="text-sm font-medium text-[#333] mb-2">Foto da nota fiscal</p>
               <div className="rounded-lg border border-gray-300 overflow-hidden">
-                <img src={receiptImageUrl} alt="Nota fiscal" className="w-full max-h-48 object-contain bg-gray-50" />
+                <img src={receiptImageUrl.trim()} alt="Nota fiscal" className="w-full max-h-48 object-contain bg-gray-50" />
                 <div className="p-2 bg-gray-100 flex justify-end">
                   <button
                     type="button"
@@ -219,7 +241,7 @@ export default function EditTransactionPage() {
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
             <Link
-              href={`/transaction/${id}`}
+              href={`/transaction/${safeId}`}
               className="flex-1 py-3 px-4 text-center border border-gray-300 text-[#333] font-semibold rounded-xl hover:bg-gray-50"
             >
               Cancelar
