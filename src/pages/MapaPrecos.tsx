@@ -76,6 +76,7 @@ const MapaPrecos = () => {
   const [search, setSearch] = useState("");
   const [styleIdx, setStyleIdx] = useState(0);
   const [points, setPoints] = useState<PricePoint[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
 
   // Fetch points from DB, fallback to mock
   useEffect(() => {
@@ -94,14 +95,19 @@ const MapaPrecos = () => {
     load();
   }, []);
 
-  // Filter points by search
+  // Derive categories from points
+  const categories = ["Todos", ...Array.from(new Set(points.map((p) => p.category).filter(Boolean)))];
+
+  // Filter points by search and category
   const filtered = points.filter((p) => {
-    if (!search.trim()) return true;
+    const matchesCategory = selectedCategory === "Todos" || p.category === selectedCategory;
+    if (!search.trim()) return matchesCategory;
     const q = search.toLowerCase();
     return (
-      p.product_name.toLowerCase().includes(q) ||
-      p.store_name.toLowerCase().includes(q) ||
-      p.category?.toLowerCase().includes(q)
+      matchesCategory &&
+      (p.product_name.toLowerCase().includes(q) ||
+        p.store_name.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q))
     );
   });
 
@@ -237,6 +243,23 @@ const MapaPrecos = () => {
               }`}
             >
               {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Category filter */}
+        <div className="absolute top-14 left-3 flex flex-wrap gap-1 bg-white/90 backdrop-blur rounded-lg p-1 shadow-md z-10 max-w-[220px]">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                cat === selectedCategory
+                  ? "bg-[#2ECC49] text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              {cat}
             </button>
           ))}
         </div>
