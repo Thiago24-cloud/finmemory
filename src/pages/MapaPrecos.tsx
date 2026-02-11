@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Camera } from "lucide-react";
+import { Search, Camera } from "lucide-react";
+import { BottomNav } from "@/components/BottomNav";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import MapFilters from "@/components/map/MapFilters";
@@ -176,14 +177,10 @@ const MapaPrecos = () => {
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card z-10 shrink-0">
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
-        </button>
-        <div className="relative flex-1 max-w-xs">
+        <h1 className="text-base font-semibold text-foreground whitespace-nowrap">
+          🗺️ Mapa de Preços
+        </h1>
+        <div className="relative flex-1 max-w-xs ml-auto">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar produto..."
@@ -192,9 +189,6 @@ const MapaPrecos = () => {
             className="pl-8 h-9 text-sm"
           />
         </div>
-        <h1 className="text-base font-semibold text-foreground whitespace-nowrap ml-auto">
-          Mapa de Preços
-        </h1>
       </header>
 
       {/* Map */}
@@ -213,19 +207,21 @@ const MapaPrecos = () => {
         />
 
         {/* Count badge */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 text-[11px] text-muted-foreground bg-card/80 backdrop-blur px-3 py-1 rounded-full z-10 shadow-sm">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-[11px] text-muted-foreground bg-card/80 backdrop-blur px-3 py-1 rounded-full z-10 shadow-sm">
           {filtered.length} preço{filtered.length !== 1 ? "s" : ""} · {period === "current" ? "este mês" : "meses anteriores"}
         </div>
 
         {/* FAB */}
         <button
           onClick={() => navigate("/share-price")}
-          className="absolute bottom-6 right-4 w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform z-10 bg-accent text-accent-foreground"
+          className="absolute bottom-20 right-4 w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform z-10 bg-accent text-accent-foreground"
           title="Compartilhar preço"
         >
           <Camera className="h-6 w-6" />
         </button>
       </div>
+
+      <BottomNav />
     </div>
   );
 };
