@@ -13,6 +13,7 @@ import MapaPrecos from "./pages/MapaPrecos";
 import SharePrice from "./pages/SharePrice";
 import ManualEntry from "./pages/ManualEntry";
 import Partnership from "./pages/Partnership";
+import Profile from "./pages/Profile";
 import ShoppingList from "./pages/ShoppingList";
 import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/share-price" element={<ProtectedRoute><SharePrice /></ProtectedRoute>} />
             <Route path="/manual-entry" element={<ProtectedRoute><ManualEntry /></ProtectedRoute>} />
             <Route path="/partnership" element={<ProtectedRoute><Partnership /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/shopping-list" element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />
             <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/termos" element={<Termos />} />

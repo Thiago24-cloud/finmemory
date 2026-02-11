@@ -6,7 +6,7 @@ const tabs = [
   { icon: Map, label: "Mapa", path: "/mapa-precos" },
   { icon: BarChart3, label: "Dashboard", path: "/dashboard" },
   { icon: PlusCircle, label: "Adicionar", path: "/add-receipt" },
-  { icon: User, label: "Perfil", path: "/partnership" },
+  { icon: User, label: "Perfil", path: "/profile" },
 ];
 
 export function BottomNav() {
