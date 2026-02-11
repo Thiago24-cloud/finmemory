@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import AddReceipt from "./pages/AddReceipt";
 import MapaPrecos from "./pages/MapaPrecos";
 import SharePrice from "./pages/SharePrice";
+import ManualEntry from "./pages/ManualEntry";
 import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/add-receipt" element={<ProtectedRoute><AddReceipt /></ProtectedRoute>} />
             <Route path="/mapa-precos" element={<ProtectedRoute><MapaPrecos /></ProtectedRoute>} />
             <Route path="/share-price" element={<ProtectedRoute><SharePrice /></ProtectedRoute>} />
+            <Route path="/manual-entry" element={<ProtectedRoute><ManualEntry /></ProtectedRoute>} />
             <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/termos" element={<Termos />} />
             <Route path="*" element={<NotFound />} />

@@ -1,13 +1,5 @@
 import {
-  Car,
-  ShoppingBag,
-  Utensils,
-  Fuel,
-  Pill,
-  Smartphone,
-  Shirt,
-  Wrench,
-  Receipt,
+  Car, ShoppingBag, Utensils, Fuel, Pill, Smartphone, Shirt, Wrench, Receipt, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -62,9 +54,10 @@ interface Transaction {
 interface TransactionListProps {
   transactions: Transaction[];
   className?: string;
+  onEdit?: (transaction: Transaction) => void;
 }
 
-export function TransactionList({ transactions, className }: TransactionListProps) {
+export function TransactionList({ transactions, className, onEdit }: TransactionListProps) {
   if (!transactions || transactions.length === 0) {
     return (
       <div className={cn("text-center py-12", className)}>
@@ -92,7 +85,11 @@ export function TransactionList({ transactions, className }: TransactionListProp
 
           return (
             <div key={transaction.id}>
-              <div className="w-full flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors text-left">
+              <button
+                type="button"
+                onClick={() => onEdit?.(transaction)}
+                className="w-full flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors text-left group"
+              >
                 <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
                   {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
                 </div>
@@ -104,10 +101,15 @@ export function TransactionList({ transactions, className }: TransactionListProp
                     {formatDate(transaction.data)}
                   </p>
                 </div>
-                <div className="text-right font-bold text-base text-foreground">
-                  - {formatCurrency(total)}
+                <div className="text-right flex items-center gap-2">
+                  <span className="font-bold text-base text-foreground">
+                    - {formatCurrency(total)}
+                  </span>
+                  {onEdit && (
+                    <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
                 </div>
-              </div>
+              </button>
               {index < transactions.length - 1 && (
                 <div className="h-px bg-border mx-4" />
               )}

@@ -6,7 +6,8 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { BalanceCard } from "@/components/dashboard/BalanceCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { TransactionList } from "@/components/dashboard/TransactionList";
-import { Camera } from "lucide-react";
+import { EditTransactionSheet } from "@/components/dashboard/EditTransactionSheet";
+import { Camera, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface TransactionItem {
@@ -25,12 +26,6 @@ interface Transaction {
   items: TransactionItem[];
 }
 
-interface SyncLog {
-  type: "info" | "success" | "warning" | "error";
-  message: string;
-  timestamp: Date;
-}
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -38,8 +33,17 @@ const Dashboard = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<{ name: string | null }>({ name: null });
-  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
-  const [showLogs, setShowLogs] = useState(false);
+
+  // Month filter
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [filterByMonth, setFilterByMonth] = useState(true);
+
+  // Edit sheet
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -80,17 +84,31 @@ const Dashboard = () => {
     setLoading(false);
   };
 
+  // Filter transactions by month
+  const filteredTransactions = useMemo(() => {
+    if (!filterByMonth) return transactions;
+    return transactions.filter((t) => t.data && t.data.startsWith(selectedMonth));
+  }, [transactions, selectedMonth, filterByMonth]);
+
+  const totalGasto = useMemo(() => {
+    return filteredTransactions.reduce((sum, t) => sum + t.total, 0);
+  }, [filteredTransactions]);
+
+  const handleMonthChange = (delta: number) => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const monthLabel = useMemo(() => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const d = new Date(y, m - 1);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  }, [selectedMonth]);
+
   const handleSync = () => {
     setSyncing(true);
-    setSyncLogs([{ type: "info", message: "🔄 Iniciando sincronização...", timestamp: new Date() }]);
-    setShowLogs(true);
-
-    // Gmail sync requires Google OAuth configuration
     setTimeout(() => {
-      setSyncLogs((prev) => [
-        ...prev,
-        { type: "warning", message: "⚠️ Sincronização do Gmail requer configuração do Google OAuth", timestamp: new Date() },
-      ]);
       toast.info("Sincronização do Gmail requer configuração do Google OAuth");
       setSyncing(false);
     }, 2000);
@@ -101,38 +119,41 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  const totalGasto = useMemo(() => {
-    return transactions.reduce((sum, t) => sum + t.total, 0);
-  }, [transactions]);
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setEditOpen(true);
+  };
 
   const userName = profile.name || user?.email?.split("@")[0] || "Usuário";
-
-  const logTypeStyles: Record<string, string> = {
-    info: "bg-blue-50 border-l-blue-300 text-blue-800",
-    success: "bg-green-50 border-l-green-300 text-green-800",
-    warning: "bg-yellow-50 border-l-yellow-300 text-yellow-800",
-    error: "bg-red-50 border-l-red-300 text-red-800",
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-md mx-auto px-5 pb-24 pt-5">
-        <DashboardHeader
-          userName={userName}
-          onSignOut={handleSignOut}
-        />
+        <DashboardHeader userName={userName} onSignOut={handleSignOut} />
 
         <BalanceCard
           balance={totalGasto}
-          transactionCount={transactions.length}
-          className="mt-6 mb-6 animate-fade-in"
+          transactionCount={filteredTransactions.length}
+          className="mt-6 mb-4 animate-fade-in"
         />
 
-        <QuickActions
-          onSync={handleSync}
-          syncing={syncing}
-          className="mb-8"
-        />
+        {/* Month selector */}
+        <div className="flex items-center justify-between bg-card rounded-2xl px-4 py-3 card-shadow mb-6">
+          <button onClick={() => handleMonthChange(-1)} className="p-1 text-muted-foreground hover:text-foreground">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setFilterByMonth(!filterByMonth)}
+            className="text-sm font-semibold text-foreground capitalize"
+          >
+            {filterByMonth ? monthLabel : "Todo o histórico"}
+          </button>
+          <button onClick={() => handleMonthChange(1)} className="p-1 text-muted-foreground hover:text-foreground">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+
+        <QuickActions onSync={handleSync} syncing={syncing} className="mb-8" />
 
         {loading ? (
           <div className="space-y-4" aria-live="polite" aria-busy="true">
@@ -150,46 +171,10 @@ const Dashboard = () => {
             </div>
           </div>
         ) : (
-          <TransactionList transactions={transactions} />
-        )}
-
-        {/* Sync Logs Panel */}
-        {syncLogs.length > 0 && !showLogs && (
-          <button
-            type="button"
-            onClick={() => setShowLogs(true)}
-            className="mt-4 px-4 py-2 bg-muted text-foreground border border-border rounded-xl text-sm font-medium"
-          >
-            📋 Ver Logs
-          </button>
-        )}
-
-        {showLogs && syncLogs.length > 0 && (
-          <div className="bg-card rounded-2xl p-5 mt-6 card-shadow max-h-[400px] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-foreground">📋 Logs da Sincronização</h3>
-              <button
-                type="button"
-                onClick={() => setShowLogs(false)}
-                className="bg-muted border-none rounded-lg py-2 px-4 cursor-pointer text-sm font-bold text-muted-foreground hover:bg-border transition-colors"
-              >
-                ✕ Fechar
-              </button>
-            </div>
-            <div className="font-mono text-[13px] leading-relaxed">
-              {syncLogs.map((log, index) => (
-                <div
-                  key={index}
-                  className={`${logTypeStyles[log.type] || logTypeStyles.info} border-l-4 py-2.5 px-3.5 mb-2 rounded overflow-hidden flex justify-between items-center`}
-                >
-                  <span>{log.message}</span>
-                  <span className="text-[11px] text-muted-foreground ml-3">
-                    {log.timestamp.toLocaleTimeString("pt-BR")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <TransactionList
+            transactions={filteredTransactions}
+            onEdit={handleEditTransaction}
+          />
         )}
       </div>
 
@@ -201,6 +186,13 @@ const Dashboard = () => {
       >
         <Camera className="h-7 w-7" />
       </a>
+
+      <EditTransactionSheet
+        transaction={editingTransaction}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={fetchTransactions}
+      />
     </div>
   );
 };
