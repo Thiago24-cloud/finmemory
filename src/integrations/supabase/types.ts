@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      partnerships: {
+        Row: {
+          created_at: string
+          id: string
+          invite_code: string
+          status: string
+          updated_at: string
+          user_id_1: string
+          user_id_2: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invite_code?: string
+          status?: string
+          updated_at?: string
+          user_id_1: string
+          user_id_2?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invite_code?: string
+          status?: string
+          updated_at?: string
+          user_id_1?: string
+          user_id_2?: string | null
+        }
+        Relationships: []
+      }
       price_points: {
         Row: {
           category: string | null
@@ -124,6 +154,56 @@ export type Database = {
         }
         Relationships: []
       }
+      shopping_list_items: {
+        Row: {
+          added_by: string
+          checked: boolean
+          checked_at: string | null
+          checked_by: string | null
+          created_at: string
+          id: string
+          name: string
+          partnership_id: string
+          quantity: number | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          added_by: string
+          checked?: boolean
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          partnership_id: string
+          quantity?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string
+          checked?: boolean
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          partnership_id?: string
+          quantity?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_list_items_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "partnerships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transacoes: {
         Row: {
           categoria: string | null
@@ -180,7 +260,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_partner_id: { Args: { _user_id: string }; Returns: string }
+      is_partner: {
+        Args: { _user_id_a: string; _user_id_b: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
