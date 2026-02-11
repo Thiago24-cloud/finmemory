@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePartnership } from "@/hooks/usePartnership";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { BalanceCard } from "@/components/dashboard/BalanceCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { EditTransactionSheet } from "@/components/dashboard/EditTransactionSheet";
-import { Camera, ChevronLeft, ChevronRight } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { toast } from "sonner";
 
 interface TransactionItem {
@@ -18,6 +19,7 @@ interface TransactionItem {
 
 interface Transaction {
   id: string;
+  user_id?: string;
   estabelecimento: string;
   data: string;
   total: number;
@@ -33,6 +35,8 @@ const Dashboard = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<{ name: string | null }>({ name: null });
+  const [showPartner, setShowPartner] = useState(false);
+  const { partnership, partnerProfile } = usePartnership();
 
   // Month filter
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -72,6 +76,7 @@ const Dashboard = () => {
       setTransactions(
         (data || []).map((t: any) => ({
           id: t.id,
+          user_id: t.user_id,
           estabelecimento: t.estabelecimento,
           data: t.data || "",
           total: Number(t.total),
@@ -84,13 +89,33 @@ const Dashboard = () => {
     setLoading(false);
   };
 
-  // Filter transactions by month
+  // Filter transactions by month and optionally by owner
   const filteredTransactions = useMemo(() => {
-    if (!filterByMonth) return transactions;
-    return transactions.filter((t) => t.data && t.data.startsWith(selectedMonth));
+    let filtered = transactions;
+    if (filterByMonth) {
+      filtered = filtered.filter((t) => t.data && t.data.startsWith(selectedMonth));
+    }
+    return filtered;
   }, [transactions, selectedMonth, filterByMonth]);
 
+  // Separate own vs partner transactions
+  const myTransactions = useMemo(() => 
+    filteredTransactions.filter(t => t.user_id === user?.id || !t.user_id),
+    [filteredTransactions, user]
+  );
+
+  const partnerTransactions = useMemo(() =>
+    filteredTransactions.filter(t => t.user_id && t.user_id !== user?.id),
+    [filteredTransactions, user]
+  );
+
+  const displayTransactions = showPartner ? partnerTransactions : myTransactions;
+
   const totalGasto = useMemo(() => {
+    return displayTransactions.reduce((sum, t) => sum + t.total, 0);
+  }, [displayTransactions]);
+
+  const totalCasal = useMemo(() => {
     return filteredTransactions.reduce((sum, t) => sum + t.total, 0);
   }, [filteredTransactions]);
 
@@ -133,9 +158,38 @@ const Dashboard = () => {
 
         <BalanceCard
           balance={totalGasto}
-          transactionCount={filteredTransactions.length}
-          className="mt-6 mb-4 animate-fade-in"
+          transactionCount={displayTransactions.length}
+          className="mt-6 mb-2 animate-fade-in"
         />
+
+        {/* Partner toggle */}
+        {partnership?.status === "active" && (
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setShowPartner(false)}
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${!showPartner ? "gradient-primary text-primary-foreground" : "bg-card text-muted-foreground border border-border"}`}
+            >
+              Meus Gastos
+            </button>
+            <button
+              onClick={() => setShowPartner(true)}
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 ${showPartner ? "gradient-primary text-primary-foreground" : "bg-card text-muted-foreground border border-border"}`}
+            >
+              <Users className="h-4 w-4" />
+              {partnerProfile?.name || "Parceiro(a)"}
+            </button>
+          </div>
+        )}
+
+        {/* Couple total */}
+        {partnership?.status === "active" && partnerTransactions.length > 0 && (
+          <div className="bg-card rounded-2xl card-shadow px-4 py-3 mb-4 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total do casal</span>
+            <span className="font-bold text-foreground">
+              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalCasal)}
+            </span>
+          </div>
+        )}
 
         {/* Month selector */}
         <div className="flex items-center justify-between bg-card rounded-2xl px-4 py-3 card-shadow mb-6">
@@ -172,8 +226,8 @@ const Dashboard = () => {
           </div>
         ) : (
           <TransactionList
-            transactions={filteredTransactions}
-            onEdit={handleEditTransaction}
+            transactions={displayTransactions}
+            onEdit={showPartner ? undefined : handleEditTransaction}
           />
         )}
       </div>

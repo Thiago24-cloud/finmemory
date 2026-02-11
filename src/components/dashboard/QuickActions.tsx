@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { RefreshCw, BarChart3, Tags, Camera, Settings, FileText, MapPin, PenLine } from "lucide-react";
+import { RefreshCw, BarChart3, Tags, Camera, Settings, FileText, MapPin, PenLine, Heart, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QuickActionsProps {
@@ -29,6 +29,18 @@ export function QuickActions({ onSync, syncing, className }: QuickActionsProps) 
       icon: <PenLine className="h-6 w-6" />,
       label: "Manual",
       onClick: () => navigate("/manual-entry"),
+      isPositive: true,
+    },
+    {
+      icon: <Heart className="h-6 w-6" />,
+      label: "Parceria",
+      onClick: () => navigate("/partnership"),
+      isPositive: true,
+    },
+    {
+      icon: <ShoppingCart className="h-6 w-6" />,
+      label: "Lista",
+      onClick: () => navigate("/shopping-list"),
       isPositive: true,
     },
     {
