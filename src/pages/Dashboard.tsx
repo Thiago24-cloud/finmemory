@@ -9,7 +9,8 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { EditTransactionSheet } from "@/components/dashboard/EditTransactionSheet";
 import { CoupleSummary } from "@/components/dashboard/CoupleSummary";
-import { Camera, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { BottomNav } from "@/components/BottomNav";
+import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { toast } from "sonner";
 
 interface TransactionItem {
@@ -154,7 +155,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-md mx-auto px-5 pb-24 pt-5">
+      <div className="max-w-md mx-auto px-5 pb-28 pt-5">
         <DashboardHeader userName={userName} onSignOut={handleSignOut} />
 
         <BalanceCard
@@ -234,14 +235,7 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* FAB */}
-      <a
-        onClick={() => navigate("/add-receipt")}
-        className="fixed bottom-6 right-5 w-16 h-16 rounded-full flex items-center justify-center card-shadow-lg hover:scale-110 active:scale-95 transition-transform z-10 gradient-primary text-primary-foreground cursor-pointer"
-        title="Escanear Nota Fiscal"
-      >
-        <Camera className="h-7 w-7" />
-      </a>
+      <BottomNav />
 
       <EditTransactionSheet
         transaction={editingTransaction}

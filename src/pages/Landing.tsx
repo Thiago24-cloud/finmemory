@@ -29,7 +29,7 @@ const Landing = () => {
               <Button
                 size="lg"
                 className="w-full gradient-primary text-primary-foreground text-base font-semibold py-6 rounded-lg"
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/mapa-precos")}
               >
                 Ir para o Dashboard
               </Button>
