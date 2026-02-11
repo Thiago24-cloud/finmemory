@@ -149,3 +149,25 @@ Os arquivos principais estão em:
 - `pages/dashboard.js`
 - `pages/add-receipt.js`
 - `pages/_app.js`
+
+---
+
+## 💡 Dica de Ouro – Componentes UI no Lovable
+
+Crie estes componentes no Lovable e depois traga o código para o FinMemory:
+
+| Componente | Uso |
+|------------|-----|
+| **DashboardCard** | Card para métricas (saldo, gastos do mês, etc.) |
+| **MonthPicker** | Seletor de mês bonito (dashboard/relatórios) |
+| **ComparisonChart** | Gráfico de comparação (mês vs mês, categorias) |
+| **PricePin** | Pin customizado para o mapa (preço no marker) |
+| **TransactionRow** | Linha da tabela de transações (estabelecimento, data, valor) |
+
+### Fluxo após criar no Lovable
+
+1. **Exporte** todos os códigos do Lovable.
+2. Crie a pasta **`components/ui/`** no FinMemory (ou use a já existente).
+3. **Cole** cada componente (DashboardCard.js, MonthPicker.js, etc.).
+4. **Conecte** com seus hooks/dados (Supabase, estado do dashboard, pontos do mapa).
+5. Substitua os blocos atuais nas páginas por esses componentes (ex.: BalanceCard → DashboardCard, lista de transações → TransactionRow, markers do mapa → PricePin).
