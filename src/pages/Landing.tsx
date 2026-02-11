@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
 const features = [
@@ -68,9 +68,13 @@ const Landing = () => {
           </div>
         </div>
 
-        <p className="text-center text-primary-foreground/60 text-xs mt-6">
-          © 2025 FinMemory — Seus dados estão seguros
-        </p>
+        <div className="text-center text-primary-foreground/60 text-xs mt-6 space-y-1">
+          <div className="flex justify-center gap-4">
+            <Link to="/privacidade" className="hover:text-primary-foreground/80 transition-colors">Privacidade</Link>
+            <Link to="/termos" className="hover:text-primary-foreground/80 transition-colors">Termos de Uso</Link>
+          </div>
+          <p>© 2025 FinMemory — Seus dados estão seguros</p>
+        </div>
       </div>
     </div>
   );
