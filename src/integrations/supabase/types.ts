@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      price_points: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          lat: number
+          lng: number
+          price: number
+          product_name: string
+          store_name: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          lat: number
+          lng: number
+          price: number
+          product_name: string
+          store_name: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          lat?: number
+          lng?: number
+          price?: number
+          product_name?: string
+          store_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       produtos: {
         Row: {
           created_at: string

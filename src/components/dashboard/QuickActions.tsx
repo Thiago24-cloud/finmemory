@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { RefreshCw, BarChart3, Tags, Camera, Settings, FileText } from "lucide-react";
+import { RefreshCw, BarChart3, Tags, Camera, Settings, FileText, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QuickActionsProps {
@@ -34,6 +34,12 @@ export function QuickActions({ onSync, syncing, className }: QuickActionsProps) 
       icon: <Tags className="h-6 w-6" />,
       label: "Categorias",
       onClick: () => {},
+    },
+    {
+      icon: <MapPin className="h-6 w-6" />,
+      label: "Mapa Preços",
+      onClick: () => navigate("/mapa-precos"),
+      isPositive: true,
     },
     {
       icon: <FileText className="h-6 w-6" />,

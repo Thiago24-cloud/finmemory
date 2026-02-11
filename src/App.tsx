@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import AddReceipt from "./pages/AddReceipt";
+import MapaPrecos from "./pages/MapaPrecos";
 import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
 import NotFound from "./pages/NotFound";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/add-receipt" element={<ProtectedRoute><AddReceipt /></ProtectedRoute>} />
+            <Route path="/mapa-precos" element={<ProtectedRoute><MapaPrecos /></ProtectedRoute>} />
             <Route path="/privacidade" element={<Privacidade />} />
             <Route path="/termos" element={<Termos />} />
             <Route path="*" element={<NotFound />} />
