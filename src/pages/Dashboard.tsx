@@ -8,6 +8,7 @@ import { BalanceCard } from "@/components/dashboard/BalanceCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { TransactionList } from "@/components/dashboard/TransactionList";
 import { EditTransactionSheet } from "@/components/dashboard/EditTransactionSheet";
+import { CoupleSummary } from "@/components/dashboard/CoupleSummary";
 import { Camera, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { toast } from "sonner";
 
@@ -181,14 +182,15 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Couple total */}
-        {partnership?.status === "active" && partnerTransactions.length > 0 && (
-          <div className="bg-card rounded-2xl card-shadow px-4 py-3 mb-4 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Total do casal</span>
-            <span className="font-bold text-foreground">
-              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalCasal)}
-            </span>
-          </div>
+        {/* Couple summary with category chart */}
+        {partnership?.status === "active" && (myTransactions.length > 0 || partnerTransactions.length > 0) && (
+          <CoupleSummary
+            myTransactions={myTransactions}
+            partnerTransactions={partnerTransactions}
+            userName={userName}
+            partnerName={partnerProfile?.name || "Parceiro(a)"}
+            className="mb-4"
+          />
         )}
 
         {/* Month selector */}
