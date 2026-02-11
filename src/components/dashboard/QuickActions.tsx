@@ -72,19 +72,19 @@ export function QuickActions({ onSync, syncing, className }: QuickActionsProps) 
   ];
 
   return (
-    <div className={cn("overflow-x-auto scrollbar-hide -mx-5 px-5", className)}>
-      <div className="flex gap-4 pb-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+    <div className={cn("", className)}>
+      <div className="grid grid-cols-5 gap-3">
         {actions.map((action, index) => (
           <button
             key={index}
             type="button"
             onClick={action.disabled ? undefined : action.onClick}
             disabled={action.disabled}
-            className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            className="flex flex-col items-center gap-1.5 hover:-translate-y-0.5 transition-transform disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           >
             <div
               className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all card-shadow",
+                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all card-shadow",
                 action.isPositive
                   ? "bg-accent/10 text-accent hover:bg-accent/20"
                   : "bg-card text-muted-foreground hover:bg-muted border border-border"
@@ -92,7 +92,7 @@ export function QuickActions({ onSync, syncing, className }: QuickActionsProps) 
             >
               {action.icon}
             </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap leading-tight">
               {action.label}
             </span>
           </button>
