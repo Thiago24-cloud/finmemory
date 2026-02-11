@@ -6,6 +6,11 @@ import {
   Camera,
   Settings,
   FileText,
+  MapPin,
+  Share2,
+  PenLine,
+  Users,
+  List,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -38,6 +43,46 @@ export function QuickActions({ onSync, syncing, userIdReady = true, className })
             <Camera className="h-6 w-6" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Escanear</span>
+        </Link>
+
+        {/* Mapa */}
+        <Link href="/mapa" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <MapPin className="h-6 w-6" />
+          </div>
+          <span className="text-xs text-[#666] whitespace-nowrap">Mapa</span>
+        </Link>
+
+        {/* Compartilhar preço */}
+        <Link href="/share-price" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <Share2 className="h-6 w-6" />
+          </div>
+          <span className="text-xs text-[#666] whitespace-nowrap">Preço</span>
+        </Link>
+
+        {/* Gasto manual */}
+        <Link href="/manual-entry" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <PenLine className="h-6 w-6" />
+          </div>
+          <span className="text-xs text-[#666] whitespace-nowrap">Gasto</span>
+        </Link>
+
+        {/* Parceria */}
+        <Link href="/partnership" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <Users className="h-6 w-6" />
+          </div>
+          <span className="text-xs text-[#666] whitespace-nowrap">Parceria</span>
+        </Link>
+
+        {/* Lista de compras */}
+        <Link href="/shopping-list" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <List className="h-6 w-6" />
+          </div>
+          <span className="text-xs text-[#666] whitespace-nowrap">Lista</span>
         </Link>
 
         {/* Relatórios */}

@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
-import { Search, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { Search, ArrowLeft, PlusCircle } from 'lucide-react';
 
 const PriceMap = dynamic(() => import('../components/PriceMap'), { ssr: false });
 
@@ -11,13 +13,31 @@ export async function getServerSideProps() {
 }
 
 export default function MapaPage({ mapboxToken }) {
+  const router = useRouter();
+  const [showSharedBanner, setShowSharedBanner] = useState(false);
+
+  useEffect(() => {
+    if (router.query.shared === '1') {
+      setShowSharedBanner(true);
+      const t = setTimeout(() => setShowSharedBanner(false), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [router.query.shared]);
+
   return (
     <>
       <Head>
         <title>Mapa de Preços | FinMemory</title>
       </Head>
       <div className="flex flex-col h-screen bg-[#e5e3df]">
-        {/* Header compacto tipo Google: uma linha, busca integrada */}
+        {/* Banner de sucesso ao compartilhar */}
+        {showSharedBanner && (
+          <div className="bg-[#2ECC49] text-white px-4 py-2.5 text-center text-sm font-medium z-30 shrink-0">
+            Preço compartilhado! Ele já aparece no mapa.
+          </div>
+        )}
+
+        {/* Header: Voltar | Busca | Compartilhar preço */}
         <header className="flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-2.5 bg-white/98 backdrop-blur-sm border-b border-gray-200 z-20 shrink-0">
           <Link
             href="/dashboard"
@@ -37,10 +57,17 @@ export default function MapaPage({ mapboxToken }) {
               />
             </div>
           </div>
-          <span className="text-sm font-semibold text-gray-800 whitespace-nowrap hidden sm:block">Mapa de Preços</span>
+          <Link
+            href="/share-price"
+            className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-[#2ECC49] text-white font-medium text-sm hover:bg-[#22a83a] transition-colors shrink-0"
+            aria-label="Compartilhar preço no mapa"
+          >
+            <PlusCircle className="h-5 w-5 shrink-0" />
+            <span className="whitespace-nowrap">Compartilhar</span>
+          </Link>
         </header>
 
-        {/* Mapa ocupa todo o espaço restante (referência Google Maps) */}
+        {/* Mapa */}
         <div className="flex-1 relative min-h-0 w-full">
           <div className="absolute inset-0 w-full h-full">
             <PriceMap mapboxToken={mapboxToken} />

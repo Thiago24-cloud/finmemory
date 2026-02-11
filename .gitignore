@@ -1,11 +1,18 @@
+<<<<<<< HEAD
 # Node dependencies
 node_modules/
 
 # Logs
+=======
+# Logs
+logs
+*.log
+>>>>>>> smart/main
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+<<<<<<< HEAD
 
 # Runtime files
 pids/
@@ -75,3 +82,22 @@ teste-pre-deploy.md
 /*.mp4
 /*.mov
 /*.avi
+=======
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+>>>>>>> smart/main
