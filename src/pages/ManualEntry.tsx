@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { createPricePointsFromTransaction } from "@/lib/autoPricePoints";
 
 const CATEGORIES = [
   "Supermercado", "Restaurante", "Transporte", "Farmácia", "Combustível",
@@ -45,6 +46,18 @@ const ManualEntry = () => {
       });
 
       if (error) throw error;
+
+      // Auto-populate price map
+      const items = descricao.trim()
+        ? [{ descricao: descricao.trim(), quantidade: 1, valor_total: parseFloat(total.replace(",", ".")) || 0 }]
+        : [{ descricao: estabelecimento.trim(), quantidade: 1, valor_total: parseFloat(total.replace(",", ".")) || 0 }];
+      await createPricePointsFromTransaction({
+        userId: user.id,
+        storeName: estabelecimento.trim(),
+        category: categoria,
+        items,
+      });
+
       toast.success("Gasto adicionado com sucesso! ✅");
       navigate("/dashboard");
     } catch (err: any) {

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { createPricePointsFromTransaction } from "@/lib/autoPricePoints";
 
 type Step = "capture" | "preview" | "processing" | "edit" | "saving" | "success";
 
@@ -158,6 +159,18 @@ const AddReceipt = () => {
       });
 
       if (insertError) throw insertError;
+
+      // Auto-populate price map from items
+      await createPricePointsFromTransaction({
+        userId: user.id,
+        storeName: form.estabelecimento,
+        category: form.categoria,
+        items: form.items.map((i) => ({
+          descricao: i.name,
+          quantidade: 1,
+          valor_total: i.price,
+        })),
+      });
 
       setStep("success");
       toast.success("Nota fiscal salva!");
