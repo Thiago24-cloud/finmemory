@@ -14,7 +14,128 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      produtos: {
+        Row: {
+          created_at: string
+          descricao: string
+          id: string
+          quantidade: number | null
+          transacao_id: string
+          valor_total: number
+          valor_unitario: number | null
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          id?: string
+          quantidade?: number | null
+          transacao_id: string
+          valor_total?: number
+          valor_unitario?: number | null
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          id?: string
+          quantidade?: number | null
+          transacao_id?: string
+          valor_total?: number
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "transacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          id: string
+          last_sync: string | null
+          name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_sync?: string | null
+          name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_sync?: string | null
+          name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transacoes: {
+        Row: {
+          categoria: string | null
+          cnpj: string | null
+          created_at: string
+          data: string | null
+          estabelecimento: string
+          forma_pagamento: string | null
+          hora: string | null
+          id: string
+          items: Json | null
+          receipt_image_url: string | null
+          source: string | null
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categoria?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data?: string | null
+          estabelecimento: string
+          forma_pagamento?: string | null
+          hora?: string | null
+          id?: string
+          items?: Json | null
+          receipt_image_url?: string | null
+          source?: string | null
+          total?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categoria?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data?: string | null
+          estabelecimento?: string
+          forma_pagamento?: string | null
+          hora?: string | null
+          id?: string
+          items?: Json | null
+          receipt_image_url?: string | null
+          source?: string | null
+          total?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
