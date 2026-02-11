@@ -19,6 +19,7 @@ export type Database = {
           category: string | null
           created_at: string
           id: string
+          image_url: string | null
           lat: number
           lng: number
           price: number
@@ -30,6 +31,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           lat: number
           lng: number
           price: number
@@ -41,6 +43,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           lat?: number
           lng?: number
           price?: number
