@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Camera } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import maplibregl from "maplibre-gl";
@@ -268,6 +268,15 @@ const MapaPrecos = () => {
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-gray-400 bg-white/80 backdrop-blur px-3 py-1 rounded-full z-10">
           Preços compartilhados pela comunidade FinMemory
         </div>
+
+        {/* FAB - Share Price */}
+        <button
+          onClick={() => navigate("/share-price")}
+          className="absolute bottom-6 right-4 w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform z-10 bg-accent text-accent-foreground"
+          title="Compartilhar preço"
+        >
+          <Camera className="h-6 w-6" />
+        </button>
       </div>
     </div>
   );
