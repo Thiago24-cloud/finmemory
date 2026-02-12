@@ -19,6 +19,12 @@ CREATE POLICY "Anyone can insert signup"
   ON public.signups FOR INSERT
   WITH CHECK (true);
 
+-- Leitura: qualquer um pode ler (necessário para o app verificar se email está cadastrado)
+DROP POLICY IF EXISTS "Anyone can read signups" ON public.signups;
+CREATE POLICY "Anyone can read signups"
+  ON public.signups FOR SELECT
+  USING (true);
+
 DROP POLICY IF EXISTS "Service role can read and update signups" ON public.signups;
 CREATE POLICY "Service role can read and update signups"
   ON public.signups FOR ALL
