@@ -9,9 +9,11 @@ import { useRouter } from 'next/router';
  */
 export default function WelcomePage() {
   const router = useRouter();
+  const { msg } = router.query;
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const isNotRegistered = msg === 'nao-cadastrado';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +37,7 @@ export default function WelcomePage() {
         return;
       }
       if (data.approved !== false) {
-        router.push('/mapa');
+        router.push('/login?callbackUrl=/mapa');
         return;
       }
       setError('Cadastro recebido! Você receberá acesso em breve.');
@@ -65,19 +67,24 @@ export default function WelcomePage() {
               className="object-contain"
             />
           </div>
+          {isNotRegistered && (
+            <div className="w-full mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm text-center">
+              Acesso restrito. Cadastre seu e-mail (conta Google) e faça login para acessar o app.
+            </div>
+          )}
           <p className="text-[#333] text-center text-lg mb-8">
-            Cadastre seu e-mail para acessar o app. Quando seu acesso for liberado, a primeira tela será o mapa de preços.
+            Cadastre seu e-mail <strong>Google</strong> (@gmail.com) para acessar. Após o cadastro, faça login e a primeira tela será o mapa.
           </p>
           <form onSubmit={handleSubmit} className="w-full space-y-4">
             <label htmlFor="email" className="block text-sm font-medium text-[#333] mb-1">
-              Seu e-mail
+              E-mail (conta Google)
             </label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu@email.com"
+              placeholder="seu@gmail.com"
               disabled={loading}
               className="w-full px-4 py-3 rounded-xl border border-[#e5e7eb] text-[#333] placeholder-[#9ca3af] focus:outline-none focus:ring-2 focus:ring-[#2ECC49] focus:border-[#2ECC49] disabled:opacity-60"
               autoComplete="email"
@@ -96,7 +103,7 @@ export default function WelcomePage() {
             </button>
           </form>
           <p className="mt-6 text-center text-sm text-[#6b7280]">
-            Ao continuar, você poderá usar o mapa de preços e a análise de gastos.
+            Só aceitamos contas @gmail.com ou @googlemail.com. Após cadastrar, faça login com o mesmo e-mail para acessar o mapa e a análise de gastos.
           </p>
         </div>
       </div>

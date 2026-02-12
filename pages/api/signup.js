@@ -12,10 +12,18 @@ function getSupabase() {
   return supabaseInstance;
 }
 
+const GOOGLE_EMAIL_DOMAINS = ['gmail.com', 'googlemail.com'];
+
 function isValidEmail(email) {
   if (!email || typeof email !== 'string') return false;
   const trimmed = email.trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) && trimmed.length <= 255;
+}
+
+function isGoogleEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const domain = email.trim().toLowerCase().split('@')[1];
+  return domain ? GOOGLE_EMAIL_DOMAINS.includes(domain) : false;
 }
 
 /**
@@ -36,6 +44,9 @@ export default async function handler(req, res) {
   const { email } = req.body || {};
   if (!isValidEmail(email)) {
     return res.status(400).json({ error: 'Informe um e-mail válido' });
+  }
+  if (!isGoogleEmail(email)) {
+    return res.status(400).json({ error: 'Use uma conta Google (ex.: @gmail.com) para se cadastrar' });
   }
 
   const normalized = email.trim().toLowerCase();

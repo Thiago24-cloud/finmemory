@@ -4,11 +4,22 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
 import { Search, ArrowLeft, PlusCircle, MessageCircle } from 'lucide-react';
+import { authOptions } from './api/auth/[...nextauth]';
+import { canAccess } from '../lib/access-server';
 
 const PriceMap = dynamic(() => import('../components/PriceMap'), { ssr: false });
 
-export async function getServerSideProps() {
+export async function getServerSideProps(ctx) {
+  const session = await getServerSession(ctx.req, ctx.res, authOptions);
+  if (!session?.user?.email) {
+    return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };
+  }
+  const allowed = await canAccess(session.user.email);
+  if (!allowed) {
+    return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+  }
   const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
   return { props: { mapboxToken: token } };
 }

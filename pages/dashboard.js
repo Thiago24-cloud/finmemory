@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
 import { Loader2, Mail, Camera, MapPin, X } from 'lucide-react';
 import Link from 'next/link';
@@ -8,6 +9,8 @@ import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
 import { QuickActions } from '../components/dashboard/QuickActions';
 import { TransactionList } from '../components/dashboard/TransactionList';
+import { authOptions } from './api/auth/[...nextauth]';
+import { canAccess } from '../lib/access-server';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
 let supabaseInstance = null;
@@ -31,6 +34,18 @@ function getSupabase() {
   }
   
   return supabaseInstance;
+}
+
+export async function getServerSideProps(ctx) {
+  const session = await getServerSession(ctx.req, ctx.res, authOptions);
+  if (!session?.user?.email) {
+    return { redirect: { destination: '/login?callbackUrl=/dashboard', permanent: false } };
+  }
+  const allowed = await canAccess(session.user.email);
+  if (!allowed) {
+    return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+  }
+  return { props: {} };
 }
 
 export default function Dashboard() {
