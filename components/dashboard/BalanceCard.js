@@ -4,8 +4,9 @@ import { cn } from '../../lib/utils';
 
 /**
  * Card de saldo total – usa valor real calculado das transações. Botão para ocultar/mostrar.
+ * label: opcional, ex. "Gasto do mês" quando filtrado por mês.
  */
-export function BalanceCard({ balance, className }) {
+export function BalanceCard({ balance, className, label }) {
   const [isVisible, setIsVisible] = useState(true);
 
   const formattedBalance = new Intl.NumberFormat('pt-BR', {
@@ -16,7 +17,7 @@ export function BalanceCard({ balance, className }) {
   return (
     <div className={cn('card-lovable', className)}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[#666] text-sm">Saldo Total</span>
+        <span className="text-[#666] text-sm">{label || 'Saldo Total'}</span>
         <button
           type="button"
           onClick={() => setIsVisible(!isVisible)}

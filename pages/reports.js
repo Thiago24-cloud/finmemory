@@ -17,6 +17,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
 
   const userId = session?.user?.supabaseId ?? (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
+  const [selectedMonth, setSelectedMonth] = useState(null); // 'YYYY-MM' ou null = todos
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/dashboard');
@@ -49,16 +50,38 @@ export default function ReportsPage() {
     return () => { cancelled = true; };
   }, [userId, status]);
 
-  const summary = useMemo(() => {
-    const total = transactions.reduce((s, t) => s + (Number(t.total) || 0), 0);
-    const byCategory = {};
+  const availableMonths = useMemo(() => {
+    const set = new Set();
     transactions.forEach((t) => {
+      if (t.data) {
+        const d = new Date(t.data);
+        if (!isNaN(d.getTime())) set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
+    });
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    if (!selectedMonth) return transactions;
+    return transactions.filter((t) => {
+      if (!t.data) return false;
+      const d = new Date(t.data);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return ym === selectedMonth;
+    });
+  }, [transactions, selectedMonth]);
+
+  const summary = useMemo(() => {
+    const list = filteredTransactions;
+    const total = list.reduce((s, t) => s + (Number(t.total) || 0), 0);
+    const byCategory = {};
+    list.forEach((t) => {
       const cat = t.categoria || 'Outros';
       byCategory[cat] = (byCategory[cat] || 0) + (Number(t.total) || 0);
     });
     const categories = Object.entries(byCategory).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-    return { total, count: transactions.length, categories };
-  }, [transactions]);
+    return { total, count: list.length, categories };
+  }, [filteredTransactions]);
 
   if (status === 'loading' || loading) {
     return (
@@ -92,6 +115,32 @@ export default function ReportsPage() {
             <p className="text-sm text-muted-foreground">Resumo das suas transações</p>
           </div>
         </div>
+
+        {availableMonths.length > 0 && (
+          <div className="mb-4">
+            <label htmlFor="reports-month-filter" className="block text-sm font-medium text-foreground mb-2">
+              Ver gastos por mês
+            </label>
+            <select
+              id="reports-month-filter"
+              value={selectedMonth || ''}
+              onChange={(e) => setSelectedMonth(e.target.value || null)}
+              className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            >
+              <option value="">Todos os meses</option>
+              {availableMonths.map((ym) => {
+                const [y, m] = ym.split('-');
+                const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1);
+                const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                return (
+                  <option key={ym} value={ym}>
+                    {label.charAt(0).toUpperCase() + label.slice(1)}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
 
         <div className="space-y-4">
           <div className="card-nubank">

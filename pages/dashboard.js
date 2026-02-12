@@ -42,6 +42,7 @@ export default function Dashboard() {
   const [lastSyncResult, setLastSyncResult] = useState(null);
   const [showLogs, setShowLogs] = useState(false);
   const [debugInfo, setDebugInfo] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(null); // 'YYYY-MM' ou null = todos
 
   // Debug: Log quando transactions mudar
   useEffect(() => {
@@ -580,9 +581,32 @@ export default function Dashboard() {
   const isAuthenticated = status === 'authenticated' && session;
   const isLoading = status === 'loading';
 
-  const totalBalance = useMemo(() => {
-    return (transactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+  // Meses únicos das transações (ano-mês) ordenados do mais recente ao mais antigo
+  const availableMonths = useMemo(() => {
+    const set = new Set();
+    (transactions || []).forEach((t) => {
+      if (t.data) {
+        const d = new Date(t.data);
+        if (!isNaN(d.getTime())) set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
+    });
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [transactions]);
+
+  // Transações filtradas pelo mês selecionado
+  const filteredTransactions = useMemo(() => {
+    if (!selectedMonth) return transactions || [];
+    return (transactions || []).filter((t) => {
+      if (!t.data) return false;
+      const d = new Date(t.data);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return ym === selectedMonth;
+    });
+  }, [transactions, selectedMonth]);
+
+  const totalBalance = useMemo(() => {
+    return (filteredTransactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+  }, [filteredTransactions]);
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-foreground">
@@ -619,7 +643,33 @@ export default function Dashboard() {
         ) : (
           <>
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
-            <BalanceCard balance={totalBalance} className="mb-6" />
+            <BalanceCard balance={totalBalance} className="mb-6" label={selectedMonth ? 'Gasto do mês' : undefined} />
+            {/* Filtro por mês */}
+            {availableMonths.length > 0 && (
+              <div className="mb-4">
+                <label htmlFor="month-filter" className="block text-sm font-medium text-[#333] mb-2">
+                  Ver gastos por mês
+                </label>
+                <select
+                  id="month-filter"
+                  value={selectedMonth || ''}
+                  onChange={(e) => setSelectedMonth(e.target.value || null)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] text-sm focus:outline-none focus:ring-2 focus:ring-[#667eea] focus:border-transparent"
+                >
+                  <option value="">Todos os meses</option>
+                  {availableMonths.map((ym) => {
+                    const [y, m] = ym.split('-');
+                    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1);
+                    const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                    return (
+                      <option key={ym} value={ym}>
+                        {label.charAt(0).toUpperCase() + label.slice(1)}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
             <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} userIdReady={!!userId} className="mb-8" />
 
             {isAuthenticated && !userId && (
@@ -651,7 +701,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <TransactionList
-                transactions={transactions}
+                transactions={filteredTransactions}
                 userId={userId}
                 onDeleted={() => loadTransactions(userId)}
               />
