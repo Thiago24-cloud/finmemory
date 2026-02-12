@@ -283,7 +283,6 @@ function questionPopupHTML(questionId, message, storeName, timeAgo, userLabel) {
 
 export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigger = 0 }) {
   const token = tokenProp || (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) || '';
-  mapboxgl.accessToken = token;
 
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -296,6 +295,8 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
   const [lat] = useState(-23.5505);
   const [zoom] = useState(12);
   const [mapStyle, setMapStyle] = useState(MAP_STYLES[0]);
+  const [mapError, setMapError] = useState(null);
+  const [mapRetry, setMapRetry] = useState(0);
 
   const clearMarkers = () => {
     markersRef.current.forEach((m) => m.remove());
@@ -415,53 +416,77 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
   }, [loadQuestionDetail]);
 
   useEffect(() => {
-    if (!token || map.current || !mapContainer.current) return;
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: mapStyle.url,
-      center: [lng, lat],
-      zoom: zoom
-    });
-
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-    map.current.on('load', async () => {
-      const points = mapPointsRef.current ?? (await fetchMapPoints());
-      mapPointsRef.current = points;
-      addMarkersToMap(map.current, points);
-      const questions = mapQuestionsRef.current?.length ? mapQuestionsRef.current : (await fetchMapQuestions());
-      mapQuestionsRef.current = questions;
-      addQuestionMarkersToMap(map.current, questions);
-    });
-
-    const supabase = getSupabase();
+    if (!token || !mapContainer.current) return;
+    if (map.current) {
+      try { map.current.remove(); } catch (_) {}
+      map.current = null;
+    }
+    setMapError(null);
     let channel;
-    if (supabase) {
-      channel = supabase
-        .channel('map_updates')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'price_points' }, async () => {
-          const points = await fetchMapPoints();
+    let supabase;
+    try {
+      if (typeof mapboxgl !== 'undefined') mapboxgl.accessToken = token;
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: mapStyle.url,
+        center: [lng, lat],
+        zoom: zoom
+      });
+
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      map.current.on('load', async () => {
+        try {
+          const points = mapPointsRef.current ?? (await fetchMapPoints());
           mapPointsRef.current = points;
-          if (map.current) addMarkersToMap(map.current, points);
-        })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'map_questions' }, async () => {
-          const questions = await fetchMapQuestions();
+          addMarkersToMap(map.current, points);
+          const questions = mapQuestionsRef.current?.length ? mapQuestionsRef.current : (await fetchMapQuestions());
           mapQuestionsRef.current = questions;
-          if (map.current) addQuestionMarkersToMap(map.current, questions);
-        })
-        .subscribe();
+          addQuestionMarkersToMap(map.current, questions);
+        } catch (e) {
+          console.warn('Erro ao carregar pontos/perguntas do mapa:', e);
+        }
+      });
+
+      map.current.on('error', (e) => {
+        console.warn('Mapbox error:', e);
+        setMapError(e?.error?.message || 'Falha ao carregar o mapa.');
+      });
+
+      supabase = getSupabase();
+      if (supabase) {
+        channel = supabase
+          .channel('map_updates')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'price_points' }, async () => {
+            const points = await fetchMapPoints();
+            mapPointsRef.current = points;
+            if (map.current) addMarkersToMap(map.current, points);
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'map_questions' }, async () => {
+            const questions = await fetchMapQuestions();
+            mapQuestionsRef.current = questions;
+            if (map.current) addQuestionMarkersToMap(map.current, questions);
+          })
+          .subscribe();
+      }
+    } catch (err) {
+      console.warn('Erro ao inicializar mapa:', err);
+      setMapError(err?.message || 'Mapa indisponível. Verifique o token Mapbox.');
+      if (map.current) {
+        try { map.current.remove(); } catch (_) {}
+        map.current = null;
+      }
     }
 
     return () => {
       if (channel && supabase) supabase.removeChannel(channel);
       clearMarkers();
       if (map.current) {
-        map.current.remove();
+        try { map.current.remove(); } catch (_) {}
         map.current = null;
       }
     };
-  }, [token, lng, lat, zoom, addQuestionMarkersToMap]);
+  }, [token, lng, lat, zoom, addQuestionMarkersToMap, mapRetry]);
 
   useEffect(() => {
     if (!map.current || refreshQuestionsTrigger === 0) return;
@@ -492,6 +517,24 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
           <p className="font-medium mb-1">Configure o token do Mapbox no .env.local:</p>
           <p className="text-sm mb-2">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.eyJ...</p>
           <p className="text-xs">Depois reinicie o servidor (Ctrl+C e <code>npm run dev</code>).</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (mapError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg text-gray-700 p-6 text-center">
+        <div>
+          <p className="font-medium mb-1">Mapa indisponível</p>
+          <p className="text-sm text-gray-600 mb-3">{mapError}</p>
+          <button
+            type="button"
+            onClick={() => { setMapError(null); setMapRetry((c) => c + 1); }}
+            className="text-sm text-[#2ECC49] font-medium hover:underline"
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     );

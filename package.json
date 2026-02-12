@@ -11,28 +11,33 @@
     "start": "next start",
     "lint": "next lint",
     "validate-env": "node scripts/validate-env.mjs",
-    "verify-build": "node scripts/verify-build.mjs"
+    "verify-build": "node scripts/verify-build.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@next/third-parties": "^16.1.6",
+    "@next/third-parties": "^15.5.10",
     "@supabase/supabase-js": "^2.45.4",
     "googleapis": "^144.0.0",
     "lucide-react": "^0.462.0",
     "mapbox-gl": "^3.18.1",
-    "next": "^14.2.22",
+    "next": "^15.5.10",
     "next-auth": "^4.24.13",
     "openai": "^4.77.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
     "@types/react": "^19.2.9",
+    "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.22",
+    "eslint-config-next": "^15.5.10",
+    "jsdom": "^25.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
   },
   "resolutions": {
     "glob": "^10.4.5",

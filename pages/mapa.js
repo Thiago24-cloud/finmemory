@@ -77,7 +77,24 @@ export default function MapaPage({ mapboxToken }) {
       {/* Mapa em tela cheia = primeira coisa que o usuário vê */}
       <div className="fixed inset-0 w-full h-full bg-[#e5e3df]">
         <div className="absolute inset-0 w-full h-full">
-          <PriceMap mapboxToken={mapboxToken} refreshQuestionsTrigger={questionRefresh} />
+          {mapboxToken ? (
+            <PriceMap mapboxToken={mapboxToken} refreshQuestionsTrigger={questionRefresh} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center p-6">
+              <div className="max-w-md bg-white/95 backdrop-blur rounded-2xl shadow-lg p-8 text-center">
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Mapa temporariamente indisponível</h2>
+                <p className="text-gray-600 text-sm mb-6">
+                  O mapa de preços precisa do token Mapbox. Em produção, configure <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> no deploy.
+                </p>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center justify-center gap-2 py-3 px-5 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a]"
+                >
+                  Ir para Gastos
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Banner de sucesso ao compartilhar */}
