@@ -322,7 +322,13 @@ FORMATO DO JSON (use null para campos não encontrados):
   "chaveAcesso": "chave" ou null
 }
 
-Se não conseguir identificar o estabelecimento ou o total, retorne um JSON com esses campos como null e adicione um campo "erro": "mensagem explicando o problema".`
+COMO ENCONTRAR O TOTAL (tente nesta ordem):
+1. Linhas com "TOTAL", "Total a pagar", "Valor total", "Total geral", "Total R$"
+2. Último valor em reais no final do cupom/recibo (geralmente é o total)
+3. Se houver lista de produtos com valorTotal, some todos os valorTotal e use como "total"
+4. Campo "subtotal" ou "total" em qualquer formato (ex: "R$ 50,99" ou 50.99)
+
+Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tiver produtos com valorTotal, sempre preencha total com a soma.`
               },
               { role: "user", content: `Extraia as informações da seguinte nota fiscal/cupom/recibo:\n\n${emailBody.substring(0, 15000)}` }
             ],
@@ -374,11 +380,39 @@ Se não conseguir identificar o estabelecimento ou o total, retorne um JSON com 
           notaFiscal = JSON.parse(jsonStr);
           console.log('✅ JSON parseado com sucesso');
 
-          // GPT retornou "erro": não conseguiu identificar estabelecimento/total — pular sem contar como erro
+          // Fallback: se GPT disse "total não encontrado" mas temos produtos com valorTotal, somar e usar como total
           if (notaFiscal?.erro && typeof notaFiscal.erro === 'string') {
-            console.log(`⏭️  GPT não conseguiu extrair dados deste e-mail: ${notaFiscal.erro}`);
-            skipped++;
-            continue;
+            const erroLower = notaFiscal.erro.toLowerCase();
+            const isTotalMissing = erroLower.includes('total') && (erroLower.includes('não encontrado') || erroLower.includes('não identificado'));
+            let recovered = false;
+            if (isTotalMissing && Array.isArray(notaFiscal.produtos) && notaFiscal.produtos.length > 0) {
+              const soma = notaFiscal.produtos.reduce((acc, p) => {
+                const v = p.valorTotal != null ? parseFloat(String(p.valorTotal).replace(/\./g, '').replace(',', '.')) : 0;
+                return acc + (isNaN(v) ? 0 : v);
+              }, 0);
+              if (soma > 0) {
+                notaFiscal.total = Math.round(soma * 100) / 100;
+                delete notaFiscal.erro;
+                recovered = true;
+                console.log('✅ Total recuperado pela soma dos produtos:', notaFiscal.total);
+              }
+            }
+            if (!recovered && notaFiscal.subtotal != null) {
+              const sub = typeof notaFiscal.subtotal === 'string'
+                ? parseFloat(notaFiscal.subtotal.replace(/R\$\s*/gi, '').replace(/\./g, '').replace(',', '.'))
+                : parseFloat(notaFiscal.subtotal);
+              if (!isNaN(sub) && sub > 0) {
+                notaFiscal.total = sub;
+                delete notaFiscal.erro;
+                recovered = true;
+                console.log('✅ Total recuperado do subtotal:', notaFiscal.total);
+              }
+            }
+            if (notaFiscal?.erro) {
+              console.log(`⏭️  GPT não conseguiu extrair dados deste e-mail: ${notaFiscal.erro}`);
+              skipped++;
+              continue;
+            }
           }
 
           console.log('📋 Dados extraídos:', {
