@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { createClient } from '@supabase/supabase-js';
-import { Loader2, Mail, Camera } from 'lucide-react';
+import { Loader2, Mail, Camera, MapPin, X } from 'lucide-react';
+import Link from 'next/link';
 import { Nav } from '../components/Nav';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
@@ -43,6 +44,8 @@ export default function Dashboard() {
   const [showLogs, setShowLogs] = useState(false);
   const [debugInfo, setDebugInfo] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(null); // 'YYYY-MM' ou null = todos
+  const [tipGmailDismissed, setTipGmailDismissed] = useState(true);
+  const [tipMapDismissed, setTipMapDismissed] = useState(true);
 
   // Debug: Log quando transactions mudar
   useEffect(() => {
@@ -444,6 +447,13 @@ export default function Dashboard() {
     }
   }, [userId, loadTransactions]);
 
+  // Onboarding: mostrar dicas uma vez (localStorage)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!localStorage.getItem('finmemory_tip_gmail')) setTipGmailDismissed(false);
+    if (!localStorage.getItem('finmemory_tip_map')) setTipMapDismissed(false);
+  }, []);
+
   // Check URL params for first sync
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -469,7 +479,7 @@ export default function Dashboard() {
   }, [userId, handleSyncEmails]);
 
   const handleConnectGmail = () => {
-    signIn('google', { callbackUrl: '/dashboard?success=true' });
+    signIn('google', { callbackUrl: '/mapa' });
   };
 
   const handleDisconnect = async () => {
@@ -478,7 +488,7 @@ export default function Dashboard() {
         localStorage.removeItem('user_id');
         setUserId(null);
         setTransactions([]);
-        await signOut({ callbackUrl: '/dashboard' });
+        await signOut({ callbackUrl: '/' });
       } catch (error) {
         console.error('Erro ao desconectar:', error);
         alert('❌ Erro ao desconectar. Tente novamente.');
@@ -608,6 +618,9 @@ export default function Dashboard() {
     return (filteredTransactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
   }, [filteredTransactions]);
 
+  const transactionCount = (transactions || []).length;
+  const userLevel = transactionCount < 10 ? 'Iniciante' : transactionCount < 50 ? 'Regular' : 'Expert';
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-foreground">
       <div className="max-w-md mx-auto px-5 pb-24 pt-5">
@@ -643,7 +656,50 @@ export default function Dashboard() {
         ) : (
           <>
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
+            {/* Nível (gamificação leve) */}
+            {transactionCount >= 0 && (
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-[#666]">
+                  {transactionCount} transação{transactionCount !== 1 ? 'ões' : ''}
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#667eea]/15 text-[#667eea]" title="Quanto mais você sincroniza, mais sobe de nível">
+                  Nível {userLevel}
+                </span>
+              </div>
+            )}
+            {/* Dicas contextuais (onboarding) – aparecem uma vez */}
+            {!tipGmailDismissed && (
+              <div className="mb-4 p-4 rounded-xl bg-[#e8f5e9] border border-[#c8e6c9] text-[#2e7d32] text-sm relative">
+                <button type="button" onClick={() => { localStorage.setItem('finmemory_tip_gmail', '1'); setTipGmailDismissed(true); }} className="absolute top-2 right-2 p-1 rounded-full hover:bg-[#c8e6c9] text-[#2e7d32]" aria-label="Fechar">
+                  <X className="h-4 w-4" />
+                </button>
+                <p className="font-medium mb-1">Conecte o Gmail</p>
+                <p className="text-xs opacity-90">Sincronize suas notas fiscais automaticamente pelos e-mails. Seus dados ficam seguros.</p>
+                <button type="button" onClick={() => { localStorage.setItem('finmemory_tip_gmail', '1'); setTipGmailDismissed(true); }} className="mt-2 text-xs font-semibold underline">Entendi</button>
+              </div>
+            )}
+            {!tipMapDismissed && (
+              <div className="mb-4 p-4 rounded-xl bg-[#e3f2fd] border border-[#bbdefb] text-[#1565c0] text-sm relative">
+                <button type="button" onClick={() => { localStorage.setItem('finmemory_tip_map', '1'); setTipMapDismissed(true); }} className="absolute top-2 right-2 p-1 rounded-full hover:bg-[#bbdefb] text-[#1565c0]" aria-label="Fechar">
+                  <X className="h-4 w-4" />
+                </button>
+                <p className="font-medium mb-1">Mapa de preços</p>
+                <p className="text-xs opacity-90">Veja onde está mais barato e pergunte à comunidade em tempo real.</p>
+                <Link href="/mapa" onClick={() => { localStorage.setItem('finmemory_tip_map', '1'); setTipMapDismissed(true); }} className="inline-block mt-2 text-xs font-semibold underline">Ver mapa</Link>
+              </div>
+            )}
             <BalanceCard balance={totalBalance} className="mb-6" label={selectedMonth ? 'Gasto do mês' : undefined} />
+            {/* Acesso rápido ao mapa (1 toque – estilo Whoosh) */}
+            <Link href="/mapa" className="flex items-center gap-3 p-4 rounded-xl bg-white border border-[#e5e7eb] shadow-card-lovable mb-4 hover:bg-[#f8f9fa] transition-colors no-underline text-[#333]">
+              <div className="w-12 h-12 rounded-xl bg-[#e8f5e9] flex items-center justify-center text-[#28a745] shrink-0">
+                <MapPin className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-[#333]">Ver mapa de preços</p>
+                <p className="text-xs text-[#666]">Onde está mais barato? Pins coloridos por tipo de loja.</p>
+              </div>
+              <span className="text-[#667eea] text-sm font-medium shrink-0">Ir</span>
+            </Link>
             {/* Filtro por mês */}
             {availableMonths.length > 0 && (
               <div className="mb-4">
@@ -670,6 +726,7 @@ export default function Dashboard() {
                 </select>
               </div>
             )}
+            <p className="text-sm font-medium text-[#666] mb-2">Ações rápidas</p>
             <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} userIdReady={!!userId} className="mb-8" />
 
             {isAuthenticated && !userId && (

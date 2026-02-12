@@ -9,12 +9,12 @@ export default function Home() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/dashboard?success=true');
+      router.push('/mapa');
     }
   }, [status, router]);
 
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/dashboard?success=true' });
+    signIn('google', { callbackUrl: '/mapa' });
   };
 
   if (status === 'loading') {
@@ -55,16 +55,16 @@ export default function Home() {
           </button>
 
           <Link
-            href="/dashboard"
-            className="w-full max-w-[400px] inline-flex justify-center py-3.5 px-6 bg-transparent text-[#667eea] border-2 border-[#667eea] rounded-lg font-semibold text-base hover:bg-[#667eea] hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#667eea] focus-visible:ring-offset-2"
-          >
-            Ver Dashboard
-          </Link>
-          <Link
             href="/mapa"
             className="w-full max-w-[400px] inline-flex justify-center gap-2 py-3.5 px-6 bg-transparent text-[#22c55e] border-2 border-[#22c55e] rounded-lg font-semibold text-base hover:bg-[#22c55e] hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e] focus-visible:ring-offset-2"
           >
             🗺️ Ver Mapa de Preços
+          </Link>
+          <Link
+            href="/dashboard"
+            className="w-full max-w-[400px] inline-flex justify-center py-3.5 px-6 bg-transparent text-[#667eea] border-2 border-[#667eea] rounded-lg font-semibold text-base hover:bg-[#667eea] hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#667eea] focus-visible:ring-offset-2"
+          >
+            Meus gastos
           </Link>
         </div>
 

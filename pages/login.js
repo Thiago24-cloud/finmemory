@@ -12,12 +12,12 @@ export default function Login() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/dashboard?success=true');
+      router.push('/mapa');
     }
   }, [status, router]);
 
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/dashboard?success=true' });
+    signIn('google', { callbackUrl: '/mapa' });
   };
 
   if (status === 'loading') {

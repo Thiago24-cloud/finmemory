@@ -15,104 +15,85 @@ import {
 import { cn } from '../../lib/utils';
 
 /**
- * Ações rápidas – Sincronizar (botão), demais como Link para navegação confiável.
+ * Ações rápidas – Estilo Whoosh: 3 principais em destaque (Sync, Escanear, Mapa), demais em scroll.
  */
 export function QuickActions({ onSync, syncing, userIdReady = true, className }) {
   const syncDisabled = syncing || !userIdReady;
+  const primaryBtn = 'flex flex-col items-center gap-1.5 min-w-[80px] snap-start hover:-translate-y-0.5 transition-transform';
+  const secondaryBtn = 'flex flex-col items-center gap-2 min-w-[64px] snap-start hover:-translate-y-0.5 transition-transform';
 
   return (
     <div className={cn('overflow-x-auto scrollbar-hide -mx-5 px-5', className)}>
-      <div className="flex gap-4 pb-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-        {/* Sincronizar: botão (ação) */}
+      {/* Linha principal: Sync, Escanear, Mapa – fácil alcance com uma mão */}
+      <div className="flex gap-3 mb-4 justify-center">
         <button
           type="button"
           onClick={syncDisabled ? undefined : onSync}
           disabled={syncDisabled}
           title={!userIdReady ? 'Preparando sua conta...' : 'Sincronizar e-mails'}
-          className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+          className={cn(primaryBtn, 'disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0')}
         >
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-[#e8f5e9] text-[#28a745] hover:bg-[#c8e6c9]">
-            <RefreshCw className={cn('h-6 w-6', syncing && 'animate-spin')} />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-[#e8f5e9] text-[#28a745] hover:bg-[#c8e6c9]">
+            <RefreshCw className={cn('h-7 w-7', syncing && 'animate-spin')} />
           </div>
-          <span className="text-xs text-[#666] whitespace-nowrap">Sincronizar</span>
+          <span className="text-xs font-medium text-[#333] whitespace-nowrap">Sincronizar</span>
         </button>
-
-        {/* Escanear */}
-        <Link href="/add-receipt" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-[#e8f5e9] text-[#28a745] hover:bg-[#c8e6c9]">
-            <Camera className="h-6 w-6" />
+        <Link href="/add-receipt" className={cn(primaryBtn, 'no-underline text-inherit')}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-[#e8f5e9] text-[#28a745] hover:bg-[#c8e6c9]">
+            <Camera className="h-7 w-7" />
           </div>
-          <span className="text-xs text-[#666] whitespace-nowrap">Escanear</span>
+          <span className="text-xs font-medium text-[#333] whitespace-nowrap">Escanear</span>
         </Link>
-
-        {/* Mapa */}
-        <Link href="/mapa" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <MapPin className="h-6 w-6" />
+        <Link href="/mapa" className={cn(primaryBtn, 'no-underline text-inherit')}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-[#e3f2fd] text-[#1976d2] hover:bg-[#bbdefb]">
+            <MapPin className="h-7 w-7" />
           </div>
-          <span className="text-xs text-[#666] whitespace-nowrap">Mapa</span>
+          <span className="text-xs font-medium text-[#333] whitespace-nowrap">Mapa</span>
         </Link>
+      </div>
+      {/* Demais ações em scroll horizontal – minimalista */}
+      <div className="flex gap-3 pb-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
 
-        {/* Compartilhar preço */}
-        <Link href="/share-price" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <Share2 className="h-6 w-6" />
+        <Link href="/share-price" className={cn(secondaryBtn, 'no-underline text-inherit')}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <Share2 className="h-5 w-5" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Preço</span>
         </Link>
 
-        {/* Gasto manual */}
-        <Link href="/manual-entry" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <PenLine className="h-6 w-6" />
+        <Link href="/manual-entry" className={cn(secondaryBtn, 'no-underline text-inherit')}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <PenLine className="h-5 w-5" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Gasto</span>
         </Link>
-
-        {/* Parceria */}
-        <Link href="/partnership" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <Users className="h-6 w-6" />
+        <Link href="/partnership" className={cn(secondaryBtn, 'no-underline text-inherit')}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <Users className="h-5 w-5" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Parceria</span>
         </Link>
-
-        {/* Lista de compras */}
-        <Link href="/shopping-list" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <List className="h-6 w-6" />
+        <Link href="/shopping-list" className={cn(secondaryBtn, 'no-underline text-inherit')}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <List className="h-5 w-5" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Lista</span>
         </Link>
-
-        {/* Relatórios */}
-        <Link href="/reports" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <BarChart3 className="h-6 w-6" />
+        <Link href="/reports" className={cn(secondaryBtn, 'no-underline text-inherit')}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <BarChart3 className="h-5 w-5" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Relatórios</span>
         </Link>
-
-        {/* Categorias */}
-        <Link href="/categories" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <Tags className="h-6 w-6" />
+        <Link href="/categories" className={cn(secondaryBtn, 'no-underline text-inherit')}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <Tags className="h-5 w-5" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Categorias</span>
         </Link>
-
-        {/* Extratos */}
-        <Link href="/reports" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <FileText className="h-6 w-6" />
-          </div>
-          <span className="text-xs text-[#666] whitespace-nowrap">Extratos</span>
-        </Link>
-
-        {/* Ajustes */}
-        <Link href="/settings" className="flex flex-col items-center gap-2 min-w-[72px] snap-start hover:-translate-y-0.5 transition-transform no-underline text-inherit">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <Settings className="h-6 w-6" />
+        <Link href="/settings" className={cn(secondaryBtn, 'no-underline text-inherit')}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <Settings className="h-5 w-5" />
           </div>
           <span className="text-xs text-[#666] whitespace-nowrap">Ajustes</span>
         </Link>

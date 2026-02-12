@@ -19,7 +19,7 @@ export function Nav({ className }) {
       )}
     >
       <Link
-        href="/dashboard"
+        href="/mapa"
         className={cn(
           linkBoxClasses,
           'text-[#333] font-semibold hover:text-[#667eea]'
@@ -28,17 +28,17 @@ export function Nav({ className }) {
         FinMemory
       </Link>
       <div className="flex flex-wrap items-center gap-4">
-        <Link href="/privacidade" className={linkBoxClasses}>
-          Privacidade
-        </Link>
-        <Link href="/termos" className={linkBoxClasses}>
-          Termos de Uso
-        </Link>
         <Link href="/mapa" className={linkBoxClasses}>
           Mapa
         </Link>
         <Link href="/dashboard" className={linkBoxClasses}>
-          Dashboard
+          Gastos
+        </Link>
+        <Link href="/privacidade" className={linkBoxClasses}>
+          Privacidade
+        </Link>
+        <Link href="/termos" className={linkBoxClasses}>
+          Termos
         </Link>
       </div>
     </nav>
