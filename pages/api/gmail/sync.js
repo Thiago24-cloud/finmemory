@@ -380,6 +380,23 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
           notaFiscal = JSON.parse(jsonStr);
           console.log('✅ JSON parseado com sucesso');
 
+          // Quando GPT não retorna "erro" mas veio sem total/produtos/subtotal, tratar como extração falha e tentar último recurso no texto
+          const hasNoTotal = (notaFiscal.total == null || notaFiscal.total === '') && (!notaFiscal.produtos || notaFiscal.produtos.length === 0) && (notaFiscal.subtotal == null || notaFiscal.subtotal === '');
+          if (hasNoTotal && !notaFiscal?.erro) {
+            const lastBrl = result.match(/R\$\s*[\d.]*,\d{2}/g);
+            if (lastBrl && lastBrl.length > 0) {
+              const last = lastBrl[lastBrl.length - 1];
+              const num = parseFloat(last.replace(/R\$\s*/gi, '').replace(/\./g, '').replace(',', '.'));
+              if (!isNaN(num) && num > 0) {
+                notaFiscal.total = num;
+                console.log('✅ Total recuperado do texto (último valor R$):', notaFiscal.total);
+              }
+            }
+            if (notaFiscal.total == null || notaFiscal.total === '' || (typeof notaFiscal.total === 'number' && (isNaN(notaFiscal.total) || notaFiscal.total <= 0))) {
+              notaFiscal.erro = 'Valor total não encontrado.';
+            }
+          }
+
           // Fallback: se GPT disse "total não encontrado" mas temos produtos com valorTotal, somar e usar como total
           if (notaFiscal?.erro && typeof notaFiscal.erro === 'string') {
             const erroLower = notaFiscal.erro.toLowerCase();
