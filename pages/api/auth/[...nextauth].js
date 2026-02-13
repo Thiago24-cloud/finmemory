@@ -43,49 +43,36 @@ export const authOptions = {
   
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log('========================================');
-      console.log('🔐 NextAuth SignIn Callback');
-      console.log('========================================');
-      console.log('User:', user.email);
-      console.log('Provider:', account.provider);
-      
       try {
+        console.log('🔐 NextAuth SignIn callback –', user?.email, account?.provider);
         const supabase = getSupabase();
         if (!supabase) {
           console.warn('⚠️ Supabase não disponível, pulando salvamento do usuário');
-          return true; // Still allow sign in
+          return true;
         }
-        
-        // Save user to Supabase
         const userData = {
           email: user.email,
           name: user.name,
-          google_id: profile.sub || user.id,
+          google_id: (profile && profile.sub) || user.id,
           access_token: account.access_token,
           refresh_token: account.refresh_token,
           token_expiry: account.expires_at ? new Date(account.expires_at * 1000) : null,
           last_sync: new Date()
         };
-        
-        console.log('💾 Saving user to Supabase...');
-        
         const { data, error } = await supabase
           .from('users')
           .upsert(userData, { onConflict: 'email' })
           .select()
           .single();
-        
         if (error) {
-          console.error('❌ Supabase error:', error);
-          // Don't block sign in if Supabase fails
+          console.error('❌ Supabase upsert (não bloqueia login):', error.message, error.code);
         } else {
-          console.log('✅ User saved:', data.id);
+          console.log('✅ User saved:', data?.id);
         }
-        
         return true;
-      } catch (error) {
-        console.error('❌ SignIn callback error:', error);
-        return true; // Still allow sign in
+      } catch (err) {
+        console.error('❌ SignIn callback exception (não bloqueia login):', err?.message || err);
+        return true;
       }
     },
     
@@ -130,11 +117,20 @@ export const authOptions = {
     }
   },
   
+  events: {
+    async error({ message, error }) {
+      // Log completo para diagnosticar OAUTH_CALLBACK_ERROR no Cloud Run
+      console.error('[next-auth][OAUTH_ERROR]', message);
+      if (error) console.error('[next-auth][OAUTH_ERROR] detail:', error?.message ?? error);
+      if (error?.stack) console.error('[next-auth][OAUTH_ERROR] stack:', error.stack);
+    }
+  },
+
   pages: {
     signIn: '/',
     error: '/auth-error'
   },
-  
+
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60 // 30 days
@@ -142,8 +138,9 @@ export const authOptions = {
   
   // IMPORTANTE: Secret obrigatório para produção
   secret: process.env.NEXTAUTH_SECRET,
-  
-  debug: process.env.NODE_ENV === 'development'
+
+  // Em produção: defina NEXTAUTH_DEBUG=1 no Cloud Run para ver o erro real do callback
+  debug: process.env.NODE_ENV === 'development' || process.env.NEXTAUTH_DEBUG === '1'
 };
 
 export default NextAuth(authOptions);

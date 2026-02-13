@@ -53,11 +53,12 @@ Write-Host "`n📦 Tag da imagem: $COMMIT_SHA" -ForegroundColor Cyan
 # Ler token Mapbox do .env.local (para o mapa funcionar no Cloud Run)
 $MAPBOX_TOKEN = ""
 if (Test-Path ".env.local") {
-    $line = Get-Content ".env.local" | Where-Object { $_ -match '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=(.+)$' } | Select-Object -First 1
-    if ($line) {
-        $MAPBOX_TOKEN = $line -replace '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=', ''
-        $MAPBOX_TOKEN = $MAPBOX_TOKEN.Trim().Trim('"').Trim("'")
-        if ($MAPBOX_TOKEN) { Write-Host "   🗺️  Token Mapbox encontrado no .env.local" -ForegroundColor Green }
+    $content = Get-Content ".env.local" -Raw
+    if ($content -match 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN\s*=\s*(.+)') {
+        $MAPBOX_TOKEN = $Matches[1].Trim().Trim('"').Trim("'").Trim()
+    }
+    if ($MAPBOX_TOKEN) {
+        Write-Host "   🗺️  Token Mapbox encontrado no .env.local" -ForegroundColor Green
     }
 }
 if (-not $MAPBOX_TOKEN) {
@@ -68,7 +69,8 @@ if (-not $MAPBOX_TOKEN) {
 Write-Host "`n🔨 Iniciando build via Cloud Build..." -ForegroundColor Cyan
 Write-Host "   Isso pode levar alguns minutos..." -ForegroundColor Yellow
 
-$subs = "_COMMIT_SHA=$COMMIT_SHA,_MAPBOX_ACCESS_TOKEN=$MAPBOX_TOKEN"
+# Token entre aspas duplas para que = ou vírgula no valor não quebrem o parsing do gcloud
+$subs = "_COMMIT_SHA=$COMMIT_SHA,_MAPBOX_ACCESS_TOKEN=`"$MAPBOX_TOKEN`""
 Write-Host "`nExecutando: gcloud builds submit --config cloudbuild.yaml --substitutions=..." -ForegroundColor Gray
 
 try {

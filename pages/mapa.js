@@ -22,8 +22,11 @@ export async function getServerSideProps(ctx) {
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
     }
-    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
-    return { props: { mapboxToken: token } };
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (!mapboxToken) {
+      console.error('Mapbox token não encontrado!');
+    }
+    return { props: { mapboxToken: mapboxToken || '' } };
   } catch (err) {
     console.error('[mapa getServerSideProps]', err);
     return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };

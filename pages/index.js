@@ -14,11 +14,13 @@ export default function HomePage() {
   const { msg } = router.query;
   const isNotRegistered = msg === 'nao-cadastrado';
 
+  // Só redireciona para o mapa se estiver autenticado e NÃO veio de "acesso negado"
+  // (evita loop: mapa redireciona para /?msg=nao-cadastrado -> index redireciona para mapa -> repetir)
   useEffect(() => {
-    if (status === 'authenticated') {
+    if (status === 'authenticated' && router.query.msg !== 'nao-cadastrado') {
       router.push('/mapa');
     }
-  }, [status, router]);
+  }, [status, router, router.query.msg]);
 
   const handleSignIn = () => {
     signIn('google', { callbackUrl: '/mapa' });
