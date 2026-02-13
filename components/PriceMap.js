@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import Supercluster from 'supercluster';
 import { getSupabase } from '../lib/supabase';
 
 // Cores da marca FinMemory (logo: verde #2ECC49, preto, branco)
@@ -147,6 +148,33 @@ function popupHTML(store, product, price, timeAgo, pinColor = BRAND.green) {
   `;
 }
 
+/** Cria elemento DOM do marcador de cluster (círculo com número de pins agrupados) */
+function createClusterMarkerElement(count, onClick) {
+  const el = document.createElement('div');
+  el.className = 'finmemory-cluster-marker';
+  el.innerHTML = `<span class="finmemory-cluster-marker__count">${count}</span>`;
+  el.style.cssText = `
+    width: 44px;
+    height: 44px;
+    background: ${BRAND.green};
+    border: 3px solid ${BRAND.white};
+    border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 1rem;
+    color: ${BRAND.white};
+    font-family: system-ui, -apple-system, sans-serif;
+  `;
+  if (typeof onClick === 'function') {
+    el.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+  }
+  return el;
+}
+
 /** Dados de teste quando não houver pontos reais no Supabase */
 const FALLBACK_MARKERS = [
   { lng: -46.6555, lat: -23.5629, store: 'Drogasil Paulista', product: 'Dipirona 500mg', price: 'R$ 12,90', timeAgo: 'Há 2 horas · Caçador #4521', category: 'farmácia' },
@@ -287,6 +315,7 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
   const mapContainer = useRef(null);
   const map = useRef(null);
   const markersRef = useRef([]);
+  const clusterIndexRef = useRef(null);
   const questionMarkersRef = useRef([]);
   const mapPointsRef = useRef(null);
   const mapQuestionsRef = useRef([]);
@@ -298,6 +327,11 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
   const [mapError, setMapError] = useState(null);
   const [mapRetry, setMapRetry] = useState(0);
 
+  useEffect(() => {
+    console.log('Token Mapbox:', process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN);
+    console.log('Todas env vars:', Object.keys(process.env).filter(k => k.startsWith('NEXT_PUBLIC_')));
+  }, []);
+
   const clearMarkers = () => {
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
@@ -305,24 +339,65 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
     questionMarkersRef.current = [];
   };
 
-  const addMarkersToMap = (mapInstance, points) => {
-    if (!mapInstance) return;
-    clearMarkers();
-    const data = Array.isArray(points) && points.length > 0 ? points : FALLBACK_MARKERS;
-    data.forEach(({ lng: l, lat: la, store, product, price, timeAgo, category }) => {
-      const priceStr = typeof price === 'number' || (typeof price === 'string' && price.trim() && !String(price).startsWith('R$')) ? formatPrice(price) : (price || 'R$ 0,00');
-      const colors = getColorForLocation(store, category);
-      const el = createCustomMarkerElement(colors);
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([l, la])
-        .setPopup(
-          new mapboxgl.Popup({ offset: 20, className: 'finmemory-popup' })
-            .setHTML(popupHTML(store || '', product || '', priceStr, timeAgo || '', colors.main))
-        )
-        .addTo(mapInstance);
-      markersRef.current.push(marker);
+  /** Converte pontos do mapa para GeoJSON para o Supercluster */
+  const pointsToGeoJSON = useCallback((points) => {
+    return (points || []).map((p) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+      properties: { ...p }
+    }));
+  }, []);
+
+  /** Atualiza marcadores a partir do índice de clusters (bbox/zoom atuais). Só limpa price markers. */
+  const updateClusterMarkers = useCallback((mapInstance, index) => {
+    if (!mapInstance || !index) return;
+    const b = mapInstance.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    const zoom = Math.floor(mapInstance.getZoom());
+    const clusters = index.getClusters(bbox, zoom);
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    clusters.forEach((feature) => {
+      const [lng, lat] = feature.geometry.coordinates;
+      const isCluster = feature.properties.cluster_id != null;
+      const count = feature.properties.point_count;
+
+      if (isCluster) {
+        const el = createClusterMarkerElement(count, () => {
+          mapInstance.flyTo({ center: [lng, lat], zoom: Math.min(zoom + 2, 18) });
+        });
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([lng, lat])
+          .addTo(mapInstance);
+        markersRef.current.push(marker);
+      } else {
+        const { store, product, price, timeAgo, category } = feature.properties;
+        const priceStr = typeof price === 'number' || (typeof price === 'string' && price?.trim() && !String(price).startsWith('R$')) ? formatPrice(price) : (price || 'R$ 0,00');
+        const colors = getColorForLocation(store, category);
+        const el = createCustomMarkerElement(colors);
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([lng, lat])
+          .setPopup(
+            new mapboxgl.Popup({ offset: 20, className: 'finmemory-popup' })
+              .setHTML(popupHTML(store || '', product || '', priceStr, timeAgo || '', colors.main))
+          )
+          .addTo(mapInstance);
+        markersRef.current.push(marker);
+      }
     });
-  };
+  }, []);
+
+  const addMarkersToMap = useCallback((mapInstance, points) => {
+    if (!mapInstance) return;
+    const data = Array.isArray(points) && points.length > 0 ? points : FALLBACK_MARKERS;
+    const features = pointsToGeoJSON(data);
+    const index = new Supercluster({ radius: 60, maxZoom: 18 });
+    index.load(features);
+    clusterIndexRef.current = index;
+    updateClusterMarkers(mapInstance, index);
+  }, [pointsToGeoJSON, updateClusterMarkers]);
 
   const buildQuestionDetailHTML = (q) => {
     const store = (q.store_name || 'Local').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -448,6 +523,12 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
         }
       });
 
+      map.current.on('moveend', () => {
+        if (clusterIndexRef.current && map.current) {
+          updateClusterMarkers(map.current, clusterIndexRef.current);
+        }
+      });
+
       map.current.on('error', (e) => {
         console.warn('Mapbox error:', e);
         setMapError(e?.error?.message || 'Falha ao carregar o mapa.');
@@ -486,7 +567,7 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
         map.current = null;
       }
     };
-  }, [token, lng, lat, zoom, addQuestionMarkersToMap, mapRetry]);
+  }, [token, lng, lat, zoom, addMarkersToMap, updateClusterMarkers, addQuestionMarkersToMap, mapRetry]);
 
   useEffect(() => {
     if (!map.current || refreshQuestionsTrigger === 0) return;
