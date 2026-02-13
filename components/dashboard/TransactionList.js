@@ -12,6 +12,7 @@ import {
   Receipt,
   Pencil,
   Trash2,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -109,34 +110,36 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
           const total = Number(transaction.total) || 0;
           const isIncome = total < 0;
           const displayValue = Math.abs(total);
+          const onde = transaction.estabelecimento?.trim() || 'Local não informado';
 
           const showConfirm = confirmId === transaction.id;
           const isDeleting = deletingId === transaction.id;
 
           return (
             <div key={transaction.id}>
-              <div className="w-full flex items-center gap-2 p-4 hover:bg-[#f8f9fa] transition-colors">
-                <Link href={`/transaction/${transaction.id}`} className="flex-1 flex items-center gap-4 min-w-0 text-left">
-                  <div className="w-12 h-12 rounded-xl bg-[#f8f9fa] flex items-center justify-center text-[#666] shrink-0">
-                    {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[#333] truncate text-base">
-                      {transaction.estabelecimento || 'Estabelecimento'}
-                    </p>
-                    <p className="text-sm text-[#666]">
-                      {formatDate(transaction.data)}
-                    </p>
-                  </div>
-                  <div
-                    className={cn(
-                      'text-right font-bold text-base shrink-0',
-                      isIncome ? 'text-[#28a745]' : 'text-[#333]'
-                    )}
-                  >
-                    {isIncome ? '+' : '-'} {formatCurrency(displayValue)}
-                  </div>
+              <div className="w-full flex items-center gap-3 p-4 hover:bg-[#f8f9fa] transition-colors">
+                <div className="w-11 h-11 rounded-xl bg-[#f8f9fa] flex items-center justify-center text-[#666] shrink-0">
+                  {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
+                </div>
+                <Link href={`/transaction/${transaction.id}`} className="flex-1 min-w-0 text-left">
+                  <p className="text-xs text-[#888] uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <MapPin className="h-3.5 w-3" /> Onde
+                  </p>
+                  <p className="font-semibold text-[#333] text-base leading-tight truncate">
+                    {onde}
+                  </p>
+                  <p className="text-sm text-[#666] mt-0.5">
+                    {formatDate(transaction.data)}
+                  </p>
                 </Link>
+                <div
+                  className={cn(
+                    'text-right font-bold text-base shrink-0',
+                    isIncome ? 'text-[#28a745]' : 'text-[#333]'
+                  )}
+                >
+                  {isIncome ? '+' : '-'} {formatCurrency(displayValue)}
+                </div>
                 {userId && (
                   <div className="flex items-center gap-1 shrink-0">
                     <Link

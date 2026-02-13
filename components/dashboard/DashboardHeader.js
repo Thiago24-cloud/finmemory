@@ -1,8 +1,9 @@
+import Link from 'next/link';
 import { LogOut, Bell } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 /**
- * Header do dashboard – avatar, nome do usuário (dados reais da sessão NextAuth), notificações e sair.
+ * Header do dashboard – avatar, nome do usuário (dados reais da sessão NextAuth), lembretes/notificações e sair.
  */
 export function DashboardHeader({ user, onSignOut, className }) {
   const userName = user?.name || (user?.email && user.email.split('@')[0]) || 'Usuário';
@@ -26,13 +27,13 @@ export function DashboardHeader({ user, onSignOut, className }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
+        <Link
+          href="/notifications"
           className="p-2 rounded-full hover:bg-[#f8f9fa] transition-colors"
-          aria-label="Notificações"
+          aria-label="Lembretes e notificações"
         >
           <Bell className="h-5 w-5 text-[#666]" />
-        </button>
+        </Link>
         <button
           type="button"
           onClick={onSignOut}
