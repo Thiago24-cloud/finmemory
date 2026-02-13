@@ -3,6 +3,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Users, Copy, Check } from 'lucide-react';
+import { BottomNav } from '../components/BottomNav';
 import { getSupabase } from '../lib/supabase';
 
 export default function PartnershipPage() {
@@ -125,7 +126,7 @@ export default function PartnershipPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] p-5">
+    <div className="min-h-screen bg-background p-5 pb-24">
       <div className="max-w-md mx-auto">
         <Link href="/dashboard" className="inline-flex items-center gap-2 text-[#666] hover:text-[#333] text-sm mb-6">
           <ArrowLeft className="h-4 w-4" /> Voltar
@@ -206,6 +207,7 @@ export default function PartnershipPage() {
           </>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 }

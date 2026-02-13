@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
 import { Loader2, Mail, Camera, MapPin, X } from 'lucide-react';
 import Link from 'next/link';
-import { Nav } from '../components/Nav';
+import { BottomNav } from '../components/BottomNav';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
 import { QuickActions } from '../components/dashboard/QuickActions';
@@ -37,15 +37,20 @@ function getSupabase() {
 }
 
 export async function getServerSideProps(ctx) {
-  const session = await getServerSession(ctx.req, ctx.res, authOptions);
-  if (!session?.user?.email) {
+  try {
+    const session = await getServerSession(ctx.req, ctx.res, authOptions);
+    if (!session?.user?.email) {
+      return { redirect: { destination: '/login?callbackUrl=/dashboard', permanent: false } };
+    }
+    const allowed = await canAccess(session.user.email);
+    if (!allowed) {
+      return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    return { props: {} };
+  } catch (err) {
+    console.error('[dashboard getServerSideProps]', err);
     return { redirect: { destination: '/login?callbackUrl=/dashboard', permanent: false } };
   }
-  const allowed = await canAccess(session.user.email);
-  if (!allowed) {
-    return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
-  }
-  return { props: {} };
 }
 
 export default function Dashboard() {
@@ -637,10 +642,10 @@ export default function Dashboard() {
   const userLevel = transactionCount < 10 ? 'Iniciante' : transactionCount < 50 ? 'Regular' : 'Expert';
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-md mx-auto px-5 pb-24 pt-5">
         <h1 className="sr-only">FinMemory - Dashboard</h1>
-        <Nav className="text-muted-foreground" />
+        <BottomNav />
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">

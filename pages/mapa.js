@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
+import { BottomNav } from '../components/BottomNav';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
@@ -12,16 +13,21 @@ import { canAccess } from '../lib/access-server';
 const PriceMap = dynamic(() => import('../components/PriceMap'), { ssr: false });
 
 export async function getServerSideProps(ctx) {
-  const session = await getServerSession(ctx.req, ctx.res, authOptions);
-  if (!session?.user?.email) {
+  try {
+    const session = await getServerSession(ctx.req, ctx.res, authOptions);
+    if (!session?.user?.email) {
+      return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };
+    }
+    const allowed = await canAccess(session.user.email);
+    if (!allowed) {
+      return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+    return { props: { mapboxToken: token } };
+  } catch (err) {
+    console.error('[mapa getServerSideProps]', err);
     return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };
   }
-  const allowed = await canAccess(session.user.email);
-  if (!allowed) {
-    return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
-  }
-  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
-  return { props: { mapboxToken: token } };
 }
 
 export default function MapaPage({ mapboxToken }) {
@@ -260,6 +266,8 @@ export default function MapaPage({ mapboxToken }) {
         <p className="absolute bottom-2 left-2 right-2 sm:left-4 sm:right-auto text-[10px] sm:text-xs text-white/95 z-10 pointer-events-none drop-shadow-md max-w-md">
           App de compras: preços e comunidade. Sua <Link href="/dashboard" className="underline pointer-events-auto hover:text-white">análise de custos</Link> em Gastos.
         </p>
+
+        <BottomNav />
       </div>
     </>
   );

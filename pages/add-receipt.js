@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { BottomNav } from '../components/BottomNav';
 import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
 
@@ -632,6 +633,7 @@ export default function AddReceipt() {
           </div>
         )}
         </div>
+        <BottomNav />
       </div>
     </>
   );

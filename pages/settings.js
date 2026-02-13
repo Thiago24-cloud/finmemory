@@ -3,6 +3,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Settings, LogOut, FileText, Shield } from 'lucide-react';
+import { BottomNav } from '../components/BottomNav';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -63,6 +64,7 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 }
