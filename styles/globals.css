@@ -167,6 +167,12 @@
 */
 
 /* Estilos para o Leaflet */
+/* Pin customizado por categoria (mapa) – sem fundo padrão do Leaflet */
+.leaflet-marker-icon.custom-pin {
+  background: none !important;
+  border: none !important;
+}
+
 .leaflet-container {
   width: 100%;
   height: 100%;

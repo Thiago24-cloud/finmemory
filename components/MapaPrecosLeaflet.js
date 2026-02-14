@@ -4,9 +4,10 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { useEffect, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getMapThemeById } from '../lib/colors';
+import { getCategoryColor } from '../lib/colors';
 
-// Fix para os ícones do Leaflet no Next.js
-const icon = L.icon({
+const DEFAULT_ICON = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -15,6 +16,16 @@ const icon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41]
 });
+
+function createCategoryIcon(hexColor) {
+  return L.divIcon({
+    className: 'custom-pin',
+    html: `<div style="background:${hexColor};width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+  });
+}
 
 function LocationMarker() {
   const [position, setPosition] = useState(null);
@@ -28,25 +39,28 @@ function LocationMarker() {
   }, [map]);
 
   return position === null ? null : (
-    <Marker position={position} icon={icon}>
+    <Marker position={position} icon={DEFAULT_ICON}>
       <Popup>Você está aqui! 📍</Popup>
     </Marker>
   );
 }
 
-export default function MapaPrecosLeaflet() {
+export default function MapaPrecosLeaflet({ mapThemeId = 'ruas' }) {
+  const theme = getMapThemeById(mapThemeId);
   const [locais, setLocais] = useState([
-    { id: 1, nome: 'Drogasil', produto: 'Dipirona 500mg', preco: 10.99, lat: -23.5505, lng: -46.6333 },
-    { id: 2, nome: 'Droga Raia', produto: 'Dipirona 500mg', preco: 12.50, lat: -23.5489, lng: -46.6388 },
-    { id: 3, nome: 'Pague Menos', produto: 'Dipirona 500mg', preco: 9.90, lat: -23.5520, lng: -46.6290 }
+    { id: 1, nome: 'Drogasil', produto: 'Dipirona 500mg', preco: 10.99, lat: -23.5505, lng: -46.6333, categoria: 'farmácia' },
+    { id: 2, nome: 'Droga Raia', produto: 'Dipirona 500mg', preco: 12.50, lat: -23.5489, lng: -46.6388, categoria: 'farmácia' },
+    { id: 3, nome: 'Pague Menos', produto: 'Dipirona 500mg', preco: 9.90, lat: -23.5520, lng: -46.6290, categoria: 'farmácia' },
+    { id: 4, nome: 'Pão de Açúcar', produto: 'Leite 1L', preco: 5.90, lat: -23.5480, lng: -46.6310, categoria: 'supermercado' },
+    { id: 5, nome: 'Restaurante do Zé', produto: 'Marmita', preco: 22.00, lat: -23.5530, lng: -46.6350, categoria: 'restaurante' },
+    { id: 6, nome: 'Lanchonete Central', produto: 'X-Tudo', preco: 18.50, lat: -23.5510, lng: -46.6340, categoria: 'lanchonete' }
   ]);
   const [carregando, setCarregando] = useState(false);
 
   const buscarLocais = async () => {
     setCarregando(true);
     try {
-      // const { data } = await supabase.from('precos_compartilhados').select('*');
-      // setLocais(data || []);
+      // TODO: buscar de /api/map/points ou Supabase
     } catch (error) {
       console.error('Erro ao buscar locais:', error);
     }
@@ -54,72 +68,74 @@ export default function MapaPrecosLeaflet() {
   };
 
   return (
-    <div className="relative w-full h-screen">
-      <div className="absolute top-0 left-0 right-0 z-[1000] bg-white shadow-md p-4">
-        <h1 className="text-2xl font-bold text-green-600">
-          🗺️ Waze dos Preços
-        </h1>
-        <p className="text-sm text-gray-600">
-          Encontre os melhores preços perto de você
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={buscarLocais}
-        className="absolute top-24 right-4 z-[1000] bg-green-500 text-white px-4 py-2 rounded-full shadow-lg hover:bg-green-600"
-      >
-        {carregando ? '🔄 Atualizando...' : '🔄 Atualizar'}
-      </button>
-
+    <div className="relative w-full h-full">
       <MapContainer
         center={[-23.5505, -46.6333]}
         zoom={13}
-        style={{ height: '100%', width: '100%', paddingTop: '100px' }}
+        style={{ height: '100%', width: '100%', paddingTop: '56px' }}
         className="z-0"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={theme.id === 'satelite'
+            ? '&copy; Esri'
+            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; CARTO'}
+          url={theme.url}
         />
         <LocationMarker />
-        {locais.map((local) => (
-          <Marker
-            key={local.id}
-            position={[local.lat, local.lng]}
-            icon={icon}
-          >
-            <Popup>
-              <div className="p-2">
-                <h3 className="font-bold text-lg">{local.nome}</h3>
-                <p className="text-sm text-gray-600">{local.produto}</p>
-                <p className="text-2xl font-bold text-green-600 mt-2">
-                  R$ {local.preco.toFixed(2)}
-                </p>
-                <button type="button" className="mt-2 bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
-                  Ver detalhes
-                </button>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {locais.map((local) => {
+          const { main } = getCategoryColor(local.categoria, local.nome);
+          const customIcon = createCategoryIcon(main);
+          return (
+            <Marker
+              key={local.id}
+              position={[local.lat, local.lng]}
+              icon={customIcon}
+            >
+              <Popup>
+                <div className="p-2 min-w-[160px]">
+                  <span
+                    className="inline-block px-2 py-0.5 rounded text-xs font-semibold text-white mb-1"
+                    style={{ backgroundColor: main }}
+                  >
+                    {local.categoria || 'Outros'}
+                  </span>
+                  <h3 className="font-bold text-gray-900 text-base mt-1">{local.nome}</h3>
+                  <p className="text-sm text-gray-600">{local.produto}</p>
+                  <p className="text-xl font-bold mt-2" style={{ color: main }}>
+                    R$ {Number(local.preco).toFixed(2)}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
 
-      <div className="absolute bottom-4 left-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
-        <h3 className="font-bold mb-2">📊 Legenda</h3>
-        <div className="text-sm space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full" />
-            <span>Melhor preço</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full" />
-            <span>Você está aqui</span>
-          </div>
+      <div className="absolute bottom-20 left-3 right-3 sm:left-4 sm:right-auto z-[1000] bg-white/95 backdrop-blur p-3 rounded-xl shadow-lg border border-gray-200/80 max-w-[280px]">
+        <h3 className="font-bold text-gray-900 mb-2 text-sm">📊 Tipos de comércio</h3>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+          {['Supermercado', 'Restaurante', 'Lanchonete', 'Farmácia', 'Padaria', 'Posto'].map((label) => {
+            const key = label.toLowerCase();
+            const { main } = getCategoryColor(key, '');
+            return (
+              <div key={key} className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full flex-shrink-0 border border-white shadow"
+                  style={{ backgroundColor: main }}
+                />
+                <span className="text-gray-700">{label}</span>
+              </div>
+            );
+          })}
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          {locais.length} locais encontrados
-        </p>
+        <button
+          type="button"
+          onClick={buscarLocais}
+          disabled={carregando}
+          className="mt-2 w-full py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 disabled:opacity-50"
+        >
+          {carregando ? 'Atualizando...' : 'Atualizar preços'}
+        </button>
       </div>
     </div>
   );

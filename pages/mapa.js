@@ -6,9 +6,11 @@ import { BottomNav } from '../components/BottomNav';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
-import { Search, ArrowLeft, PlusCircle, MessageCircle } from 'lucide-react';
+import { Search, ArrowLeft, PlusCircle, MessageCircle, Map } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
+import { MAP_THEMES, MAP_THEME_STORAGE_KEY, getMapThemeById } from '../lib/colors';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -34,6 +36,8 @@ export default function MapaPage() {
   const { data: session, status } = useSession();
   const [showSharedBanner, setShowSharedBanner] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [showMapasSheet, setShowMapasSheet] = useState(false);
+  const [mapThemeId, setMapThemeId] = useState('ruas');
   const [questionMessage, setQuestionMessage] = useState('');
   const [questionStore, setQuestionStore] = useState('');
   const [questionSubmitting, setQuestionSubmitting] = useState(false);
@@ -42,12 +46,25 @@ export default function MapaPage() {
   const [questionLocation, setQuestionLocation] = useState(null);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem(MAP_THEME_STORAGE_KEY);
+      if (saved && MAP_THEMES.some((t) => t.id === saved)) setMapThemeId(saved);
+    }
+  }, []);
+
+  useEffect(() => {
     if (router.query.shared === '1') {
       setShowSharedBanner(true);
       const t = setTimeout(() => setShowSharedBanner(false), 5000);
       return () => clearTimeout(t);
     }
   }, [router.query.shared]);
+
+  const handleSelectMapTheme = (id) => {
+    setMapThemeId(id);
+    if (typeof window !== 'undefined') window.localStorage.setItem(MAP_THEME_STORAGE_KEY, id);
+    setShowMapasSheet(false);
+  };
 
   const handleSubmitQuestion = async (e) => {
     e.preventDefault();
@@ -93,7 +110,7 @@ export default function MapaPage() {
       {/* Mapa em tela cheia = primeira coisa que o usuário vê */}
       <div className="fixed inset-0 w-full h-full bg-[#e5e3df]">
         <div className="absolute inset-0 w-full h-full">
-          <MapaPrecos />
+          <MapaPrecos mapThemeId={mapThemeId} />
         </div>
 
         {/* Banner de sucesso ao compartilhar */}
@@ -115,6 +132,15 @@ export default function MapaPage() {
                 <ArrowLeft className="h-5 w-5 shrink-0" />
                 <span className="sm:inline hidden">Gastos</span>
               </Link>
+              <button
+                type="button"
+                onClick={() => setShowMapasSheet(true)}
+                className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 font-semibold text-sm transition-colors shrink-0"
+                aria-label="Estilos do mapa"
+              >
+                <Map className="h-5 w-5 shrink-0" />
+                <span className="whitespace-nowrap">Mapas</span>
+              </button>
               <div className="flex-1 flex items-center min-w-0 max-w-[200px] sm:max-w-xs">
                 <div className="w-full flex items-center bg-gray-100/90 rounded-full pl-3 pr-3 py-2 focus-within:bg-white focus-within:ring-1 focus-within:ring-[#2ECC49] transition-all">
                   <Search className="h-4 w-4 text-gray-400 shrink-0 mr-2" />
@@ -165,6 +191,40 @@ export default function MapaPage() {
             </>
           )}
         </header>
+
+        {/* Sheet: Mapas – escolher tom de cor do mapa */}
+        <Sheet open={showMapasSheet} onOpenChange={setShowMapasSheet}>
+          <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
+            <SheetHeader className="mb-4">
+              <SheetTitle className="text-lg font-bold text-center">
+                🗺️ Estilos do mapa
+              </SheetTitle>
+              <p className="text-sm text-gray-600 text-center">
+                Escolha o tom de cor do mapa. Sua escolha fica salva.
+              </p>
+            </SheetHeader>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {MAP_THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => handleSelectMapTheme(theme.id)}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-left ${
+                    mapThemeId === theme.id
+                      ? 'border-violet-500 bg-violet-50 text-violet-900'
+                      : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/50'
+                  }`}
+                >
+                  <div
+                    className="w-full h-12 rounded-xl shadow-inner"
+                    style={{ backgroundColor: theme.preview }}
+                  />
+                  <span className="font-semibold text-sm text-gray-900">{theme.name}</span>
+                </button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Modal: Perguntar aos usuários */}
         {showQuestionModal && (

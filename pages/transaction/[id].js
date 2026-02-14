@@ -17,6 +17,8 @@ export default function TransactionDetailPage() {
   const [transaction, setTransaction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [removingPhoto, setRemovingPhoto] = useState(false);
+  const [receiptImageUrl, setReceiptImageUrl] = useState(null);
 
   useEffect(() => {
     if (!id || status === 'loading') return;
@@ -55,6 +57,7 @@ export default function TransactionDetailPage() {
           return;
         }
         setTransaction(data);
+        setReceiptImageUrl(data?.receipt_image_url || null);
       } catch (e) {
         if (!cancelled) {
           setError(e.message || 'Erro ao carregar.');
@@ -104,9 +107,6 @@ export default function TransactionDetailPage() {
   const formattedTime = transaction.hora ? transaction.hora.substring(0, 5) : null;
   const total = Number(transaction.total) || 0;
   const produtos = transaction.produtos || [];
-
-  const [removingPhoto, setRemovingPhoto] = useState(false);
-  const [receiptImageUrl, setReceiptImageUrl] = useState(transaction.receipt_image_url || null);
 
   const hasReceiptImage = receiptImageUrl && receiptImageUrl.trim();
 

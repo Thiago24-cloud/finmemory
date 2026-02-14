@@ -15,6 +15,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getCategoryColor } from '../../lib/colors';
 
 const categoryIcons = {
   transporte: <Car className="h-5 w-5" />,
@@ -22,13 +23,16 @@ const categoryIcons = {
   supermercado: <ShoppingBag className="h-5 w-5" />,
   mercado: <ShoppingBag className="h-5 w-5" />,
   restaurante: <Utensils className="h-5 w-5" />,
+  lanchonete: <Utensils className="h-5 w-5" />,
   alimentação: <Utensils className="h-5 w-5" />,
   combustível: <Fuel className="h-5 w-5" />,
   posto: <Fuel className="h-5 w-5" />,
   farmácia: <Pill className="h-5 w-5" />,
   eletrônicos: <Smartphone className="h-5 w-5" />,
   vestuário: <Shirt className="h-5 w-5" />,
+  roupas: <Shirt className="h-5 w-5" />,
   serviços: <Wrench className="h-5 w-5" />,
+  padaria: <Receipt className="h-5 w-5" />,
 };
 
 function getCategoryIcon(category, merchant) {
@@ -123,7 +127,10 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
           return (
             <div key={transaction.id}>
               <div className="w-full flex items-center gap-3 p-4 hover:bg-[#f8f9fa] transition-colors">
-                <div className="w-11 h-11 rounded-xl bg-[#f8f9fa] flex items-center justify-center text-[#666] shrink-0">
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 text-white"
+                  style={{ backgroundColor: getCategoryColor(transaction.categoria, transaction.estabelecimento).main }}
+                >
                   {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
                 </div>
                 <Link href={`/transaction/${transaction.id}`} className="flex-1 min-w-0 text-left">
