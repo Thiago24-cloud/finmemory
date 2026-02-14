@@ -12,7 +12,6 @@ import {
   Receipt,
   Pencil,
   Trash2,
-  MapPin,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getCategoryColor } from '../../lib/colors';
@@ -112,12 +111,12 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
         Toque em uma compra para ver <strong>preços e produtos</strong> que você pagou.
       </p>
 
-      <div className="card-lovable overflow-hidden">
-        {transactions.map((transaction, index) => {
+      <div className="card-lovable overflow-hidden divide-y divide-[#e5e7eb]">
+        {transactions.map((transaction) => {
           const total = Number(transaction.total) || 0;
           const isIncome = total < 0;
           const displayValue = Math.abs(total);
-          const onde = transaction.estabelecimento?.trim() || 'Local não informado';
+          const nomeLoja = (transaction.estabelecimento && String(transaction.estabelecimento).trim()) || 'Local não informado';
           const produtos = transaction.produtos || [];
           const numItens = Array.isArray(produtos) ? produtos.length : 0;
 
@@ -125,81 +124,85 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
           const isDeleting = deletingId === transaction.id;
 
           return (
-            <div key={transaction.id}>
-              <div className="w-full flex items-center gap-3 p-4 hover:bg-[#f8f9fa] transition-colors">
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 text-white"
-                  style={{ backgroundColor: getCategoryColor(transaction.categoria, transaction.estabelecimento).main }}
-                >
-                  {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
-                </div>
-                <Link href={`/transaction/${transaction.id}`} className="flex-1 min-w-0 text-left">
-                  <p className="text-xs text-[#888] uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <MapPin className="h-3.5 w-3" /> Onde
-                  </p>
-                  <p className="font-semibold text-[#333] text-base leading-tight truncate">
-                    {onde}
-                  </p>
-                  <p className="text-sm text-[#666] mt-0.5 flex items-center gap-2">
-                    {formatDate(transaction.data)}
-                    {numItens > 0 && (
-                      <span className="text-[#667eea] font-medium">
-                        · {numItens} {numItens === 1 ? 'item' : 'itens'}
+            <div key={transaction.id} className="bg-white">
+              <Link href={`/transaction/${transaction.id}`} className="block active:bg-[#f8f9fa]">
+                <div className="flex gap-3 p-4 sm:p-4">
+                  {/* Ícone por categoria */}
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white flex-shrink-0"
+                    style={{ backgroundColor: getCategoryColor(transaction.categoria, transaction.estabelecimento).main }}
+                  >
+                    {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
+                  </div>
+
+                  {/* Nome da loja em destaque + valor na mesma linha */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-[#111] text-base sm:text-lg leading-snug line-clamp-2">
+                        {nomeLoja}
+                      </h3>
+                      <span
+                        className={cn(
+                          'font-bold text-base shrink-0 whitespace-nowrap',
+                          isIncome ? 'text-[#16a34a]' : 'text-[#333]'
+                        )}
+                      >
+                        {isIncome ? '+' : '−'} {formatCurrency(displayValue)}
                       </span>
-                    )}
-                  </p>
-                </Link>
-                <div
-                  className={cn(
-                    'text-right font-bold text-base shrink-0',
-                    isIncome ? 'text-[#28a745]' : 'text-[#333]'
-                  )}
-                >
-                  {isIncome ? '+' : '-'} {formatCurrency(displayValue)}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className="text-sm text-[#666]">
+                        {formatDate(transaction.data)}
+                      </span>
+                      {numItens > 0 && (
+                        <span className="text-xs text-[#667eea] font-medium">
+                          {numItens} {numItens === 1 ? 'item' : 'itens'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {userId && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Link
-                      href={`/transaction/${transaction.id}/edit`}
-                      className="p-2 rounded-lg text-[#666] hover:bg-[#e5e7eb] hover:text-[#333]"
-                      title="Editar"
-                      onClick={(e) => e.stopPropagation()}
+              </Link>
+
+              {/* Ações: Editar e Excluir em linha separada para não apertar no mobile */}
+              {userId && (
+                <div className="flex items-center justify-end gap-1 px-4 pb-3 pt-0">
+                  <Link
+                    href={`/transaction/${transaction.id}/edit`}
+                    className="p-2.5 rounded-xl text-[#666] hover:bg-[#e5e7eb] hover:text-[#333] transition-colors"
+                    title="Editar"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Link>
+                  {!showConfirm ? (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmId(transaction.id); }}
+                      className="p-2.5 rounded-xl text-[#666] hover:bg-red-50 hover:text-red-600 transition-colors"
+                      title="Excluir"
+                      disabled={isDeleting}
                     >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-                    {!showConfirm ? (
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-2 text-xs">
                       <button
                         type="button"
-                        onClick={(e) => { e.preventDefault(); setConfirmId(transaction.id); }}
-                        className="p-2 rounded-lg text-[#666] hover:bg-red-50 hover:text-red-600"
-                        title="Deletar"
-                        disabled={isDeleting}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(transaction.id); }}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-lg font-medium"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {isDeleting ? '...' : 'Excluir'}
                       </button>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(transaction.id)}
-                          className="px-2 py-1 bg-red-600 text-white rounded font-medium"
-                        >
-                          {isDeleting ? '...' : 'Sim'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmId(null)}
-                          className="px-2 py-1 bg-gray-200 text-gray-800 rounded font-medium"
-                        >
-                          Não
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-              {index < transactions.length - 1 && (
-                <div className="h-px bg-[#e5e7eb] mx-4" />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmId(null); }}
+                        className="px-3 py-1.5 bg-gray-200 text-gray-800 rounded-lg font-medium"
+                      >
+                        Cancelar
+                      </button>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           );
