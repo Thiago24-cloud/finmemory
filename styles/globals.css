@@ -63,7 +63,10 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
@@ -145,7 +148,7 @@
   display: none;
 }
 
-/* Mapa FinMemory – popups com identidade da marca */
+/* Mapa FinMemory – estilos Mapbox removidos (mapbox-gl desinstalado)
 .finmemory-popup .mapboxgl-popup-content {
   padding: 0;
   border-radius: 14px;
@@ -160,4 +163,25 @@
 }
 .finmemory-popup .mapboxgl-popup-close-button:hover {
   color: #1a1a1a;
+}
+*/
+
+/* Estilos para o Leaflet */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-popup-pane {
+  z-index: 1000;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  min-width: 200px;
 }
