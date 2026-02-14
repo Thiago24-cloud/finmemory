@@ -98,12 +98,15 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
 
   return (
     <div className={cn('space-y-1', className)}>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-semibold text-[#333]">Histórico</h2>
         <span className="text-sm text-[#666]">
           {transactions.length} transação(ões)
         </span>
       </div>
+      <p className="text-xs text-[#666] mb-4">
+        Toque em uma compra para ver <strong>preços e produtos</strong> que você pagou.
+      </p>
 
       <div className="card-lovable overflow-hidden">
         {transactions.map((transaction, index) => {
@@ -111,6 +114,8 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
           const isIncome = total < 0;
           const displayValue = Math.abs(total);
           const onde = transaction.estabelecimento?.trim() || 'Local não informado';
+          const produtos = transaction.produtos || [];
+          const numItens = Array.isArray(produtos) ? produtos.length : 0;
 
           const showConfirm = confirmId === transaction.id;
           const isDeleting = deletingId === transaction.id;
@@ -128,8 +133,13 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
                   <p className="font-semibold text-[#333] text-base leading-tight truncate">
                     {onde}
                   </p>
-                  <p className="text-sm text-[#666] mt-0.5">
+                  <p className="text-sm text-[#666] mt-0.5 flex items-center gap-2">
                     {formatDate(transaction.data)}
+                    {numItens > 0 && (
+                      <span className="text-[#667eea] font-medium">
+                        · {numItens} {numItens === 1 ? 'item' : 'itens'}
+                      </span>
+                    )}
                   </p>
                 </Link>
                 <div

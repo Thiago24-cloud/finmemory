@@ -29,7 +29,7 @@
     "openai": "^4.77.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-leaflet": "^5.0.0",
+    "react-leaflet": "^4.2.1",
     "sonner": "^1.7.4",
     "supercluster": "^8.0.1",
     "tailwind-merge": "^2.6.0"

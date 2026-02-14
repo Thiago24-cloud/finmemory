@@ -206,12 +206,13 @@ export default function TransactionDetailPage() {
             </div>
           )}
 
-          {produtos.length > 0 && (
-            <div className="border-t border-border px-6 py-4">
-              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-accent" />
-                Produtos ({produtos.length})
-              </h2>
+          {/* Preços e produtos que você pagou – sempre visível */}
+          <div className="border-t border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-accent" />
+              Preços e produtos que você pagou
+            </h2>
+            {produtos.length > 0 ? (
               <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
                 <table className="w-full text-sm">
                   <thead>
@@ -240,8 +241,12 @@ export default function TransactionDetailPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Esta compra ainda não tem itens detalhados. Use <strong>Escanear Nota</strong> (botão + no app) para fotos de notas fiscais e ver preço de cada produto.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
