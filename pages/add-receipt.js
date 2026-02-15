@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BottomNav } from '../components/BottomNav';
 import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
+import Image from 'next/image';
 
 /**
  * Página de captura e processamento de nota fiscal via OCR.
@@ -341,14 +342,15 @@ export default function AddReceipt() {
 
       <div className="min-h-screen bg-gradient-primary font-sans">
         {/* Header fixo – Voltar sempre visível (não some ao rolar) */}
-        <div className="sticky top-0 z-20 flex items-center gap-4 p-5 pb-4 bg-gradient-primary">
+        <div className="sticky top-0 z-20 flex items-center gap-3 p-5 pb-4 bg-gradient-primary">
           <Link
             href="/dashboard"
             className="min-h-[44px] inline-flex items-center gap-2 bg-white/20 text-white py-2.5 px-4 rounded-xl text-sm font-medium hover:bg-white/30 active:bg-white/40 transition-colors no-underline"
           >
             <span aria-hidden>←</span> Voltar
           </Link>
-          <h1 className="text-white text-2xl m-0 flex-1">📸 Escanear Nota</h1>
+          <Image src="/logo.png" alt="" width={36} height={36} className="object-contain shrink-0 rounded-lg" />
+          <h1 className="text-white text-xl sm:text-2xl m-0 flex-1">Escanear Nota</h1>
         </div>
 
         <div className="px-5 pb-8">

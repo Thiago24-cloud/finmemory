@@ -51,13 +51,13 @@ export default function HomePage() {
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center p-5 bg-gradient-primary font-sans">
         <div className="bg-white rounded-[20px] p-8 md:p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-[600px] w-full">
-          {/* Logo Fin Memory */}
+          {/* Logo FinMemory */}
           <div className="mb-8 flex justify-center">
             <Image
               src="/logo.png"
-              alt="Fin Memory"
-              width={280}
-              height={80}
+              alt="FinMemory"
+              width={160}
+              height={160}
               priority
               className="object-contain"
             />

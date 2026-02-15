@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function Custom404() {
   return (
@@ -9,7 +10,9 @@ export default function Custom404() {
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center p-5 bg-gradient-primary font-sans">
         <div className="bg-white rounded-[20px] p-8 md:p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.25)] max-w-[480px] w-full">
-          <div className="text-6xl mb-4">🔍</div>
+          <div className="flex justify-center mb-4">
+            <Image src="/logo.png" alt="FinMemory" width={80} height={80} className="object-contain" />
+          </div>
           <h1 className="text-3xl md:text-4xl font-bold mb-2 text-[#333]">
             404
           </h1>

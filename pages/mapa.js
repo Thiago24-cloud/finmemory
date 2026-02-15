@@ -6,6 +6,7 @@ import { BottomNav } from '../components/BottomNav';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
+import Image from 'next/image';
 import { Search, ArrowLeft, PlusCircle, MessageCircle, Map } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
@@ -171,8 +172,9 @@ export default function MapaPage() {
             </>
           ) : (
             <>
-              <Link href="/mapa" className="font-bold text-[#333] text-lg shrink-0">
-                FinMemory
+              <Link href="/" className="flex items-center gap-2 shrink-0 no-underline text-[#333]">
+                <Image src="/logo.png" alt="FinMemory" width={36} height={36} className="object-contain rounded-lg" />
+                <span className="font-bold text-lg">FinMemory</span>
               </Link>
               <span className="flex-1 text-xs text-gray-500 hidden sm:block">App de compras · Onde está mais barato?</span>
               <button

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
 import { Loader2, Mail, Camera, MapPin, X } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BottomNav } from '../components/BottomNav';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
@@ -654,6 +655,7 @@ export default function Dashboard() {
           </div>
         ) : !isAuthenticated ? (
           <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6 text-center px-4">
+            <Image src="/logo.png" alt="FinMemory" width={80} height={80} className="object-contain" />
             <div className="w-20 h-20 rounded-full bg-[#e8f5e9] flex items-center justify-center">
               <Mail className="h-10 w-10 text-[#28a745]" />
             </div>
