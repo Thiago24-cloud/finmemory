@@ -351,7 +351,12 @@ export default function AddReceipt() {
         {/* Erro global */}
         {error && (
           <div className="bg-[#fee2e2] border border-[#fecaca] text-[#dc2626] py-3 px-4 rounded-xl mb-5 text-sm">
-            ⚠️ {error}
+            <p className="font-medium mb-1">⚠️ {error}</p>
+            {(error.includes('OpenAI') || error.toLowerCase().includes('configuração do servidor')) && (
+              <p className="mt-2 text-[#b91c1c] text-xs leading-relaxed">
+                Para escanear notas pelo app em produção, o administrador precisa adicionar a variável <strong>OPENAI_API_KEY</strong> no serviço Cloud Run (Variáveis e segredos). Enquanto isso, você pode usar <strong>Gastos → Sincronizar</strong> para puxar notas do Gmail ou lançar um <strong>Gasto manual</strong>.
+              </p>
+            )}
           </div>
         )}
 

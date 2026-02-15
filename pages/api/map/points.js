@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
 
 /**
- * GET /api/map/points
- * Retorna pontos do mapa de preços (tabela price_points).
- * user_id é mascarado como "Explorador #XXXX" para exibir no popup.
+ * GET /api/map/points - lista pontos do mapa.
+ * POST /api/map/points - divulgar preço (requer login; usa service role para evitar RLS).
+ * user_id é mascarado como "Explorador #XXXX" no GET.
  */
 let supabaseInstance = null;
 
@@ -38,13 +40,55 @@ function formatTimeAgo(dateStr) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   const supabase = getSupabase();
   if (!supabase) {
     return res.status(500).json({ error: 'Configuração do servidor incompleta' });
+  }
+
+  if (req.method === 'POST') {
+    const session = await getServerSession(req, res, authOptions);
+    const userId = session?.user?.supabaseId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Faça login para compartilhar preços.' });
+    }
+    const { product_name, price, store_name, lat, lng, category } = req.body || {};
+    if (!product_name || typeof product_name !== 'string' || !product_name.trim()) {
+      return res.status(400).json({ error: 'Informe o nome do produto.' });
+    }
+    if (price === undefined || price === null || isNaN(parseFloat(price))) {
+      return res.status(400).json({ error: 'Informe o preço.' });
+    }
+    if (!store_name || typeof store_name !== 'string' || !store_name.trim()) {
+      return res.status(400).json({ error: 'Informe o nome da loja.' });
+    }
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+      return res.status(400).json({ error: 'Ative a localização para compartilhar no mapa.' });
+    }
+    try {
+      const { error: insertErr } = await supabase.from('price_points').insert({
+        user_id: userId,
+        product_name: String(product_name).trim(),
+        price: parseFloat(price),
+        store_name: String(store_name).trim(),
+        lat: latNum,
+        lng: lngNum,
+        category: category && String(category).trim() ? String(category).trim() : null
+      });
+      if (insertErr) {
+        console.error('Erro ao inserir price_point:', insertErr);
+        return res.status(500).json({ error: insertErr.message || 'Erro ao salvar.' });
+      }
+      return res.status(201).json({ success: true });
+    } catch (e) {
+      console.error('POST /api/map/points:', e);
+      return res.status(500).json({ error: e.message || 'Erro ao salvar.' });
+    }
+  }
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {

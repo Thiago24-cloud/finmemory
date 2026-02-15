@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
-import { getSupabase } from '../lib/supabase';
 
 const CATEGORIES = [
   'Supermercado', 'Farmácia', 'Posto', 'Bar/Restaurante', 'Padaria', 'Hortifruti', 'Eletrônicos', 'Outros',
@@ -22,8 +21,6 @@ export default function SharePricePage() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-
-  const userId = session?.user?.supabaseId || (typeof window !== 'undefined' && localStorage.getItem('user_id'));
 
   useEffect(() => {
     getLocation();
@@ -46,7 +43,7 @@ export default function SharePricePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    if (!userId) {
+    if (!session?.user) {
       setError('Faça login para compartilhar preços.');
       return;
     }
@@ -61,25 +58,24 @@ export default function SharePricePage() {
 
     setSubmitting(true);
     try {
-      const supabase = getSupabase();
-      if (!supabase) {
-        setError('Configuração indisponível.');
-        setSubmitting(false);
+      const priceNum = parseFloat(String(price).replace(',', '.')) || 0;
+      const res = await fetch('/api/map/points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_name: productName.trim(),
+          price: priceNum,
+          store_name: storeName.trim(),
+          lat,
+          lng,
+          category: category || null
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Erro ao salvar.');
         return;
       }
-
-      const priceNum = parseFloat(String(price).replace(',', '.')) || 0;
-      const { error: insertErr } = await supabase.from('price_points').insert({
-        user_id: userId,
-        product_name: productName.trim(),
-        price: priceNum,
-        store_name: storeName.trim(),
-        lat,
-        lng,
-        category: category || null,
-      });
-
-      if (insertErr) throw insertErr;
       router.push('/mapa?shared=1');
     } catch (err) {
       setError(err.message || 'Erro ao salvar.');
