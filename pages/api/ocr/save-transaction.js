@@ -57,7 +57,8 @@ export default async function handler(req, res) {
       items,
       category,
       payment_method,
-      receipt_image_url
+      receipt_image_url,
+      shareOnMap
     } = req.body;
 
     // Validações
@@ -128,7 +129,8 @@ export default async function handler(req, res) {
 
     console.log('✅ Transação salva com sucesso:', transaction.id);
 
-    // Geocodificar e inserir pontos no mapa de preços (price_points)
+    // Geocodificar e inserir pontos no mapa de preços (price_points) só se o usuário optou por divulgar
+    if (shareOnMap) {
     try {
       const geoQuery = [merchant_name.trim()].concat(
         (req.body.merchant_address && String(req.body.merchant_address).trim())
@@ -171,6 +173,9 @@ export default async function handler(req, res) {
       }
     } catch (mapError) {
       console.warn('⚠️ Erro ao alimentar mapa:', mapError.message);
+    }
+    } else {
+      console.log('ℹ️ Usuário optou por não divulgar preços no mapa');
     }
 
     // Salvar produtos na tabela produtos (se existir e tiver itens)

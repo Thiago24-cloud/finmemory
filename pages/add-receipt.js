@@ -101,6 +101,8 @@ export default function AddReceipt() {
     payment_method: '',
     receipt_image_url: ''
   });
+  // Toggle: false = só nos meus registros; true = divulgar preços da nota no mapa
+  const [shareOnMap, setShareOnMap] = useState(false);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -246,7 +248,8 @@ export default function AddReceipt() {
         body: JSON.stringify({
           userId,
           ...formData,
-          total_amount: parseFloat(formData.total_amount) || 0
+          total_amount: parseFloat(formData.total_amount) || 0,
+          shareOnMap
         })
       });
 
@@ -317,6 +320,7 @@ export default function AddReceipt() {
       payment_method: '',
       receipt_image_url: ''
     });
+    setShareOnMap(false);
   };
 
   // Loading de sessão
@@ -591,6 +595,32 @@ export default function AddReceipt() {
                 >
                   + Adicionar Item
                 </button>
+              </div>
+
+              {/* Toggle: divulgar preços da nota no mapa ou só nos registros */}
+              <div className="mb-6">
+                <p className="text-xs text-[#6b7280] mb-2">
+                  Deslize para a direita para divulgar os produtos da nota no mapa; à esquerda = só nos seus registros.
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-[#374151]">
+                    {shareOnMap ? '🗺️ Divulgar no mapa' : '📋 Só meus registros'}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={shareOnMap}
+                    aria-label={shareOnMap ? 'Preços serão divulgados no mapa' : 'Preços só nos seus registros'}
+                    onClick={() => setShareOnMap((v) => !v)}
+                    className="relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#667eea] focus:ring-offset-2"
+                    style={{ backgroundColor: shareOnMap ? '#2ECC49' : '#e5e7eb' }}
+                  >
+                    <span
+                      className="absolute top-1 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200"
+                      style={{ left: shareOnMap ? 'calc(100% - 22px)' : '4px' }}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
 
