@@ -1,7 +1,7 @@
 'use client';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getMapThemeById } from '../lib/colors';
@@ -45,27 +45,49 @@ function LocationMarker() {
   );
 }
 
+/** Busca compras compartilhadas no mapa (localização onde a pessoa efetuou a compra). */
+async function fetchMapPoints() {
+  try {
+    const res = await fetch('/api/map/points');
+    if (!res.ok) return [];
+    const json = await res.json();
+    const points = json.points || [];
+    return points.map((p) => ({
+      id: p.id,
+      nome: p.store_name,
+      produto: p.product_name,
+      preco: p.price,
+      lat: Number(p.lat),
+      lng: Number(p.lng),
+      categoria: p.category || '',
+      time_ago: p.time_ago,
+      user_label: p.user_label
+    }));
+  } catch (e) {
+    console.warn('Erro ao buscar pontos do mapa:', e);
+    return [];
+  }
+}
+
 export default function MapaPrecosLeaflet({ mapThemeId = 'ruas' }) {
   const theme = getMapThemeById(mapThemeId);
-  const [locais, setLocais] = useState([
-    { id: 1, nome: 'Drogasil', produto: 'Dipirona 500mg', preco: 10.99, lat: -23.5505, lng: -46.6333, categoria: 'farmácia' },
-    { id: 2, nome: 'Droga Raia', produto: 'Dipirona 500mg', preco: 12.50, lat: -23.5489, lng: -46.6388, categoria: 'farmácia' },
-    { id: 3, nome: 'Pague Menos', produto: 'Dipirona 500mg', preco: 9.90, lat: -23.5520, lng: -46.6290, categoria: 'farmácia' },
-    { id: 4, nome: 'Pão de Açúcar', produto: 'Leite 1L', preco: 5.90, lat: -23.5480, lng: -46.6310, categoria: 'supermercado' },
-    { id: 5, nome: 'Restaurante do Zé', produto: 'Marmita', preco: 22.00, lat: -23.5530, lng: -46.6350, categoria: 'restaurante' },
-    { id: 6, nome: 'Lanchonete Central', produto: 'X-Tudo', preco: 18.50, lat: -23.5510, lng: -46.6340, categoria: 'lanchonete' }
-  ]);
+  const [locais, setLocais] = useState([]);
   const [carregando, setCarregando] = useState(false);
 
-  const buscarLocais = async () => {
+  const buscarLocais = useCallback(async () => {
     setCarregando(true);
     try {
-      // TODO: buscar de /api/map/points ou Supabase
+      const points = await fetchMapPoints();
+      setLocais(points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng)));
     } catch (error) {
       console.error('Erro ao buscar locais:', error);
     }
     setCarregando(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    buscarLocais();
+  }, [buscarLocais]);
 
   return (
     <div className="relative w-full h-full">
@@ -104,6 +126,11 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'ruas' }) {
                   <p className="text-xl font-bold mt-2" style={{ color: main }}>
                     R$ {Number(local.preco).toFixed(2)}
                   </p>
+                  {(local.time_ago || local.user_label) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {[local.time_ago, local.user_label].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
                 </div>
               </Popup>
             </Marker>
@@ -128,6 +155,11 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'ruas' }) {
             );
           })}
         </div>
+        {locais.length === 0 && !carregando && (
+          <p className="mt-1.5 text-xs text-gray-500">
+            Nenhum preço compartilhado ainda. Use &quot;Compartilhar&quot; no topo para divulgar uma compra no mapa.
+          </p>
+        )}
         <button
           type="button"
           onClick={buscarLocais}
