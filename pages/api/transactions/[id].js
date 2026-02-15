@@ -34,7 +34,18 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PATCH') {
-    const { estabelecimento, total, data, receipt_image_url: receiptImageUrl } = req.body;
+    const { restore, estabelecimento, total, data, receipt_image_url: receiptImageUrl } = req.body || {};
+    if (restore === true) {
+      const { error: restoreError } = await supabase
+        .from('transacoes')
+        .update({ deleted_at: null })
+        .eq('id', id)
+        .eq('user_id', userId);
+      if (restoreError) {
+        return res.status(500).json({ success: false, error: restoreError.message });
+      }
+      return res.status(200).json({ success: true });
+    }
     const updates = {};
     if (estabelecimento != null && String(estabelecimento).trim()) updates.estabelecimento = String(estabelecimento).trim();
     if (total != null && !isNaN(parseFloat(total))) updates.total = parseFloat(total);
@@ -60,17 +71,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    const { error: deleteProdError } = await supabase
-      .from('produtos')
-      .delete()
-      .eq('transacao_id', id);
-    if (deleteProdError) {
-      console.error('Erro ao deletar produtos:', deleteProdError);
-    }
-
+    // Soft delete: marcar como excluído (lixeira) em vez de apagar
     const { error } = await supabase
       .from('transacoes')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
       .eq('user_id', userId);
 

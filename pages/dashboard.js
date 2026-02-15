@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
-import { Loader2, Mail, Camera, MapPin, X } from 'lucide-react';
+import { Loader2, Mail, Camera, MapPin, X, Trash2, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BottomNav } from '../components/BottomNav';
@@ -10,6 +10,7 @@ import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
 import { QuickActions } from '../components/dashboard/QuickActions';
 import { TransactionList } from '../components/dashboard/TransactionList';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 
@@ -67,6 +68,10 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(null); // 'YYYY-MM' ou null = todos
   const [tipGmailDismissed, setTipGmailDismissed] = useState(true);
   const [tipMapDismissed, setTipMapDismissed] = useState(true);
+  const [showTrashSheet, setShowTrashSheet] = useState(false);
+  const [deletedTransactions, setDeletedTransactions] = useState([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState(null);
 
   // Debug: Log quando transactions mudar
   useEffect(() => {
@@ -177,6 +182,7 @@ export default function Dashboard() {
         .from('transacoes')
         .select('id, user_id, estabelecimento, total, data')
         .eq('user_id', uid)
+        .is('deleted_at', null)
         .limit(5);
 
       if (simpleError) {
@@ -227,6 +233,7 @@ export default function Dashboard() {
         .from('transacoes')
         .select('*, produtos (*)')
         .eq('user_id', uid)
+        .is('deleted_at', null)
         .order('data', { ascending: false })
         .order('hora', { ascending: false });
 
@@ -244,6 +251,7 @@ export default function Dashboard() {
             .from('transacoes')
             .select('*')
             .eq('user_id', uid)
+            .is('deleted_at', null)
             .order('data', { ascending: false })
             .order('hora', { ascending: false });
           
@@ -285,6 +293,49 @@ export default function Dashboard() {
       setLoading(false);
     }
   }, []);
+
+  const loadDeletedTransactions = useCallback(async (uid) => {
+    if (!uid) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+    setTrashLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('transacoes')
+        .select('id, estabelecimento, total, data, deleted_at')
+        .eq('user_id', uid)
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+      if (error) throw error;
+      setDeletedTransactions(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Erro ao carregar lixeira:', e);
+      setDeletedTransactions([]);
+    } finally {
+      setTrashLoading(false);
+    }
+  }, []);
+
+  const handleRestore = useCallback(async (id) => {
+    if (!userId) return;
+    setRestoringId(id);
+    try {
+      const res = await fetch(`/api/transactions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, restore: true })
+      });
+      const json = await res.json();
+      if (json.success) {
+        loadDeletedTransactions(userId);
+        loadTransactions(userId);
+      }
+    } catch (e) {
+      console.error('Erro ao restaurar:', e);
+    } finally {
+      setRestoringId(null);
+    }
+  }, [userId, loadDeletedTransactions, loadTransactions]);
 
   const handleSyncEmails = useCallback(async (isFirstSync = false) => {
     if (!userId) {
@@ -749,7 +800,23 @@ export default function Dashboard() {
               </div>
             )}
             <p className="text-sm font-medium text-[#666] mb-2">Ações rápidas</p>
-            <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} userIdReady={!!userId} className="mb-8" />
+            <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} userIdReady={!!userId} className="mb-4" />
+
+            {/* Lixeira: notas excluídas – restaurar por engano */}
+            <button
+              type="button"
+              onClick={() => { setShowTrashSheet(true); loadDeletedTransactions(userId); }}
+              className="flex items-center gap-3 w-full p-4 rounded-xl bg-white border border-[#e5e7eb] shadow-card-lovable mb-8 hover:bg-[#f8f9fa] transition-colors text-left"
+            >
+              <div className="w-12 h-12 rounded-xl bg-[#fef2f2] flex items-center justify-center text-[#dc2626] shrink-0">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-[#333]">Lixeira</p>
+                <p className="text-xs text-[#666]">Excluiu uma nota sem querer? Restaure daqui.</p>
+              </div>
+              <span className="text-[#666] text-sm shrink-0">Abrir</span>
+            </button>
 
             {isAuthenticated && !userId && (
               <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
@@ -785,6 +852,57 @@ export default function Dashboard() {
                 onDeleted={() => loadTransactions(userId)}
               />
             )}
+
+            {/* Sheet: Lixeira – listar excluídas e restaurar */}
+            <Sheet open={showTrashSheet} onOpenChange={setShowTrashSheet}>
+              <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
+                <SheetHeader className="mb-4">
+                  <SheetTitle className="text-lg font-bold text-center flex items-center justify-center gap-2">
+                    <Trash2 className="h-5 w-5 text-[#dc2626]" />
+                    Lixeira
+                  </SheetTitle>
+                  <p className="text-sm text-[#666] text-center">
+                    Notas excluídas. Toque em &quot;Restaurar&quot; para voltar ao histórico.
+                  </p>
+                </SheetHeader>
+                {trashLoading ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-[#666]">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Carregando...</span>
+                  </div>
+                ) : deletedTransactions.length === 0 ? (
+                  <div className="text-center py-8 text-[#666] text-sm">
+                    Nenhuma nota na lixeira.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {deletedTransactions.map((t) => {
+                      const total = Number(t.total) || 0;
+                      const displayValue = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(total));
+                      const dataStr = t.data ? new Date(t.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+                      const isRestoring = restoringId === t.id;
+                      return (
+                        <div key={t.id} className="flex items-center justify-between gap-3 p-4 rounded-xl bg-[#f8f9fa] border border-[#e5e7eb]">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-[#333] truncate">{t.estabelecimento || 'Sem nome'}</p>
+                            <p className="text-sm text-[#666]">{dataStr} · {displayValue}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRestore(t.id)}
+                            disabled={isRestoring}
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#2ECC49] text-white text-sm font-medium hover:bg-[#22a83a] disabled:opacity-50"
+                          >
+                            {isRestoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                            Restaurar
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </SheetContent>
+            </Sheet>
 
             {syncLogs.length > 0 && !showLogs && (
               <button
