@@ -144,21 +144,30 @@ export default function AddReceipt() {
 
     setError(null);
 
-    // Validar tipo (inclui HEIC para iOS)
+    // Arquivo vazio (alguns dispositivos retornam isso)
+    if (file.size === 0) {
+      setError('A foto veio vazia. Tente de novo ou use "Escolher da Galeria".');
+      e.target.value = '';
+      return;
+    }
+
+    // Validar tipo (inclui HEIC para iOS – mas HEIC será rejeitado na compressão)
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/heic'];
     if (!validTypes.includes(file.type)) {
       setError('Formato não suportado. Use JPG, PNG ou WebP.');
+      e.target.value = '';
       return;
     }
 
     // Validar tamanho inicial (antes de comprimir)
     if (file.size > 10 * 1024 * 1024) { // 10MB limite inicial
       setError('Imagem muito grande. Máximo 10MB.');
+      e.target.value = '';
       return;
     }
 
     try {
-      // Comprimir imagem
+      // Comprimir imagem (HEIC no iPhone falha aqui – navegador não converte para canvas)
       const compressed = await compressImage(file);
       setImageBase64(compressed);
       setImagePreview(compressed);
@@ -166,12 +175,11 @@ export default function AddReceipt() {
     } catch (err) {
       console.error('Erro ao processar imagem:', err);
       setError(
-        file.type === 'image/heic' 
-          ? 'Formato HEIC não suportado. Use JPG ou PNG, ou altere as configurações da câmera.'
-          : 'Erro ao processar imagem. Tente outra.'
+        file.type === 'image/heic'
+          ? 'iPhone gravou em HEIC. Use "Escolher da Galeria" e selecione a foto, ou em Ajustes > Câmera > Formatos escolha "Mais compatível" (JPG).'
+          : 'Erro ao processar imagem. Tente outra ou use "Escolher da Galeria".'
       );
     } finally {
-      // Limpar input para permitir selecionar o mesmo arquivo de novo (fix iOS)
       e.target.value = '';
     }
   };
@@ -226,7 +234,10 @@ export default function AddReceipt() {
 
     } catch (err) {
       console.error('Erro no OCR:', err);
-      const msg = err.message || 'Erro ao processar. Verifique sua conexão e tente novamente.';
+      let msg = err.message || 'Erro ao processar. Verifique sua conexão e tente novamente.';
+      if (msg.includes('OpenAI') || msg.includes('configuração do servidor') || msg.includes('API key')) {
+        msg = 'Serviço de leitura da nota não configurado. Configure OPENAI_API_KEY no Cloud Run (veja a dica abaixo) ou use Sincronizar Gmail / Gasto manual.';
+      }
       setError(msg);
       setStep(STEPS.PREVIEW);
     }
@@ -376,41 +387,43 @@ export default function AddReceipt() {
             </p>
 
             <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="bg-gradient-primary text-white border-none py-4 px-6 rounded-xl text-base font-semibold cursor-pointer transition-transform hover:scale-[1.02]"
+              {/* Label nativo: no celular o toque abre a câmera direto (mais confiável que click() no input) */}
+              <label
+                htmlFor="add-receipt-camera"
+                className="bg-gradient-primary text-white border-none py-4 px-6 rounded-xl text-base font-semibold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] text-center block"
               >
                 📷 Tirar Foto
-              </button>
+              </label>
               <input
+                id="add-receipt-camera"
                 ref={cameraInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
                 capture="environment"
                 onChange={handleFileSelect}
                 className="hidden"
                 aria-label="Tirar foto da nota fiscal"
               />
 
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-[#f3f4f6] text-[#374151] border-none py-4 px-6 rounded-xl text-base cursor-pointer hover:bg-[#e5e7eb] transition-colors"
+              <label
+                htmlFor="add-receipt-gallery"
+                className="bg-[#f3f4f6] text-[#374151] border-none py-4 px-6 rounded-xl text-base cursor-pointer hover:bg-[#e5e7eb] transition-colors text-center block"
               >
                 🖼️ Escolher da Galeria
-              </button>
+              </label>
               <input
+                id="add-receipt-gallery"
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
                 onChange={handleFileSelect}
                 className="hidden"
+                aria-label="Escolher imagem da galeria"
               />
             </div>
 
             <p className="text-xs text-[#9ca3af] mt-4">
-              Formatos aceitos: JPG, PNG, WebP (máx. 2MB)
+              JPG, PNG ou WebP (máx. 2MB). Se a câmera não abrir, use Escolher da Galeria.
             </p>
           </div>
         )}
