@@ -1,0 +1,416 @@
+diff --git a/node_modules/@react-leaflet/core/lib/attribution.d.ts b/node_modules/@react-leaflet/core/lib/attribution.d.ts
+index 8907251..61bb09b 100644
+--- a/node_modules/@react-leaflet/core/lib/attribution.d.ts
++++ b/node_modules/@react-leaflet/core/lib/attribution.d.ts
+@@ -1,2 +1,2 @@
+-import type { Map } from 'leaflet';
+-export declare function useAttribution(map: Map, attribution: string | null | undefined): void;
++import type { Map as LeafletMap } from 'leaflet';
++export declare function useAttribution(map: LeafletMap, attribution: string | null | undefined): void;
+diff --git a/node_modules/@react-leaflet/core/lib/circle.d.ts b/node_modules/@react-leaflet/core/lib/circle.d.ts
+index 39910d5..e4d56c5 100644
+--- a/node_modules/@react-leaflet/core/lib/circle.d.ts
++++ b/node_modules/@react-leaflet/core/lib/circle.d.ts
+@@ -1,4 +1,4 @@
+-import type { Circle as LeafletCircle, CircleMarker as LeafletCircleMarker, CircleMarkerOptions, CircleOptions, LatLngExpression } from 'leaflet';
++import type { CircleMarkerOptions, CircleOptions, LatLngExpression, Circle as LeafletCircle, CircleMarker as LeafletCircleMarker } from 'leaflet';
+ import type { ReactNode } from 'react';
+ import type { PathProps } from './path.js';
+ export interface CircleMarkerProps extends CircleMarkerOptions, PathProps {
+diff --git a/node_modules/@react-leaflet/core/lib/component.d.ts b/node_modules/@react-leaflet/core/lib/component.d.ts
+index c67a870..a0869fd 100644
+--- a/node_modules/@react-leaflet/core/lib/component.d.ts
++++ b/node_modules/@react-leaflet/core/lib/component.d.ts
+@@ -1,11 +1,11 @@
+-import React, { type MutableRefObject, type ReactNode } from 'react';
++import React, { type PropsWithoutRef, type RefObject, type ReactNode } from 'react';
+ import type { DivOverlay, DivOverlayHook } from './div-overlay.js';
+ import type { LeafletElement } from './element.js';
+-declare type ElementHook<E, P> = (props: P) => MutableRefObject<LeafletElement<E>>;
+-export declare type PropsWithChildren = {
++type ElementHook<E, P> = (props: P) => RefObject<LeafletElement<E>>;
++export type PropsWithChildren = PropsWithoutRef<{
+     children?: ReactNode;
+-};
+-export declare function createContainerComponent<E, P extends PropsWithChildren>(useElement: ElementHook<E, P>): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<E>>;
+-export declare function createDivOverlayComponent<E extends DivOverlay, P extends PropsWithChildren>(useElement: ReturnType<DivOverlayHook<E, P>>): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<E>>;
+-export declare function createLeafComponent<E, P>(useElement: ElementHook<E, P>): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<E>>;
++}>;
++export declare function createContainerComponent<E, P extends PropsWithChildren>(useElement: ElementHook<E, PropsWithoutRef<P>>): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<E>>;
++export declare function createDivOverlayComponent<E extends DivOverlay, P extends PropsWithChildren>(useElement: ReturnType<DivOverlayHook<E, PropsWithoutRef<P>>>): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<E>>;
++export declare function createLeafComponent<E, P>(useElement: ElementHook<E, PropsWithoutRef<P>>): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<E>>;
+ export {};
+diff --git a/node_modules/@react-leaflet/core/lib/component.js b/node_modules/@react-leaflet/core/lib/component.js
+index d0c92b4..d1cc750 100644
+--- a/node_modules/@react-leaflet/core/lib/component.js
++++ b/node_modules/@react-leaflet/core/lib/component.js
+@@ -1,21 +1,23 @@
+ import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+ import { createPortal } from 'react-dom';
+-import { LeafletProvider } from './context.js';
++import { LeafletContext } from './context.js';
+ export function createContainerComponent(useElement) {
+     function ContainerComponent(props, forwardedRef) {
+-        const { instance , context  } = useElement(props).current;
++        const { instance, context } = useElement(props).current;
+         useImperativeHandle(forwardedRef, ()=>instance);
+-        return props.children == null ? null : /*#__PURE__*/ React.createElement(LeafletProvider, {
++        const { children } = props;
++        return children == null ? null : /*#__PURE__*/ React.createElement(LeafletContext, {
+             value: context
+-        }, props.children);
++        }, children);
+     }
+     return /*#__PURE__*/ forwardRef(ContainerComponent);
+ }
+ export function createDivOverlayComponent(useElement) {
+     function OverlayComponent(props, forwardedRef) {
+         const [isOpen, setOpen] = useState(false);
+-        const { instance  } = useElement(props, setOpen).current;
++        const { instance } = useElement(props, setOpen).current;
+         useImperativeHandle(forwardedRef, ()=>instance);
++        // biome-ignore lint/correctness/useExhaustiveDependencies: update overlay when children change
+         useEffect(function updateOverlay() {
+             if (isOpen) {
+                 instance.update();
+@@ -33,7 +35,7 @@ export function createDivOverlayComponent(useElement) {
+ }
+ export function createLeafComponent(useElement) {
+     function LeafComponent(props, forwardedRef) {
+-        const { instance  } = useElement(props).current;
++        const { instance } = useElement(props).current;
+         useImperativeHandle(forwardedRef, ()=>instance);
+         return null;
+     }
+diff --git a/node_modules/@react-leaflet/core/lib/context.d.ts b/node_modules/@react-leaflet/core/lib/context.d.ts
+index f280ef3..55cc089 100644
+--- a/node_modules/@react-leaflet/core/lib/context.d.ts
++++ b/node_modules/@react-leaflet/core/lib/context.d.ts
+@@ -1,34 +1,25 @@
+-/// <reference types="react" />
+-import type { Control, Layer, LayerGroup, Map } from 'leaflet';
++import type { Control, Layer, LayerGroup, Map as LeafletMap } from 'leaflet';
+ export declare const CONTEXT_VERSION = 1;
+-export declare type ControlledLayer = {
++export type ControlledLayer = {
+     addLayer(layer: Layer): void;
+     removeLayer(layer: Layer): void;
+ };
+-export declare type LeafletContextInterface = Readonly<{
++export type LeafletContextInterface = Readonly<{
+     __version: number;
+-    map: Map;
++    map: LeafletMap;
+     layerContainer?: ControlledLayer | LayerGroup;
+     layersControl?: Control.Layers;
+     overlayContainer?: Layer;
+     pane?: string;
+ }>;
+-export declare function createLeafletContext(map: Map): LeafletContextInterface;
++export declare function createLeafletContext(map: LeafletMap): LeafletContextInterface;
+ export declare function extendContext(source: LeafletContextInterface, extra: Partial<LeafletContextInterface>): LeafletContextInterface;
+ export declare const LeafletContext: import("react").Context<Readonly<{
+     __version: number;
+-    map: Map;
+-    layerContainer?: LayerGroup<any> | ControlledLayer | undefined;
+-    layersControl?: Control.Layers | undefined;
+-    overlayContainer?: Layer | undefined;
+-    pane?: string | undefined;
+-}> | null>;
+-export declare const LeafletProvider: import("react").Provider<Readonly<{
+-    __version: number;
+-    map: Map;
+-    layerContainer?: LayerGroup<any> | ControlledLayer | undefined;
+-    layersControl?: Control.Layers | undefined;
+-    overlayContainer?: Layer | undefined;
+-    pane?: string | undefined;
++    map: LeafletMap;
++    layerContainer?: ControlledLayer | LayerGroup;
++    layersControl?: Control.Layers;
++    overlayContainer?: Layer;
++    pane?: string;
+ }> | null>;
+ export declare function useLeafletContext(): LeafletContextInterface;
+diff --git a/node_modules/@react-leaflet/core/lib/context.js b/node_modules/@react-leaflet/core/lib/context.js
+index cf4d48e..f117994 100644
+--- a/node_modules/@react-leaflet/core/lib/context.js
++++ b/node_modules/@react-leaflet/core/lib/context.js
+@@ -13,7 +13,6 @@ export function extendContext(source, extra) {
+     });
+ }
+ export const LeafletContext = createContext(null);
+-export const LeafletProvider = LeafletContext.Provider;
+ export function useLeafletContext() {
+     const context = useContext(LeafletContext);
+     if (context == null) {
+diff --git a/node_modules/@react-leaflet/core/lib/control.d.ts b/node_modules/@react-leaflet/core/lib/control.d.ts
+index 8a3cd3c..fa7d598 100644
+--- a/node_modules/@react-leaflet/core/lib/control.d.ts
++++ b/node_modules/@react-leaflet/core/lib/control.d.ts
+@@ -1,3 +1,3 @@
+-import { Control, type ControlOptions } from 'leaflet';
++import type { Control, ControlOptions } from 'leaflet';
+ import type { ElementHook } from './element.js';
+ export declare function createControlHook<E extends Control, P extends ControlOptions>(useElement: ElementHook<E, P>): (props: P) => ReturnType<ElementHook<E, P>>;
+diff --git a/node_modules/@react-leaflet/core/lib/control.js b/node_modules/@react-leaflet/core/lib/control.js
+index 4452b59..7e798e3 100644
+--- a/node_modules/@react-leaflet/core/lib/control.js
++++ b/node_modules/@react-leaflet/core/lib/control.js
+@@ -4,9 +4,9 @@ export function createControlHook(useElement) {
+     return function useLeafletControl(props) {
+         const context = useLeafletContext();
+         const elementRef = useElement(props, context);
+-        const { instance  } = elementRef.current;
++        const { instance } = elementRef.current;
+         const positionRef = useRef(props.position);
+-        const { position  } = props;
++        const { position } = props;
+         useEffect(function addControl() {
+             instance.addTo(context.map);
+             return function removeControl() {
+diff --git a/node_modules/@react-leaflet/core/lib/div-overlay.d.ts b/node_modules/@react-leaflet/core/lib/div-overlay.d.ts
+index acae67c..a05e307 100644
+--- a/node_modules/@react-leaflet/core/lib/div-overlay.d.ts
++++ b/node_modules/@react-leaflet/core/lib/div-overlay.d.ts
+@@ -1,9 +1,9 @@
+ import type { Popup, Tooltip } from 'leaflet';
+ import { type LeafletContextInterface } from './context.js';
+-import type { LeafletElement, ElementHook } from './element.js';
++import type { ElementHook, LeafletElement } from './element.js';
+ import type { LayerProps } from './layer.js';
+-export declare type DivOverlay = Popup | Tooltip;
+-export declare type SetOpenFunc = (open: boolean) => void;
+-export declare type DivOverlayLifecycleHook<E, P> = (element: LeafletElement<E>, context: LeafletContextInterface, props: P, setOpen: SetOpenFunc) => void;
+-export declare type DivOverlayHook<E extends DivOverlay, P> = (useElement: ElementHook<E, P>, useLifecycle: DivOverlayLifecycleHook<E, P>) => (props: P, setOpen: SetOpenFunc) => ReturnType<ElementHook<E, P>>;
++export type DivOverlay = Popup | Tooltip;
++export type SetOpenFunc = (open: boolean) => void;
++export type DivOverlayLifecycleHook<E, P> = (element: LeafletElement<E>, context: LeafletContextInterface, props: P, setOpen: SetOpenFunc) => void;
++export type DivOverlayHook<E extends DivOverlay, P> = (useElement: ElementHook<E, P>, useLifecycle: DivOverlayLifecycleHook<E, P>) => (props: P, setOpen: SetOpenFunc) => ReturnType<ElementHook<E, P>>;
+ export declare function createDivOverlayHook<E extends DivOverlay, P extends LayerProps>(useElement: ElementHook<E, P>, useLifecycle: DivOverlayLifecycleHook<E, P>): (props: P, setOpen: SetOpenFunc) => ReturnType<ElementHook<E, P>>;
+diff --git a/node_modules/@react-leaflet/core/lib/dom.js b/node_modules/@react-leaflet/core/lib/dom.js
+index e41c0e8..2a29092 100644
+--- a/node_modules/@react-leaflet/core/lib/dom.js
++++ b/node_modules/@react-leaflet/core/lib/dom.js
+@@ -3,14 +3,14 @@ function splitClassName(className) {
+     return className.split(' ').filter(Boolean);
+ }
+ export function addClassName(element, className) {
+-    splitClassName(className).forEach((cls)=>{
++    for (const cls of splitClassName(className)){
+         DomUtil.addClass(element, cls);
+-    });
++    }
+ }
+ export function removeClassName(element, className) {
+-    splitClassName(className).forEach((cls)=>{
++    for (const cls of splitClassName(className)){
+         DomUtil.removeClass(element, cls);
+-    });
++    }
+ }
+ export function updateClassName(element, prevClassName, nextClassName) {
+     if (element != null && nextClassName !== prevClassName) {
+diff --git a/node_modules/@react-leaflet/core/lib/element.d.ts b/node_modules/@react-leaflet/core/lib/element.d.ts
+index 88ffea7..6e55fb8 100644
+--- a/node_modules/@react-leaflet/core/lib/element.d.ts
++++ b/node_modules/@react-leaflet/core/lib/element.d.ts
+@@ -1,10 +1,10 @@
+-import { type MutableRefObject } from 'react';
++import { type RefObject } from 'react';
+ import type { LeafletContextInterface } from './context.js';
+-export declare type LeafletElement<T, C = any> = Readonly<{
++export type LeafletElement<T, C = unknown> = Readonly<{
+     instance: T;
+     context: LeafletContextInterface;
+     container?: C | null;
+ }>;
+-export declare function createElementObject<T, C = any>(instance: T, context: LeafletContextInterface, container?: C | null): LeafletElement<T, C>;
+-export declare type ElementHook<E, P> = (props: P, context: LeafletContextInterface) => MutableRefObject<LeafletElement<E>>;
+-export declare function createElementHook<E, P, C = any>(createElement: (props: P, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: P, prevProps: P) => void): (props: P, context: LeafletContextInterface) => ReturnType<ElementHook<E, P>>;
++export declare function createElementObject<T, C = unknown>(instance: T, context: LeafletContextInterface, container?: C | null): LeafletElement<T, C>;
++export type ElementHook<E, P> = (props: P, context: LeafletContextInterface) => RefObject<LeafletElement<E>>;
++export declare function createElementHook<E, P, C = unknown>(createElement: (props: P, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: P, prevProps: P) => void): (props: P, context: LeafletContextInterface) => ReturnType<ElementHook<E, P>>;
+diff --git a/node_modules/@react-leaflet/core/lib/element.js b/node_modules/@react-leaflet/core/lib/element.js
+index 76c1d2e..5a10883 100644
+--- a/node_modules/@react-leaflet/core/lib/element.js
++++ b/node_modules/@react-leaflet/core/lib/element.js
+@@ -9,16 +9,16 @@ export function createElementObject(instance, context, container) {
+ export function createElementHook(createElement, updateElement) {
+     if (updateElement == null) {
+         return function useImmutableLeafletElement(props, context) {
+-            const elementRef = useRef();
++            const elementRef = useRef(undefined);
+             if (!elementRef.current) elementRef.current = createElement(props, context);
+             return elementRef;
+         };
+     }
+     return function useMutableLeafletElement(props, context) {
+-        const elementRef = useRef();
++        const elementRef = useRef(undefined);
+         if (!elementRef.current) elementRef.current = createElement(props, context);
+         const propsRef = useRef(props);
+-        const { instance  } = elementRef.current;
++        const { instance } = elementRef.current;
+         useEffect(function updateElementProps() {
+             if (propsRef.current !== props) {
+                 updateElement(instance, props, propsRef.current);
+@@ -27,7 +27,7 @@ export function createElementHook(createElement, updateElement) {
+         }, [
+             instance,
+             props,
+-            context
++            updateElement
+         ]);
+         return elementRef;
+     };
+diff --git a/node_modules/@react-leaflet/core/lib/events.d.ts b/node_modules/@react-leaflet/core/lib/events.d.ts
+index cc9421d..ba8f431 100644
+--- a/node_modules/@react-leaflet/core/lib/events.d.ts
++++ b/node_modules/@react-leaflet/core/lib/events.d.ts
+@@ -1,6 +1,6 @@
+ import type { Evented, LeafletEventHandlerFnMap } from 'leaflet';
+ import type { LeafletElement } from './element.js';
+-export declare type EventedProps = {
++export type EventedProps = {
+     eventHandlers?: LeafletEventHandlerFnMap;
+ };
+ export declare function useEventHandlers(element: LeafletElement<Evented>, eventHandlers: LeafletEventHandlerFnMap | null | undefined): void;
+diff --git a/node_modules/@react-leaflet/core/lib/events.js b/node_modules/@react-leaflet/core/lib/events.js
+index 79a61cc..77eea9f 100644
+--- a/node_modules/@react-leaflet/core/lib/events.js
++++ b/node_modules/@react-leaflet/core/lib/events.js
+@@ -1,6 +1,6 @@
+ import { useEffect, useRef } from 'react';
+ export function useEventHandlers(element, eventHandlers) {
+-    const eventHandlersRef = useRef();
++    const eventHandlersRef = useRef(undefined);
+     useEffect(function addEventHandlers() {
+         if (eventHandlers != null) {
+             element.instance.on(eventHandlers);
+diff --git a/node_modules/@react-leaflet/core/lib/generic.d.ts b/node_modules/@react-leaflet/core/lib/generic.d.ts
+index 3046834..7dec782 100644
+--- a/node_modules/@react-leaflet/core/lib/generic.d.ts
++++ b/node_modules/@react-leaflet/core/lib/generic.d.ts
+@@ -1,18 +1,18 @@
+-/// <reference types="react" />
+ import type { Control, ControlOptions, FeatureGroup, Layer, Path } from 'leaflet';
++import type { PropsWithoutRef } from 'react';
+ import { type PropsWithChildren } from './component.js';
+ import type { LeafletContextInterface } from './context.js';
++import { type DivOverlay, type DivOverlayLifecycleHook } from './div-overlay.js';
+ import { type LeafletElement } from './element.js';
+ import { type LayerProps } from './layer.js';
+-import { type DivOverlay, type DivOverlayLifecycleHook } from './div-overlay.js';
+ import { type PathProps } from './path.js';
+ interface LayerWithChildrenProps extends LayerProps, PropsWithChildren {
+ }
+ interface PathWithChildrenProps extends PathProps, PropsWithChildren {
+ }
+-export declare function createControlComponent<E extends Control, P extends ControlOptions>(createInstance: (props: P) => E): import("react").ForwardRefExoticComponent<import("react").PropsWithoutRef<P> & import("react").RefAttributes<E>>;
+-export declare function createLayerComponent<E extends Layer, P extends LayerWithChildrenProps>(createElement: (props: P, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: P, prevProps: P) => void): import("react").ForwardRefExoticComponent<import("react").PropsWithoutRef<P> & import("react").RefAttributes<E>>;
+-export declare function createOverlayComponent<E extends DivOverlay, P extends LayerWithChildrenProps>(createElement: (props: P, context: LeafletContextInterface) => LeafletElement<E>, useLifecycle: DivOverlayLifecycleHook<E, P>): import("react").ForwardRefExoticComponent<import("react").PropsWithoutRef<P> & import("react").RefAttributes<E>>;
+-export declare function createPathComponent<E extends FeatureGroup | Path, P extends PathWithChildrenProps>(createElement: (props: P, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: P, prevProps: P) => void): import("react").ForwardRefExoticComponent<import("react").PropsWithoutRef<P> & import("react").RefAttributes<E>>;
+-export declare function createTileLayerComponent<E extends Layer, P extends LayerProps>(createElement: (props: P, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: P, prevProps: P) => void): import("react").ForwardRefExoticComponent<import("react").PropsWithoutRef<P> & import("react").RefAttributes<E>>;
++export declare function createControlComponent<E extends Control, P extends ControlOptions>(createInstance: (props: PropsWithoutRef<P>) => E): import("react").ForwardRefExoticComponent<PropsWithoutRef<P> & import("react").RefAttributes<E>>;
++export declare function createLayerComponent<E extends Layer, P extends LayerWithChildrenProps>(createElement: (props: PropsWithoutRef<P>, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: PropsWithoutRef<P>, prevProps: PropsWithoutRef<P>) => void): import("react").ForwardRefExoticComponent<PropsWithoutRef<P> & import("react").RefAttributes<E>>;
++export declare function createOverlayComponent<E extends DivOverlay, P extends LayerWithChildrenProps>(createElement: (props: PropsWithoutRef<P>, context: LeafletContextInterface) => LeafletElement<E>, useLifecycle: DivOverlayLifecycleHook<E, PropsWithoutRef<P>>): import("react").ForwardRefExoticComponent<PropsWithoutRef<P> & import("react").RefAttributes<E>>;
++export declare function createPathComponent<E extends FeatureGroup | Path, P extends PathWithChildrenProps>(createElement: (props: PropsWithoutRef<P>, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: PropsWithoutRef<P>, prevProps: PropsWithoutRef<P>) => void): import("react").ForwardRefExoticComponent<PropsWithoutRef<P> & import("react").RefAttributes<E>>;
++export declare function createTileLayerComponent<E extends Layer, P extends LayerProps>(createElement: (props: PropsWithoutRef<P>, context: LeafletContextInterface) => LeafletElement<E>, updateElement?: (instance: E, props: PropsWithoutRef<P>, prevProps: PropsWithoutRef<P>) => void): import("react").ForwardRefExoticComponent<PropsWithoutRef<P> & import("react").RefAttributes<E>>;
+ export {};
+diff --git a/node_modules/@react-leaflet/core/lib/generic.js b/node_modules/@react-leaflet/core/lib/generic.js
+index e893066..f98463e 100644
+--- a/node_modules/@react-leaflet/core/lib/generic.js
++++ b/node_modules/@react-leaflet/core/lib/generic.js
+@@ -1,8 +1,8 @@
+ import { createContainerComponent, createDivOverlayComponent, createLeafComponent } from './component.js';
+ import { createControlHook } from './control.js';
++import { createDivOverlayHook } from './div-overlay.js';
+ import { createElementHook, createElementObject } from './element.js';
+ import { createLayerHook } from './layer.js';
+-import { createDivOverlayHook } from './div-overlay.js';
+ import { createPathHook } from './path.js';
+ export function createControlComponent(createInstance) {
+     function createElement(props, context) {
+diff --git a/node_modules/@react-leaflet/core/lib/grid-layer.js b/node_modules/@react-leaflet/core/lib/grid-layer.js
+index 81526cd..aa7a08d 100644
+--- a/node_modules/@react-leaflet/core/lib/grid-layer.js
++++ b/node_modules/@react-leaflet/core/lib/grid-layer.js
+@@ -1,5 +1,5 @@
+ export function updateGridLayer(layer, props, prevProps) {
+-    const { opacity , zIndex  } = props;
++    const { opacity, zIndex } = props;
+     if (opacity != null && opacity !== prevProps.opacity) {
+         layer.setOpacity(opacity);
+     }
+diff --git a/node_modules/@react-leaflet/core/lib/index.d.ts b/node_modules/@react-leaflet/core/lib/index.d.ts
+index 0ce757d..366bb23 100644
+--- a/node_modules/@react-leaflet/core/lib/index.d.ts
++++ b/node_modules/@react-leaflet/core/lib/index.d.ts
+@@ -1,7 +1,7 @@
+ export { useAttribution } from './attribution.js';
+ export { type CircleMarkerProps, type CircleProps, updateCircle, } from './circle.js';
+ export { createContainerComponent, createDivOverlayComponent, createLeafComponent, } from './component.js';
+-export { CONTEXT_VERSION, type LeafletContextInterface, LeafletContext, LeafletProvider, createLeafletContext, extendContext, useLeafletContext, } from './context.js';
++export { CONTEXT_VERSION, type LeafletContextInterface, LeafletContext, createLeafletContext, extendContext, useLeafletContext, } from './context.js';
+ export { createControlHook } from './control.js';
+ export { type DivOverlayHook, type DivOverlayLifecycleHook, type SetOpenFunc, createDivOverlayHook, } from './div-overlay.js';
+ export { addClassName, removeClassName, updateClassName } from './dom.js';
+diff --git a/node_modules/@react-leaflet/core/lib/index.js b/node_modules/@react-leaflet/core/lib/index.js
+index 69dff41..e174cff 100644
+--- a/node_modules/@react-leaflet/core/lib/index.js
++++ b/node_modules/@react-leaflet/core/lib/index.js
+@@ -1,7 +1,7 @@
+ export { useAttribution } from './attribution.js';
+ export { updateCircle } from './circle.js';
+ export { createContainerComponent, createDivOverlayComponent, createLeafComponent } from './component.js';
+-export { CONTEXT_VERSION, LeafletContext, LeafletProvider, createLeafletContext, extendContext, useLeafletContext } from './context.js';
++export { CONTEXT_VERSION, LeafletContext, createLeafletContext, extendContext, useLeafletContext } from './context.js';
+ export { createControlHook } from './control.js';
+ export { createDivOverlayHook } from './div-overlay.js';
+ export { addClassName, removeClassName, updateClassName } from './dom.js';
+diff --git a/node_modules/@react-leaflet/core/lib/layer.d.ts b/node_modules/@react-leaflet/core/lib/layer.d.ts
+index 148bc6a..f508d27 100644
+--- a/node_modules/@react-leaflet/core/lib/layer.d.ts
++++ b/node_modules/@react-leaflet/core/lib/layer.d.ts
+@@ -1,6 +1,6 @@
+ import type { InteractiveLayerOptions, Layer, LayerOptions } from 'leaflet';
+ import { type LeafletContextInterface } from './context.js';
+-import type { LeafletElement, ElementHook } from './element.js';
++import type { ElementHook, LeafletElement } from './element.js';
+ import { type EventedProps } from './events.js';
+ export interface LayerProps extends EventedProps, LayerOptions {
+ }
+diff --git a/node_modules/@react-leaflet/core/lib/media-overlay.d.ts b/node_modules/@react-leaflet/core/lib/media-overlay.d.ts
+index 636962f..2a1f645 100644
+--- a/node_modules/@react-leaflet/core/lib/media-overlay.d.ts
++++ b/node_modules/@react-leaflet/core/lib/media-overlay.d.ts
+@@ -1,4 +1,4 @@
+-import { type LatLngBoundsExpression, type ImageOverlay as LeafletImageOverlay, type ImageOverlayOptions, type SVGOverlay as LeafletSVGOverlay, type VideoOverlay as LeafletVideoOverlay } from 'leaflet';
++import { type ImageOverlayOptions, type LatLngBoundsExpression, type ImageOverlay as LeafletImageOverlay, type SVGOverlay as LeafletSVGOverlay, type VideoOverlay as LeafletVideoOverlay } from 'leaflet';
+ import type { InteractiveLayerProps } from './layer.js';
+ export interface MediaOverlayProps extends ImageOverlayOptions, InteractiveLayerProps {
+     bounds: LatLngBoundsExpression;
+diff --git a/node_modules/@react-leaflet/core/lib/path.d.ts b/node_modules/@react-leaflet/core/lib/path.d.ts
+index 17d66ad..befbfee 100644
+--- a/node_modules/@react-leaflet/core/lib/path.d.ts
++++ b/node_modules/@react-leaflet/core/lib/path.d.ts
+@@ -1,5 +1,5 @@
+ import type { FeatureGroup, Path, PathOptions } from 'leaflet';
+-import type { LeafletElement, ElementHook } from './element.js';
++import type { ElementHook, LeafletElement } from './element.js';
+ import { type InteractiveLayerProps } from './layer.js';
+ export interface PathProps extends InteractiveLayerProps {
+     pathOptions?: PathOptions;
+diff --git a/node_modules/@react-leaflet/core/lib/path.js b/node_modules/@react-leaflet/core/lib/path.js
+index 636a448..5f2f726 100644
+--- a/node_modules/@react-leaflet/core/lib/path.js
++++ b/node_modules/@react-leaflet/core/lib/path.js
+@@ -4,7 +4,7 @@ import { useEventHandlers } from './events.js';
+ import { useLayerLifecycle } from './layer.js';
+ import { withPane } from './pane.js';
+ export function usePathOptions(element, props) {
+-    const optionsRef = useRef();
++    const optionsRef = useRef(undefined);
+     useEffect(function updatePathOptions() {
+         if (props.pathOptions !== optionsRef.current) {
+             const options = props.pathOptions ?? {};
