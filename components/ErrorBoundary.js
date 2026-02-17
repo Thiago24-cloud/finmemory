@@ -38,7 +38,7 @@ export default class ErrorBoundary extends Component {
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <button
                 type="button"
-                onClick={() => window.location.reload()}
+                onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
                 className="inline-flex items-center justify-center gap-2 py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a]"
               >
                 Recarregar

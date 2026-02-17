@@ -110,7 +110,7 @@ export default function Dashboard() {
       if (userId !== session.user.supabaseId) {
         console.log('✅ User ID da sessão:', session.user.supabaseId);
         setUserId(session.user.supabaseId);
-        localStorage.setItem('user_id', session.user.supabaseId);
+        if (typeof window !== 'undefined') localStorage.setItem('user_id', session.user.supabaseId);
       }
     } else if (session?.user?.email && !userId) {
       // Fetch user ID from Supabase if not in session
@@ -148,13 +148,13 @@ export default function Dashboard() {
           console.log('   Email:', data.email);
           console.log('   Nome:', data.name);
           setUserId(data.id);
-          localStorage.setItem('user_id', data.id);
+          if (typeof window !== 'undefined') localStorage.setItem('user_id', data.id);
         } else {
           console.warn('⚠️ Nenhum usuário encontrado para este email');
           console.warn('   Isso pode acontecer se o usuário ainda não fez login pela primeira vez');
         }
       };
-      fetchUserId();
+      fetchUserId().catch((err) => console.warn('fetchUserId:', err?.message || err));
     }
   }, [session]);
 
@@ -526,27 +526,24 @@ export default function Dashboard() {
     if (!localStorage.getItem('finmemory_tip_map')) setTipMapDismissed(false);
   }, []);
 
-  // Check URL params for first sync
+  // Check URL params for first sync (só no browser)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const error = urlParams.get('error');
-    
-    if (error) {
-      // Erros de autenticação agora são tratados pela página /auth-error
-      // Mas caso chegue aqui diretamente, mostra mensagem genérica
-      console.error('Erro de autenticação:', error);
-      window.history.replaceState({}, '', '/dashboard');
-      return;
-    }
-    
-    if (success === 'true' && userId) {
-      window.history.replaceState({}, '', '/dashboard');
-      setTimeout(() => {
-        handleSyncEmails(true);
-      }, 1000);
+    try {
+      if (typeof window === 'undefined') return;
+      const urlParams = new URLSearchParams(window.location.search);
+      const success = urlParams.get('success');
+      const error = urlParams.get('error');
+      if (error) {
+        console.error('Erro de autenticação:', error);
+        window.history.replaceState({}, '', '/dashboard');
+        return;
+      }
+      if (success === 'true' && userId) {
+        window.history.replaceState({}, '', '/dashboard');
+        setTimeout(() => handleSyncEmails(true), 1000);
+      }
+    } catch (e) {
+      console.warn('[dashboard] URL params check:', e?.message || e);
     }
   }, [userId, handleSyncEmails]);
 
@@ -555,9 +552,9 @@ export default function Dashboard() {
   };
 
   const handleDisconnect = async () => {
-    if (confirm('⚠️ Deseja realmente desconectar? Suas transações não serão perdidas.')) {
+    if (typeof window !== 'undefined' && confirm('⚠️ Deseja realmente desconectar? Suas transações não serão perdidas.')) {
       try {
-        localStorage.removeItem('user_id');
+        if (typeof window !== 'undefined') localStorage.removeItem('user_id');
         setUserId(null);
         setTransactions([]);
         await signOut({ callbackUrl: '/' });
@@ -657,7 +654,7 @@ export default function Dashboard() {
     const successCount = debug.tests.filter(t => t.success).length;
     const totalTests = debug.tests.length;
     
-    alert(`🔍 Diagnóstico concluído!\n\nTestes passados: ${successCount}/${totalTests}\n\nVerifique o console para mais detalhes.`);
+    if (typeof window !== 'undefined') alert(`🔍 Diagnóstico concluído!\n\nTestes passados: ${successCount}/${totalTests}\n\nVerifique o console para mais detalhes.`);
   };
 
   const isAuthenticated = status === 'authenticated' && session;
