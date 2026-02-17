@@ -698,7 +698,7 @@ export default function Dashboard() {
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+            <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
             <p className="text-[#666]">Carregando sessão...</p>
           </div>
         ) : !isAuthenticated ? (
@@ -732,7 +732,7 @@ export default function Dashboard() {
                 <span className="text-xs text-[#666]">
                   {transactionCount} transação{transactionCount !== 1 ? 'ões' : ''}
                 </span>
-                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#667eea]/15 text-[#667eea]" title="Quanto mais você sincroniza, mais sobe de nível">
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#2ECC49]/15 text-[#2ECC49]" title="Quanto mais você sincroniza, mais sobe de nível">
                   Nível {userLevel}
                 </span>
               </div>
@@ -768,7 +768,7 @@ export default function Dashboard() {
                 <p className="font-semibold text-[#333]">Ver mapa de preços</p>
                 <p className="text-xs text-[#666]">Onde está mais barato? Pins coloridos por tipo de loja.</p>
               </div>
-              <span className="text-[#667eea] text-sm font-medium shrink-0">Ir</span>
+              <span className="text-[#2ECC49] text-sm font-medium shrink-0">Ir</span>
             </Link>
             {/* Filtro por mês */}
             {availableMonths.length > 0 && (
@@ -780,7 +780,7 @@ export default function Dashboard() {
                   id="month-filter"
                   value={selectedMonth || ''}
                   onChange={(e) => setSelectedMonth(e.target.value || null)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] text-sm focus:outline-none focus:ring-2 focus:ring-[#667eea] focus:border-transparent"
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent"
                 >
                   <option value="">Todos os meses</option>
                   {availableMonths.map((ym) => {
@@ -1002,7 +1002,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 text-sm">
                   <div>
                     <strong className="text-[#666]">E-mails encontrados:</strong>
-                    <div className="text-lg font-bold text-[#667eea]">
+                    <div className="text-lg font-bold text-[#2ECC49]">
                       {lastSyncResult.total}
                     </div>
                   </div>
@@ -1030,7 +1030,7 @@ export default function Dashboard() {
                   )}
                   <div>
                     <strong className="text-[#666]">Total no banco:</strong>
-                    <div className="text-lg font-bold text-[#667eea]">
+                    <div className="text-lg font-bold text-[#2ECC49]">
                       {lastSyncResult.transactionsInDb}
                     </div>
                   </div>

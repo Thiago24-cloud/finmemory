@@ -532,7 +532,7 @@ export default function AddReceipt() {
         {/* STEP: PROCESSING */}
         {step === STEPS.PROCESSING && (
           <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
-            <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#667eea] rounded-full animate-spin mx-auto mb-6" />
+            <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#2ECC49] rounded-full animate-spin mx-auto mb-6" />
             <h2 className="text-xl text-[#333] m-0 mb-2">Lendo sua nota fiscal...</h2>
             <p className="text-sm text-[#666] m-0">
               Isso pode levar alguns segundos
@@ -670,7 +670,7 @@ export default function AddReceipt() {
                 <button
                   type="button"
                   onClick={addItem}
-                  className="bg-[#f3f4f6] text-[#667eea] border-none py-2.5 px-4 rounded-lg text-sm cursor-pointer w-full hover:bg-[#e5e7eb]"
+                  className="bg-[#f3f4f6] text-[#2ECC49] border-none py-2.5 px-4 rounded-lg text-sm cursor-pointer w-full hover:bg-[#e5e7eb]"
                 >
                   + Adicionar Item
                 </button>
@@ -691,7 +691,7 @@ export default function AddReceipt() {
                     aria-checked={shareOnMap}
                     aria-label={shareOnMap ? 'Preços serão divulgados no mapa' : 'Preços só nos seus registros'}
                     onClick={() => setShareOnMap((v) => !v)}
-                    className="relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#667eea] focus:ring-offset-2"
+                    className="relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#2ECC49] focus:ring-offset-2"
                     style={{ backgroundColor: shareOnMap ? '#2ECC49' : '#e5e7eb' }}
                   >
                     <span
@@ -731,7 +731,7 @@ export default function AddReceipt() {
         {/* STEP: SAVING */}
         {step === STEPS.SAVING && (
           <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
-            <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#667eea] rounded-full animate-spin mx-auto mb-6" />
+            <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#2ECC49] rounded-full animate-spin mx-auto mb-6" />
             <h2 className="text-xl text-[#333] m-0">Salvando transação...</h2>
           </div>
         )}

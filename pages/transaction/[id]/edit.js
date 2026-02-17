@@ -125,7 +125,7 @@ export default function EditTransactionPage() {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+          <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
           <p className="text-[#666]">Carregando...</p>
         </div>
       </div>
@@ -152,7 +152,7 @@ export default function EditTransactionPage() {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+          <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
           <p className="text-[#666]">Carregando...</p>
         </div>
       </div>
@@ -183,7 +183,7 @@ export default function EditTransactionPage() {
               type="text"
               value={form.estabelecimento}
               onChange={(e) => setForm((f) => ({ ...f, estabelecimento: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent"
               required
             />
           </div>
@@ -196,7 +196,7 @@ export default function EditTransactionPage() {
               value={form.total}
               onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
               placeholder="0,00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent"
               required
             />
           </div>
@@ -207,7 +207,7 @@ export default function EditTransactionPage() {
               type="date"
               value={form.data}
               onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent"
               required
             />
           </div>
@@ -236,7 +236,7 @@ export default function EditTransactionPage() {
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 py-3 px-4 bg-[#667eea] text-white font-semibold rounded-xl hover:bg-[#5a6fd6] disabled:opacity-50"
+              className="flex-1 py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a] disabled:opacity-50"
             >
               {saving ? 'Salvando...' : 'Salvar'}
             </button>

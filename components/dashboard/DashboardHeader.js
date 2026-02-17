@@ -17,7 +17,7 @@ export function DashboardHeader({ user, onSignOut, className }) {
         <Link href="/mapa" className="shrink-0" aria-label="FinMemory - Mapa">
           <Image src="/logo.png" alt="" width={40} height={40} className="object-contain rounded-lg" />
         </Link>
-        <div className="h-12 w-12 rounded-full border-2 border-[#667eea] overflow-hidden bg-[#f8f9fa] flex items-center justify-center text-[#333] text-sm flex-shrink-0">
+        <div className="h-12 w-12 rounded-full border-2 border-[#2ECC49] overflow-hidden bg-[#f8f9fa] flex items-center justify-center text-[#333] text-sm flex-shrink-0">
           {avatarUrl ? (
             <img src={avatarUrl} alt={userName} className="h-full w-full object-cover" />
           ) : (

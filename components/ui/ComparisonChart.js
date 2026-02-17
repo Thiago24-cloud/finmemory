@@ -28,7 +28,7 @@ export function ComparisonChart({ data = [], compareData, title, className }) {
               <span className="text-sm text-[#666] w-24 truncate">{item.label}</span>
               <div className="flex-1 h-6 bg-[#f0f0f0] rounded overflow-hidden">
                 <div
-                  className="h-full rounded bg-[#667eea]"
+                  className="h-full rounded bg-[#2ECC49]"
                   style={{ width: `${Math.min(100, (item.value / max) * 100)}%` }}
                 />
               </div>

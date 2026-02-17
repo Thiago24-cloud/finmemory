@@ -115,7 +115,7 @@ export default function PartnershipPage() {
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
       </div>
     );
   }
@@ -132,7 +132,7 @@ export default function PartnershipPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
         <h1 className="text-xl font-bold text-[#333] mb-2 flex items-center gap-2">
-          <Users className="h-6 w-6 text-[#667eea]" />
+          <Users className="h-6 w-6 text-[#2ECC49]" />
           Parceria
         </h1>
         <p className="text-sm text-[#666] mb-6">Compartilhe lista de compras com seu parceiro(a).</p>
@@ -160,13 +160,13 @@ export default function PartnershipPage() {
                     {copied ? <Check className="h-5 w-5 text-green-600" /> : <Copy className="h-5 w-5 text-[#666]" />}
                   </button>
                 </div>
-                <Link href="/shopping-list" className="block text-center py-2 text-[#667eea] font-medium">
+                <Link href="/shopping-list" className="block text-center py-2 text-[#2ECC49] font-medium">
                   Ir para Lista de compras
                 </Link>
               </>
             )}
             {partnership.status === 'active' && (
-              <Link href="/shopping-list" className="block w-full py-3 text-center bg-[#667eea] text-white font-semibold rounded-xl hover:bg-[#5a6fd6]">
+              <Link href="/shopping-list" className="block w-full py-3 text-center bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a]">
                 Abrir lista de compras
               </Link>
             )}
@@ -178,7 +178,7 @@ export default function PartnershipPage() {
                 type="button"
                 onClick={handleCreate}
                 disabled={creating}
-                className="w-full py-3 px-4 bg-[#667eea] text-white font-semibold rounded-xl hover:bg-[#5a6fd6] disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
                 Criar parceria e gerar código
@@ -193,7 +193,7 @@ export default function PartnershipPage() {
                   onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                   placeholder="Código"
                   maxLength={10}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea] uppercase"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49] uppercase"
                 />
                 <button
                   type="submit"

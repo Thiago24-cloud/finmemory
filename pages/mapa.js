@@ -136,8 +136,8 @@ export default function MapaPage() {
               <button
                 type="button"
                 onClick={() => setShowMapasSheet(true)}
-                className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 font-semibold text-sm transition-colors shrink-0"
-                aria-label="Estilos do mapa"
+                className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-[#E8F5E9] text-[#2E7D32] hover:bg-[#C8E6C9] font-semibold text-sm transition-colors shrink-0 border border-[#2ECC49]/30"
+                aria-label="Mapas – tons e estilos do mapa"
               >
                 <Map className="h-5 w-5 shrink-0" />
                 <span className="whitespace-nowrap">Mapas</span>
@@ -194,15 +194,15 @@ export default function MapaPage() {
           )}
         </header>
 
-        {/* Sheet: Mapas – escolher tom de cor do mapa */}
+        {/* Sheet: Mapas – pasta principal dos tons do mapa (Notion-like: clique e escolha o visual) */}
         <Sheet open={showMapasSheet} onOpenChange={setShowMapasSheet}>
           <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
             <SheetHeader className="mb-4">
-              <SheetTitle className="text-lg font-bold text-center">
-                🗺️ Estilos do mapa
+              <SheetTitle className="text-xl font-bold text-center text-gray-900">
+                Mapas
               </SheetTitle>
               <p className="text-sm text-gray-600 text-center">
-                Escolha o tom de cor do mapa. Sua escolha fica salva.
+                Tons do mapa – escolha o visual. Sua escolha fica salva para a próxima vez.
               </p>
             </SheetHeader>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -213,12 +213,12 @@ export default function MapaPage() {
                   onClick={() => handleSelectMapTheme(theme.id)}
                   className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-left ${
                     mapThemeId === theme.id
-                      ? 'border-violet-500 bg-violet-50 text-violet-900'
-                      : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/50'
+                      ? 'border-[#2ECC49] bg-[#E8F5E9] text-gray-900 ring-2 ring-[#2ECC49]/30'
+                      : 'border-gray-200 bg-white hover:border-[#2ECC49]/50 hover:bg-[#f0fdf4]'
                   }`}
                 >
                   <div
-                    className="w-full h-12 rounded-xl shadow-inner"
+                    className="w-full h-14 rounded-xl shadow-inner"
                     style={{ backgroundColor: theme.preview }}
                   />
                   <span className="font-semibold text-sm text-gray-900">{theme.name}</span>

@@ -28,13 +28,13 @@ export default function Custom404() {
             </Link>
             <Link
               href="/dashboard"
-              className="w-full inline-flex justify-center py-3.5 px-6 bg-transparent text-[#667eea] border-2 border-[#667eea] rounded-xl font-semibold hover:bg-[#667eea] hover:text-white transition-colors"
+              className="w-full inline-flex justify-center py-3.5 px-6 bg-transparent text-[#2ECC49] border-2 border-[#2ECC49] rounded-xl font-semibold hover:bg-[#2ECC49] hover:text-white transition-colors"
             >
               Dashboard
             </Link>
             <Link
               href="/mapa"
-              className="w-full inline-flex justify-center py-3.5 px-6 bg-transparent text-[#22c55e] border-2 border-[#22c55e] rounded-xl font-semibold hover:bg-[#22c55e] hover:text-white transition-colors"
+              className="w-full inline-flex justify-center py-3.5 px-6 bg-transparent text-[#2ECC49] border-2 border-[#2ECC49] rounded-xl font-semibold hover:bg-[#2ECC49] hover:text-white transition-colors"
             >
               🗺️ Mapa de Preços
             </Link>

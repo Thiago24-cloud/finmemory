@@ -155,7 +155,7 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
                         {formatDate(transaction.data)}
                       </span>
                       {numItens > 0 && (
-                        <span className="text-xs text-[#667eea] font-medium">
+                        <span className="text-xs text-[#2ECC49] font-medium">
                           {numItens} {numItens === 1 ? 'item' : 'itens'}
                         </span>
                       )}

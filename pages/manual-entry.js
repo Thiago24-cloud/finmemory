@@ -83,7 +83,7 @@ export default function ManualEntryPage() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
       </div>
     );
   }
@@ -111,7 +111,7 @@ export default function ManualEntryPage() {
               type="text"
               value={estabelecimento}
               onChange={(e) => setEstabelecimento(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
               required
             />
           </div>
@@ -123,7 +123,7 @@ export default function ManualEntryPage() {
               value={total}
               onChange={(e) => setTotal(e.target.value)}
               placeholder="0,00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
               required
             />
           </div>
@@ -133,7 +133,7 @@ export default function ManualEntryPage() {
               type="date"
               value={data}
               onChange={(e) => setData(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
             />
           </div>
           <div>
@@ -141,7 +141,7 @@ export default function ManualEntryPage() {
             <select
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -155,7 +155,7 @@ export default function ManualEntryPage() {
               value={formaPagamento}
               onChange={(e) => setFormaPagamento(e.target.value)}
               placeholder="Ex: Cartão, PIX"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
             />
           </div>
           <div>
@@ -165,13 +165,13 @@ export default function ManualEntryPage() {
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
               placeholder="Ex: Almoço executivo"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
             />
           </div>
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 px-4 bg-[#667eea] text-white font-semibold rounded-xl hover:bg-[#5a6fd6] disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a] disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
             {submitting ? 'Salvando...' : 'Salvar'}

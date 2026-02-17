@@ -39,7 +39,7 @@ export default function NotificationsPage() {
           </Link>
 
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-full bg-[#667eea]/10 flex items-center justify-center text-[#667eea]">
+            <div className="w-12 h-12 rounded-full bg-[#2ECC49]/10 flex items-center justify-center text-[#2ECC49]">
               <Bell className="h-6 w-6" />
             </div>
             <div>
@@ -54,15 +54,15 @@ export default function NotificationsPage() {
             </p>
             <ul className="text-left space-y-3 text-sm text-[#555] mb-6">
               <li className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-[#667eea] shrink-0" />
+                <Calendar className="h-5 w-5 text-[#2ECC49] shrink-0" />
                 Contas e vencimentos
               </li>
               <li className="flex items-center gap-3">
-                <Target className="h-5 w-5 text-[#667eea] shrink-0" />
+                <Target className="h-5 w-5 text-[#2ECC49] shrink-0" />
                 Metas de gastos do mês
               </li>
               <li className="flex items-center gap-3">
-                <Receipt className="h-5 w-5 text-[#667eea] shrink-0" />
+                <Receipt className="h-5 w-5 text-[#2ECC49] shrink-0" />
                 Resumo semanal de compras
               </li>
             </ul>

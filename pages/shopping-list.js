@@ -97,7 +97,7 @@ export default function ShoppingListPage() {
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-[#667eea]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
       </div>
     );
   }
@@ -116,7 +116,7 @@ export default function ShoppingListPage() {
           </Link>
           <div className="bg-white rounded-xl p-6 shadow-card-lovable text-center">
             <p className="text-[#666] mb-4">Você precisa de uma parceria ativa para usar a lista de compras.</p>
-            <Link href="/partnership" className="inline-block py-3 px-4 bg-[#667eea] text-white font-semibold rounded-xl hover:bg-[#5a6fd6]">
+            <Link href="/partnership" className="inline-block py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a]">
               Ir para Parceria
             </Link>
           </div>
@@ -140,12 +140,12 @@ export default function ShoppingListPage() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Novo item"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#667eea]"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
           />
           <button
             type="submit"
             disabled={adding || !newName.trim()}
-            className="p-2 bg-[#667eea] text-white rounded-lg hover:bg-[#5a6fd6] disabled:opacity-50"
+            className="p-2 bg-[#2ECC49] text-white rounded-lg hover:bg-[#22a83a] disabled:opacity-50"
           >
             <Plus className="h-5 w-5" />
           </button>

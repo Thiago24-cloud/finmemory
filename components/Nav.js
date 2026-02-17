@@ -22,7 +22,7 @@ export function Nav({ className }) {
         href="/mapa"
         className={cn(
           linkBoxClasses,
-          'text-[#333] font-semibold hover:text-[#667eea]'
+          'text-[#333] font-semibold hover:text-[#2ECC49]'
         )}
       >
         FinMemory

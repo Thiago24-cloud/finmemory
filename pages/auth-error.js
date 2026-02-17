@@ -114,7 +114,7 @@ export default function AuthError() {
       justifyContent: 'center',
       padding: '20px',
       fontFamily: 'system-ui, -apple-system, sans-serif',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      background: 'linear-gradient(135deg, #2ECC49 0%, #22a83a 100%)'
     }}>
       <div style={{
         background: 'white',
@@ -179,7 +179,7 @@ export default function AuthError() {
             onClick={handleTryAgain}
             style={{ 
               padding: '16px 40px',
-              background: 'linear-gradient(135deg, #34A853, #0F9D58)',
+              background: 'linear-gradient(135deg, #2ECC49, #22a83a)',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
@@ -198,8 +198,8 @@ export default function AuthError() {
             style={{ 
               padding: '14px 40px',
               background: 'transparent',
-              color: '#667eea',
-              border: '2px solid #667eea',
+              color: '#2ECC49',
+              border: '2px solid #2ECC49',
               borderRadius: '8px',
               fontSize: '14px',
               fontWeight: '600',
@@ -231,7 +231,7 @@ export default function AuthError() {
             Problemas persistentes? Entre em contato:{' '}
             <a 
               href="mailto:suporte@finmemory.app" 
-              style={{ color: '#667eea', textDecoration: 'none' }}
+              style={{ color: '#2ECC49', textDecoration: 'none' }}
             >
               suporte@finmemory.app
             </a>

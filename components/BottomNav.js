@@ -7,7 +7,7 @@ import { AddActionSheet } from './AddActionSheet';
 import { useState } from 'react';
 
 const tabs = [
-  { icon: Map, label: 'Mapa', path: '/mapa', isAction: false },
+  { icon: Map, label: 'Mapas', path: '/mapa', isAction: false },
   { icon: BarChart3, label: 'Gastos', path: '/dashboard', isAction: false },
   { icon: PlusCircle, label: 'Adicionar', path: '__action__', isAction: true },
   { icon: User, label: 'Perfil', path: '/settings', isAction: false },

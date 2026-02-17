@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function Privacidade() {
   return React.createElement('main', { style: { padding: '2rem', maxWidth: 800, margin: '0 auto', fontFamily: 'system-ui, sans-serif' } },
-    React.createElement('h1', { style: { color: '#764ba2' } }, 'Política de Privacidade - FinMemory'),
+    React.createElement('h1', { style: { color: '#2ECC49' } }, 'Política de Privacidade - FinMemory'),
     React.createElement('p', null, 'Última atualização: 21/01/2026'),
     React.createElement('section', null,
       React.createElement('h2', null, '1. Introdução'),

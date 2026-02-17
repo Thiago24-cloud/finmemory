@@ -21,7 +21,7 @@ export function BalanceCard({ balance, className, label }) {
         <button
           type="button"
           onClick={() => setIsVisible(!isVisible)}
-          className="p-2 rounded-full hover:bg-[#f8f9fa] hover:text-[#667eea] transition-colors"
+          className="p-2 rounded-full hover:bg-[#f8f9fa] hover:text-[#2ECC49] transition-colors"
           aria-label={isVisible ? 'Ocultar saldo' : 'Mostrar saldo'}
         >
           {isVisible ? (

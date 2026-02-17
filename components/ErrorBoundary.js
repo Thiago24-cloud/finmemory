@@ -45,7 +45,7 @@ export default class ErrorBoundary extends Component {
               </button>
               <Link
                 href="/dashboard"
-                className="inline-flex items-center justify-center gap-2 py-3 px-4 bg-[#667eea] text-white font-semibold rounded-xl hover:bg-[#5a6fd6]"
+                className="inline-flex items-center justify-center gap-2 py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a]"
               >
                 Voltar ao Dashboard
               </Link>

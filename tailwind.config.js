@@ -32,7 +32,7 @@ module.exports = {
         'card-lovable': '0 4px 6px rgba(0, 0, 0, 0.1)',
         'card-dark': '0 4px 6px rgba(0, 0, 0, 0.3)',
         'card-light': '0 2px 8px rgba(0, 0, 0, 0.1)',
-        'fab': '0 4px 12px rgba(102, 126, 234, 0.4)',
+        'fab': '0 4px 12px rgba(46, 204, 73, 0.4)',
       },
       borderRadius: {
         lg: 'var(--radius)',

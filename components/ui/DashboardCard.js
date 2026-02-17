@@ -15,7 +15,7 @@ export function DashboardCard({ title, value, subtitle, icon, className }) {
     <div className={cn('bg-white rounded-2xl p-5 shadow-card-lovable', className)}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-[#666] text-sm font-medium">{title}</span>
-        {icon && <span className="text-[#667eea]">{icon}</span>}
+        {icon && <span className="text-[#2ECC49]">{icon}</span>}
       </div>
       <div className="text-2xl font-bold text-[#333]">{value ?? '—'}</div>
       {subtitle && <p className="text-[#666] text-xs mt-2">{subtitle}</p>}
