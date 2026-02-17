@@ -3,7 +3,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { BottomNav } from '../components/BottomNav';
-import { QrScanner } from '../components/QrScanner';
 import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -72,13 +71,29 @@ async function compressImage(file, maxSizeMB = 1.5) {
 // Estados do fluxo
 const STEPS = {
   CAPTURE: 'capture',
-  QR_SCAN: 'qr_scan',
   PREVIEW: 'preview',
   PROCESSING: 'processing',
   EDIT: 'edit',
   SAVING: 'saving',
   SUCCESS: 'success'
 };
+
+// Converte data URL (base64) em File para o scanner de QR
+function dataURLtoFile(dataUrl, filename = 'receipt.jpg') {
+  const arr = dataUrl.split(',');
+  const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+  const bstr = atob(arr[1] || '');
+  const n = bstr.length;
+  const u8 = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u8[i] = bstr.charCodeAt(i);
+  return new File([u8], filename, { type: mime });
+}
+
+// Indica se o conteúdo do QR parece ser URL da NFC-e
+function looksLikeNfceQr(text) {
+  const t = (text || '').trim();
+  return t.length > 10 && (/^https?:\/\//i.test(t) || /^\d{44}$/.test(t.replace(/\D/g, '')) || /^[pP]=/.test(t));
+}
 
 export default function AddReceipt() {
   const { data: session, status } = useSession();
@@ -186,7 +201,24 @@ export default function AddReceipt() {
     }
   };
 
-  // Processar imagem via OCR
+  // Aplicar dados da NFC-e no formulário (após ler QR da foto ou da câmera)
+  const applyNfceData = (data) => {
+    setFormData({
+      date: data.date || '',
+      merchant_name: data.merchant_name || '',
+      merchant_cnpj: data.merchant_cnpj || '',
+      total_amount: data.total_amount ? String(data.total_amount) : '',
+      items: Array.isArray(data.items) && data.items.length > 0
+        ? data.items.map((i) => ({ name: i.name || '', price: Number(i.price) || 0 }))
+        : [],
+      category: '',
+      payment_method: '',
+      receipt_image_url: data.receipt_image_url || data.nfce_url || ''
+    });
+    setStep(STEPS.EDIT);
+  };
+
+  // Processar nota: primeiro tenta ler QR da foto; se não achar, usa OCR (visão)
   const processImage = async () => {
     if (!imageBase64) {
       setError('Imagem não carregada. Tente novamente.');
@@ -200,6 +232,38 @@ export default function AddReceipt() {
     setStep(STEPS.PROCESSING);
     setError(null);
 
+    // 1) Tentar ler QR code da foto (NFC-e): se achar URL/chave, buscar dados e ir para edição
+    if (typeof window !== 'undefined') {
+      try {
+        const file = dataURLtoFile(imageBase64, 'receipt.jpg');
+        const { Html5Qrcode } = await import('html5-qrcode');
+        const el = document.getElementById('finmemory-qr-file-scan');
+        if (el) {
+          const qr = new Html5Qrcode('finmemory-qr-file-scan');
+          try {
+            const decodedText = await qr.scanFile(file, false);
+            if (decodedText && looksLikeNfceQr(decodedText)) {
+              const res = await fetch('/api/ocr/fetch-nfce', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: decodedText, qrContent: decodedText })
+              });
+              const json = await res.json();
+              if (json.success && json.data) {
+                applyNfceData(json.data);
+                return;
+              }
+            }
+          } finally {
+            qr.clear();
+          }
+        }
+      } catch (_) {
+        // Nenhum QR na imagem ou falha no scan → segue para OCR
+      }
+    }
+
+    // 2) OCR por visão (GPT) na mesma foto
     try {
       const response = await fetch('/api/ocr/process-receipt', {
         method: 'POST',
@@ -216,11 +280,8 @@ export default function AddReceipt() {
         throw new Error(result.error || result.details || 'Erro ao processar nota fiscal');
       }
 
-      // Salvar dados extraídos
       setExtractedData(result.data);
       setRemainingRequests(result.remaining_requests);
-      
-      // Preencher formulário
       setFormData({
         date: result.data.date || '',
         merchant_name: result.data.merchant_name || '',
@@ -231,9 +292,7 @@ export default function AddReceipt() {
         payment_method: result.data.payment_method || '',
         receipt_image_url: result.data.receipt_image_url || ''
       });
-
       setStep(STEPS.EDIT);
-
     } catch (err) {
       console.error('Erro no OCR:', err);
       let msg = err.message || 'Erro ao processar. Verifique sua conexão e tente novamente.';
@@ -337,42 +396,6 @@ export default function AddReceipt() {
     setShareOnMap(false);
   };
 
-  // Após escanear QR: buscar dados da NFC-e e ir para edição
-  const handleQrScanned = async (qrContent) => {
-    if (!qrContent) return;
-    setError(null);
-    setStep(STEPS.PROCESSING);
-    try {
-      const res = await fetch('/api/ocr/fetch-nfce', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: qrContent, qrContent })
-      });
-      const json = await res.json();
-      if (!json.success) {
-        throw new Error(json.error || 'Não foi possível ler os dados da nota.');
-      }
-      const data = json.data || {};
-      setFormData({
-        date: data.date || '',
-        merchant_name: data.merchant_name || '',
-        merchant_cnpj: data.merchant_cnpj || '',
-        total_amount: data.total_amount ? String(data.total_amount) : '',
-        items: Array.isArray(data.items) && data.items.length > 0
-          ? data.items.map((i) => ({ name: i.name || '', price: Number(i.price) || 0 }))
-          : [],
-        category: '',
-        payment_method: '',
-        receipt_image_url: data.receipt_image_url || data.nfce_url || ''
-      });
-      setStep(STEPS.EDIT);
-      if (json.message) setError(null);
-    } catch (err) {
-      setError(err.message || 'Erro ao buscar dados da NFC-e.');
-      setStep(STEPS.QR_SCAN);
-    }
-  };
-
   // Loading de sessão
   if (status === 'loading') {
     return (
@@ -458,35 +481,16 @@ export default function AddReceipt() {
                 className="hidden"
                 aria-label="Escolher imagem da galeria"
               />
-
-              <button
-                type="button"
-                onClick={() => setStep(STEPS.QR_SCAN)}
-                className="bg-[#e0e7ff] text-[#3730a3] border border-[#c7d2fe] py-4 px-6 rounded-xl text-base font-medium cursor-pointer hover:bg-[#c7d2fe] transition-colors text-center block"
-              >
-                📱 Escanear QR Code da nota
-              </button>
             </div>
 
             <p className="text-xs text-[#9ca3af] mt-4">
-              JPG, PNG ou WebP (máx. 2MB). Se a câmera não abrir, use Escolher da Galeria. Notas NFC-e: use o QR Code.
+              JPG, PNG ou WebP (máx. 2MB). Se a câmera não abrir, use Escolher da Galeria. Na próxima tela, ao tocar em &quot;Processar Nota&quot;, o QR da NFC-e (se estiver na foto) será lido automaticamente.
             </p>
           </div>
         )}
 
-        {/* STEP: QR SCAN */}
-        {step === STEPS.QR_SCAN && (
-          <div className="bg-white rounded-[24px] py-6 px-6 text-center card-lovable">
-            <h2 className="text-xl text-[#333] m-0 mb-2">Aponte a câmera para o QR Code da nota</h2>
-            <p className="text-sm text-[#666] m-0 mb-4">
-              O QR code fica na parte de baixo da NFC-e (cupom ou recibo)
-            </p>
-            <QrScanner
-              onScan={handleQrScanned}
-              onClose={() => { setStep(STEPS.CAPTURE); setError(null); }}
-            />
-          </div>
-        )}
+        {/* Container oculto para o scanner de QR a partir da foto (html5-qrcode exige um elemento no DOM) */}
+        <div id="finmemory-qr-file-scan" className="hidden" aria-hidden="true" />
 
         {/* STEP: PREVIEW */}
         {step === STEPS.PREVIEW && imagePreview && (
