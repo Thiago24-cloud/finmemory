@@ -24,7 +24,7 @@ async function compressImage(file, maxSizeMB = 1.5) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let { width, height } = img;
