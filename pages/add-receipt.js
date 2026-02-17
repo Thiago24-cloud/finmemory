@@ -218,7 +218,7 @@ export default function AddReceipt() {
     setStep(STEPS.EDIT);
   };
 
-  // Processar nota: primeiro tenta ler QR da foto; se não achar, usa OCR (visão)
+  // Processar nota: tenta ler QR da foto (NFC-e); se não achar ou der erro, usa OCR (visão)
   const processImage = async () => {
     if (!imageBase64) {
       setError('Imagem não carregada. Tente novamente.');
@@ -232,16 +232,20 @@ export default function AddReceipt() {
     setStep(STEPS.PROCESSING);
     setError(null);
 
-    // 1) Tentar ler QR code da foto (NFC-e): se achar URL/chave, buscar dados e ir para edição
+    // 1) Opcional: tentar QR da foto (não bloqueia o OCR em caso de falha)
     if (typeof window !== 'undefined') {
       try {
         const file = dataURLtoFile(imageBase64, 'receipt.jpg');
+        if (!file || !(file instanceof File)) throw new Error('invalid file');
         const { Html5Qrcode } = await import('html5-qrcode');
         const el = document.getElementById('finmemory-qr-file-scan');
         if (el) {
           const qr = new Html5Qrcode('finmemory-qr-file-scan');
           try {
-            const decodedText = await qr.scanFile(file, false);
+            const decodedText = await Promise.race([
+              qr.scanFile(file, false),
+              new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+            ]);
             if (decodedText && looksLikeNfceQr(decodedText)) {
               const res = await fetch('/api/ocr/fetch-nfce', {
                 method: 'POST',
@@ -255,11 +259,11 @@ export default function AddReceipt() {
               }
             }
           } finally {
-            qr.clear();
+            try { qr.clear(); } catch (_) {}
           }
         }
       } catch (_) {
-        // Nenhum QR na imagem ou falha no scan → segue para OCR
+        // Qualquer falha no QR → segue para OCR (não bloqueia)
       }
     }
 
@@ -489,8 +493,8 @@ export default function AddReceipt() {
           </div>
         )}
 
-        {/* Container oculto para o scanner de QR a partir da foto (html5-qrcode exige um elemento no DOM) */}
-        <div id="finmemory-qr-file-scan" className="hidden" aria-hidden="true" />
+        {/* Container para o scanner de QR (off-screen com tamanho; lib exige elemento no DOM) */}
+        <div id="finmemory-qr-file-scan" className="absolute w-[1px] h-[1px] opacity-0 pointer-events-none left-[-9999px] top-0" aria-hidden="true" />
 
         {/* STEP: PREVIEW */}
         {step === STEPS.PREVIEW && imagePreview && (
