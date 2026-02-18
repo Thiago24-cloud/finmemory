@@ -15,16 +15,16 @@ import {
 import { cn } from '../../lib/utils';
 
 /**
- * Ações rápidas – Estilo Whoosh: 3 principais em destaque (Sync, Escanear, Mapa), demais em scroll.
+ * Ações rápidas – 3 principais em destaque (Sync, Escanear, Mapa), demais em grid que quebra linha.
  */
 export function QuickActions({ onSync, syncing, userIdReady = true, className }) {
   const syncDisabled = syncing || !userIdReady;
-  const primaryBtn = 'flex flex-col items-center gap-1.5 min-w-[80px] snap-start hover:-translate-y-0.5 transition-transform';
-  const secondaryBtn = 'flex flex-col items-center gap-2 min-w-[64px] snap-start hover:-translate-y-0.5 transition-transform';
+  const primaryBtn = 'flex flex-col items-center gap-1.5 min-w-[80px] hover:-translate-y-0.5 transition-transform';
+  const secondaryBtn = 'flex flex-col items-center gap-2 min-w-[64px] hover:-translate-y-0.5 transition-transform';
 
   return (
-    <div className={cn('overflow-x-auto scrollbar-hide -mx-5 px-5', className)}>
-      {/* Linha principal: Sync, Escanear, Mapa – fácil alcance com uma mão */}
+    <div className={cn('max-w-2xl mx-auto', className)}>
+      {/* Linha principal: Sync, Escanear, Mapa */}
       <div className="flex gap-3 mb-4 justify-center">
         <button
           type="button"
@@ -51,8 +51,8 @@ export function QuickActions({ onSync, syncing, userIdReady = true, className })
           <span className="text-xs font-medium text-[#333] whitespace-nowrap">Mapa</span>
         </Link>
       </div>
-      {/* Demais ações em scroll horizontal – minimalista */}
-      <div className="flex gap-3 pb-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+      {/* Demais ações: grid responsivo que quebra linha no desktop */}
+      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 pb-2 justify-items-center">
 
         <Link href="/share-price" className={cn(secondaryBtn, 'no-underline text-inherit')}>
           <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
