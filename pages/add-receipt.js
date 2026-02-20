@@ -100,22 +100,6 @@ function looksLikeNfceQr(text) {
   return false;
 }
 
-// Extrai o domínio para exibir no banner (ex.: fazenda.sp.gov.br)
-function getDisplayDomain(url) {
-  if (!url || typeof url !== 'string') return '';
-  const t = url.trim();
-  try {
-    if (/^https?:\/\//i.test(t)) {
-      const host = new URL(t).hostname.replace(/^www\./, '');
-      return host || t.slice(0, 35);
-    }
-    if (t.length <= 40) return t;
-    return t.slice(0, 37) + '...';
-  } catch (_) {
-    return t.length <= 40 ? t : t.slice(0, 37) + '...';
-  }
-}
-
 // Mapeia resposta do /api/consultar-nfce para o formato do formulário (applyNfceData)
 function dataFromConsultarNfce(res) {
   const estabelecimento = res.estabelecimento;
@@ -162,10 +146,6 @@ export default function AddReceipt() {
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
-  const qrScannerRef = useRef(null);
-  const [decodedQrUrl, setDecodedQrUrl] = useState(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [lastQrDebug, setLastQrDebug] = useState(null);
 
   // Buscar user_id
   useEffect(() => {
@@ -219,99 +199,6 @@ export default function AddReceipt() {
       }
     } catch (_) {}
   }, [step]);
-
-  useEffect(() => {
-    if (step !== STEPS.SCAN_QR) setCameraOpen(false);
-  }, [step]);
-
-  // Scanner de QR por câmera – só quando step === SCAN_QR e usuário clicou em "Abrir câmera"
-  useEffect(() => {
-    if (step !== STEPS.SCAN_QR || !cameraOpen || typeof window === 'undefined') return;
-    const el = document.getElementById('qr-reader');
-    if (!el) return;
-
-    let instance = null;
-    let cancelled = false;
-
-    async function initScanner() {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      instance = new Html5Qrcode('qr-reader');
-      qrScannerRef.current = instance;
-
-      let cameraConfig = { facingMode: { exact: 'environment' } };
-      try {
-        const cameras = await instance.getCameras();
-        if (cameras && cameras.length > 0) {
-          const back = cameras.find((c) => /back|traseira|rear|environment/i.test(c.label || ''));
-          if (back) cameraConfig = { deviceId: { exact: back.id } };
-          else if (cameras.length > 1) cameraConfig = { deviceId: { exact: cameras[cameras.length - 1].id } };
-        }
-      } catch (_) {}
-
-      try {
-        await instance.start(
-          cameraConfig,
-          { fps: 20, qrbox: { width: 300, height: 300 } },
-          (decodedText) => {
-            const raw = (decodedText || '').trim();
-            setLastQrDebug(raw || '(vazio)');
-            if (!raw || raw.length < 10) return;
-            setDecodedQrUrl(raw);
-            processarNFCe(raw, instance);
-          },
-          () => {}
-        );
-        const video = el.querySelector('video');
-        if (video) {
-          video.setAttribute('playsinline', 'true');
-          video.setAttribute('webkit-playsinline', 'true');
-          video.muted = true;
-          video.playsInline = true;
-          video.play().catch(() => {});
-        }
-      } catch (e) {
-        if (!cancelled) setError(e.name === 'NotAllowedError' || (e.message && e.message.includes('Permission')) ? 'Permita o acesso à câmera nas configurações do navegador/sistema.' : 'Não foi possível abrir a câmera. Use HTTPS e permita a câmera.');
-      }
-    }
-
-    async function processarNFCe(decodedText, scannerInstance) {
-      try {
-        const res = await fetch('/api/consultar-nfce', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: decodedText })
-        });
-        const json = await res.json();
-        if (!res.ok) {
-          setDecodedQrUrl(null);
-          setError(json.error || 'Não foi possível consultar a NFC-e.');
-          return;
-        }
-        if (scannerInstance) {
-          try { if (scannerInstance.isScanning) await scannerInstance.stop(); } catch (_) {}
-        }
-        qrScannerRef.current = null;
-        setDecodedQrUrl(null);
-        applyNfceData(dataFromConsultarNfce(json));
-      } catch (err) {
-        console.error('Erro ao buscar NFC-e:', err);
-        setDecodedQrUrl(null);
-        setError('Não foi possível carregar os dados da nota. Tente tirar uma foto da nota.');
-      }
-    }
-
-    initScanner();
-
-    return () => {
-      cancelled = true;
-      setDecodedQrUrl(null);
-      setLastQrDebug(null);
-      if (qrScannerRef.current) {
-        try { if (qrScannerRef.current.isScanning) qrScannerRef.current.stop().catch(() => {}); } catch (_) {}
-        qrScannerRef.current = null;
-      }
-    };
-  }, [step, cameraOpen]);
 
   // Processar arquivo selecionado
   const handleFileSelect = async (e) => {
@@ -601,17 +488,17 @@ export default function AddReceipt() {
           </div>
         )}
 
-        {/* STEP: CAPTURE */}
+        {/* STEP: CAPTURE - Fotografar nota (QR lido da imagem; funciona 100% no iOS) */}
         {step === STEPS.CAPTURE && (
           <div className="bg-white rounded-[24px] py-10 px-6 text-center card-lovable">
-            <div className="text-6xl mb-4">📄</div>
-            <h2 className="text-xl text-[#333] m-0 mb-2">Tire uma foto da nota fiscal</h2>
-            <p className="text-sm text-[#666] m-0 mb-8">
-              Posicione a nota em uma superfície plana com boa iluminação
+            <div className="text-6xl mb-4">📸</div>
+            <h2 className="text-xl text-[#333] m-0 mb-2">Fotografe a nota fiscal</h2>
+            <p className="text-sm text-[#666] m-0 mb-6">
+              Tire uma foto do QR Code no rodapé da nota. O app lê o QR, consulta a SEFAZ e salva automaticamente no FinMemory.
             </p>
 
             <div className="flex flex-col gap-3">
-              {/* Label nativo: no celular o toque abre a câmera direto (mais confiável que click() no input) */}
+              {/* Label nativo: no iOS o toque abre a câmera nativa - funciona 100% */}
               <label
                 htmlFor="add-receipt-camera"
                 className="bg-gradient-primary text-white border-none py-4 px-6 rounded-xl text-base font-semibold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] text-center block"
@@ -644,81 +531,16 @@ export default function AddReceipt() {
                 className="hidden"
                 aria-label="Escolher imagem da galeria"
               />
-
-              <button
-                type="button"
-                onClick={() => setStep(STEPS.SCAN_QR)}
-                className="bg-[#e0f2fe] text-[#0369a1] border-none py-4 px-6 rounded-xl text-base font-medium cursor-pointer hover:bg-[#bae6fd] transition-colors text-center"
-              >
-                📱 Escanear QR Code da NFC-e
-              </button>
             </div>
 
             <p className="text-xs text-[#9ca3af] mt-4">
-              JPG, PNG ou WebP (máx. 2MB). Se a câmera não abrir, use Escolher da Galeria. Na próxima tela, ao tocar em &quot;Processar Nota&quot;, o QR da NFC-e (se estiver na foto) será lido automaticamente.
+              Foto → QR Code lido → SEFAZ → produtos salvos. JPG, PNG ou WebP. Compatível com iPhone.
             </p>
           </div>
         )}
 
-        {/* Container para o scanner de QR (off-screen com tamanho; lib exige elemento no DOM) */}
+        {/* Container para o scanner de QR da foto (off-screen; lib exige elemento no DOM) */}
         <div id="finmemory-qr-file-scan" className="absolute w-[1px] h-[1px] opacity-0 pointer-events-none left-[-9999px] top-0" aria-hidden="true" />
-
-        {/* STEP: SCAN_QR – câmera para escanear QR da NFC-e */}
-        {step === STEPS.SCAN_QR && (
-          <div className="bg-white rounded-[24px] p-6 card-lovable">
-            <h2 className="text-xl text-[#333] m-0 mb-2">Escanear QR Code da NFC-e</h2>
-            <p className="text-sm text-[#666] m-0 mb-4">
-              O QR Code fica no rodapé da nota. Use a <strong>câmera traseira</strong>, boa iluminação e mantenha o QR parado na moldura.
-            </p>
-            {!cameraOpen ? (
-              <>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setError(null);
-                    try {
-                      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                      stream.getTracks().forEach((t) => t.stop());
-                    } catch (_) {}
-                    setCameraOpen(true);
-                  }}
-                  className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd]"
-                >
-                  📷 Abrir câmera para escanear
-                </button>
-                <p className="text-xs text-[#6b7280] mt-3 m-0">
-                  Toque acima para abrir a câmera (o navegador vai pedir permissão).
-                </p>
-              </>
-            ) : (
-              <>
-                <div
-                  id="qr-reader"
-                  className="min-h-[280px] w-full [&_.qr-shaded-region]:border-4 [&_.qr-shaded-region]:border-dashed [&_.qr-shaded-region]:border-[#eab308] [&_video]:rounded-xl [&_video]:object-cover"
-                />
-                {decodedQrUrl && (
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-2 py-2 px-4 rounded-full bg-[#fef08a] text-[#854d0e] text-sm font-medium border border-[#eab308]/50">
-                      <span className="text-[#16a34a]" aria-hidden>✓</span>
-                      {getDisplayDomain(decodedQrUrl)}
-                    </span>
-                    <span className="text-xs text-[#666]">Consultando nota...</span>
-                  </div>
-                )}
-                <p className="text-xs text-gray-500 mt-2 font-mono break-all" aria-live="polite">
-                  {lastQrDebug != null ? `Debug: QR lido: ${lastQrDebug.length > 80 ? lastQrDebug.slice(0, 80) + '…' : lastQrDebug}` : 'Debug: aguardando leitura...'}
-                </p>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => { setDecodedQrUrl(null); setLastQrDebug(null); setCameraOpen(false); if (qrScannerRef.current) { try { if (qrScannerRef.current.isScanning) qrScannerRef.current.stop().catch(() => {}); } catch (_) {} qrScannerRef.current = null; } setStep(STEPS.CAPTURE); }}
-              className="mt-4 w-full py-3 px-4 bg-[#f3f4f6] text-[#374151] rounded-xl font-medium border-none cursor-pointer"
-            >
-              ← Voltar
-            </button>
-          </div>
-        )}
 
         {/* STEP: PREVIEW */}
         {step === STEPS.PREVIEW && imagePreview && (
