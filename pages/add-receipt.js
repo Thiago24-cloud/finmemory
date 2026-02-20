@@ -95,6 +95,39 @@ function looksLikeNfceQr(text) {
   return t.length > 10 && (/^https?:\/\//i.test(t) || /^\d{44}$/.test(t.replace(/\D/g, '')) || /^[pP]=/.test(t));
 }
 
+// Extrai o domínio para exibir no banner (ex.: fazenda.sp.gov.br)
+function getDisplayDomain(url) {
+  if (!url || typeof url !== 'string') return '';
+  const t = url.trim();
+  try {
+    if (/^https?:\/\//i.test(t)) {
+      const host = new URL(t).hostname.replace(/^www\./, '');
+      return host || t.slice(0, 35);
+    }
+    if (t.length <= 40) return t;
+    return t.slice(0, 37) + '...';
+  } catch (_) {
+    return t.length <= 40 ? t : t.slice(0, 37) + '...';
+  }
+}
+
+// Mapeia resposta do /api/consultar-nfce para o formato do formulário (applyNfceData)
+function dataFromConsultarNfce(res) {
+  const estabelecimento = res.estabelecimento;
+  const merchant_name = typeof estabelecimento === 'object' && estabelecimento?.nome
+    ? estabelecimento.nome
+    : (estabelecimento || '');
+  return {
+    date: res.data || '',
+    merchant_name: merchant_name || '',
+    merchant_cnpj: res.cnpj || '',
+    total_amount: res.total != null ? String(Number(res.total).toFixed(2)) : '',
+    items: Array.isArray(res.itens) ? res.itens.map((i) => ({ name: i.name || '', price: Number(i.price) || 0 })) : [],
+    receipt_image_url: res.nfce_url || '',
+    nfce_url: res.nfce_url || ''
+  };
+}
+
 export default function AddReceipt() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -124,6 +157,9 @@ export default function AddReceipt() {
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const qrScannerRef = useRef(null);
+  // URL do QR detectado (ex.: para mostrar "fazenda.sp.gov.br" no banner)
+  const [decodedQrUrl, setDecodedQrUrl] = useState(null);
 
   // Buscar user_id
   useEffect(() => {
@@ -153,6 +189,105 @@ export default function AddReceipt() {
       router.push('/login');
     }
   }, [status, router]);
+
+  // Prefill vindo da página /scanner (NFCeScanner): aplicar e ir direto para EDIT
+  useEffect(() => {
+    if (typeof window === 'undefined' || step !== STEPS.CAPTURE) return;
+    try {
+      const raw = sessionStorage.getItem('finmemory_nfce_prefill');
+      if (!raw) return;
+      sessionStorage.removeItem('finmemory_nfce_prefill');
+      const prefill = JSON.parse(raw);
+      if (prefill && (prefill.merchant_name || prefill.total_amount)) {
+        setFormData({
+          date: prefill.date || '',
+          merchant_name: prefill.merchant_name || '',
+          merchant_cnpj: prefill.merchant_cnpj || '',
+          total_amount: prefill.total_amount != null ? String(prefill.total_amount) : '',
+          items: Array.isArray(prefill.items) ? prefill.items.map((i) => ({ name: i.name || '', price: Number(i.price) || 0 })) : [],
+          category: prefill.category || '',
+          payment_method: prefill.payment_method || '',
+          receipt_image_url: prefill.receipt_image_url || ''
+        });
+        setStep(STEPS.EDIT);
+      }
+    } catch (_) {}
+  }, [step]);
+
+  // Scanner de QR por câmera (Html5Qrcode com câmera traseira) – só quando step === SCAN_QR
+  useEffect(() => {
+    if (step !== STEPS.SCAN_QR || typeof window === 'undefined') return;
+    const el = document.getElementById('qr-reader');
+    if (!el) return;
+
+    let instance = null;
+    let cancelled = false;
+
+    async function initScanner() {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      instance = new Html5Qrcode('qr-reader');
+      qrScannerRef.current = instance;
+
+      try {
+        await instance.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: (vW, vH) => ({ width: Math.min(260, vW - 40), height: Math.min(260, vH - 40) }) },
+          (decodedText) => {
+            if (!decodedText || !looksLikeNfceQr(decodedText)) return;
+            setDecodedQrUrl(decodedText);
+            processarNFCe(decodedText, instance);
+          },
+          () => {}
+        );
+        const video = el.querySelector('video');
+        if (video) {
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('webkit-playsinline', 'true');
+          video.muted = true;
+          video.playsInline = true;
+        }
+      } catch (e) {
+        if (!cancelled) setError(e.name === 'NotAllowedError' || (e.message && e.message.includes('Permission')) ? 'Permita o acesso à câmera nas configurações do navegador/sistema.' : 'Não foi possível abrir a câmera. Use HTTPS e permita a câmera.');
+      }
+    }
+
+    async function processarNFCe(decodedText, scannerInstance) {
+      try {
+        const res = await fetch('/api/consultar-nfce', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: decodedText })
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setDecodedQrUrl(null);
+          setError(json.error || 'Não foi possível consultar a NFC-e.');
+          return;
+        }
+        if (scannerInstance) {
+          try { if (scannerInstance.isScanning) await scannerInstance.stop(); } catch (_) {}
+        }
+        qrScannerRef.current = null;
+        setDecodedQrUrl(null);
+        applyNfceData(dataFromConsultarNfce(json));
+      } catch (err) {
+        console.error('Erro ao buscar NFC-e:', err);
+        setDecodedQrUrl(null);
+        setError('Não foi possível carregar os dados da nota. Tente tirar uma foto da nota.');
+      }
+    }
+
+    initScanner();
+
+    return () => {
+      cancelled = true;
+      setDecodedQrUrl(null);
+      if (qrScannerRef.current) {
+        try { if (qrScannerRef.current.isScanning) qrScannerRef.current.stop().catch(() => {}); } catch (_) {}
+        qrScannerRef.current = null;
+      }
+    };
+  }, [step]);
 
   // Processar arquivo selecionado
   const handleFileSelect = async (e) => {
@@ -247,14 +382,14 @@ export default function AddReceipt() {
               new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
             ]);
             if (decodedText && looksLikeNfceQr(decodedText)) {
-              const res = await fetch('/api/ocr/fetch-nfce', {
+              const res = await fetch('/api/consultar-nfce', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: decodedText, qrContent: decodedText })
+                body: JSON.stringify({ url: decodedText })
               });
               const json = await res.json();
-              if (json.success && json.data) {
-                applyNfceData(json.data);
+              if (res.ok) {
+                applyNfceData(dataFromConsultarNfce(json));
                 return;
               }
             }
@@ -485,6 +620,14 @@ export default function AddReceipt() {
                 className="hidden"
                 aria-label="Escolher imagem da galeria"
               />
+
+              <button
+                type="button"
+                onClick={() => setStep(STEPS.SCAN_QR)}
+                className="bg-[#e0f2fe] text-[#0369a1] border-none py-4 px-6 rounded-xl text-base font-medium cursor-pointer hover:bg-[#bae6fd] transition-colors text-center"
+              >
+                📱 Escanear QR Code da NFC-e
+              </button>
             </div>
 
             <p className="text-xs text-[#9ca3af] mt-4">
@@ -495,6 +638,39 @@ export default function AddReceipt() {
 
         {/* Container para o scanner de QR (off-screen com tamanho; lib exige elemento no DOM) */}
         <div id="finmemory-qr-file-scan" className="absolute w-[1px] h-[1px] opacity-0 pointer-events-none left-[-9999px] top-0" aria-hidden="true" />
+
+        {/* STEP: SCAN_QR – câmera para escanear QR da NFC-e (estilo: caixa amarela + banner com link) */}
+        {step === STEPS.SCAN_QR && (
+          <div className="bg-white rounded-[24px] p-6 card-lovable">
+            <h2 className="text-xl text-[#333] m-0 mb-2">Aponte a câmera para o QR Code da nota</h2>
+            <p className="text-sm text-[#666] m-0 mb-2">
+              O QR Code geralmente está no rodapé da NFC-e
+            </p>
+            <p className="text-xs text-[#6b7280] m-0 mb-4">
+              Use a <strong>câmera traseira</strong> e mantenha o QR dentro da moldura amarela.
+            </p>
+            <div
+              id="qr-reader"
+              className="min-h-[280px] w-full [&_.qr-shaded-region]:border-4 [&_.qr-shaded-region]:border-dashed [&_.qr-shaded-region]:border-[#eab308] [&_video]:rounded-xl [&_video]:object-cover"
+            />
+            {decodedQrUrl && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 py-2 px-4 rounded-full bg-[#fef08a] text-[#854d0e] text-sm font-medium border border-[#eab308]/50">
+                  <span className="text-[#16a34a]" aria-hidden>✓</span>
+                  {getDisplayDomain(decodedQrUrl)}
+                </span>
+                <span className="text-xs text-[#666]">Consultando nota...</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => { setDecodedQrUrl(null); if (qrScannerRef.current) { try { if (qrScannerRef.current.isScanning) qrScannerRef.current.stop().catch(() => {}); } catch (_) {} qrScannerRef.current = null; } setStep(STEPS.CAPTURE); }}
+              className="mt-4 w-full py-3 px-4 bg-[#f3f4f6] text-[#374151] rounded-xl font-medium border-none cursor-pointer"
+            >
+              ← Voltar
+            </button>
+          </div>
+        )}
 
         {/* STEP: PREVIEW */}
         {step === STEPS.PREVIEW && imagePreview && (

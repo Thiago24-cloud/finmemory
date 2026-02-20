@@ -11,6 +11,7 @@ import {
   PenLine,
   Users,
   List,
+  QrCode,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -54,6 +55,12 @@ export function QuickActions({ onSync, syncing, userIdReady = true, className })
       {/* Demais ações: grid responsivo que quebra linha no desktop */}
       <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 pb-2 justify-items-center">
 
+        <Link href="/scanner" className={cn(secondaryBtn, 'no-underline text-inherit')} title="Escanear Nota Fiscal (NFC-e)">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <QrCode className="h-5 w-5" />
+          </div>
+          <span className="text-xs text-[#666] whitespace-nowrap">NFC-e</span>
+        </Link>
         <Link href="/share-price" className={cn(secondaryBtn, 'no-underline text-inherit')}>
           <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
             <Share2 className="h-5 w-5" />

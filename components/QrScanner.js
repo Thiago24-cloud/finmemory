@@ -41,7 +41,7 @@ export function QrScanner({ onScan, onClose }) {
           { facingMode: 'environment' },
           {
             fps: 10,
-            qrbox: { width: 260, height: 260 }
+            qrbox: (vW, vH) => ({ width: Math.min(260, vW - 40), height: Math.min(260, vH - 40) })
           },
           (decodedText) => {
             const cb = onScanRef.current;
@@ -53,6 +53,13 @@ export function QrScanner({ onScan, onClose }) {
           },
           () => {}
         );
+        const video = el.querySelector('video');
+        if (video) {
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('webkit-playsinline', 'true');
+          video.muted = true;
+          video.playsInline = true;
+        }
       } catch (e) {
         if (cancelled) return;
         console.error('QrScanner start error:', e);
