@@ -4,15 +4,6 @@ import { useEffect, useState } from 'react';
 import { QrScanner } from './QrScanner';
 import { useNFCe } from '../hooks/useNFCe';
 
-function looksLikeNfceQr(text) {
-  const t = (text || '').trim();
-  return t.length > 10 && (
-    /^https?:\/\//i.test(t) ||
-    /^\d{44}$/.test(t.replace(/\D/g, '')) ||
-    /^[pP]=/.test(t)
-  );
-}
-
 function getDisplayDomain(url) {
   if (!url || typeof url !== 'string') return '';
   const t = url.trim();
@@ -32,11 +23,13 @@ function getDisplayDomain(url) {
  */
 export function NFCeScanner({ userId, onSuccess, onClose }) {
   const [decodedUrl, setDecodedUrl] = useState(null);
+  const [lastQrDebug, setLastQrDebug] = useState(null);
   const { status, error, consultar, reset, isSuccess, isError } = useNFCe();
 
   const handleScan = async (text) => {
     const trimmed = String(text).trim();
-    if (!trimmed || !looksLikeNfceQr(trimmed)) return;
+    setLastQrDebug(trimmed || '(vazio)');
+    if (!trimmed || trimmed.length < 10) return;
     setDecodedUrl(trimmed);
     await consultar(trimmed, userId || undefined);
   };
@@ -50,6 +43,7 @@ export function NFCeScanner({ userId, onSuccess, onClose }) {
   const handleClose = () => {
     reset();
     setDecodedUrl(null);
+    setLastQrDebug(null);
     onClose?.();
   };
 
@@ -77,6 +71,9 @@ export function NFCeScanner({ userId, onSuccess, onClose }) {
       {isError && error && (
         <p className="text-red-600 text-sm bg-red-50 py-2 px-3 rounded-xl">{error}</p>
       )}
+      <p className="text-xs text-gray-500 font-mono break-all" aria-live="polite">
+        {lastQrDebug != null ? `Debug: QR lido: ${lastQrDebug.length > 80 ? lastQrDebug.slice(0, 80) + '…' : lastQrDebug}` : 'Debug: aguardando leitura...'}
+      </p>
     </div>
   );
 }

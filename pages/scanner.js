@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth/next';
@@ -26,6 +27,7 @@ export async function getServerSideProps(ctx) {
 }
 
 export default function ScannerPage() {
+  const [cameraOpen, setCameraOpen] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
   const userId = session?.user?.supabaseId || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
@@ -65,17 +67,29 @@ export default function ScannerPage() {
         </div>
         <div className="px-5 pb-8">
           <div className="bg-white rounded-[24px] p-6 shadow-lg">
-            <p className="text-[#666] text-sm mb-2">
+            <p className="text-[#666] text-sm mb-4">
               Aponte a câmera para o QR Code da NFC-e. A nota será consultada, categorizada e salva automaticamente.
             </p>
-            <p className="text-xs text-[#6b7280] mb-4">
-              Use a <strong>câmera traseira</strong> e mantenha o QR dentro da moldura.
-            </p>
-            <NFCeScanner
-              userId={userId}
-              onSuccess={handleSuccess}
-              onClose={handleClose}
-            />
+            {!cameraOpen ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCameraOpen(true)}
+                  className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd]"
+                >
+                  📷 Abrir câmera para escanear
+                </button>
+                <p className="text-xs text-[#6b7280] mt-3 m-0">
+                  Toque acima para abrir a câmera (o navegador pode pedir permissão). Use a câmera traseira.
+                </p>
+              </>
+            ) : (
+              <NFCeScanner
+                userId={userId}
+                onSuccess={handleSuccess}
+                onClose={handleClose}
+              />
+            )}
           </div>
         </div>
       </div>

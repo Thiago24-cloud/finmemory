@@ -89,10 +89,15 @@ function dataURLtoFile(dataUrl, filename = 'receipt.jpg') {
   return new File([u8], filename, { type: mime });
 }
 
-// Indica se o conteúdo do QR parece ser URL da NFC-e
+// Indica se o conteúdo do QR pode ser NFC-e (URL SEFAZ, chave 44 dígitos, ou parâmetro p=)
 function looksLikeNfceQr(text) {
-  const t = (text || '').trim();
-  return t.length > 10 && (/^https?:\/\//i.test(t) || /^\d{44}$/.test(t.replace(/\D/g, '')) || /^[pP]=/.test(t));
+  const t = (text || '').trim().replace(/\s+/g, ' ');
+  if (t.length < 10) return false;
+  if (/^https?:\/\//i.test(t)) return true;
+  if (/^[pP]=/.test(t)) return true;
+  if (t.replace(/\D/g, '').length >= 44) return true;
+  if (/nfce|fazenda|sefaz|gov\.br/i.test(t)) return true;
+  return false;
 }
 
 // Extrai o domínio para exibir no banner (ex.: fazenda.sp.gov.br)
@@ -158,8 +163,9 @@ export default function AddReceipt() {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const qrScannerRef = useRef(null);
-  // URL do QR detectado (ex.: para mostrar "fazenda.sp.gov.br" no banner)
   const [decodedQrUrl, setDecodedQrUrl] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [lastQrDebug, setLastQrDebug] = useState(null);
 
   // Buscar user_id
   useEffect(() => {
@@ -214,9 +220,13 @@ export default function AddReceipt() {
     } catch (_) {}
   }, [step]);
 
-  // Scanner de QR por câmera (Html5Qrcode com câmera traseira) – só quando step === SCAN_QR
   useEffect(() => {
-    if (step !== STEPS.SCAN_QR || typeof window === 'undefined') return;
+    if (step !== STEPS.SCAN_QR) setCameraOpen(false);
+  }, [step]);
+
+  // Scanner de QR por câmera – só quando step === SCAN_QR e usuário clicou em "Abrir câmera"
+  useEffect(() => {
+    if (step !== STEPS.SCAN_QR || !cameraOpen || typeof window === 'undefined') return;
     const el = document.getElementById('qr-reader');
     if (!el) return;
 
@@ -231,11 +241,13 @@ export default function AddReceipt() {
       try {
         await instance.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: (vW, vH) => ({ width: Math.min(260, vW - 40), height: Math.min(260, vH - 40) }) },
+          { fps: 15, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
-            if (!decodedText || !looksLikeNfceQr(decodedText)) return;
-            setDecodedQrUrl(decodedText);
-            processarNFCe(decodedText, instance);
+            const raw = (decodedText || '').trim();
+            setLastQrDebug(raw || '(vazio)');
+            if (!raw || raw.length < 10) return;
+            setDecodedQrUrl(raw);
+            processarNFCe(raw, instance);
           },
           () => {}
         );
@@ -245,6 +257,7 @@ export default function AddReceipt() {
           video.setAttribute('webkit-playsinline', 'true');
           video.muted = true;
           video.playsInline = true;
+          video.play().catch(() => {});
         }
       } catch (e) {
         if (!cancelled) setError(e.name === 'NotAllowedError' || (e.message && e.message.includes('Permission')) ? 'Permita o acesso à câmera nas configurações do navegador/sistema.' : 'Não foi possível abrir a câmera. Use HTTPS e permita a câmera.');
@@ -282,12 +295,13 @@ export default function AddReceipt() {
     return () => {
       cancelled = true;
       setDecodedQrUrl(null);
+      setLastQrDebug(null);
       if (qrScannerRef.current) {
         try { if (qrScannerRef.current.isScanning) qrScannerRef.current.stop().catch(() => {}); } catch (_) {}
         qrScannerRef.current = null;
       }
     };
-  }, [step]);
+  }, [step, cameraOpen]);
 
   // Processar arquivo selecionado
   const handleFileSelect = async (e) => {
@@ -639,32 +653,49 @@ export default function AddReceipt() {
         {/* Container para o scanner de QR (off-screen com tamanho; lib exige elemento no DOM) */}
         <div id="finmemory-qr-file-scan" className="absolute w-[1px] h-[1px] opacity-0 pointer-events-none left-[-9999px] top-0" aria-hidden="true" />
 
-        {/* STEP: SCAN_QR – câmera para escanear QR da NFC-e (estilo: caixa amarela + banner com link) */}
+        {/* STEP: SCAN_QR – câmera para escanear QR da NFC-e */}
         {step === STEPS.SCAN_QR && (
           <div className="bg-white rounded-[24px] p-6 card-lovable">
-            <h2 className="text-xl text-[#333] m-0 mb-2">Aponte a câmera para o QR Code da nota</h2>
-            <p className="text-sm text-[#666] m-0 mb-2">
-              O QR Code geralmente está no rodapé da NFC-e
+            <h2 className="text-xl text-[#333] m-0 mb-2">Escanear QR Code da NFC-e</h2>
+            <p className="text-sm text-[#666] m-0 mb-4">
+              O QR Code fica no rodapé da nota. Use a <strong>câmera traseira</strong> e mantenha o QR na moldura.
             </p>
-            <p className="text-xs text-[#6b7280] m-0 mb-4">
-              Use a <strong>câmera traseira</strong> e mantenha o QR dentro da moldura amarela.
-            </p>
-            <div
-              id="qr-reader"
-              className="min-h-[280px] w-full [&_.qr-shaded-region]:border-4 [&_.qr-shaded-region]:border-dashed [&_.qr-shaded-region]:border-[#eab308] [&_video]:rounded-xl [&_video]:object-cover"
-            />
-            {decodedQrUrl && (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 py-2 px-4 rounded-full bg-[#fef08a] text-[#854d0e] text-sm font-medium border border-[#eab308]/50">
-                  <span className="text-[#16a34a]" aria-hidden>✓</span>
-                  {getDisplayDomain(decodedQrUrl)}
-                </span>
-                <span className="text-xs text-[#666]">Consultando nota...</span>
-              </div>
+            {!cameraOpen ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCameraOpen(true)}
+                  className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd]"
+                >
+                  📷 Abrir câmera para escanear
+                </button>
+                <p className="text-xs text-[#6b7280] mt-3 m-0">
+                  Toque acima para abrir a câmera (o navegador pode pedir permissão).
+                </p>
+              </>
+            ) : (
+              <>
+                <div
+                  id="qr-reader"
+                  className="min-h-[280px] w-full [&_.qr-shaded-region]:border-4 [&_.qr-shaded-region]:border-dashed [&_.qr-shaded-region]:border-[#eab308] [&_video]:rounded-xl [&_video]:object-cover"
+                />
+                {decodedQrUrl && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 py-2 px-4 rounded-full bg-[#fef08a] text-[#854d0e] text-sm font-medium border border-[#eab308]/50">
+                      <span className="text-[#16a34a]" aria-hidden>✓</span>
+                      {getDisplayDomain(decodedQrUrl)}
+                    </span>
+                    <span className="text-xs text-[#666]">Consultando nota...</span>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-2 font-mono break-all" aria-live="polite">
+                  {lastQrDebug != null ? `Debug: QR lido: ${lastQrDebug.length > 80 ? lastQrDebug.slice(0, 80) + '…' : lastQrDebug}` : 'Debug: aguardando leitura...'}
+                </p>
+              </>
             )}
             <button
               type="button"
-              onClick={() => { setDecodedQrUrl(null); if (qrScannerRef.current) { try { if (qrScannerRef.current.isScanning) qrScannerRef.current.stop().catch(() => {}); } catch (_) {} qrScannerRef.current = null; } setStep(STEPS.CAPTURE); }}
+              onClick={() => { setDecodedQrUrl(null); setLastQrDebug(null); setCameraOpen(false); if (qrScannerRef.current) { try { if (qrScannerRef.current.isScanning) qrScannerRef.current.stop().catch(() => {}); } catch (_) {} qrScannerRef.current = null; } setStep(STEPS.CAPTURE); }}
               className="mt-4 w-full py-3 px-4 bg-[#f3f4f6] text-[#374151] rounded-xl font-medium border-none cursor-pointer"
             >
               ← Voltar

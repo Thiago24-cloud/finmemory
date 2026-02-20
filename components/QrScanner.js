@@ -39,17 +39,15 @@ export function QrScanner({ onScan, onClose }) {
 
         await instance.start(
           { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: (vW, vH) => ({ width: Math.min(260, vW - 40), height: Math.min(260, vH - 40) })
-          },
+          { fps: 15, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
             const cb = onScanRef.current;
-            if (!decodedText || !cb) return;
+            const t = (decodedText && String(decodedText).trim()) || '';
+            if (!t || !cb) return;
             try {
               if (instance && instance.isScanning) instance.stop().catch(() => {});
             } catch (_) {}
-            cb(String(decodedText).trim());
+            cb(t);
           },
           () => {}
         );
@@ -59,6 +57,7 @@ export function QrScanner({ onScan, onClose }) {
           video.setAttribute('webkit-playsinline', 'true');
           video.muted = true;
           video.playsInline = true;
+          video.play().catch(() => {});
         }
       } catch (e) {
         if (cancelled) return;
