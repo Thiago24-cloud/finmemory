@@ -238,10 +238,20 @@ export default function AddReceipt() {
       instance = new Html5Qrcode('qr-reader');
       qrScannerRef.current = instance;
 
+      let cameraConfig = { facingMode: { exact: 'environment' } };
+      try {
+        const cameras = await instance.getCameras();
+        if (cameras && cameras.length > 0) {
+          const back = cameras.find((c) => /back|traseira|rear|environment/i.test(c.label || ''));
+          if (back) cameraConfig = { deviceId: { exact: back.id } };
+          else if (cameras.length > 1) cameraConfig = { deviceId: { exact: cameras[cameras.length - 1].id } };
+        }
+      } catch (_) {}
+
       try {
         await instance.start(
-          { facingMode: 'environment' },
-          { fps: 15, qrbox: { width: 250, height: 250 } },
+          cameraConfig,
+          { fps: 20, qrbox: { width: 300, height: 300 } },
           (decodedText) => {
             const raw = (decodedText || '').trim();
             setLastQrDebug(raw || '(vazio)');
@@ -658,19 +668,26 @@ export default function AddReceipt() {
           <div className="bg-white rounded-[24px] p-6 card-lovable">
             <h2 className="text-xl text-[#333] m-0 mb-2">Escanear QR Code da NFC-e</h2>
             <p className="text-sm text-[#666] m-0 mb-4">
-              O QR Code fica no rodapé da nota. Use a <strong>câmera traseira</strong> e mantenha o QR na moldura.
+              O QR Code fica no rodapé da nota. Use a <strong>câmera traseira</strong>, boa iluminação e mantenha o QR parado na moldura.
             </p>
             {!cameraOpen ? (
               <>
                 <button
                   type="button"
-                  onClick={() => setCameraOpen(true)}
+                  onClick={async () => {
+                    setError(null);
+                    try {
+                      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                      stream.getTracks().forEach((t) => t.stop());
+                    } catch (_) {}
+                    setCameraOpen(true);
+                  }}
                   className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd]"
                 >
                   📷 Abrir câmera para escanear
                 </button>
                 <p className="text-xs text-[#6b7280] mt-3 m-0">
-                  Toque acima para abrir a câmera (o navegador pode pedir permissão).
+                  Toque acima para abrir a câmera (o navegador vai pedir permissão).
                 </p>
               </>
             ) : (

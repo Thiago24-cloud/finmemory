@@ -37,9 +37,19 @@ export function QrScanner({ onScan, onClose }) {
         instance = new Html5Qrcode(QR_CONTAINER_ID);
         scannerRef.current = instance;
 
+        let cameraConfig = { facingMode: { exact: 'environment' } };
+        try {
+          const cameras = await instance.getCameras();
+          if (cameras && cameras.length > 0) {
+            const back = cameras.find((c) => /back|traseira|rear|environment/i.test(c.label || ''));
+            if (back) cameraConfig = { deviceId: { exact: back.id } };
+            else if (cameras.length > 1) cameraConfig = { deviceId: { exact: cameras[cameras.length - 1].id } };
+          }
+        } catch (_) {}
+
         await instance.start(
-          { facingMode: 'environment' },
-          { fps: 15, qrbox: { width: 250, height: 250 } },
+          cameraConfig,
+          { fps: 20, qrbox: { width: 300, height: 300 } },
           (decodedText) => {
             const cb = onScanRef.current;
             const t = (decodedText && String(decodedText).trim()) || '';
@@ -70,7 +80,7 @@ export function QrScanner({ onScan, onClose }) {
       }
     }
 
-    const t = setTimeout(start, 150);
+    const t = setTimeout(start, 0);
     return () => {
       cancelled = true;
       clearTimeout(t);

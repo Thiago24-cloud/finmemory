@@ -74,7 +74,13 @@ export default function ScannerPage() {
               <>
                 <button
                   type="button"
-                  onClick={() => setCameraOpen(true)}
+                  onClick={async () => {
+                    try {
+                      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                      stream.getTracks().forEach((t) => t.stop());
+                    } catch (_) {}
+                    setCameraOpen(true);
+                  }}
                   className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd]"
                 >
                   📷 Abrir câmera para escanear
