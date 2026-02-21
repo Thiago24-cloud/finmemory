@@ -102,7 +102,8 @@ export default async function handler(req, res) {
       .limit(500);
 
     if (q.length >= 2) {
-      query = query.ilike('product_name', `%${q}%`);
+      const pattern = `%${q}%`;
+      query = query.or(`product_name.ilike.${pattern},store_name.ilike.${pattern},category.ilike.${pattern}`);
     }
 
     const { data, error } = await query;
