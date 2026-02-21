@@ -58,7 +58,9 @@ export default async function handler(req, res) {
       category,
       payment_method,
       receipt_image_url,
-      shareOnMap
+      shareOnMap,
+      lat: userLat,
+      lng: userLng
     } = req.body;
 
     // Validações
@@ -129,22 +131,29 @@ export default async function handler(req, res) {
 
     console.log('✅ Transação salva com sucesso:', transaction.id);
 
-    // Geocodificar e inserir pontos no mapa de preços (price_points) só se o usuário optou por divulgar
+    // Inserir pontos no mapa (price_points) se o usuário optou por divulgar
     if (shareOnMap) {
     try {
-      const geoQuery = [merchant_name.trim()].concat(
-        (req.body.merchant_address && String(req.body.merchant_address).trim())
-          ? [String(req.body.merchant_address).trim()]
-          : []
-      ).join(', ') + ', Brasil';
-      const coords = await geocodeAddress(geoQuery);
+      let coords = null;
+      const latNum = userLat != null ? parseFloat(userLat) : NaN;
+      const lngNum = userLng != null ? parseFloat(userLng) : NaN;
+      if (!Number.isNaN(latNum) && !Number.isNaN(lngNum) && latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180) {
+        coords = { lat: latNum, lng: lngNum };
+      }
+      if (!coords) {
+        const geoQuery = [merchant_name.trim()].concat(
+          (req.body.merchant_address && String(req.body.merchant_address).trim())
+            ? [String(req.body.merchant_address).trim()]
+            : []
+        ).join(', ') + ', Brasil';
+        coords = await geocodeAddress(geoQuery);
+      }
       if (coords && coords.lat != null && coords.lng != null) {
         const pointsToInsert = [];
         if (items && items.length > 0) {
           items.forEach((item) => {
             pointsToInsert.push({
               user_id: userId,
-              transacao_id: transaction.id,
               product_name: (item.name && String(item.name).trim()) || 'Produto',
               price: parseFloat(item.price) || 0,
               store_name: merchant_name.trim(),
@@ -156,7 +165,6 @@ export default async function handler(req, res) {
         } else {
           pointsToInsert.push({
             user_id: userId,
-            transacao_id: transaction.id,
             product_name: 'Compra',
             price: parseFloat(total_amount) || 0,
             store_name: merchant_name.trim(),
@@ -169,7 +177,7 @@ export default async function handler(req, res) {
         if (mapErr) console.warn('⚠️ Erro ao inserir price_points:', mapErr.message);
         else console.log(`✅ ${pointsToInsert.length} ponto(s) adicionado(s) ao mapa`);
       } else {
-        console.log('⚠️ Geocoding não retornou coordenadas para:', merchant_name);
+        console.log('⚠️ Sem coordenadas (geolocalização negada e geocoding falhou) para:', merchant_name);
       }
     } catch (mapError) {
       console.warn('⚠️ Erro ao alimentar mapa:', mapError.message);

@@ -365,6 +365,20 @@ export default function AddReceipt() {
     setError(null);
 
     try {
+      let lat = null;
+      let lng = null;
+      if (shareOnMap && typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
+          });
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+        } catch (_) {
+          // Geolocalização negada ou falhou – API usa geocoding como fallback
+        }
+      }
+
       const response = await fetch('/api/ocr/save-transaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -372,7 +386,8 @@ export default function AddReceipt() {
           userId,
           ...formData,
           total_amount: parseFloat(formData.total_amount) || 0,
-          shareOnMap
+          shareOnMap,
+          ...(lat != null && lng != null && { lat, lng })
         })
       });
 
@@ -729,7 +744,7 @@ export default function AddReceipt() {
               {/* Toggle: divulgar preços da nota no mapa ou só nos registros */}
               <div className="mb-6">
                 <p className="text-xs text-[#6b7280] mb-2">
-                  Deslize para a direita para divulgar os produtos da nota no mapa; à esquerda = só nos seus registros.
+                  Divulgar no mapa: ative e permita a localização ao salvar para que os produtos apareçam no mapa. À esquerda = só nos seus registros.
                 </p>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium text-[#374151]">
