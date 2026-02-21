@@ -92,13 +92,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data, error } = await supabase
+    const q = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
+    let query = supabase
       .from('price_points')
       .select('id, product_name, price, store_name, lat, lng, category, created_at, user_id')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
       .order('created_at', { ascending: false })
       .limit(500);
+
+    if (q.length >= 2) {
+      query = query.ilike('product_name', `%${q}%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Erro ao buscar price_points:', error);

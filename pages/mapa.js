@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import Image from 'next/image';
-import { Search, ArrowLeft, PlusCircle, MessageCircle, Map } from 'lucide-react';
+import { Search, ArrowLeft, PlusCircle, Map } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import { MAP_THEMES, MAP_THEME_STORAGE_KEY, getMapThemeById } from '../lib/colors';
@@ -36,15 +36,16 @@ export default function MapaPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [showSharedBanner, setShowSharedBanner] = useState(false);
-  const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [showMapasSheet, setShowMapasSheet] = useState(false);
   const [mapThemeId, setMapThemeId] = useState('ruas');
-  const [questionMessage, setQuestionMessage] = useState('');
-  const [questionStore, setQuestionStore] = useState('');
-  const [questionSubmitting, setQuestionSubmitting] = useState(false);
-  const [questionError, setQuestionError] = useState('');
-  const [questionRefresh, setQuestionRefresh] = useState(0);
-  const [questionLocation, setQuestionLocation] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -67,40 +68,8 @@ export default function MapaPage() {
     setShowMapasSheet(false);
   };
 
-  const handleSubmitQuestion = async (e) => {
-    e.preventDefault();
-    setQuestionError('');
-    if (!questionMessage.trim() || questionMessage.trim().length < 3) {
-      setQuestionError('Digite sua pergunta (mín. 3 caracteres).');
-      return;
-    }
-    setQuestionSubmitting(true);
-    try {
-      const res = await fetch('/api/map/questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: questionMessage.trim(),
-          store_name: questionStore.trim() || null,
-          lat: questionLocation?.lat ?? null,
-          lng: questionLocation?.lng ?? null,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setQuestionError(data.error || 'Erro ao publicar. Tente de novo.');
-        return;
-      }
-      setQuestionMessage('');
-      setQuestionStore('');
-      setQuestionLocation(null);
-      setShowQuestionModal(false);
-      setQuestionRefresh((c) => c + 1);
-    } catch (err) {
-      setQuestionError('Erro de conexão. Tente de novo.');
-    } finally {
-      setQuestionSubmitting(false);
-    }
+  const handleFocusSearch = () => {
+    searchInputRef.current?.focus();
   };
 
   return (
@@ -111,7 +80,7 @@ export default function MapaPage() {
       {/* Mapa em tela cheia = primeira coisa que o usuário vê */}
       <div className="fixed inset-0 w-full h-full bg-[#e5e3df]">
         <div className="absolute inset-0 w-full h-full">
-          <MapaPrecos mapThemeId={mapThemeId} />
+          <MapaPrecos mapThemeId={mapThemeId} searchQuery={debouncedSearch} />
         </div>
 
         {/* Banner de sucesso ao compartilhar */}
@@ -146,20 +115,24 @@ export default function MapaPage() {
                 <div className="w-full flex items-center bg-gray-100/90 rounded-full pl-3 pr-3 py-2 focus-within:bg-white focus-within:ring-1 focus-within:ring-[#2ECC49] transition-all">
                   <Search className="h-4 w-4 text-gray-400 shrink-0 mr-2" />
                   <input
+                    ref={searchInputRef}
                     type="text"
-                    placeholder="Buscar produto..."
+                    placeholder="Buscar produto (ex: arroz)..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="flex-1 min-w-0 bg-transparent border-0 text-gray-800 placeholder-gray-500 focus:outline-none text-sm"
+                    aria-label="Buscar produto no mapa"
                   />
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowQuestionModal(true)}
+                onClick={handleFocusSearch}
                 className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-amber-500 text-white font-medium text-sm hover:bg-amber-600 transition-colors shrink-0"
-                aria-label="Perguntar à comunidade"
+                aria-label="Onde comprar? Buscar produto no mapa"
               >
-                <MessageCircle className="h-5 w-5 shrink-0" />
-                <span className="whitespace-nowrap hidden sm:inline">Perguntar</span>
+                <Search className="h-5 w-5 shrink-0" />
+                <span className="whitespace-nowrap hidden sm:inline">Onde comprar?</span>
               </button>
               <Link
                 href="/share-price"
@@ -227,84 +200,6 @@ export default function MapaPage() {
             </div>
           </SheetContent>
         </Sheet>
-
-        {/* Modal: Perguntar aos usuários */}
-        {showQuestionModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="question-modal-title">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
-              <h2 id="question-modal-title" className="text-lg font-bold text-gray-900 mb-3">
-                Perguntar à comunidade
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Ex.: &quot;Tem salmão defumado no estoque?&quot; ou &quot;Alguém viu preço do azeite?&quot;
-              </p>
-              {!session && (
-                <p className="text-sm text-amber-700 bg-amber-50 rounded-lg p-3 mb-4">
-                  Faça login para publicar sua pergunta.
-                </p>
-              )}
-              <form onSubmit={handleSubmitQuestion}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sua pergunta *</label>
-                <textarea
-                  value={questionMessage}
-                  onChange={(e) => setQuestionMessage(e.target.value)}
-                  placeholder="Ex.: Tem salmão defumado aí?"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm resize-none"
-                  disabled={!session}
-                />
-                <label className="block text-sm font-medium text-gray-700 mt-3 mb-1">Local (opcional)</label>
-                <input
-                  type="text"
-                  value={questionStore}
-                  onChange={(e) => setQuestionStore(e.target.value)}
-                  placeholder="Ex.: Extra Lapa"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
-                  disabled={!session}
-                />
-                {session && (
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!navigator.geolocation) {
-                          setQuestionError('Geolocalização não disponível.');
-                          return;
-                        }
-                        navigator.geolocation.getCurrentPosition(
-                          (pos) => setQuestionLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                          () => setQuestionError('Não foi possível obter localização.')
-                        );
-                      }}
-                      className="text-sm text-amber-600 hover:text-amber-700 font-medium"
-                    >
-                      {questionLocation ? '✓ Minha localização adicionada' : 'Usar minha localização (aparece no mapa)'}
-                    </button>
-                  </div>
-                )}
-                {questionError && (
-                  <p className="mt-2 text-sm text-red-600" role="alert">{questionError}</p>
-                )}
-                <div className="flex gap-2 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => { setShowQuestionModal(false); setQuestionError(''); }}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!session || questionSubmitting}
-                    className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white font-medium text-sm hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {questionSubmitting ? 'Enviando...' : 'Publicar'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* Tagline: posicionamento compras → análise de custos */}
         <p className="absolute bottom-2 left-2 right-2 sm:left-4 sm:right-auto text-[10px] sm:text-xs text-white/95 z-10 pointer-events-none drop-shadow-md max-w-md">

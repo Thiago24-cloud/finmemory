@@ -45,10 +45,13 @@ function LocationMarker() {
   );
 }
 
-/** Busca compras compartilhadas no mapa (localização onde a pessoa efetuou a compra). */
-async function fetchMapPoints() {
+/** Busca compras compartilhadas no mapa. Se searchQuery, filtra por nome do produto. */
+async function fetchMapPoints(searchQuery = '') {
   try {
-    const res = await fetch('/api/map/points');
+    const url = searchQuery.trim().length >= 2
+      ? `/api/map/points?q=${encodeURIComponent(searchQuery.trim())}`
+      : '/api/map/points';
+    const res = await fetch(url);
     if (!res.ok) return [];
     const json = await res.json();
     const points = json.points || [];
@@ -69,25 +72,25 @@ async function fetchMapPoints() {
   }
 }
 
-export default function MapaPrecosLeaflet({ mapThemeId = 'ruas' }) {
+export default function MapaPrecosLeaflet({ mapThemeId = 'ruas', searchQuery = '' }) {
   const theme = getMapThemeById(mapThemeId);
   const [locais, setLocais] = useState([]);
   const [carregando, setCarregando] = useState(false);
 
-  const buscarLocais = useCallback(async () => {
+  const buscarLocais = useCallback(async (query = searchQuery) => {
     setCarregando(true);
     try {
-      const points = await fetchMapPoints();
+      const points = await fetchMapPoints(query);
       setLocais(points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng)));
     } catch (error) {
       console.error('Erro ao buscar locais:', error);
     }
     setCarregando(false);
-  }, []);
+  }, [searchQuery]);
 
   useEffect(() => {
-    buscarLocais();
-  }, [buscarLocais]);
+    buscarLocais(searchQuery);
+  }, [searchQuery, buscarLocais]);
 
   return (
     <div className="relative w-full h-full">
@@ -157,7 +160,14 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'ruas' }) {
         </div>
         {locais.length === 0 && !carregando && (
           <p className="mt-1.5 text-xs text-gray-500">
-            Nenhum preço compartilhado ainda. Use &quot;Compartilhar&quot; no topo para divulgar uma compra no mapa.
+            {searchQuery.trim().length >= 2
+              ? `Nenhum preço de &quot;${searchQuery.trim()}&quot; compartilhado ainda. Compartilhe o primeiro!`
+              : 'Nenhum preço compartilhado ainda. Use "Compartilhar" no topo ou busque um produto (ex: arroz).'}
+          </p>
+        )}
+        {locais.length > 0 && searchQuery.trim().length >= 2 && (
+          <p className="mt-1.5 text-xs text-emerald-600 font-medium">
+            {locais.length} local(is) onde &quot;{searchQuery.trim()}&quot; está à venda
           </p>
         )}
         <button
