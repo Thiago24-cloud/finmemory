@@ -13,9 +13,16 @@
     "lint": "next lint",
     "validate-env": "node scripts/validate-env.mjs",
     "verify-build": "node scripts/verify-build.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cap:sync": "cap sync",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0",
     "@next/third-parties": "^15.5.10",
     "@radix-ui/react-dialog": "^1.1.14",
     "@supabase/supabase-js": "^2.45.4",
