@@ -10,7 +10,8 @@ import { TransactionList } from "@/components/dashboard/TransactionList";
 import { EditTransactionSheet } from "@/components/dashboard/EditTransactionSheet";
 import { CoupleSummary } from "@/components/dashboard/CoupleSummary";
 import { BottomNav } from "@/components/BottomNav";
-import { ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 interface TransactionItem {
@@ -50,6 +51,9 @@ const Dashboard = () => {
   // Edit sheet
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchProfile();
@@ -112,6 +116,23 @@ const Dashboard = () => {
   );
 
   const displayTransactions = showPartner ? partnerTransactions : myTransactions;
+
+  // Filter by search (estabelecimento, categoria ou nome do produto nos itens)
+  // Transações já vêm ordenadas por data decrescente (últimas primeiro)
+  const searchFilteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return displayTransactions;
+    const q = searchQuery.trim().toLowerCase();
+    return displayTransactions.filter((t) => {
+      if ((t.estabelecimento || "").toLowerCase().includes(q)) return true;
+      if ((t.categoria || "").toLowerCase().includes(q)) return true;
+      const items = Array.isArray(t.items) ? t.items : [];
+      const hasMatchingItem = items.some(
+        (item: { descricao?: string; name?: string }) =>
+          (item?.descricao || item?.name || "").toLowerCase().includes(q)
+      );
+      return hasMatchingItem;
+    });
+  }, [displayTransactions, searchQuery]);
 
   const totalGasto = useMemo(() => {
     return displayTransactions.reduce((sum, t) => sum + t.total, 0);
@@ -212,6 +233,21 @@ const Dashboard = () => {
 
         <QuickActions onSync={handleSync} syncing={syncing} className="mb-8" />
 
+        {/* Search */}
+        {!loading && (myTransactions.length > 0 || partnerTransactions.length > 0) && (
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              placeholder="Buscar por estabelecimento, categoria ou produto..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 rounded-xl bg-card border-border"
+              aria-label="Buscar por estabelecimento, categoria ou produto"
+            />
+          </div>
+        )}
+
         {loading ? (
           <div className="space-y-4" aria-live="polite" aria-busy="true">
             <div className="bg-card rounded-2xl card-shadow p-4">
@@ -229,8 +265,11 @@ const Dashboard = () => {
           </div>
         ) : (
           <TransactionList
-            transactions={displayTransactions}
+            transactions={searchFilteredTransactions}
             onEdit={showPartner ? undefined : handleEditTransaction}
+            emptyState={
+              searchQuery.trim() && searchFilteredTransactions.length === 0 ? "search" : "default"
+            }
           />
         )}
       </div>

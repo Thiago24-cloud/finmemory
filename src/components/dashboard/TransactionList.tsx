@@ -1,5 +1,5 @@
 import {
-  Car, ShoppingBag, Utensils, Fuel, Pill, Smartphone, Shirt, Wrench, Receipt, Pencil,
+  Car, ShoppingBag, Utensils, Fuel, Pill, Smartphone, Shirt, Wrench, Receipt, Pencil, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,10 +55,23 @@ interface TransactionListProps {
   transactions: Transaction[];
   className?: string;
   onEdit?: (transaction: Transaction) => void;
+  /** When true, shows "no results" message instead of "no transactions yet" */
+  emptyState?: "default" | "search";
 }
 
-export function TransactionList({ transactions, className, onEdit }: TransactionListProps) {
+export function TransactionList({ transactions, className, onEdit, emptyState = "default" }: TransactionListProps) {
   if (!transactions || transactions.length === 0) {
+    if (emptyState === "search") {
+      return (
+        <div className={cn("text-center py-12", className)}>
+          <Search className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">Nenhum resultado</h3>
+          <p className="text-sm text-muted-foreground">
+            Nenhuma transação encontrada para sua busca. Tente outro termo.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className={cn("text-center py-12", className)}>
         <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
