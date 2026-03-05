@@ -68,3 +68,6 @@ reports/
 # Backups locais
 *.backup
 teste-pre-deploy.md
+
+# Vídeos de teste (evitar arquivos grandes no repo)
+Testes do FinMemory.mp4
