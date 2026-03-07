@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
-import { Loader2, Mail, Camera, MapPin, X, Trash2, RotateCcw } from 'lucide-react';
+import { Loader2, Mail, Camera, MapPin, X, Trash2, RotateCcw, Search } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BottomNav } from '../components/BottomNav';
@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [deletedTransactions, setDeletedTransactions] = useState([]);
   const [trashLoading, setTrashLoading] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Debug: Log quando transactions mudar
   useEffect(() => {
@@ -660,16 +661,29 @@ export default function Dashboard() {
   const isAuthenticated = status === 'authenticated' && session;
   const isLoading = status === 'loading';
 
-  // Meses únicos das transações (ano-mês) ordenados do mais recente ao mais antigo
+  // Meses únicos das transações apenas do ano mais recente (evita lista com anos antigos)
   const availableMonths = useMemo(() => {
     const set = new Set();
+    let maxYear = 0;
     (transactions || []).forEach((t) => {
       if (t.data) {
-        const d = new Date(t.data);
-        if (!isNaN(d.getTime())) set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        const str = String(t.data).trim();
+        let d = null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) d = new Date(str);
+        else if (/^(\d{2})\/(\d{2})\/(\d{4})/.test(str)) {
+          const [, day, month, year] = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+          d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+        } else d = new Date(str);
+        if (d && !isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          if (y > maxYear) maxYear = y;
+          set.add(`${y}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        }
       }
     });
-    return Array.from(set).sort((a, b) => b.localeCompare(a));
+    const list = Array.from(set).sort((a, b) => b.localeCompare(a));
+    if (maxYear === 0) return list;
+    return list.filter((ym) => ym.startsWith(String(maxYear)));
   }, [transactions]);
 
   // Transações filtradas pelo mês selecionado
@@ -682,6 +696,20 @@ export default function Dashboard() {
       return ym === selectedMonth;
     });
   }, [transactions, selectedMonth]);
+
+  // Filtro por busca (estabelecimento, categoria ou nome do produto)
+  const searchFilteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return filteredTransactions;
+    const q = searchQuery.trim().toLowerCase();
+    return (filteredTransactions || []).filter((t) => {
+      if ((t.estabelecimento || '').toLowerCase().includes(q)) return true;
+      if ((t.categoria || '').toLowerCase().includes(q)) return true;
+      const produtos = Array.isArray(t.produtos) ? t.produtos : [];
+      return produtos.some(
+        (p) => (p?.descricao || p?.nome || '').toLowerCase().includes(q)
+      );
+    });
+  }, [filteredTransactions, searchQuery]);
 
   const totalBalance = useMemo(() => {
     return (filteredTransactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
@@ -843,11 +871,27 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <TransactionList
-                transactions={filteredTransactions}
-                userId={userId}
-                onDeleted={() => loadTransactions(userId)}
-              />
+              <>
+                {filteredTransactions.length > 0 && (
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#999] pointer-events-none" aria-hidden />
+                    <input
+                      type="search"
+                      placeholder="Buscar por estabelecimento, categoria ou produto..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] placeholder:text-[#999] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/50 focus:border-[#2ECC49]"
+                      aria-label="Buscar transações por estabelecimento, categoria ou produto"
+                    />
+                  </div>
+                )}
+                <TransactionList
+                  transactions={searchFilteredTransactions}
+                  userId={userId}
+                  onDeleted={() => loadTransactions(userId)}
+                  emptyState={searchQuery.trim() && searchFilteredTransactions.length === 0 ? 'search' : 'default'}
+                />
+              </>
             )}
 
             {/* Sheet: Lixeira – listar excluídas e restaurar */}

@@ -50,15 +50,29 @@ export default function ReportsPage() {
     return () => { cancelled = true; };
   }, [userId, status]);
 
+  // Apenas meses do ano mais recente com transações (evita lista com anos antigos)
   const availableMonths = useMemo(() => {
     const set = new Set();
+    let maxYear = 0;
     transactions.forEach((t) => {
       if (t.data) {
-        const d = new Date(t.data);
-        if (!isNaN(d.getTime())) set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        const str = String(t.data).trim();
+        let d = null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) d = new Date(str);
+        else if (/^(\d{2})\/(\d{2})\/(\d{4})/.test(str)) {
+          const [, day, month, year] = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+          d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+        } else d = new Date(str);
+        if (d && !isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          if (y > maxYear) maxYear = y;
+          set.add(`${y}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        }
       }
     });
-    return Array.from(set).sort((a, b) => b.localeCompare(a));
+    const list = Array.from(set).sort((a, b) => b.localeCompare(a));
+    if (maxYear === 0) return list;
+    return list.filter((ym) => ym.startsWith(String(maxYear)));
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {

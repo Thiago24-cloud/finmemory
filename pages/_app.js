@@ -3,6 +3,7 @@ import { SessionProvider } from 'next-auth/react';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { Toaster } from 'sonner';
 import AnalyticsProvider from '../components/AnalyticsProvider';
+import ClientOnly from '../components/ClientOnly';
 import ErrorBoundary from '../components/ErrorBoundary';
 import '../styles/globals.css';
 
@@ -29,7 +30,9 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
           <Component {...pageProps} />
           <Toaster richColors position="top-center" />
         </AnalyticsProvider>
-        <SafeGoogleAnalytics />
+        <ClientOnly>
+          <SafeGoogleAnalytics />
+        </ClientOnly>
       </SessionProvider>
     </ErrorBoundary>
   );
