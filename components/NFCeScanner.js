@@ -24,7 +24,7 @@ function getDisplayDomain(url) {
 export function NFCeScanner({ userId, onSuccess, onClose }) {
   const [decodedUrl, setDecodedUrl] = useState(null);
   const [lastQrDebug, setLastQrDebug] = useState(null);
-  const { status, error, consultar, reset, isSuccess, isError } = useNFCe();
+  const { status, error, notice, consultar, reset, isSuccess, isError } = useNFCe();
 
   const handleScan = async (text) => {
     const trimmed = String(text).trim();
@@ -70,6 +70,9 @@ export function NFCeScanner({ userId, onSuccess, onClose }) {
       )}
       {isError && error && (
         <p className="text-red-600 text-sm bg-red-50 py-2 px-3 rounded-xl">{error}</p>
+      )}
+      {!isError && notice && (
+        <p className="text-amber-700 text-sm bg-amber-50 py-2 px-3 rounded-xl">{notice}</p>
       )}
       <p className="text-xs text-gray-500 font-mono break-all" aria-live="polite">
         {lastQrDebug != null ? `Debug: QR lido: ${lastQrDebug.length > 80 ? lastQrDebug.slice(0, 80) + '…' : lastQrDebug}` : 'Debug: aguardando leitura...'}

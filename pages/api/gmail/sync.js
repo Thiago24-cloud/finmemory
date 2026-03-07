@@ -180,43 +180,50 @@ export default async function handler(req, res) {
       });
     }
 
-    // Busca por termos relacionados a notas fiscais (no assunto ou corpo)
-    // Inclui busca em todas as pastas (inbox, promoções, etc.)
-    let query = 'in:anywhere (cupom OR fiscal OR nota OR NFC-e OR NF-e OR danfe OR comprovante OR recibo OR drogaria OR farmacia)';
-    
-    console.log('🔎 Query de busca:', query);
-    
-    let daysSinceSync;
-    if (firstSync || !user.last_sync) {
-      daysSinceSync = 30;
-      query += ' newer_than:30d';
-      console.log('📧 Primeira sync (ou sem last_sync): últimos 30 dias');
-    } else {
-      const lastSync = new Date(user.last_sync);
-      const rawDays = Math.ceil((now - lastSync) / (1000 * 60 * 60 * 24)) + 1;
-      daysSinceSync = Number.isFinite(rawDays) && rawDays > 0
-        ? Math.min(Math.max(1, rawDays), 90)
-        : 30;
-      query += ` newer_than:${daysSinceSync}d`;
-      console.log(`📧 Sync desde: ${daysSinceSync} dias atrás`);
-    }
+    const searchQueries = buildSearchQueries({
+      firstSync,
+      lastSync: user.last_sync,
+      now
+    });
 
     // Buscar e-mails no Gmail
     let messages = [];
+    const seenMessageIds = new Set();
+    let currentQuery = '';
     try {
-      const response = await gmail.users.messages.list({
-        userId: 'me',
-        q: query,
-        maxResults: 50
-      });
+      for (const query of searchQueries) {
+        currentQuery = query;
+        console.log(`🔎 Buscando com query: ${query}`);
+        const response = await gmail.users.messages.list({
+          userId: 'me',
+          q: query,
+          maxResults: 50,
+          includeSpamTrash: true
+        });
 
-      messages = response.data.messages || [];
+        const batch = response.data.messages || [];
+        if (batch.length === 0) {
+          continue;
+        }
+
+        for (const message of batch) {
+          if (!seenMessageIds.has(message.id)) {
+            seenMessageIds.add(message.id);
+            messages.push(message);
+          }
+        }
+
+        if (messages.length >= 50) {
+          break;
+        }
+      }
+
       console.log(`📨 ${messages.length} e-mails encontrados`);
     } catch (gmailListError) {
       const errMsg = gmailListError?.message ?? String(gmailListError);
       const errCode = gmailListError?.code ?? gmailListError?.response?.status;
       console.error('❌ Erro ao listar e-mails do Gmail:', errMsg);
-      console.error('   Code:', errCode, '| Query:', query);
+      console.error('   Code:', errCode, '| Query:', currentQuery);
       if (gmailListError?.stack) console.error('   Stack:', gmailListError.stack);
       
       // Verificar se é erro de permissão
@@ -266,14 +273,34 @@ export default async function handler(req, res) {
           format: 'full'
         });
 
-        let emailBody = extractEmailBody(emailData.data);
+        const headers = emailData.data.payload?.headers || [];
+        const subject = getHeader(headers, 'Subject');
+        const from = getHeader(headers, 'From');
+        const snippet = emailData.data.snippet || '';
+
+        const extractedBody = extractEmailBody(emailData.data);
+        let emailBody = extractedBody;
         
         if (!emailBody || emailBody.length < 50) {
+          const fallback = [subject, from, snippet].filter(Boolean).join(' ');
+          if (fallback) {
+            emailBody = fallback;
+          }
+        }
+
+        const emailContext = buildEmailContext({
+          subject,
+          from,
+          snippet,
+          body: emailBody
+        });
+
+        if (!emailContext || emailContext.length < 10) {
           console.log(`⚠️  E-mail vazio ou muito curto, pulando...`);
           continue;
         }
 
-        console.log(`📄 Corpo do e-mail extraído: ${emailBody.length} caracteres`);
+        console.log(`📄 Conteúdo do e-mail preparado: ${emailContext.length} caracteres`);
         console.log('🤖 Enviando para GPT...');
         
         let completion;
@@ -330,7 +357,7 @@ COMO ENCONTRAR O TOTAL (tente nesta ordem):
 
 Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tiver produtos com valorTotal, sempre preencha total com a soma.`
               },
-              { role: "user", content: `Extraia as informações da seguinte nota fiscal/cupom/recibo:\n\n${emailBody.substring(0, 15000)}` }
+              { role: "user", content: `Extraia as informações da seguinte nota fiscal/cupom/recibo:\n\n${emailContext.substring(0, 15000)}` }
             ],
             temperature: 0.1,
             response_format: { type: "json_object" }
@@ -350,7 +377,7 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
                     role: "system",
                     content: `Você é um especialista em extrair informações de notas fiscais brasileiras. Retorne APENAS JSON válido sem markdown, sem texto adicional. Campos obrigatórios: estabelecimento (string) e total (number > 0).`
                   },
-                  { role: "user", content: `Extraia as informações da seguinte nota fiscal:\n\n${emailBody.substring(0, 15000)}` }
+                  { role: "user", content: `Extraia as informações da seguinte nota fiscal:\n\n${emailContext.substring(0, 15000)}` }
                 ],
                 temperature: 0.1
               });
@@ -370,12 +397,18 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
 
         let notaFiscal;
         try {
-          // Remove markdown code blocks se existirem
-          let jsonStr = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-          // Remove possíveis prefixos de texto antes do JSON
-          const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            jsonStr = jsonMatch[0];
+          let jsonStr = extractJsonPayload(result);
+          if (!jsonStr) {
+            // Remove markdown code blocks se existirem
+            jsonStr = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            // Remove possíveis prefixos de texto antes do JSON
+            const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              jsonStr = jsonMatch[0];
+            }
+          }
+          if (!jsonStr) {
+            throw new Error('JSON não encontrado na resposta');
           }
           notaFiscal = JSON.parse(jsonStr);
           console.log('✅ JSON parseado com sucesso');
@@ -633,22 +666,111 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
   }
 }
 
+function buildSearchQueries({ firstSync, lastSync, now }) {
+  const timeFilter = buildTimeFilter({ firstSync, lastSync, now });
+  const keywords = [
+    '"nota fiscal"',
+    '"nota fiscal eletrônica"',
+    '"nf-e"',
+    '"nfc-e"',
+    'nfce',
+    'nfe',
+    'danfe',
+    '"cupom fiscal"',
+    '"documento auxiliar"',
+    '"chave de acesso"',
+    '"documento fiscal"',
+    'sefaz',
+    'comprovante',
+    'recibo'
+  ];
+  const keywordQuery = keywords.join(' OR ');
+
+  return [
+    `in:anywhere (${keywordQuery}) ${timeFilter}`,
+    `has:attachment filename:pdf (${keywordQuery}) ${timeFilter}`
+  ];
+}
+
+function buildTimeFilter({ firstSync, lastSync, now }) {
+  if (firstSync) {
+    console.log('📧 Primeira sync: últimos 30 dias');
+    return 'newer_than:30d';
+  }
+
+  const lastSyncDate = lastSync ? new Date(lastSync) : null;
+  if (!lastSyncDate || Number.isNaN(lastSyncDate.getTime())) {
+    console.log('📧 Sync sem data anterior, usando 30 dias');
+    return 'newer_than:30d';
+  }
+
+  const daysSinceSync = Math.max(
+    1,
+    Math.ceil((now - lastSyncDate) / (1000 * 60 * 60 * 24)) + 1
+  );
+  console.log(`📧 Sync desde: ${daysSinceSync} dias atrás`);
+  return `newer_than:${daysSinceSync}d`;
+}
+
+function buildEmailContext({ subject, from, snippet, body }) {
+  const sections = [];
+  if (subject) sections.push(`Assunto: ${subject}`);
+  if (from) sections.push(`Remetente: ${from}`);
+  if (snippet) sections.push(`Resumo: ${snippet}`);
+  if (body) sections.push(`Conteudo:\n${body}`);
+  return sections.join('\n').trim();
+}
+
+function getHeader(headers, headerName) {
+  if (!Array.isArray(headers)) return '';
+  const header = headers.find(
+    item => item.name && item.name.toLowerCase() === headerName.toLowerCase()
+  );
+  return header?.value || '';
+}
+
+function extractJsonPayload(text) {
+  if (!text) return null;
+  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  return cleaned.slice(start, end + 1);
+}
+
+function decodeBase64Url(data) {
+  if (!data) return '';
+  const normalized = data.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  return Buffer.from(padded, 'base64').toString('utf-8');
+}
+
+function decodeQuotedPrintable(text) {
+  if (!text || !text.includes('=')) return text || '';
+  return text
+    .replace(/=\r?\n/g, '')
+    .replace(/=([A-Fa-f0-9]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
 function extractEmailBody(emailData) {
   let body = '';
-  const parts = emailData.payload.parts || [emailData.payload];
-  
+  const parts = emailData.payload?.parts || [emailData.payload];
+
   for (const part of parts) {
     if (!part) continue;
-    if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
-      if (part.body?.data) {
-        body += Buffer.from(part.body.data, 'base64').toString('utf-8') + '\n';
-      }
-    }
     if (part.parts?.length) {
       body += extractEmailBody({ payload: { parts: part.parts } });
     }
+
+    const isText = part.mimeType === 'text/plain' || part.mimeType === 'text/html';
+    const isAttachment = part.filename && part.filename.length > 0;
+
+    if (isText && !isAttachment && part.body?.data) {
+      body += decodeBase64Url(part.body.data) + '\n';
+    }
   }
-  
+
+  body = decodeQuotedPrintable(body);
   body = body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
   return body.trim();
 }
