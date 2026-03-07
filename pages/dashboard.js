@@ -38,6 +38,31 @@ function getSupabase() {
   return supabaseInstance;
 }
 
+function getYearMonthKey(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}`;
+    const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}`;
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getLatestYear(monthKeys) {
+  let latest = null;
+  monthKeys.forEach((ym) => {
+    const year = parseInt(ym.split('-')[0], 10);
+    if (!Number.isNaN(year)) {
+      latest = latest === null ? year : Math.max(latest, year);
+    }
+  });
+  return latest;
+}
+
 export async function getServerSideProps(ctx) {
   try {
     const session = await getServerSession(ctx.req, ctx.res, authOptions);
@@ -664,21 +689,20 @@ export default function Dashboard() {
   const availableMonths = useMemo(() => {
     const set = new Set();
     (transactions || []).forEach((t) => {
-      if (t.data) {
-        const d = new Date(t.data);
-        if (!isNaN(d.getTime())) set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-      }
+      const ym = getYearMonthKey(t.data);
+      if (ym) set.add(ym);
     });
-    return Array.from(set).sort((a, b) => b.localeCompare(a));
+    const allMonths = Array.from(set);
+    const latestYear = getLatestYear(allMonths);
+    const filtered = latestYear ? allMonths.filter((ym) => ym.startsWith(`${latestYear}-`)) : allMonths;
+    return filtered.sort((a, b) => b.localeCompare(a));
   }, [transactions]);
 
   // Transações filtradas pelo mês selecionado
   const filteredTransactions = useMemo(() => {
     if (!selectedMonth) return transactions || [];
     return (transactions || []).filter((t) => {
-      if (!t.data) return false;
-      const d = new Date(t.data);
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const ym = getYearMonthKey(t.data);
       return ym === selectedMonth;
     });
   }, [transactions, selectedMonth]);
