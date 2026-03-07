@@ -12,6 +12,7 @@ import {
   Receipt,
   Pencil,
   Trash2,
+  Search,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getCategoryColor } from '../../lib/colors';
@@ -61,8 +62,9 @@ function formatCurrency(value) {
 /**
  * Lista de transações – dados reais do Supabase (transacoes + produtos).
  * Editar: link para /transaction/[id]/edit. Deletar: botão com confirmação, chama onDeleted após sucesso.
+ * emptyState: 'default' | 'search' – quando 'search', mostra mensagem de "nenhum resultado" em vez de "nenhuma transação ainda".
  */
-export function TransactionList({ transactions, userId, onDeleted, className }) {
+export function TransactionList({ transactions, userId, onDeleted, className, emptyState = 'default' }) {
   const [deletingId, setDeletingId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
 
@@ -88,6 +90,17 @@ export function TransactionList({ transactions, userId, onDeleted, className }) 
   };
 
   if (!transactions || transactions.length === 0) {
+    if (emptyState === 'search') {
+      return (
+        <div className={cn('text-center py-12', className)}>
+          <Search className="h-16 w-16 mx-auto text-[#999] mb-4" />
+          <h3 className="text-lg font-medium text-[#333] mb-2">Nenhum resultado</h3>
+          <p className="text-sm text-[#666]">
+            Nenhuma transação encontrada para sua busca. Tente outro termo.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className={cn('text-center py-12', className)}>
         <ShoppingBag className="h-16 w-16 mx-auto text-[#999] mb-4" />

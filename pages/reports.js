@@ -78,7 +78,28 @@ export default function ReportsPage() {
   // Apenas meses do ano mais recente com transações (evita lista com anos antigos)
   const availableMonths = useMemo(() => {
     const set = new Set();
+    let maxYear = 0;
     transactions.forEach((t) => {
+<<<<<<< HEAD
+      if (t.data) {
+        const str = String(t.data).trim();
+        let d = null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) d = new Date(str);
+        else if (/^(\d{2})\/(\d{2})\/(\d{4})/.test(str)) {
+          const [, day, month, year] = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+          d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+        } else d = new Date(str);
+        if (d && !isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          if (y > maxYear) maxYear = y;
+          set.add(`${y}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        }
+      }
+    });
+    const list = Array.from(set).sort((a, b) => b.localeCompare(a));
+    if (maxYear === 0) return list;
+    return list.filter((ym) => ym.startsWith(String(maxYear)));
+=======
       const ym = getYearMonthKey(t.data);
       if (ym) set.add(ym);
     });
@@ -86,11 +107,15 @@ export default function ReportsPage() {
     const latestYear = getLatestYear(allMonths);
     const filtered = latestYear ? allMonths.filter((ym) => ym.startsWith(`${latestYear}-`)) : allMonths;
     return filtered.sort((a, b) => b.localeCompare(a));
+>>>>>>> ddbc6b17cd3d2609d555726fed271b9a917aed55
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
     if (!selectedMonth) return transactions;
-    return transactions.filter((t) => getYearMonthKey(t.data) === selectedMonth);
+    return transactions.filter((t) => {
+      const ym = getYearMonthKey(t.data);
+      return ym === selectedMonth;
+    });
   }, [transactions, selectedMonth]);
 
   const summary = useMemo(() => {
