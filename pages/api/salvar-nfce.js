@@ -2,7 +2,7 @@
  * POST /api/salvar-nfce
  *
  * Salva a NFC-e processada na tabela transacoes (schema transacoes).
- * Body: userId, estabelecimento, cnpj, data, total, itens, category, forma_pagamento, nfce_url
+ * Body: userId, estabelecimento, endereco, cnpj, data, total, itens, category, forma_pagamento, nfce_url
  * Autenticação: session NextAuth; userId deve coincidir com session.user.supabaseId.
  */
 
@@ -41,6 +41,7 @@ export default async function handler(req, res) {
     const {
       userId,
       estabelecimento,
+      endereco,
       cnpj,
       data,
       total,
@@ -61,9 +62,13 @@ export default async function handler(req, res) {
     const nomeEstab = typeof estabelecimento === 'object' && estabelecimento?.nome
       ? estabelecimento.nome
       : (estabelecimento || '').trim();
-    if (!nomeEstab || nomeEstab.length < 2) {
-      return res.status(400).json({ success: false, error: 'Nome do estabelecimento é obrigatório' });
-    }
+    const enderecoRaw = typeof estabelecimento === 'object' && estabelecimento?.endereco
+      ? estabelecimento.endereco
+      : endereco;
+    const enderecoFinal = enderecoRaw ? String(enderecoRaw).trim() : '';
+    const nomeEstabFinal = nomeEstab && nomeEstab.length >= 2
+      ? nomeEstab
+      : 'Estabelecimento não identificado';
 
     const totalNum = total != null ? parseFloat(total) : NaN;
     if (isNaN(totalNum) || totalNum <= 0) {
@@ -86,7 +91,8 @@ export default async function handler(req, res) {
 
     const transactionData = {
       user_id: effectiveUserId,
-      estabelecimento: nomeEstab,
+      estabelecimento: nomeEstabFinal,
+      endereco: enderecoFinal || null,
       cnpj: cnpj || null,
       data: dataTransacao,
       total: totalNum,

@@ -17,11 +17,13 @@ export function useNFCe() {
   const [status, setStatus] = useState(STATUS.IDLE);
   const [nfceData, setNfceData] = useState(null);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const reset = useCallback(() => {
     setStatus(STATUS.IDLE);
     setNfceData(null);
     setError(null);
+    setNotice(null);
   }, []);
 
   const consultar = useCallback(async (url, userId) => {
@@ -31,6 +33,7 @@ export function useNFCe() {
       return null;
     }
     setError(null);
+    setNotice(null);
     setStatus(STATUS.CONSULTING);
 
     try {
@@ -43,12 +46,18 @@ export function useNFCe() {
 
       if (!res.ok) {
         setError(data.error || 'Não foi possível consultar a NFC-e');
+        setNotice(null);
         setStatus(STATUS.ERROR);
         return null;
       }
 
+      if (data.aviso) {
+        setNotice(data.aviso);
+      }
+
       const payload = {
         estabelecimento: data.estabelecimento,
+        endereco: data.endereco,
         data: data.data,
         cnpj: data.cnpj,
         total: data.total,
@@ -82,6 +91,7 @@ export function useNFCe() {
         body: JSON.stringify({
           userId,
           estabelecimento: payload.estabelecimento,
+          endereco: payload.endereco,
           cnpj: payload.cnpj,
           data: payload.data,
           total: payload.total,
@@ -104,6 +114,7 @@ export function useNFCe() {
     } catch (err) {
       console.error('useNFCe error:', err);
       setError(err.message || 'Erro ao processar NFC-e');
+      setNotice(null);
       setStatus(STATUS.ERROR);
       return null;
     }
@@ -113,6 +124,7 @@ export function useNFCe() {
     status,
     nfceData,
     error,
+    notice,
     consultar,
     reset,
     isIdle: status === STATUS.IDLE,

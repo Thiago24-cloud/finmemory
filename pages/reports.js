@@ -10,6 +10,31 @@ function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+function getYearMonthKey(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}`;
+    const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}`;
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getLatestYear(monthKeys) {
+  let latest = null;
+  monthKeys.forEach((ym) => {
+    const year = parseInt(ym.split('-')[0], 10);
+    if (!Number.isNaN(year)) {
+      latest = latest === null ? year : Math.max(latest, year);
+    }
+  });
+  return latest;
+}
+
 export default function ReportsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -53,36 +78,19 @@ export default function ReportsPage() {
   // Apenas meses do ano mais recente com transações (evita lista com anos antigos)
   const availableMonths = useMemo(() => {
     const set = new Set();
-    let maxYear = 0;
     transactions.forEach((t) => {
-      if (t.data) {
-        const str = String(t.data).trim();
-        let d = null;
-        if (/^\d{4}-\d{2}-\d{2}/.test(str)) d = new Date(str);
-        else if (/^(\d{2})\/(\d{2})\/(\d{4})/.test(str)) {
-          const [, day, month, year] = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-          d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
-        } else d = new Date(str);
-        if (d && !isNaN(d.getTime())) {
-          const y = d.getFullYear();
-          if (y > maxYear) maxYear = y;
-          set.add(`${y}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-        }
-      }
+      const ym = getYearMonthKey(t.data);
+      if (ym) set.add(ym);
     });
-    const list = Array.from(set).sort((a, b) => b.localeCompare(a));
-    if (maxYear === 0) return list;
-    return list.filter((ym) => ym.startsWith(String(maxYear)));
+    const allMonths = Array.from(set);
+    const latestYear = getLatestYear(allMonths);
+    const filtered = latestYear ? allMonths.filter((ym) => ym.startsWith(`${latestYear}-`)) : allMonths;
+    return filtered.sort((a, b) => b.localeCompare(a));
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
     if (!selectedMonth) return transactions;
-    return transactions.filter((t) => {
-      if (!t.data) return false;
-      const d = new Date(t.data);
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      return ym === selectedMonth;
-    });
+    return transactions.filter((t) => getYearMonthKey(t.data) === selectedMonth);
   }, [transactions, selectedMonth]);
 
   const summary = useMemo(() => {
