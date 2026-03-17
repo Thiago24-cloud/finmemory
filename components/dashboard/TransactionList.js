@@ -13,6 +13,7 @@ import {
   Pencil,
   Trash2,
   Search,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getCategoryColor } from '../../lib/colors';
@@ -59,14 +60,27 @@ function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+/** Compra pode ser divulgada no mapa se foi feita nos últimos 7 dias. */
+function canPublishToMap(transaction) {
+  if (!transaction?.data) return false;
+  const txDateStr = String(transaction.data).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) return false;
+  const txDate = new Date(txDateStr + 'T12:00:00Z');
+  const now = new Date();
+  const diffDays = Math.floor((now - txDate) / (24 * 60 * 60 * 1000));
+  return diffDays >= 0 && diffDays <= 7;
+}
+
 /**
  * Lista de transações – dados reais do Supabase (transacoes + produtos).
  * Editar: link para /transaction/[id]/edit. Deletar: botão com confirmação, chama onDeleted após sucesso.
  * emptyState: 'default' | 'search' – quando 'search', mostra mensagem de "nenhum resultado" em vez de "nenhuma transação ainda".
  */
-export function TransactionList({ transactions, userId, onDeleted, className, emptyState = 'default' }) {
+export function TransactionList({ transactions, userId, onDeleted, onPublishedToMap, className, emptyState = 'default' }) {
   const [deletingId, setDeletingId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [publishingId, setPublishingId] = useState(null);
+  const [publishedToMapIds, setPublishedToMapIds] = useState(new Set());
 
   const handleDelete = async (id) => {
     if (!userId || !onDeleted) return;
@@ -86,6 +100,45 @@ export function TransactionList({ transactions, userId, onDeleted, className, em
       console.error('Erro ao deletar:', e);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handlePublishToMap = async (transaction) => {
+    const id = transaction.id;
+    if (!id || publishingId) return;
+    setPublishingId(id);
+    let lat = null;
+    let lng = null;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
+        });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      }
+    } catch (_) {
+      // Sem localização; API usará geocoding do estabelecimento
+    }
+    try {
+      const res = await fetch(`/api/transactions/${id}/publish-to-map`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lat != null && lng != null ? { lat, lng } : {})
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPublishedToMapIds((prev) => new Set(prev).add(id));
+        if (typeof onPublishedToMap === 'function') onPublishedToMap(json.mapPointsAdded);
+        alert(`Pronto! ${json.mapPointsAdded || 0} preço(s) no mapa. Abra a aba Mapa e toque em "Atualizar preços" se não aparecer.`);
+      } else {
+        alert(json.error || 'Não foi possível divulgar no mapa.');
+      }
+    } catch (e) {
+      console.error('Erro ao divulgar no mapa:', e);
+      alert('Erro ao divulgar no mapa. Tente de novo.');
+    } finally {
+      setPublishingId(null);
     }
   };
 
@@ -121,7 +174,7 @@ export function TransactionList({ transactions, userId, onDeleted, className, em
         </span>
       </div>
       <p className="text-xs text-[#666] mb-4">
-        Toque em uma compra para ver <strong>preços e produtos</strong> que você pagou.
+        Toque em uma compra para ver <strong>preços e produtos</strong>. Compras dos últimos 7 dias podem ser divulgadas no mapa (ícone 🗺️). Ative a localização do site se pedir.
       </p>
 
       <div className="card-lovable overflow-hidden divide-y divide-[#e5e7eb]">
@@ -177,9 +230,33 @@ export function TransactionList({ transactions, userId, onDeleted, className, em
                 </div>
               </Link>
 
-              {/* Ações: Editar e Excluir em linha separada para não apertar no mobile */}
+              {/* Ações: Divulgar no mapa (24h), Editar e Excluir */}
               {userId && (
-                <div className="flex items-center justify-end gap-1 px-4 pb-3 pt-0">
+                <div className="flex items-center justify-end gap-1 px-4 pb-3 pt-0 flex-wrap">
+                  {canPublishToMap(transaction) && (
+                    publishedToMapIds.has(transaction.id) ? (
+                      <span className="flex items-center gap-1.5 text-xs text-[#059669] px-2.5 py-1.5" title="Já divulgado no mapa">
+                        <MapPin className="h-4 w-4" /> No mapa
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePublishToMap(transaction); }}
+                        disabled={publishingId === transaction.id}
+                        className="p-2.5 rounded-xl text-[#059669] hover:bg-[#ecfdf5] transition-colors disabled:opacity-50 flex items-center gap-1"
+                        title="Divulgar preços no mapa (compras dos últimos 7 dias)"
+                      >
+                        {publishingId === transaction.id ? (
+                          <span className="text-xs">...</span>
+                        ) : (
+                          <>
+                            <MapPin className="h-4 w-4" />
+                            <span className="text-xs font-medium">Mapa</span>
+                          </>
+                        )}
+                      </button>
+                    )
+                  )}
                   <Link
                     href={`/transaction/${transaction.id}/edit`}
                     className="p-2.5 rounded-xl text-[#666] hover:bg-[#e5e7eb] hover:text-[#333] transition-colors"

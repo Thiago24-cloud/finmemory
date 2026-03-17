@@ -213,27 +213,27 @@ export default function TransactionDetailPage() {
               Preços e produtos que você pagou
             </h2>
             {produtos.length > 0 ? (
-              <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
-                <table className="w-full text-sm">
+              <div className="rounded-xl border border-border overflow-x-auto bg-muted/30 -mx-1 px-1">
+                <table className="w-full text-sm min-w-[320px]">
                   <thead>
                     <tr className="bg-muted/50">
-                      <th className="text-left p-3 font-semibold text-foreground">Produto</th>
-                      <th className="text-center p-3 font-semibold text-foreground w-16">Qtd</th>
-                      <th className="text-right p-3 font-semibold text-foreground w-24">Unit.</th>
-                      <th className="text-right p-3 font-semibold text-foreground w-24">Total</th>
+                      <th className="text-left p-3 font-semibold text-foreground min-w-0">Produto</th>
+                      <th className="text-center p-3 font-semibold text-foreground w-16 shrink-0">Qtd</th>
+                      <th className="text-right p-3 font-semibold text-foreground min-w-[5rem] shrink-0">Unit.</th>
+                      <th className="text-right p-3 font-semibold text-foreground min-w-[5rem] shrink-0">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {produtos.map((produto) => (
                       <tr key={produto.id} className="border-t border-border">
-                        <td className="p-3 font-medium text-foreground">{produto.descricao}</td>
-                        <td className="p-3 text-center text-muted-foreground">
+                        <td className="p-3 font-medium text-foreground min-w-0 break-words">{produto.descricao}</td>
+                        <td className="p-3 text-center text-muted-foreground shrink-0 whitespace-nowrap">
                           {(Number(produto.quantidade) || 0).toFixed(0)} {produto.unidade || 'UN'}
                         </td>
-                        <td className="p-3 text-right text-muted-foreground">
+                        <td className="p-3 text-right text-muted-foreground shrink-0 whitespace-nowrap">
                           {formatCurrency(produto.valor_unitario)}
                         </td>
-                        <td className="p-3 text-right font-semibold text-foreground">
+                        <td className="p-3 text-right font-semibold text-foreground shrink-0 whitespace-nowrap">
                           {formatCurrency(produto.valor_total)}
                         </td>
                       </tr>
