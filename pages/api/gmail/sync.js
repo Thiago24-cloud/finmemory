@@ -699,8 +699,27 @@ const RECEIPT_KEYWORDS = [
 const MAX_MESSAGES_PER_QUERY = 200;
 const MAX_RESULTS_PER_PAGE = 100;
 
+/** Retorna data no formato YYYY/MM/DD para o operador after: do Gmail (mesma janela de tempo do buildTimeFilter). */
+function buildDateFilterForAfter({ firstSync, lastSync, now }) {
+  let daysAgo = FIRST_SYNC_DAYS;
+  if (!firstSync && lastSync) {
+    const lastSyncDate = new Date(lastSync);
+    if (!Number.isNaN(lastSyncDate.getTime())) {
+      daysAgo = Math.max(1, Math.ceil((now - lastSyncDate) / (1000 * 60 * 60 * 24)) + 1);
+      if (daysAgo > MAX_INCREMENTAL_DAYS) daysAgo = MAX_INCREMENTAL_DAYS;
+    }
+  }
+  const date = new Date(now);
+  date.setDate(date.getDate() - daysAgo);
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${y}/${m}/${d}`;
+}
+
 function buildSearchQueries({ firstSync, lastSync, now }) {
   const timeFilter = buildTimeFilter({ firstSync, lastSync, now });
+  const dateFilter = buildDateFilterForAfter({ firstSync, lastSync, now });
   const keywordQuery = RECEIPT_KEYWORDS.join(' OR ');
 
   return [
@@ -708,7 +727,9 @@ function buildSearchQueries({ firstSync, lastSync, now }) {
     `in:anywhere (${keywordQuery}) ${timeFilter}`,
     `has:attachment (filename:pdf OR filename:xml) (${keywordQuery}) ${timeFilter}`,
     `subject:nota subject:fiscal ${timeFilter}`,
-    `subject:nfce OR subject:nfe ${timeFilter}`
+    `subject:nfce OR subject:nfe ${timeFilter}`,
+    `label:CATEGORY_PURCHASES after:${dateFilter}`,
+    `label:CATEGORY_PROMOTIONS after:${dateFilter}`
   ];
 }
 
