@@ -186,7 +186,7 @@ export default async function handler(req, res) {
       now
     });
 
-    // Buscar e-mails no Gmail
+    // Buscar e-mails no Gmail (com paginação)
     let messages = [];
     const seenMessageIds = new Set();
     let currentQuery = '';
@@ -194,28 +194,34 @@ export default async function handler(req, res) {
       for (const query of searchQueries) {
         currentQuery = query;
         console.log(`🔎 Buscando com query: ${query}`);
-        const response = await gmail.users.messages.list({
-          userId: 'me',
-          q: query,
-          maxResults: 50,
-          includeSpamTrash: true
-        });
+        let pageToken = null;
+        let collectedForQuery = 0;
 
-        const batch = response.data.messages || [];
-        if (batch.length === 0) {
-          continue;
-        }
+        do {
+          const response = await gmail.users.messages.list({
+            userId: 'me',
+            q: query,
+            maxResults: MAX_RESULTS_PER_PAGE,
+            pageToken: pageToken || undefined,
+            includeSpamTrash: true
+          });
 
-        for (const message of batch) {
-          if (!seenMessageIds.has(message.id)) {
-            seenMessageIds.add(message.id);
-            messages.push(message);
+          const batch = response.data.messages || [];
+          pageToken = response.data.nextPageToken || null;
+
+          for (const message of batch) {
+            if (!seenMessageIds.has(message.id)) {
+              seenMessageIds.add(message.id);
+              messages.push(message);
+              collectedForQuery++;
+            }
           }
-        }
 
-        if (messages.length >= 50) {
-          break;
-        }
+          if (batch.length < MAX_RESULTS_PER_PAGE || !pageToken) break;
+          if (collectedForQuery >= MAX_MESSAGES_PER_QUERY) break;
+        } while (pageToken);
+
+        if (messages.length >= MAX_MESSAGES_PER_QUERY * 2) break;
       }
 
       console.log(`📨 ${messages.length} e-mails encontrados`);
@@ -666,49 +672,71 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
   }
 }
 
+/** Termos de busca para notas fiscais / comprovantes (Gmail). */
+const RECEIPT_KEYWORDS = [
+  '"nota fiscal"',
+  '"nota fiscal eletrônica"',
+  '"nota fiscal de compra"',
+  '"nf-e"',
+  '"nfc-e"',
+  'nfce',
+  'nfe',
+  'danfe',
+  '"cupom fiscal"',
+  '"recibo de compra"',
+  '"comprovante de compra"',
+  '"documento auxiliar"',
+  '"chave de acesso"',
+  '"documento fiscal"',
+  'sefaz',
+  'comprovante',
+  'recibo',
+  '"xml nfe"',
+  '"nota fiscal consumidor"',
+  'cnf'
+];
+
+const MAX_MESSAGES_PER_QUERY = 200;
+const MAX_RESULTS_PER_PAGE = 100;
+
 function buildSearchQueries({ firstSync, lastSync, now }) {
   const timeFilter = buildTimeFilter({ firstSync, lastSync, now });
-  const keywords = [
-    '"nota fiscal"',
-    '"nota fiscal eletrônica"',
-    '"nf-e"',
-    '"nfc-e"',
-    'nfce',
-    'nfe',
-    'danfe',
-    '"cupom fiscal"',
-    '"documento auxiliar"',
-    '"chave de acesso"',
-    '"documento fiscal"',
-    'sefaz',
-    'comprovante',
-    'recibo'
-  ];
-  const keywordQuery = keywords.join(' OR ');
+  const keywordQuery = RECEIPT_KEYWORDS.join(' OR ');
 
   return [
+    `in:inbox (${keywordQuery}) ${timeFilter}`,
     `in:anywhere (${keywordQuery}) ${timeFilter}`,
-    `has:attachment filename:pdf (${keywordQuery}) ${timeFilter}`
+    `has:attachment (filename:pdf OR filename:xml) (${keywordQuery}) ${timeFilter}`,
+    `subject:nota subject:fiscal ${timeFilter}`,
+    `subject:nfce OR subject:nfe ${timeFilter}`
   ];
 }
 
+const FIRST_SYNC_DAYS = 90;
+const MAX_INCREMENTAL_DAYS = 90;
+
 function buildTimeFilter({ firstSync, lastSync, now }) {
   if (firstSync) {
-    console.log('📧 Primeira sync: últimos 30 dias');
-    return 'newer_than:30d';
+    console.log(`📧 Primeira sync: últimos ${FIRST_SYNC_DAYS} dias`);
+    return `newer_than:${FIRST_SYNC_DAYS}d`;
   }
 
   const lastSyncDate = lastSync ? new Date(lastSync) : null;
   if (!lastSyncDate || Number.isNaN(lastSyncDate.getTime())) {
-    console.log('📧 Sync sem data anterior, usando 30 dias');
-    return 'newer_than:30d';
+    console.log(`📧 Sync sem data anterior, usando ${FIRST_SYNC_DAYS} dias`);
+    return `newer_than:${FIRST_SYNC_DAYS}d`;
   }
 
-  const daysSinceSync = Math.max(
+  let daysSinceSync = Math.max(
     1,
     Math.ceil((now - lastSyncDate) / (1000 * 60 * 60 * 24)) + 1
   );
-  console.log(`📧 Sync desde: ${daysSinceSync} dias atrás`);
+  if (daysSinceSync > MAX_INCREMENTAL_DAYS) {
+    daysSinceSync = MAX_INCREMENTAL_DAYS;
+    console.log(`📧 Sync limitada a ${MAX_INCREMENTAL_DAYS} dias`);
+  } else {
+    console.log(`📧 Sync desde: ${daysSinceSync} dias atrás`);
+  }
   return `newer_than:${daysSinceSync}d`;
 }
 
