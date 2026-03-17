@@ -326,14 +326,15 @@ REGRA CRÍTICA — O QUE NÃO É COMPRA (retorne "erro": "E-mail é promoção o
 - E-mails que só convidam a pagar, sem confirmar que o pagamento foi feito
 
 O QUE É COMPRA (extraia normalmente):
+- "Pagamento Confirmado" + "Total do pedido: R$ X" + "Pagamento feito com: Pix/Cartão" = SEMPRE é compra (ex.: Amazon). Extraia estabelecimento "Amazon" ou "Amazon.com.br", total = valor do "Total do pedido", data do "Realizado em".
 - "Pagamento feito com: Pix/Cartão", "Total pago", "Sua compra foi realizada"
-- Amazon: "Resumo do pedido", "Total do pedido: R$ X", "Pagamento feito com: Pix" = compra realizada
+- Amazon: "Resumo do pedido" com "Total do pedido: R$ X" e "Pagamento feito com: Pix" = compra realizada
 - NF-e, NFC-e, cupom fiscal, recibo de compra com valor total e/ou lista de itens pagos
 - Qualquer e-mail que CONFIRME que um pagamento já foi efetuado (valor + estabelecimento)
 
 CAMPOS: estabelecimento (string), total (number > 0). Opcionais: cnpj, endereco, cidade, estado, data, hora, formaPagamento, produtos[], descontos, subtotal, numeroNota, chaveAcesso.
 
-Para TOTAL: use "Total do pedido", "Total pago", "Valor total", ou soma dos produtos. Em confirmação Amazon/Marketplace: use o "Total do pedido" ou "Total" indicado como valor pago.
+Para TOTAL: use "Total do pedido", "Total pago", "Valor total", ou soma dos produtos. Em confirmação Amazon: o valor que aparece em "Total do pedido: R$38,90" é o total (use 38.9).
 
 Se o e-mail for claramente promoção/lembrete/anúncio (e não comprovante de compra já feita), retorne: {"erro": "E-mail é promoção ou lembrete, não comprovante de compra.", "estabelecimento": null, "total": null, "produtos": []}.`
               },
@@ -517,6 +518,22 @@ Se o e-mail for claramente promoção/lembrete/anúncio (e não comprovante de c
               totalValue = parseFloat(cleaned);
             } else {
               totalValue = parseFloat(notaFiscal.subtotal);
+            }
+          }
+        }
+
+        // Fallback: e-mail tipo Amazon "Pagamento Confirmado" + "Total do pedido: R$ X" — extrair total do texto
+        if ((!totalValue || isNaN(totalValue) || totalValue <= 0) && emailContext && /Pagamento Confirmado/i.test(emailContext) && /Total do pedido/i.test(emailContext)) {
+          const match = emailContext.match(/Total do pedido:\s*R\$\s*([\d.,]+)/i) || emailContext.match(/Total do pedido[:\s]+([\d.,]+)/i);
+          if (match) {
+            const num = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(num) && num > 0) {
+              totalValue = num;
+              notaFiscal.total = totalValue;
+              if (!notaFiscal.estabelecimento || !notaFiscal.estabelecimento.trim()) {
+                notaFiscal.estabelecimento = /Amazon/i.test(emailContext) ? 'Amazon.com.br' : 'Amazon';
+              }
+              console.log('✅ Total e estabelecimento recuperados do texto (formato Amazon):', totalValue, notaFiscal.estabelecimento);
             }
           }
         }
