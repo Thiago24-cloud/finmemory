@@ -317,53 +317,27 @@ export default async function handler(req, res) {
             messages: [
               {
                 role: "system",
-                content: `Você é um especialista em extrair informações de notas fiscais brasileiras (NF-e, NFC-e, cupons fiscais, recibos).
+                content: `Você extrai dados APENAS de comprovantes de COMPRA JÁ REALIZADA (recibo, nota fiscal, confirmação de pedido pago). Retorne APENAS JSON válido, sem markdown.
 
-IMPORTANTE: Retorne APENAS um JSON válido, sem markdown, sem texto adicional antes ou depois.
+REGRA CRÍTICA — O QUE NÃO É COMPRA (retorne "erro": "E-mail é promoção ou lembrete, não comprovante de compra." e total: null):
+- Anúncios de assinatura ("Assine o Premium", "Garantir oferta", "12x de R$")
+- Lembretes de vencimento ("sua assinatura vai vencer", "Renovar assinatura")
+- Promoções e ofertas ("50% off", "7 dias grátis", "Teste grátis", "Recomendações para você")
+- E-mails que só convidam a pagar, sem confirmar que o pagamento foi feito
 
-CAMPOS OBRIGATÓRIOS (não pode faltar):
-- estabelecimento: Nome da loja/empresa (string, obrigatório)
-- total: Valor total da compra (number, obrigatório, sempre > 0)
+O QUE É COMPRA (extraia normalmente):
+- "Pagamento feito com: Pix/Cartão", "Total pago", "Sua compra foi realizada"
+- Amazon: "Resumo do pedido", "Total do pedido: R$ X", "Pagamento feito com: Pix" = compra realizada
+- NF-e, NFC-e, cupom fiscal, recibo de compra com valor total e/ou lista de itens pagos
+- Qualquer e-mail que CONFIRME que um pagamento já foi efetuado (valor + estabelecimento)
 
-CAMPOS OPCIONAIS (pode ser null se não encontrar):
-- cnpj, endereco, cidade, estado, data, hora, formaPagamento, descontos, subtotal, numeroNota, chaveAcesso, produtos
+CAMPOS: estabelecimento (string), total (number > 0). Opcionais: cnpj, endereco, cidade, estado, data, hora, formaPagamento, produtos[], descontos, subtotal, numeroNota, chaveAcesso.
 
-FORMATO DO JSON (use null para campos não encontrados):
-{
-  "estabelecimento": "Nome da Loja",
-  "cnpj": "12.345.678/0001-90" ou null,
-  "endereco": "Rua, número" ou null,
-  "cidade": "Cidade" ou null,
-  "estado": "UF" ou null,
-  "data": "YYYY-MM-DD" ou null,
-  "hora": "HH:MM:SS" ou null,
-  "total": 50.99,
-  "formaPagamento": "Cartão/Dinheiro/PIX" ou null,
-  "produtos": [
-    {
-      "codigo": "123" ou null,
-      "descricao": "Nome do produto",
-      "quantidade": 2.0,
-      "unidade": "UN" ou "KG" ou "L",
-      "valorUnitario": 25.50,
-      "valorTotal": 51.00
-    }
-  ] ou [],
-  "descontos": 0.00 ou null,
-  "subtotal": 50.99 ou null,
-  "numeroNota": "123456" ou null,
-  "chaveAcesso": "chave" ou null
-}
+Para TOTAL: use "Total do pedido", "Total pago", "Valor total", ou soma dos produtos. Em confirmação Amazon/Marketplace: use o "Total do pedido" ou "Total" indicado como valor pago.
 
-COMO ENCONTRAR O TOTAL (tente nesta ordem):
-1. Linhas com "TOTAL", "Total a pagar", "Valor total", "Total geral", "Total R$"
-2. Último valor em reais no final do cupom/recibo (geralmente é o total)
-3. Se houver lista de produtos com valorTotal, some todos os valorTotal e use como "total"
-4. Campo "subtotal" ou "total" em qualquer formato (ex: "R$ 50,99" ou 50.99)
-
-Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tiver produtos com valorTotal, sempre preencha total com a soma.`
+Se o e-mail for claramente promoção/lembrete/anúncio (e não comprovante de compra já feita), retorne: {"erro": "E-mail é promoção ou lembrete, não comprovante de compra.", "estabelecimento": null, "total": null, "produtos": []}.`
               },
-              { role: "user", content: `Extraia as informações da seguinte nota fiscal/cupom/recibo:\n\n${emailContext.substring(0, 15000)}` }
+              { role: "user", content: `O conteúdo abaixo é de um e-mail. Extraia como compra SOMENTE se for comprovante de compra já realizada (recibo/confirmação de pagamento). Se for anúncio, oferta ou lembrete de renovação, retorne erro.\n\n${emailContext.substring(0, 15000)}` }
             ],
             temperature: 0.1,
             response_format: { type: "json_object" }
@@ -381,9 +355,9 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
                 messages: [
                   {
                     role: "system",
-                    content: `Você é um especialista em extrair informações de notas fiscais brasileiras. Retorne APENAS JSON válido sem markdown, sem texto adicional. Campos obrigatórios: estabelecimento (string) e total (number > 0).`
+                    content: `Extraia dados só de COMPROVANTES de compra já realizada (recibo, confirmação de pagamento). NÃO extraia anúncios, promoções ou lembretes de renovação — para esses retorne {"erro": "Promoção ou lembrete, não comprovante.", "total": null}. Campos: estabelecimento (string), total (number > 0). Amazon: use "Total do pedido" e "Pagamento feito com" como compra realizada.`
                   },
-                  { role: "user", content: `Extraia as informações da seguinte nota fiscal:\n\n${emailContext.substring(0, 15000)}` }
+                  { role: "user", content: `Extraia como compra só se for comprovante/recibo de compra já feita:\n\n${emailContext.substring(0, 15000)}` }
                 ],
                 temperature: 0.1
               });
@@ -419,8 +393,9 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
           notaFiscal = JSON.parse(jsonStr);
           console.log('✅ JSON parseado com sucesso');
 
-          // Quando GPT não retorna "erro" mas veio sem total/produtos/subtotal, tratar como extração falha e tentar último recurso no texto
-          const hasNoTotal = (notaFiscal.total == null || notaFiscal.total === '') && (!notaFiscal.produtos || notaFiscal.produtos.length === 0) && (notaFiscal.subtotal == null || notaFiscal.subtotal === '');
+          // Quando GPT não retorna "erro" mas veio sem total (null, vazio ou 0) e sem produtos para somar, tentar último valor R$ no texto
+          const totalFaltando = notaFiscal.total == null || notaFiscal.total === '' || (typeof notaFiscal.total === 'number' && (isNaN(notaFiscal.total) || notaFiscal.total <= 0));
+          const hasNoTotal = totalFaltando && (!notaFiscal.produtos || notaFiscal.produtos.length === 0) && (notaFiscal.subtotal == null || notaFiscal.subtotal === '');
           if (hasNoTotal && !notaFiscal?.erro) {
             const lastBrl = result.match(/R\$\s*[\d.]*,\d{2}/g);
             if (lastBrl && lastBrl.length > 0) {
@@ -468,6 +443,19 @@ Só use "erro" se realmente não houver nenhum valor de compra no texto. Se tive
               console.log(`⏭️  GPT não conseguiu extrair dados deste e-mail: ${notaFiscal.erro}`);
               skipped++;
               continue;
+            }
+          }
+
+          // Total zerado/ausente mas temos produtos com valorTotal? Usar a soma (ex.: SHEIN, comprovantes da aba Compras)
+          const currentTotal = notaFiscal.total != null ? parseFloat(notaFiscal.total) : NaN;
+          if ((!notaFiscal.total || isNaN(currentTotal) || currentTotal <= 0) && Array.isArray(notaFiscal.produtos) && notaFiscal.produtos.length > 0) {
+            const soma = notaFiscal.produtos.reduce((acc, p) => {
+              const v = p.valorTotal != null ? parseFloat(String(p.valorTotal).replace(/\./g, '').replace(',', '.')) : 0;
+              return acc + (isNaN(v) ? 0 : v);
+            }, 0);
+            if (soma > 0) {
+              notaFiscal.total = Math.round(soma * 100) / 100;
+              console.log('✅ Total recuperado pela soma dos produtos (total estava 0 ou ausente):', notaFiscal.total);
             }
           }
 
