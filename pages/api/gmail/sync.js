@@ -712,8 +712,8 @@ function buildDateFilterForAfter({ firstSync, lastSync, now }) {
   const date = new Date(now);
   date.setDate(date.getDate() - daysAgo);
   const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
   return `${y}/${m}/${d}`;
 }
 
@@ -723,13 +723,14 @@ function buildSearchQueries({ firstSync, lastSync, now }) {
   const keywordQuery = RECEIPT_KEYWORDS.join(' OR ');
 
   return [
+    // Aba Compras e Promoções primeiro (sintaxe do Gmail: category:purchases / category:promotions)
+    `category:purchases after:${dateFilter}`,
+    `category:promotions after:${dateFilter}`,
     `in:inbox (${keywordQuery}) ${timeFilter}`,
     `in:anywhere (${keywordQuery}) ${timeFilter}`,
     `has:attachment (filename:pdf OR filename:xml) (${keywordQuery}) ${timeFilter}`,
     `subject:nota subject:fiscal ${timeFilter}`,
-    `subject:nfce OR subject:nfe ${timeFilter}`,
-    `label:CATEGORY_PURCHASES after:${dateFilter}`,
-    `label:CATEGORY_PROMOTIONS after:${dateFilter}`
+    `subject:nfce OR subject:nfe ${timeFilter}`
   ];
 }
 
