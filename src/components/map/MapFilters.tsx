@@ -28,10 +28,10 @@ const MapFilters = ({
         <Tabs value={period} onValueChange={(v) => onPeriodChange(v as "current" | "past")}>
           <TabsList className="bg-card/90 backdrop-blur shadow-md">
             <TabsTrigger value="current" className="text-xs data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
-              🟢 Este Mês
+              🟢 Últimas 24h
             </TabsTrigger>
             <TabsTrigger value="past" className="text-xs data-[state=active]:bg-muted-foreground data-[state=active]:text-card">
-              🔘 Anteriores
+              🔘 Expirados (somem após 24h)
             </TabsTrigger>
           </TabsList>
         </Tabs>

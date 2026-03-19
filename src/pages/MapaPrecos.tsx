@@ -20,9 +20,7 @@ interface PricePoint {
 }
 
 const MAP_STYLES = [
-  { label: "Claro", url: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json" },
-  { label: "Ruas", url: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" },
-  { label: "Escuro", url: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" },
+  { label: "Verde", url: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" },
 ];
 
 function timeAgo(dateStr: string) {
@@ -75,12 +73,16 @@ const MapaPrecos = () => {
 
   // Filter by period, search, category
   const filtered = useMemo(() => {
-    const monthStart = getCurrentMonthStart();
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     return points.filter((p) => {
       const pointDate = new Date(p.created_at);
-      const isPeriodMatch =
-        period === "current" ? pointDate >= monthStart : pointDate < monthStart;
-      if (!isPeriodMatch) return false;
+      // TTL: pontos que passaram de 24h devem sumir do mapa.
+      // Mantemos a aba "past" para compatibilidade, mas ela não terá itens.
+      if (period === "current") {
+        if (pointDate < cutoff) return false;
+      } else {
+        return false;
+      }
 
       const matchesCategory = selectedCategory === "Todos" || p.category === selectedCategory;
       if (!matchesCategory) return false;
@@ -208,7 +210,7 @@ const MapaPrecos = () => {
 
         {/* Count badge */}
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-[11px] text-muted-foreground bg-card/80 backdrop-blur px-3 py-1 rounded-full z-10 shadow-sm">
-          {filtered.length} preço{filtered.length !== 1 ? "s" : ""} · {period === "current" ? "este mês" : "meses anteriores"}
+          {filtered.length} preço{filtered.length !== 1 ? "s" : ""} · {period === "current" ? "últimas 24h" : "expirados"}
         </div>
 
         {/* FAB */}
