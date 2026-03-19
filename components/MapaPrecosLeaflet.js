@@ -134,6 +134,20 @@ function StoreMarkers() {
               <h3 className="font-bold text-gray-900 text-sm mt-1">{store.name}</h3>
               {store.address && <p className="text-xs text-gray-600 mt-0.5">{store.address}</p>}
               {store.neighborhood && <p className="text-xs text-gray-500">{store.neighborhood}</p>}
+              {store.tem_oferta_hoje && (
+                <div className="mt-2">
+                  <p className="text-xs font-semibold text-amber-700">
+                    Ofertas ativas: {store.offer_count || 0}
+                  </p>
+                  {Array.isArray(store.offer_products) && store.offer_products.length > 0 && (
+                    <ul className="mt-1 space-y-1 text-xs text-gray-700 pl-4 list-disc">
+                      {store.offer_products.map((prod, i) => (
+                        <li key={`${store.id}-offer-${i}`}>{prod}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </Popup>
         </Marker>

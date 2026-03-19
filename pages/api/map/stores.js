@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     // (MVP: não depende de nova coluna no schema; usa created_at + categoria).
     const { data: promoPoints, error: promoErr } = await supabase
       .from('price_points')
-      .select('lat,lng,category,store_name,created_at')
+      .select('lat,lng,category,store_name,product_name,created_at')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
       .gte('created_at', cutoffIso)
@@ -112,6 +112,19 @@ export default async function handler(req, res) {
 
     const storesBase = data || [];
     const storeOfferMap = new Map(storesBase.map((s) => [s.id, false]));
+    const storeOfferCountMap = new Map(storesBase.map((s) => [s.id, 0]));
+    const storeOfferProductsMap = new Map(storesBase.map((s) => [s.id, []]));
+
+    const attachOffer = (storeId, productName) => {
+      storeOfferMap.set(storeId, true);
+      storeOfferCountMap.set(storeId, (storeOfferCountMap.get(storeId) || 0) + 1);
+      const current = storeOfferProductsMap.get(storeId) || [];
+      const prod = String(productName || '').trim();
+      if (prod && !current.includes(prod) && current.length < 6) {
+        current.push(prod);
+        storeOfferProductsMap.set(storeId, current);
+      }
+    };
 
     // Ativa tem_oferta_hoje se existir pelo menos 1 ponto promocional recente próximo da loja.
     const points = (promoPoints || []).filter((p) => p && p.lat != null && p.lng != null && isPromoCategory(p.category));
@@ -126,7 +139,7 @@ export default async function handler(req, res) {
       if (pStoreName) {
         for (const s of storesBase) {
           if (String(s.name || '').toLowerCase() === pStoreName) {
-            storeOfferMap.set(s.id, true);
+            attachOffer(s.id, p.product_name);
             matched = true;
             break;
           }
@@ -141,7 +154,7 @@ export default async function handler(req, res) {
         if (Number.isNaN(sLat) || Number.isNaN(sLng)) continue;
         const d = distanceKm(sLat, sLng, pLat, pLng);
         if (d <= promoThresholdKm) {
-          storeOfferMap.set(s.id, true);
+          attachOffer(s.id, p.product_name);
           break;
         }
       }
@@ -156,7 +169,9 @@ export default async function handler(req, res) {
         lat: s.lat,
         lng: s.lng,
         neighborhood: s.neighborhood,
-        tem_oferta_hoje: !!storeOfferMap.get(s.id)
+        tem_oferta_hoje: !!storeOfferMap.get(s.id),
+        offer_count: storeOfferCountMap.get(s.id) || 0,
+        offer_products: storeOfferProductsMap.get(s.id) || []
       }));
       return res.status(200).json({ stores });
     }
@@ -172,6 +187,8 @@ export default async function handler(req, res) {
         lng: s.lng,
         neighborhood: s.neighborhood,
         tem_oferta_hoje: !!storeOfferMap.get(s.id),
+        offer_count: storeOfferCountMap.get(s.id) || 0,
+        offer_products: storeOfferProductsMap.get(s.id) || [],
         distance_km: distanceKm(lat, lng, s.lat, s.lng)
       }))
       .filter((s) => s.distance_km <= radiusKm)
