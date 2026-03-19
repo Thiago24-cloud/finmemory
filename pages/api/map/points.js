@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
+import { geocodeAddress } from '../../../lib/geocode';
 
 /**
  * GET /api/map/points - lista pontos do mapa.
@@ -61,17 +62,28 @@ export default async function handler(req, res) {
     if (!store_name || typeof store_name !== 'string' || !store_name.trim()) {
       return res.status(400).json({ error: 'Informe o nome da loja.' });
     }
-    const latNum = parseFloat(lat);
-    const lngNum = parseFloat(lng);
+    const storeNameStr = String(store_name).trim();
+    // Priorizar o endereço da loja (onde o preço foi visto), não a localização de quem divulgou
+    let latNum = NaN;
+    let lngNum = NaN;
+    const coordsFromGeocode = await geocodeAddress(`${storeNameStr}, Brasil`) || await geocodeAddress(`${storeNameStr}, São Paulo, Brasil`);
+    if (coordsFromGeocode && coordsFromGeocode.lat != null && coordsFromGeocode.lng != null) {
+      latNum = coordsFromGeocode.lat;
+      lngNum = coordsFromGeocode.lng;
+    }
     if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
-      return res.status(400).json({ error: 'Ative a localização para compartilhar no mapa.' });
+      latNum = parseFloat(lat);
+      lngNum = parseFloat(lng);
+    }
+    if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+      return res.status(400).json({ error: 'Não foi possível localizar a loja. Informe o endereço completo ou ative a localização.' });
     }
     try {
       const { error: insertErr } = await supabase.from('price_points').insert({
         user_id: userId,
         product_name: String(product_name).trim(),
         price: parseFloat(price),
-        store_name: String(store_name).trim(),
+        store_name: storeNameStr,
         lat: latNum,
         lng: lngNum,
         category: category && String(category).trim() ? String(category).trim() : null
@@ -93,11 +105,17 @@ export default async function handler(req, res) {
 
   try {
     const q = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
+    // TTL do mapa: qualquer ponto publicado com mais de 24h deve sumir.
+    const ttlHours = 24;
+    const cutoff = new Date(Date.now() - ttlHours * 60 * 60 * 1000);
+    const cutoffIso = cutoff.toISOString();
+
     let query = supabase
       .from('price_points')
       .select('id, product_name, price, store_name, lat, lng, category, created_at, user_id')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+      .gte('created_at', cutoffIso)
       .order('created_at', { ascending: false })
       .limit(500);
 

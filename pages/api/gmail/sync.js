@@ -574,10 +574,49 @@ Se o e-mail for claramente promoção/lembrete/anúncio (e não comprovante de c
             dataTransacao = new Date().toISOString().slice(0, 10);
           }
         }
-        if (typeof dataTransacao === 'object' && dataTransacao instanceof Date) {
-          dataTransacao = dataTransacao.toISOString().slice(0, 10);
-        } else if (typeof dataTransacao === 'string' && dataTransacao.length > 10) {
-          dataTransacao = dataTransacao.slice(0, 10);
+        // Normaliza datas para YYYY-MM-DD (evita erro "datestyle" quando GPT retorna dd/mm/yyyy)
+        const normalizeToISODate = (val) => {
+          if (!val) return null;
+          if (val instanceof Date) {
+            const iso = val.toISOString().slice(0, 10);
+            return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+          }
+          if (typeof val !== 'string') return null;
+          const s = val.trim();
+          // Já está em YYYY-MM-DD...
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+          // dd/MM/yyyy ou dd-MM-yyyy (alguns GPTs retornam assim)
+          const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+          if (m) {
+            const dd = m[1];
+            const mm = m[2];
+            const yyyy = m[3];
+            const iso = `${yyyy}-${mm}-${dd}`;
+            return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+          }
+          // Se vier com time (ex.: 18/03/2026 17:32), tenta extrair dd/MM/yyyy do começo
+          const m2 = s.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+          if (m2) {
+            const dd = m2[1];
+            const mm = m2[2];
+            const yyyy = m2[3];
+            const iso = `${yyyy}-${mm}-${dd}`;
+            return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+          }
+          // Último recurso: corta os primeiros 10 caracteres (para strings como "2026-03-19T...")
+          if (s.length > 10) {
+            const iso = s.slice(0, 10);
+            return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+          }
+          return null;
+        };
+
+        const normalized = normalizeToISODate(dataTransacao);
+        if (!normalized) {
+          const fallback = new Date().toISOString().slice(0, 10);
+          dataTransacao = fallback;
+        } else {
+          dataTransacao = normalized;
         }
 
         const { data: transaction, error: transError } = await supabase

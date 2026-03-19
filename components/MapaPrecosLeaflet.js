@@ -58,8 +58,8 @@ function storeTypeColor(type) {
 }
 
 /** Ícones por tipo de estabelecimento (estilo Google Maps: cesta, cruz, garfo, etc.) */
-function createStoreIcon(type) {
-  const bg = storeTypeColor(type);
+function createStoreIcon(type, temOfertaHoje = false) {
+  const bg = temOfertaHoje ? '#F59E0B' : storeTypeColor(type);
   const t = String(type || '').toLowerCase();
   let svg = '';
   if (t === 'supermarket') {
@@ -121,11 +121,14 @@ function StoreMarkers() {
         <Marker
           key={store.id}
           position={[Number(store.lat), Number(store.lng)]}
-          icon={createStoreIcon(store.type)}
+          icon={createStoreIcon(store.type, !!store.tem_oferta_hoje)}
         >
           <Popup>
             <div className="p-2 min-w-[180px]">
-              <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold text-white mb-1" style={{ backgroundColor: storeTypeColor(store.type) }}>
+              <span
+                className="inline-block px-2 py-0.5 rounded text-xs font-semibold text-white mb-1"
+                style={{ backgroundColor: store.tem_oferta_hoje ? '#F59E0B' : storeTypeColor(store.type) }}
+              >
                 {storeTypeLabel(store.type)}
               </span>
               <h3 className="font-bold text-gray-900 text-sm mt-1">{store.name}</h3>
