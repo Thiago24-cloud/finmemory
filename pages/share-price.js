@@ -21,13 +21,39 @@ export default function SharePricePage() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [nearbyStores, setNearbyStores] = useState([]);
 
+  // Pré-preencher loja e categoria quando vier do mapa (geo-fencing: /share-price?store=Nome&category=Supermercado)
   useEffect(() => {
-    getLocation();
-  }, []);
+    if (!router.isReady) return;
+    const q = router.query;
+    if (q.store && typeof q.store === 'string') setStoreName(q.store.trim());
+    if (q.category && typeof q.category === 'string') setCategory(q.category.trim());
+  }, [router.isReady, router.query]);
+
+  // Não pedir localização ao abrir: em muitos telemóveis o browser bloqueia até o utilizador tocar
+  // Buscar lojas próximas quando tiver localização (tabela stores do populate-stores)
+  useEffect(() => {
+    if (lat == null || lng == null) {
+      setNearbyStores([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/map/stores?lat=${lat}&lng=${lng}&radius=2000`)
+      .then((res) => (res.ok ? res.json() : { stores: [] }))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.stores)) setNearbyStores(data.stores);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [lat, lng]);
 
   const getLocation = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setError('O seu navegador não suporta geolocalização. Use um browser atualizado.');
+      return;
+    }
+    setError(null);
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -35,8 +61,17 @@ export default function SharePricePage() {
         setLng(pos.coords.longitude);
         setLocating(false);
       },
-      () => setLocating(false),
-      { timeout: 5000 }
+      (err) => {
+        setLocating(false);
+        if (err.code === 1) {
+          setError('Localização bloqueada. Ative a permissão nas definições do navegador/site e toque de novo em "Usar minha localização".');
+        } else if (err.code === 3 || err.message?.includes('timeout')) {
+          setError('Tempo esgotado. Verifique se o GPS está ligado e tente novamente.');
+        } else {
+          setError('Não foi possível obter a localização. Ative o GPS e toque em "Usar minha localização".');
+        }
+      },
+      { timeout: 12000, enableHighAccuracy: true }
     );
   };
 
@@ -51,25 +86,25 @@ export default function SharePricePage() {
       setError('Preencha produto, preço e loja.');
       return;
     }
-    if (lat == null || lng == null) {
-      setError('Ative a localização para compartilhar no mapa.');
-      return;
-    }
 
     setSubmitting(true);
+    setError(null);
     try {
       const priceNum = parseFloat(String(price).replace(',', '.')) || 0;
+      const body = {
+        product_name: productName.trim(),
+        price: priceNum,
+        store_name: storeName.trim(),
+        category: category || null
+      };
+      if (lat != null && lng != null) {
+        body.lat = lat;
+        body.lng = lng;
+      }
       const res = await fetch('/api/map/points', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_name: productName.trim(),
-          price: priceNum,
-          store_name: storeName.trim(),
-          lat,
-          lng,
-          category: category || null
-        })
+        body: JSON.stringify(body)
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -104,7 +139,7 @@ export default function SharePricePage() {
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
         <h1 className="text-xl font-bold text-[#333] mb-4">Compartilhar preço</h1>
-        <p className="text-sm text-[#666] mb-4">O preço aparecerá no mapa para a comunidade.</p>
+        <p className="text-sm text-[#666] mb-4">O preço aparecerá no mapa no endereço da loja (onde você comprou), não onde você está.</p>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl p-6 shadow-card-lovable space-y-4">
           {error && (
@@ -140,9 +175,20 @@ export default function SharePricePage() {
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
               placeholder="Ex: Pão de Açúcar"
+              list="nearby-stores-list"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
               required
             />
+            <datalist id="nearby-stores-list">
+              {nearbyStores.map((s) => (
+                <option key={s.id} value={s.name}>
+                  {s.neighborhood ? `${s.name} — ${s.neighborhood}` : s.name}
+                </option>
+              ))}
+            </datalist>
+            {nearbyStores.length > 0 && (
+              <p className="text-xs text-[#2ECC49] mt-1">📍 {nearbyStores.length} loja(s) próxima(s) sugerida(s). Comece a digitar ou escolha na lista.</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-[#333] mb-1">Categoria</label>
@@ -157,6 +203,9 @@ export default function SharePricePage() {
             </select>
           </div>
           <div>
+            <p className="text-xs text-[#666] mb-2">
+              O sistema usa o nome da loja para localizar no mapa. Se não encontrar, toque em &quot;Usar minha localização&quot; para ajudar.
+            </p>
             <button
               type="button"
               onClick={getLocation}
@@ -164,12 +213,12 @@ export default function SharePricePage() {
               className="inline-flex items-center gap-2 px-4 py-2 bg-[#f0f0f0] rounded-lg text-sm font-medium text-[#333] hover:bg-[#e5e5e5] disabled:opacity-60"
             >
               <MapPin className="h-4 w-4" />
-              {locating ? 'Obtendo...' : lat != null ? 'Localização ok' : 'Usar minha localização'}
+              {locating ? 'A obter...' : lat != null ? 'Localização ok' : 'Usar minha localização'}
             </button>
           </div>
           <button
             type="submit"
-            disabled={submitting || lat == null}
+            disabled={submitting}
             className="w-full py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a] disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : null}

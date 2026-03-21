@@ -12,7 +12,10 @@ import { CoupleSummary } from "@/components/dashboard/CoupleSummary";
 import { BottomNav } from "@/components/BottomNav";
 import { ChevronLeft, ChevronRight, Users, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { CalculatorMini } from "@/components/dashboard/CalculatorMini";
+import { CobrancasMiniCard } from "@/components/dashboard/CobrancasMiniCard";
 
 interface TransactionItem {
   descricao: string;
@@ -40,6 +43,12 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<{ name: string | null }>({ name: null });
   const [showPartner, setShowPartner] = useState(false);
   const { partnership, partnerProfile } = usePartnership();
+
+  // Calculadora / base editavel pelo cliente
+  const [calcBase, setCalcBase] = useState<number>(0);
+  const [calcBaseTouched, setCalcBaseTouched] = useState(false);
+  // Total de cobranças nao pagas (para exibicao/controle futuro)
+  const [unpaidChargesTotal, setUnpaidChargesTotal] = useState<number>(0);
 
   // Month filter
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -142,6 +151,16 @@ const Dashboard = () => {
     return filteredTransactions.reduce((sum, t) => sum + t.total, 0);
   }, [filteredTransactions]);
 
+  // Ao trocar de mes, volta a base para o saldo atual (comportamento mais esperado para “custos por mes”).
+  useEffect(() => {
+    setCalcBaseTouched(false);
+  }, [selectedMonth]);
+
+  // Inicializa/atualiza a base SOMENTE se o cliente ainda nao tocou nela manualmente.
+  useEffect(() => {
+    if (!calcBaseTouched) setCalcBase(totalGasto);
+  }, [totalGasto, calcBaseTouched, selectedMonth]);
+
   const handleMonthChange = (delta: number) => {
     const [y, m] = selectedMonth.split("-").map(Number);
     const d = new Date(y, m - 1 + delta, 1);
@@ -183,6 +202,38 @@ const Dashboard = () => {
           balance={totalGasto}
           transactionCount={displayTransactions.length}
           className="mt-6 mb-2 animate-fade-in"
+        />
+
+        {/* Calculadora + Cobranças (mini, tudo na pagina de custos) */}
+        <CalculatorMini
+          baseValue={calcBase}
+          onBaseValueChange={(v) => {
+            setCalcBaseTouched(true);
+            setCalcBase(v);
+          }}
+        />
+        <div className="mt-1 mb-3 text-xs text-muted-foreground">
+          Sobra apos cobrancas nao pagas:{" "}
+          <span className="font-semibold text-foreground">
+            {(calcBase - unpaidChargesTotal).toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}
+          </span>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full mb-4"
+          onClick={() => navigate("/contas")}
+        >
+          Ver calculadora completa
+        </Button>
+        <CobrancasMiniCard
+          selectedMonth={selectedMonth}
+          onAfterPayment={fetchTransactions}
+          onUnpaidTotalChange={setUnpaidChargesTotal}
         />
 
         {/* Partner toggle */}

@@ -105,31 +105,102 @@ export default async function handler(req, res) {
 
   try {
     const q = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
-    // TTL do mapa: qualquer ponto publicado com mais de 24h deve sumir.
-    const ttlHours = 24;
-    const cutoff = new Date(Date.now() - ttlHours * 60 * 60 * 1000);
-    const cutoffIso = cutoff.toISOString();
+    // TTL padrão: 24h (preços divulgados por usuários).
+    const defaultTtlHours = Math.max(
+      1,
+      Number.parseInt(process.env.MAP_DEFAULT_TTL_HOURS || '24', 10) || 24
+    );
+    // Promoções (ex.: import DIA — category com "promo") ficam mais tempo no ar.
+    const promoTtlHours = Math.max(
+      defaultTtlHours,
+      Number.parseInt(process.env.MAP_PROMO_TTL_HOURS || '168', 10) || 168
+    );
+    const normalCutoffIso = new Date(
+      Date.now() - defaultTtlHours * 60 * 60 * 1000
+    ).toISOString();
+    const promoCutoffIso = new Date(
+      Date.now() - promoTtlHours * 60 * 60 * 1000
+    ).toISOString();
 
-    let query = supabase
-      .from('price_points')
-      .select('id, product_name, price, store_name, lat, lng, category, created_at, user_id')
-      .not('lat', 'is', null)
-      .not('lng', 'is', null)
-      .gte('created_at', cutoffIso)
-      .order('created_at', { ascending: false })
-      .limit(500);
+    const baseSelect =
+      'id, product_name, price, store_name, lat, lng, category, created_at, user_id';
 
-    if (q.length >= 2) {
+    const applySearch = (qb) => {
+      if (q.length < 2) return qb;
       const pattern = `%${q}%`;
-      query = query.or(`product_name.ilike.${pattern},store_name.ilike.${pattern},category.ilike.${pattern}`);
+      return qb.or(
+        `product_name.ilike.${pattern},store_name.ilike.${pattern},category.ilike.${pattern}`
+      );
+    };
+
+    // 1) Ofertas/promoções (import DIA etc.): TTL maior
+    let promoQuery = applySearch(
+      supabase
+        .from('price_points')
+        .select(baseSelect)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .ilike('category', '%promo%')
+        .gte('created_at', promoCutoffIso)
+        .order('created_at', { ascending: false })
+        .limit(500)
+    );
+
+    // 2) Demais pontos: TTL curto (categoria sem "promo" ou nula) — duas queries para evitar edge cases do PostgREST
+    let normalNullQuery = applySearch(
+      supabase
+        .from('price_points')
+        .select(baseSelect)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .is('category', null)
+        .gte('created_at', normalCutoffIso)
+        .order('created_at', { ascending: false })
+        .limit(500)
+    );
+    let normalOtherQuery = applySearch(
+      supabase
+        .from('price_points')
+        .select(baseSelect)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .not('category', 'ilike', '%promo%')
+        .gte('created_at', normalCutoffIso)
+        .order('created_at', { ascending: false })
+        .limit(500)
+    );
+
+    const [
+      { data: promoRows, error: promoErr },
+      { data: normalNullRows, error: normalNullErr },
+      { data: normalOtherRows, error: normalOtherErr },
+    ] = await Promise.all([promoQuery, normalNullQuery, normalOtherQuery]);
+
+    if (promoErr) {
+      console.error('Erro ao buscar price_points (promo):', promoErr);
+      return res.status(500).json({ error: promoErr.message });
+    }
+    if (normalNullErr) {
+      console.error('Erro ao buscar price_points (normal null):', normalNullErr);
+      return res.status(500).json({ error: normalNullErr.message });
+    }
+    if (normalOtherErr) {
+      console.error('Erro ao buscar price_points (normal):', normalOtherErr);
+      return res.status(500).json({ error: normalOtherErr.message });
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Erro ao buscar price_points:', error);
-      return res.status(500).json({ error: error.message });
+    const byId = new Map();
+    for (const row of [
+      ...(promoRows || []),
+      ...(normalNullRows || []),
+      ...(normalOtherRows || []),
+    ]) {
+      if (row?.id) byId.set(row.id, row);
     }
+    const merged = Array.from(byId.values()).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+    const data = merged.slice(0, 500);
 
     const points = (data || []).map((row) => ({
       id: row.id,

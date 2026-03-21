@@ -54,14 +54,26 @@ export default async function handler(req, res) {
       merchant_name,
       merchant_cnpj,
       total_amount,
-      items,
+      items: bodyItems,
       category,
       payment_method,
       receipt_image_url,
       shareOnMap,
       lat: userLat,
-      lng: userLng
+      lng: userLng,
+      merchant_address
     } = req.body;
+
+    // Garantir que items seja sempre um array (pode vir como string em alguns casos)
+    let items = [];
+    if (Array.isArray(bodyItems)) {
+      items = bodyItems;
+    } else if (typeof bodyItems === 'string') {
+      try {
+        const parsed = JSON.parse(bodyItems);
+        items = Array.isArray(parsed) ? parsed : [];
+      } catch (_) {}
+    }
 
     // Validações
     if (!userId) {
@@ -102,7 +114,7 @@ export default async function handler(req, res) {
       total: parseFloat(total_amount),
       forma_pagamento: payment_method || null,
       categoria: category || null,
-      items: items && items.length > 0 ? items : null,
+      items: items.length > 0 ? items : null,
       source: 'receipt_ocr',
       receipt_image_url: receipt_image_url || null
     };
@@ -132,58 +144,75 @@ export default async function handler(req, res) {
     console.log('✅ Transação salva com sucesso:', transaction.id);
 
     // Inserir pontos no mapa (price_points) se o usuário optou por divulgar
+    let mapPointsAdded = 0;
+    let mapError = null;
     if (shareOnMap) {
-    try {
-      let coords = null;
-      const latNum = userLat != null ? parseFloat(userLat) : NaN;
-      const lngNum = userLng != null ? parseFloat(userLng) : NaN;
-      if (!Number.isNaN(latNum) && !Number.isNaN(lngNum) && latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180) {
-        coords = { lat: latNum, lng: lngNum };
-      }
-      if (!coords) {
-        const geoQuery = [merchant_name.trim()].concat(
-          (req.body.merchant_address && String(req.body.merchant_address).trim())
-            ? [String(req.body.merchant_address).trim()]
-            : []
-        ).join(', ') + ', Brasil';
-        coords = await geocodeAddress(geoQuery);
-      }
-      if (coords && coords.lat != null && coords.lng != null) {
-        const pointsToInsert = [];
-        if (items && items.length > 0) {
-          items.forEach((item) => {
+      try {
+        // Sempre priorizar o endereço do estabelecimento (onde a compra foi feita), não a localização de quem divulgou
+        let coords = null;
+        const addressPart = (merchant_address && String(merchant_address).trim()) ? String(merchant_address).trim() : '';
+        const queries = [
+          [merchant_name.trim(), addressPart, 'Brasil'].filter(Boolean).join(', '),
+          merchant_name.trim() + ', São Paulo, Brasil',
+          merchant_name.trim() + ', Brasil'
+        ].filter((q) => q.length >= 3);
+        for (const geoQuery of queries) {
+          coords = await geocodeAddress(geoQuery);
+          if (coords && coords.lat != null && coords.lng != null) break;
+        }
+        if (!coords) {
+          const latNum = userLat != null ? parseFloat(userLat) : NaN;
+          const lngNum = userLng != null ? parseFloat(userLng) : NaN;
+          if (!Number.isNaN(latNum) && !Number.isNaN(lngNum) && latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180) {
+            coords = { lat: latNum, lng: lngNum };
+          }
+        }
+        if (coords && coords.lat != null && coords.lng != null) {
+          const pointsToInsert = [];
+          if (items.length > 0) {
+            items.forEach((item, idx) => {
+              const name = (item && (item.name ?? item.nome) && String(item.name ?? item.nome).trim())
+                ? String(item.name ?? item.nome).trim()
+                : `Produto ${idx + 1}`;
+              const price = parseFloat(item.price ?? item.valor ?? 0) || 0;
+              pointsToInsert.push({
+                user_id: userId,
+                product_name: name,
+                price,
+                store_name: merchant_name.trim(),
+                lat: coords.lat,
+                lng: coords.lng,
+                category: category || null
+              });
+            });
+          } else {
             pointsToInsert.push({
               user_id: userId,
-              product_name: (item.name && String(item.name).trim()) || 'Produto',
-              price: parseFloat(item.price) || 0,
+              product_name: 'Compra',
+              price: parseFloat(total_amount) || 0,
               store_name: merchant_name.trim(),
               lat: coords.lat,
               lng: coords.lng,
               category: category || null
             });
-          });
+          }
+          console.log('🗺️ Inserindo no mapa:', pointsToInsert.length, 'ponto(s)', pointsToInsert.map((p) => p.product_name));
+          const { error: mapErr } = await supabase.from('price_points').insert(pointsToInsert);
+          if (mapErr) {
+            console.warn('⚠️ Erro ao inserir price_points:', mapErr.message);
+            mapError = mapErr.message;
+          } else {
+            mapPointsAdded = pointsToInsert.length;
+            console.log(`✅ ${pointsToInsert.length} ponto(s) adicionado(s) ao mapa`);
+          }
         } else {
-          pointsToInsert.push({
-            user_id: userId,
-            product_name: 'Compra',
-            price: parseFloat(total_amount) || 0,
-            store_name: merchant_name.trim(),
-            lat: coords.lat,
-            lng: coords.lng,
-            category: category || null
-          });
+          mapError = 'Não foi possível obter a localização. Ative a localização ao salvar ou informe o endereço do estabelecimento.';
+          console.log('⚠️ Sem coordenadas (geolocalização negada e geocoding falhou) para:', merchant_name);
         }
-        const { error: mapErr } = await supabase.from('price_points').insert(pointsToInsert);
-        if (mapErr) console.warn('⚠️ Erro ao inserir price_points:', mapErr.message);
-        else console.log(`✅ ${pointsToInsert.length} ponto(s) adicionado(s) ao mapa`);
-      } else {
-        console.log('⚠️ Sem coordenadas (geolocalização negada e geocoding falhou) para:', merchant_name);
+      } catch (mapErrorThrown) {
+        mapError = mapErrorThrown?.message || 'Erro ao divulgar no mapa.';
+        console.warn('⚠️ Erro ao alimentar mapa:', mapErrorThrown?.message);
       }
-    } catch (mapError) {
-      console.warn('⚠️ Erro ao alimentar mapa:', mapError.message);
-    }
-    } else {
-      console.log('ℹ️ Usuário optou por não divulgar preços no mapa');
     }
 
     // Salvar produtos na tabela produtos (se existir e tiver itens)
@@ -220,7 +249,8 @@ export default async function handler(req, res) {
         total: transaction.total,
         data: transaction.data,
         source: transaction.source
-      }
+      },
+      ...(shareOnMap && { mapPointsAdded, mapError })
     });
 
   } catch (error) {

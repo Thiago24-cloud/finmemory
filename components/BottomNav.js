@@ -40,21 +40,13 @@ export function BottomNav() {
                 onClick={() => handleTabClick(tab)}
                 className={cn(
                   'flex flex-col items-center gap-0.5 px-3 py-2 rounded-2xl transition-all min-w-[60px] relative',
-                  tab.isAction && 'relative -mt-4',
                   isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                {tab.isAction ? (
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-transform active:scale-95 gradient-primary text-white">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                ) : (
-                  <Icon className={cn('h-5 w-5 transition-transform', isActive && 'scale-110')} />
-                )}
+                <Icon className={cn('h-5 w-5 transition-transform', (isActive || tab.isAction) && 'scale-110')} />
                 <span
                   className={cn(
                     'text-[10px] transition-colors',
-                    tab.isAction && 'mt-0.5',
                     isActive ? 'font-bold' : 'font-medium'
                   )}
                 >

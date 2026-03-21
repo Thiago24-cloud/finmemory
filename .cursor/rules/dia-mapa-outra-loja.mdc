@@ -1,0 +1,16 @@
+---
+description: FinMemory — importar promoções DIA em outra loja (mapa, API import-dia-offers, Supabase, pin laranja).
+alwaysApply: true
+---
+
+# DIA — outra loja no mapa de preços
+
+Quando o usuário pedir para **analisar/importar outra loja DIA**, **outro endereço DIA**, ou **colocar promoções do DIA no mapa**:
+
+1. Abrir e seguir o playbook **`docs/DIA-MAPA-IMPORTAR-OUTRA-LOJA.md`** (fonte da verdade).
+2. Usar **`POST /api/scrapers/import-dia-offers`** com `storeUrl` (página `https://dia.com.br/lojas/...`), e de preferência **`lat`/`lng`** da loja (Google Maps ou `public.stores`).
+3. Se `DIA_IMPORT_SECRET` existir no ambiente, o cliente precisa enviar **`X-Cron-Secret`** ou **`?secret=`** igual ao valor.
+4. Garantir que **`price_points.store_name`** e coordenadas **batam** com **`public.stores`** para o pin laranja e o popup “Ofertas ativas” (ver seção SQL do doc).
+5. Mapa lista pontos com **TTL 24h**; categoria promocional típica: **`Supermercado - Promoção`**.
+
+Implementação do scraper: `pages/api/map/stores.js` (ofertas na loja), `pages/api/map/points.js` (TTL), `pages/api/scrapers/import-dia-offers.js`.

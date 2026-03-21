@@ -101,6 +101,7 @@ Analise esta imagem e extraia as seguintes informações em formato JSON:
   "date": "YYYY-MM-DD",
   "merchant_name": "Nome completo do estabelecimento",
   "merchant_cnpj": "XX.XXX.XXX/XXXX-XX",
+  "merchant_address": "Endereço completo se visível (rua, número, bairro, cidade)",
   "total_amount": 123.45,
   "items": [
     {"name": "Nome do produto", "price": 12.90},
@@ -339,6 +340,7 @@ export default async function handler(req, res) {
         date: extractedData.date || null,
         merchant_name: extractedData.merchant_name || null,
         merchant_cnpj: extractedData.merchant_cnpj || null,
+        merchant_address: extractedData.merchant_address || null,
         total_amount: parseFloat(extractedData.total_amount) || null,
         items: extractedData.items || [],
         category: extractedData.category || null,

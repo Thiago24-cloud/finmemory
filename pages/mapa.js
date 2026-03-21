@@ -37,7 +37,7 @@ export default function MapaPage() {
   const { data: session, status } = useSession();
   const [showSharedBanner, setShowSharedBanner] = useState(false);
   const [showMapasSheet, setShowMapasSheet] = useState(false);
-  const [mapThemeId, setMapThemeId] = useState('ruas');
+  const [mapThemeId, setMapThemeId] = useState('verde');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchInputRef = useRef(null);

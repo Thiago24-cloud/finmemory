@@ -1,10 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Plus, Trash2, Check } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Trash2, Check, Filter } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 import { getSupabase } from '../lib/supabase';
+
+const FILTER_STATUS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'pending', label: 'Pendentes' },
+  { value: 'checked', label: 'Concluídos' },
+];
+
+const FILTER_PERIOD = [
+  { value: 'all', label: 'Todos os períodos' },
+  { value: 'today', label: 'Hoje' },
+  { value: '7d', label: 'Últimos 7 dias' },
+  { value: 'month', label: 'Este mês' },
+  { value: 'last_month', label: 'Mês passado' },
+];
+
+function itemInPeriod(item, period) {
+  const d = item.created_at ? new Date(item.created_at) : null;
+  if (!d || period === 'all') return true;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === 'today') return d >= todayStart;
+  if (period === '7d') {
+    const weekAgo = new Date(todayStart);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return d >= weekAgo;
+  }
+  if (period === 'month') {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return d >= monthStart;
+  }
+  if (period === 'last_month') {
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    return d >= lastMonthStart && d <= lastMonthEnd;
+  }
+  return true;
+}
 
 export default function ShoppingListPage() {
   const router = useRouter();
@@ -14,6 +51,9 @@ export default function ShoppingListPage() {
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPeriod, setFilterPeriod] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const userId = session?.user?.supabaseId || (typeof window !== 'undefined' && localStorage.getItem('user_id'));
 
@@ -31,12 +71,23 @@ export default function ShoppingListPage() {
       setLoading(false);
       return;
     }
+    const { data: memberRow } = await supabase
+      .from('partnership_members')
+      .select('partnership_id')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (!memberRow) {
+      setPartnership(null);
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     const { data: p } = await supabase
       .from('partnerships')
       .select('id')
-      .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
+      .eq('id', memberRow.partnership_id)
       .eq('status', 'active')
-      .limit(1)
       .maybeSingle();
     setPartnership(p || null);
     if (p) {
@@ -44,13 +95,46 @@ export default function ShoppingListPage() {
         .from('shopping_list_items')
         .select('*')
         .eq('partnership_id', p.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
       setItems(list || []);
     } else {
       setItems([]);
     }
     setLoading(false);
   };
+
+  const filteredItems = useMemo(() => {
+    let list = items;
+    if (filterStatus === 'pending') list = list.filter((i) => !i.checked);
+    if (filterStatus === 'checked') list = list.filter((i) => i.checked);
+    list = list.filter((i) => itemInPeriod(i, filterPeriod));
+    return list;
+  }, [items, filterStatus, filterPeriod]);
+
+  const groupedByDay = useMemo(() => {
+    const groups = {};
+    filteredItems.forEach((item) => {
+      const d = item.created_at ? new Date(item.created_at) : new Date();
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const yesterdayStart = new Date(todayStart);
+      yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+      let label;
+      if (d >= todayStart) label = 'Hoje';
+      else if (d >= yesterdayStart) label = 'Ontem';
+      else label = d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
+      if (!groups[label]) groups[label] = [];
+      groups[label].push(item);
+    });
+    const order = ['Hoje', 'Ontem'];
+    const rest = Object.keys(groups).filter((k) => !order.includes(k));
+    rest.sort((a, b) => {
+      const da = groups[a][0]?.created_at || '';
+      const db = groups[b][0]?.created_at || '';
+      return db.localeCompare(da);
+    });
+    return [...order.filter((k) => groups[k]), ...rest].map((label) => ({ label, items: groups[label] }));
+  }, [filteredItems]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -134,7 +218,7 @@ export default function ShoppingListPage() {
         </Link>
         <h1 className="text-xl font-bold text-[#333] mb-4">Lista de compras</h1>
 
-        <form onSubmit={handleAdd} className="flex gap-2 mb-6">
+        <form onSubmit={handleAdd} className="flex gap-2 mb-4">
           <input
             type="text"
             value={newName}
@@ -151,35 +235,96 @@ export default function ShoppingListPage() {
           </button>
         </form>
 
-        <ul className="space-y-2">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-card-lovable"
-            >
-              <button
-                type="button"
-                onClick={() => toggleChecked(item)}
-                className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ${item.checked ? 'bg-[#28a745] border-[#28a745] text-white' : 'border-gray-300'}`}
-              >
-                {item.checked ? <Check className="h-4 w-4" /> : null}
-              </button>
-              <span className={`flex-1 ${item.checked ? 'line-through text-[#666]' : 'text-[#333]'}`}>
-                {item.name}
-                {item.quantity > 1 && ` (${item.quantity}${item.unit || ''})`}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleDelete(item.id)}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </li>
+        {/* Filtros: estado (Todos / Pendentes / Concluídos) e período (por dia de uso) */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setShowFilters((s) => !s)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200"
+          >
+            <Filter className="h-4 w-4" />
+            Filtros
+            {(filterStatus !== 'all' || filterPeriod !== 'all') && (
+              <span className="bg-[#2ECC49] text-white text-xs px-1.5 py-0.5 rounded-full">ativo</span>
+            )}
+          </button>
+          {showFilters && (
+            <div className="mt-3 p-4 bg-white rounded-xl border border-gray-200 space-y-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">Estado</p>
+                <div className="flex flex-wrap gap-2">
+                  {FILTER_STATUS.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setFilterStatus(f.value)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${filterStatus === f.value ? 'bg-[#2ECC49] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">Período (dia em que adicionou)</p>
+                <div className="flex flex-wrap gap-2">
+                  {FILTER_PERIOD.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setFilterPeriod(f.value)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${filterPeriod === f.value ? 'bg-[#2ECC49] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Lista agrupada por dia */}
+        <div className="space-y-6">
+          {groupedByDay.map(({ label, items: dayItems }) => (
+            <div key={label}>
+              <h2 className="text-sm font-semibold text-gray-500 mb-2">{label}</h2>
+              <ul className="space-y-2">
+                {dayItems.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-card-lovable"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleChecked(item)}
+                      className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center ${item.checked ? 'bg-[#28a745] border-[#28a745] text-white' : 'border-gray-300'}`}
+                    >
+                      {item.checked ? <Check className="h-4 w-4" /> : null}
+                    </button>
+                    <span className={`flex-1 ${item.checked ? 'line-through text-[#666]' : 'text-[#333]'}`}>
+                      {item.name}
+                      {item.quantity > 1 && ` (${item.quantity}${item.unit || ''})`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
-        {items.length === 0 && (
-          <p className="text-center text-[#666] py-8">Nenhum item. Adicione acima.</p>
+        </div>
+        {filteredItems.length === 0 && (
+          <p className="text-center text-[#666] py-8">
+            {items.length === 0
+              ? 'Nenhum item. Adicione acima.'
+              : 'Nenhum item neste filtro. Mude os filtros acima.'}
+          </p>
         )}
       </div>
       <BottomNav />

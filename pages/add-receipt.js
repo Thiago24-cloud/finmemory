@@ -135,6 +135,7 @@ export default function AddReceipt() {
     date: '',
     merchant_name: '',
     merchant_cnpj: '',
+    merchant_address: '',
     total_amount: '',
     items: [],
     category: '',
@@ -143,6 +144,11 @@ export default function AddReceipt() {
   });
   // Toggle: false = só nos meus registros; true = divulgar preços da nota no mapa
   const [shareOnMap, setShareOnMap] = useState(false);
+  // Lojas próximas ao compartilhar no mapa (quando usuário pede sugestão)
+  const [receiptLocating, setReceiptLocating] = useState(false);
+  const [nearbyStoresReceipt, setNearbyStoresReceipt] = useState([]);
+  // Feedback após salvar com "Divulgar no mapa"
+  const [mapFeedback, setMapFeedback] = useState(null);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -189,6 +195,7 @@ export default function AddReceipt() {
           date: prefill.date || '',
           merchant_name: prefill.merchant_name || '',
           merchant_cnpj: prefill.merchant_cnpj || '',
+          merchant_address: prefill.merchant_address || '',
           total_amount: prefill.total_amount != null ? String(prefill.total_amount) : '',
           items: Array.isArray(prefill.items) ? prefill.items.map((i) => ({ name: i.name || '', price: Number(i.price) || 0 })) : [],
           category: prefill.category || '',
@@ -253,6 +260,7 @@ export default function AddReceipt() {
       date: data.date || '',
       merchant_name: data.merchant_name || '',
       merchant_cnpj: data.merchant_cnpj || '',
+      merchant_address: data.merchant_address || '',
       total_amount: data.total_amount ? String(data.total_amount) : '',
       items: Array.isArray(data.items) && data.items.length > 0
         ? data.items.map((i) => ({ name: i.name || '', price: Number(i.price) || 0 }))
@@ -336,6 +344,7 @@ export default function AddReceipt() {
         date: result.data.date || '',
         merchant_name: result.data.merchant_name || '',
         merchant_cnpj: result.data.merchant_cnpj || '',
+        merchant_address: result.data.merchant_address || '',
         total_amount: result.data.total_amount?.toString() || '',
         items: result.data.items || [],
         category: result.data.category || '',
@@ -379,16 +388,24 @@ export default function AddReceipt() {
         }
       }
 
+      const payload = {
+        userId,
+        date: formData.date || '',
+        merchant_name: formData.merchant_name || '',
+        merchant_cnpj: formData.merchant_cnpj || '',
+        merchant_address: formData.merchant_address || '',
+        total_amount: parseFloat(formData.total_amount) || 0,
+        items: Array.isArray(formData.items) ? formData.items : [],
+        category: formData.category || '',
+        payment_method: formData.payment_method || '',
+        receipt_image_url: formData.receipt_image_url || '',
+        shareOnMap,
+        ...(lat != null && lng != null && { lat, lng })
+      };
       const response = await fetch('/api/ocr/save-transaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          ...formData,
-          total_amount: parseFloat(formData.total_amount) || 0,
-          shareOnMap,
-          ...(lat != null && lng != null && { lat, lng })
-        })
+        body: JSON.stringify(payload)
       });
 
       const result = await response.json();
@@ -398,7 +415,8 @@ export default function AddReceipt() {
       }
 
       setStep(STEPS.SUCCESS);
-      
+      setMapFeedback(shareOnMap ? { mapPointsAdded: result.mapPointsAdded ?? 0, mapError: result.mapError ?? null } : null);
+
       // Redirecionar após 2 segundos
       setTimeout(() => {
         router.push('/dashboard');
@@ -452,6 +470,7 @@ export default function AddReceipt() {
       date: '',
       merchant_name: '',
       merchant_cnpj: '',
+      merchant_address: '',
       total_amount: '',
       items: [],
       category: '',
@@ -459,6 +478,7 @@ export default function AddReceipt() {
       receipt_image_url: ''
     });
     setShareOnMap(false);
+    setMapFeedback(null);
   };
 
   // Loading de sessão
@@ -628,9 +648,50 @@ export default function AddReceipt() {
                   type="text"
                   value={formData.merchant_name}
                   onChange={(e) => updateField('merchant_name', e.target.value)}
+                  list="nearby-stores-receipt-list"
                   className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                   placeholder="Nome da loja"
                 />
+                <datalist id="nearby-stores-receipt-list">
+                  {nearbyStoresReceipt.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.neighborhood ? `${s.name} — ${s.neighborhood}` : s.name}
+                    </option>
+                  ))}
+                </datalist>
+                {shareOnMap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptLocating(true);
+                      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
+                            fetch(`/api/map/stores?lat=${lat}&lng=${lng}&radius=2000`)
+                              .then((res) => (res.ok ? res.json() : { stores: [] }))
+                              .then((data) => {
+                                if (Array.isArray(data.stores)) setNearbyStoresReceipt(data.stores);
+                              })
+                              .finally(() => setReceiptLocating(false));
+                          },
+                          () => setReceiptLocating(false),
+                          { timeout: 5000 }
+                        );
+                      } else setReceiptLocating(false);
+                    }}
+                    disabled={receiptLocating}
+                    className="mt-2 text-sm text-[#2ECC49] hover:underline disabled:opacity-60"
+                  >
+                    {receiptLocating ? 'Buscando...' : '📍 Sugerir lojas próximas'}
+                  </button>
+                )}
+                {nearbyStoresReceipt.length > 0 && (
+                  <p className="text-xs text-[#2ECC49] mt-1">
+                    {nearbyStoresReceipt.length} loja(s) próxima(s). Comece a digitar ou escolha na lista.
+                  </p>
+                )}
               </div>
 
               <div className="mb-4">
@@ -741,6 +802,19 @@ export default function AddReceipt() {
                 </button>
               </div>
 
+              {shareOnMap && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-[#374151] mb-1.5">Endereço (opcional, melhora a localização no mapa)</label>
+                  <input
+                    type="text"
+                    value={formData.merchant_address || ''}
+                    onChange={(e) => updateField('merchant_address', e.target.value)}
+                    className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
+                    placeholder="Ex: Rua X, 123 - Bairro, Cidade"
+                  />
+                </div>
+              )}
+
               {/* Toggle: divulgar preços da nota no mapa ou só nos registros */}
               <div className="mb-6">
                 <p className="text-xs text-[#6b7280] mb-2">
@@ -806,6 +880,19 @@ export default function AddReceipt() {
           <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
             <div className="text-6xl mb-4">✅</div>
             <h2 className="text-2xl text-[#059669] m-0 mb-2">Nota fiscal salva!</h2>
+            {mapFeedback != null && (
+              <div className="mt-3 mb-3 text-sm">
+                {mapFeedback.mapPointsAdded > 0 ? (
+                  <p className="text-[#059669] m-0">
+                    🗺️ Seus preços foram divulgados no mapa ({mapFeedback.mapPointsAdded} {mapFeedback.mapPointsAdded === 1 ? 'ponto' : 'pontos'}).
+                  </p>
+                ) : mapFeedback.mapError ? (
+                  <p className="text-amber-700 bg-amber-50 rounded-lg py-2 px-3 m-0">
+                    Mapa: {mapFeedback.mapError} Na próxima vez, ative a localização ao salvar ou preencha o endereço.
+                  </p>
+                ) : null}
+              </div>
+            )}
             <p className="text-sm text-[#666] m-0">
               Redirecionando para o dashboard...
             </p>

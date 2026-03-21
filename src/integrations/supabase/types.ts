@@ -90,6 +90,7 @@ export type Database = {
           id: string
           quantidade: number | null
           transacao_id: string
+          unidade: string | null
           valor_total: number
           valor_unitario: number | null
         }
@@ -99,6 +100,7 @@ export type Database = {
           id?: string
           quantidade?: number | null
           transacao_id: string
+          unidade?: string | null
           valor_total?: number
           valor_unitario?: number | null
         }
@@ -108,6 +110,7 @@ export type Database = {
           id?: string
           quantidade?: number | null
           transacao_id?: string
+          unidade?: string | null
           valor_total?: number
           valor_unitario?: number | null
         }
@@ -251,6 +254,83 @@ export type Database = {
           source?: string | null
           total?: number
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ,
+      cobrancas: {
+        Row: {
+          ativa: boolean
+          competencia: string | null
+          created_at: string
+          categoria: string
+          dia_vencimento: number | null
+          id: string
+          recorrencia: string
+          titulo: string
+          updated_at: string
+          valor: number
+          user_id: string
+        }
+        Insert: {
+          ativa?: boolean
+          competencia?: string | null
+          created_at?: string
+          categoria?: string
+          dia_vencimento?: number | null
+          id?: string
+          recorrencia?: string
+          titulo: string
+          updated_at?: string
+          valor: number
+          user_id: string
+        }
+        Update: {
+          ativa?: boolean
+          competencia?: string | null
+          created_at?: string
+          categoria?: string
+          dia_vencimento?: number | null
+          id?: string
+          recorrencia?: string
+          titulo?: string
+          updated_at?: string
+          valor?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ,
+      cobrancas_pagamentos: {
+        Row: {
+          competencia: string
+          created_at: string
+          cobranca_id: string
+          data_pagamento: string
+          forma_pagamento: string | null
+          id: string
+          obs: string | null
+          user_id: string
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          cobranca_id: string
+          data_pagamento: string
+          forma_pagamento?: string | null
+          id?: string
+          obs?: string | null
+          user_id: string
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          cobranca_id?: string
+          data_pagamento?: string
+          forma_pagamento?: string | null
+          id?: string
+          obs?: string | null
           user_id?: string
         }
         Relationships: []

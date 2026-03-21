@@ -7,6 +7,13 @@ const nextConfig = {
   trailingSlash: false,
   // Evitar que Next.js infira workspace root (ex.: pasta Downloads) e coloque standalone em subpasta
   outputFileTracingRoot: path.join(__dirname),
+  // iOS/Safari pedem esses paths; redirecionar para o logo para evitar 404
+  async rewrites() {
+    return [
+      { source: '/apple-touch-icon.png', destination: '/logo.png' },
+      { source: '/apple-touch-icon-precomposed.png', destination: '/logo.png' },
+    ]
+  },
 }
 
 module.exports = nextConfig

@@ -1,0 +1,15 @@
+# Não enviar .env* no upload do gcloud builds submit (segredos ficam só no Cloud Run)
+.env
+.env.*
+.env.local
+.env.*.local
+.env.test
+.env.production.local
+
+# Seguir o resto do .gitignore
+.git
+.gitignore
+node_modules/
+.next/
+*.log
+.DS_Store

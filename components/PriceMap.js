@@ -48,11 +48,7 @@ function darkenHex(hex, percent = 12) {
 }
 
 const MAP_STYLES = [
-  { id: 'light-v11', label: 'Claro', url: 'mapbox://styles/mapbox/light-v11' },
-  { id: 'streets-v12', label: 'Ruas', url: 'mapbox://styles/mapbox/streets-v12' },
-  { id: 'dark-v11', label: 'Escuro', url: 'mapbox://styles/mapbox/dark-v11' },
   { id: 'outdoors-v12', label: 'Outdoor', url: 'mapbox://styles/mapbox/outdoors-v12' },
-  { id: 'satellite-streets-v12', label: 'Satélite', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
 ];
 
 /** Cria o elemento DOM do marcador customizado: quadrado arredondado com cor por local + cifrão branco + cauda */

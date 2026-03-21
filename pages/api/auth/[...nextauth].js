@@ -1,6 +1,17 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import { SupabaseAdapter } from '@next-auth/supabase-adapter';
 import { createClient } from '@supabase/supabase-js';
+
+// Em produção com uma única URL (só Cloud Run): forçar sempre esta base (evita Invalid URL quando a env está antiga/errada)
+const DEFAULT_NEXTAUTH_URL = 'https://finmemory-836908221936.southamerica-east1.run.app';
+if (typeof process !== 'undefined') {
+  const url = process.env.NEXTAUTH_URL || '';
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction || !url || !url.startsWith('http')) {
+    process.env.NEXTAUTH_URL = DEFAULT_NEXTAUTH_URL;
+  }
+}
 
 // Lazy initialization do Supabase - só cria quando realmente necessário
 let supabaseInstance = null;
@@ -25,6 +36,32 @@ function getSupabase() {
 }
 
 export const authOptions = {
+  // Necessário atrás de proxy (Firebase Hosting → Cloud Run): NextAuth confia no host do proxy
+  trustHost: true,
+  // Só cria o adapter quando as env existem (no build do Cloud Build não há SUPABASE_SERVICE_ROLE_KEY)
+  adapter:
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? SupabaseAdapter({
+          url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+          secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        })
+      : undefined,
+  // Permite vincular conta Google a usuário já existente com mesmo email (ex.: usuário criado quando linkAccount falhou por coluna faltando)
+  allowDangerousEmailAccountLinking: true,
+  // Cookies: sem domain para link do Cloud Run; nomes sem __Host- para evitar CSRF falhar atrás de proxy.
+  useSecureCookies: true,
+  cookies: {
+    sessionToken: {
+      name: 'next-auth.session-token',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true }
+    },
+    callbackUrl: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true } },
+    csrfToken: {
+      name: 'next-auth.csrf-token',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true }
+    },
+    state: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true, maxAge: 900 } }
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -42,6 +79,18 @@ export const authOptions = {
   ],
   
   callbacks: {
+    // Evita TypeError: Invalid URL quando o cookie callbackUrl contém token/corrompido (NextAuth chama new URL(url) no default)
+    redirect({ url, baseUrl }) {
+      if (!url || typeof url !== 'string') return baseUrl;
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      try {
+        const parsed = new URL(url);
+        if (parsed.origin === new URL(baseUrl).origin) return url;
+      } catch (_) {
+        // url era token ou valor inválido (ex.: cookie errado) — ignora e usa baseUrl
+      }
+      return baseUrl;
+    },
     async signIn({ user, account, profile }) {
       try {
         console.log('🔐 NextAuth SignIn callback –', user?.email, account?.provider);
@@ -76,43 +125,30 @@ export const authOptions = {
       }
     },
     
-    async jwt({ token, account, user }) {
-      // Persist the OAuth access_token to the token right after signin
-      if (account) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.provider = account.provider;
+    async session({ session, user }) {
+      // strategy: 'database' — user vem do adapter (em fluxo de erro user pode ser undefined)
+      if (user?.id) {
+        session.user.id = user.id;
       }
-      if (user) {
-        token.userId = user.id;
-      }
-      return token;
-    },
-    
-    async session({ session, token }) {
-      // Send properties to the client
-      session.accessToken = token.accessToken;
-      session.user.id = token.userId;
-      
-      // Get the Supabase user ID
-      try {
-        const supabase = getSupabase();
-        if (supabase) {
-          const { data } = await supabase
-            .from('users')
-            .select('id, created_at')
-            .eq('email', session.user.email)
-            .single();
-          
-          if (data) {
-            session.user.supabaseId = data.id;
-            session.user.created_at = data.created_at;
+      // Dados da nossa tabela customizada `users` (id, created_at) para compatibilidade
+      if (session?.user?.email) {
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            const { data } = await supabase
+              .from('users')
+              .select('id, created_at')
+              .eq('email', session.user.email)
+              .single();
+            if (data) {
+              session.user.supabaseId = data.id;
+              session.user.created_at = data.created_at;
+            }
           }
+        } catch (error) {
+          console.error('Error fetching Supabase user:', error);
         }
-      } catch (error) {
-        console.error('Error fetching Supabase user:', error);
       }
-      
       return session;
     }
   },
@@ -132,7 +168,7 @@ export const authOptions = {
   },
 
   session: {
-    strategy: 'jwt',
+    strategy: 'database',
     maxAge: 30 * 24 * 60 * 60 // 30 days
   },
   
@@ -143,4 +179,18 @@ export const authOptions = {
   debug: process.env.NODE_ENV === 'development' || process.env.NEXTAUTH_DEBUG === '1'
 };
 
-export default NextAuth(authOptions);
+const nextAuthHandler = NextAuth(authOptions);
+
+export default async function handler(req, res) {
+  try {
+    return await nextAuthHandler(req, res);
+  } catch (err) {
+    const isInvalidUrl = err instanceof TypeError && err?.message?.includes?.('Invalid URL');
+    if (isInvalidUrl) {
+      console.error('[next-auth] Invalid URL caught, redirecting to error page:', err?.message);
+      res.redirect(302, '/auth-error?error=Configuration');
+      return;
+    }
+    throw err;
+  }
+}

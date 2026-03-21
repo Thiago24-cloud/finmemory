@@ -1,8 +1,34 @@
-import { useSession, signIn } from 'next-auth/react';
-import { useEffect } from 'react';
+import { useSession, signIn, getCsrfToken } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
+
+const SESSION_LOADING_TIMEOUT_MS = 5000;
+
+/** POST em formulário para garantir envio do cookie CSRF (evita signin?csrf=true no Cloud Run) */
+async function signInWithGoogleForm(callbackUrl = '/mapa') {
+  const csrfToken = await getCsrfToken();
+  if (!csrfToken) {
+    signIn('google', { callbackUrl });
+    return;
+  }
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/api/auth/signin/google';
+  const csrf = document.createElement('input');
+  csrf.name = 'csrfToken';
+  csrf.value = csrfToken;
+  csrf.type = 'hidden';
+  form.appendChild(csrf);
+  const cb = document.createElement('input');
+  cb.name = 'callbackUrl';
+  cb.value = callbackUrl;
+  cb.type = 'hidden';
+  form.appendChild(cb);
+  document.body.appendChild(form);
+  form.submit();
+}
 
 /**
  * Página inicial: logo Fin Memory + login com Google.
@@ -13,6 +39,17 @@ export default function HomePage() {
   const router = useRouter();
   const { msg } = router.query;
   const isNotRegistered = msg === 'nao-cadastrado';
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  // Evita ficar preso em "Carregando..." se /api/auth/session demorar ou falhar (ex.: adapter DB)
+  useEffect(() => {
+    if (status !== 'loading') return;
+    const t = setTimeout(() => setLoadingTimedOut(true), SESSION_LOADING_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [status]);
+  useEffect(() => {
+    if (status !== 'loading') setLoadingTimedOut(false);
+  }, [status]);
 
   // Só redireciona para o mapa se estiver autenticado e NÃO veio de "acesso negado"
   // (evita loop: mapa redireciona para /?msg=nao-cadastrado -> index redireciona para mapa -> repetir)
@@ -23,10 +60,11 @@ export default function HomePage() {
   }, [status, router, router.query.msg]);
 
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/mapa' });
+    signInWithGoogleForm('/mapa');
   };
 
-  if (status === 'loading') {
+  const showLoading = status === 'loading' && !loadingTimedOut;
+  if (showLoading) {
     return (
       <>
         <Head>

@@ -33,14 +33,22 @@ export default function PartnershipPage() {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from('partnerships')
-      .select('*')
-      .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
-      .order('created_at', { ascending: false })
+    const { data: memberRow } = await supabase
+      .from('partnership_members')
+      .select('partnership_id')
+      .eq('user_id', userId)
       .limit(1)
       .maybeSingle();
-    setPartnership(data || null);
+    if (memberRow) {
+      const { data: p } = await supabase
+        .from('partnerships')
+        .select('*')
+        .eq('id', memberRow.partnership_id)
+        .single();
+      setPartnership(p || null);
+    } else {
+      setPartnership(null);
+    }
     setLoading(false);
   };
 
@@ -58,6 +66,7 @@ export default function PartnershipPage() {
         .select()
         .single();
       if (err) throw err;
+      await supabase.from('partnership_members').insert({ partnership_id: data.id, user_id: userId });
       setPartnership(data);
     } catch (e) {
       setError(e.message || 'Erro ao criar parceria.');
@@ -79,23 +88,33 @@ export default function PartnershipPage() {
         .from('partnerships')
         .select('id, user_id_1')
         .eq('invite_code', code)
-        .eq('status', 'pending')
         .single();
       if (!row) {
-        setError('Código inválido ou já utilizado.');
+        setError('Código inválido.');
+        setJoining(false);
+        return;
+      }
+      const { data: alreadyMember } = await supabase
+        .from('partnership_members')
+        .select('partnership_id')
+        .eq('partnership_id', row.id)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (alreadyMember) {
+        setError('Você já está nesta parceria.');
         setJoining(false);
         return;
       }
       if (row.user_id_1 === userId) {
-        setError('Você não pode usar seu próprio código.');
+        setError('Você já criou esta parceria.');
         setJoining(false);
         return;
       }
-      const { error: err } = await supabase
-        .from('partnerships')
-        .update({ user_id_2: userId, status: 'active' })
-        .eq('id', row.id);
-      if (err) throw err;
+      const { error: insertErr } = await supabase
+        .from('partnership_members')
+        .insert({ partnership_id: row.id, user_id: userId });
+      if (insertErr) throw insertErr;
+      await supabase.from('partnerships').update({ status: 'active' }).eq('id', row.id);
       await fetchPartnership();
     } catch (e) {
       setError(e.message || 'Erro ao entrar na parceria.');
@@ -135,7 +154,7 @@ export default function PartnershipPage() {
           <Users className="h-6 w-6 text-[#2ECC49]" />
           Parceria
         </h1>
-        <p className="text-sm text-[#666] mb-6">Compartilhe lista de compras com seu parceiro(a).</p>
+        <p className="text-sm text-[#666] mb-6">Compartilhe a lista de compras com quantas pessoas quiser. Gere um código e envie pelo app.</p>
 
         {error && (
           <div className="p-3 rounded-lg bg-red-50 text-red-800 text-sm mb-4">{error}</div>
@@ -146,7 +165,7 @@ export default function PartnershipPage() {
             <p className="text-sm text-[#666]">Status: <strong>{partnership.status}</strong></p>
             {partnership.status === 'pending' && (
               <>
-                <p className="text-sm text-[#333]">Compartilhe este código com seu parceiro(a):</p>
+                <p className="text-sm text-[#333]">Compartilhe este código com quem quiser entrar na parceria:</p>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-mono font-bold tracking-wider bg-[#f0f0f0] px-4 py-2 rounded-lg">
                     {partnership.invite_code}

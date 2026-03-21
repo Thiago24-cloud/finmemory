@@ -18,6 +18,7 @@ import ShoppingList from "./pages/ShoppingList";
 import Privacidade from "./pages/Privacidade";
 import Termos from "./pages/Termos";
 import NotFound from "./pages/NotFound";
+import Contas from "./pages/Contas";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/contas" element={<ProtectedRoute><Contas /></ProtectedRoute>} />
             <Route path="/add-receipt" element={<ProtectedRoute><AddReceipt /></ProtectedRoute>} />
             <Route path="/mapa-precos" element={<ProtectedRoute><MapaPrecos /></ProtectedRoute>} />
             <Route path="/share-price" element={<ProtectedRoute><SharePrice /></ProtectedRoute>} />

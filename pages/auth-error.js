@@ -66,6 +66,11 @@ const ERROR_MESSAGES = {
     message: 'A solicitação de login não está formatada corretamente.',
     suggestion: 'Tente limpar o cache do navegador e fazer login novamente.'
   },
+  Configuration: {
+    title: 'Erro de Configuração do Login',
+    message: 'O login com Google está mal configurado (credenciais OAuth ou URL do app).',
+    suggestion: 'Limpe os cookies deste site (finmemory-836908221936.southamerica-east1.run.app), feche e abra o navegador e tente de novo. Se continuar: verifique no Google Cloud as Credenciais OAuth e a variável NEXTAUTH_URL no Cloud Run.'
+  },
   access_denied: {
     title: 'Acesso Negado',
     message: 'Você recusou as permissões solicitadas pelo aplicativo.',

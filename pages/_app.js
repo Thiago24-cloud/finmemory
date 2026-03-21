@@ -5,20 +5,31 @@ import { Toaster } from 'sonner';
 import AnalyticsProvider from '../components/AnalyticsProvider';
 import ClientOnly from '../components/ClientOnly';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import '../styles/globals.css';
 
-/** Evita que falha do Google Analytics derrube o app ao abrir */
+/**
+ * Só carrega o script do GA em hosts permitidos (produção),
+ * para não poluir métricas com localhost, previews, etc.
+ */
 class SafeGoogleAnalytics extends Component {
-  state = { hasError: false };
+  state = { hasError: false, hostChecked: false, hostAllowed: false };
   static getDerivedStateFromError() {
     return { hasError: true };
   }
   componentDidCatch(err, info) {
     console.warn('GoogleAnalytics error (ignored):', err?.message || err, info);
   }
+  componentDidMount() {
+    const hostAllowed =
+      typeof window !== 'undefined' && isGaAllowedHost(window.location.hostname);
+    this.setState({ hostChecked: true, hostAllowed });
+  }
   render() {
     if (this.state.hasError) return null;
-    return <GoogleAnalytics gaId="G-K783HNBGE8" />;
+    if (!this.state.hostChecked) return null;
+    if (!this.state.hostAllowed) return null;
+    return <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />;
   }
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getMapThemeById } from '../lib/colors';
@@ -17,13 +17,21 @@ const DEFAULT_ICON = L.icon({
   shadowSize: [41, 41]
 });
 
-function createCategoryIcon(hexColor) {
+/** Pin de preço no mapa. Vários itens no mesmo lugar → bolha maior com o total (ex.: 29), para não “sumir” atrás do pin da loja. */
+function createCategoryIcon(hexColor, bundleCount = 1) {
+  const n = Math.max(1, Number(bundleCount) || 1);
+  const isBundle = n > 1;
+  const size = isBundle ? 42 : 32;
+  const half = size / 2;
+  const label = isBundle
+    ? `<span style="font-size:14px;font-weight:800;color:#fff;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);">${n}</span>`
+    : '';
   return L.divIcon({
-    className: 'custom-pin',
-    html: `<div style="background:${hexColor};width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -14]
+    className: 'custom-pin custom-pin-price',
+    html: `<div style="background:${hexColor};width:${size}px;height:${size}px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;">${label}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half]
   });
 }
 
@@ -122,6 +130,7 @@ function StoreMarkers() {
           key={store.id}
           position={[Number(store.lat), Number(store.lng)]}
           icon={createStoreIcon(store.type, !!store.tem_oferta_hoje)}
+          zIndexOffset={-300}
         >
           <Popup>
             <div className="p-2 min-w-[180px]">
@@ -236,13 +245,10 @@ function LocationMarker({ onLocationFound }) {
   );
 }
 
-/** Busca compras compartilhadas no mapa. Se searchQuery, filtra por nome do produto. */
-async function fetchMapPoints(searchQuery = '') {
+/** Busca todos os pontos recentes do mapa (sem ?q). O filtro por busca é feito no cliente — assim as ofertas da loja e os pins não “dessincronizam”. */
+async function fetchMapPoints() {
   try {
-    const url = searchQuery.trim().length >= 2
-      ? `/api/map/points?q=${encodeURIComponent(searchQuery.trim())}`
-      : '/api/map/points';
-    const res = await fetch(url);
+    const res = await fetch('/api/map/points');
     if (!res.ok) return [];
     const json = await res.json();
     const points = json.points || [];
@@ -284,6 +290,19 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
   const [storeNearby, setStoreNearby] = useState(null);
   const [dismissedStorePrompt, setDismissedStorePrompt] = useState(false);
 
+  /** Pins visíveis: todos os pontos ou só os que batem com a busca (evita pin sumir com texto residual na caixa). */
+  const visibleLocais = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const base = locais.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
+    if (q.length < 2) return base;
+    return base.filter(
+      (p) =>
+        (p.produto || '').toLowerCase().includes(q) ||
+        (p.nome || '').toLowerCase().includes(q) ||
+        (p.categoria || '').toLowerCase().includes(q)
+    );
+  }, [locais, searchQuery]);
+
   const handleLocationFound = useCallback((lat, lng) => {
     setDismissedStorePrompt(false);
     fetch(`/api/map/stores?lat=${lat}&lng=${lng}&radius=150`)
@@ -298,20 +317,20 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
       .catch(() => setStoreNearby(null));
   }, []);
 
-  const buscarLocais = useCallback(async (query = searchQuery) => {
+  const buscarLocais = useCallback(async () => {
     setCarregando(true);
     try {
-      const points = await fetchMapPoints(query);
+      const points = await fetchMapPoints();
       setLocais(points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng)));
     } catch (error) {
       console.error('Erro ao buscar locais:', error);
     }
     setCarregando(false);
-  }, [searchQuery]);
+  }, []);
 
   useEffect(() => {
-    buscarLocais(searchQuery);
-  }, [searchQuery, buscarLocais]);
+    buscarLocais();
+  }, [buscarLocais]);
 
   return (
     <div className="relative w-full h-full">
@@ -329,17 +348,18 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
         />
         <LocationMarker onLocationFound={handleLocationFound} />
         <StoreMarkers />
-        {groupPointsByLocation(locais).map((group, idx) => {
+        {groupPointsByLocation(visibleLocais).map((group, idx) => {
           const first = group.points[0];
           const { main } = getCategoryColor(first.categoria, first.nome);
-          const customIcon = createCategoryIcon(main);
-          const total = group.points.reduce((s, p) => s + Number(p.preco || 0), 0);
           const count = group.points.length;
+          const customIcon = createCategoryIcon(main, count);
+          const total = group.points.reduce((s, p) => s + Number(p.preco || 0), 0);
           return (
             <Marker
               key={`${group.lat}-${group.lng}-${idx}`}
               position={[group.lat, group.lng]}
               icon={customIcon}
+              zIndexOffset={2500}
             >
               <Popup className="mapa-precos-popup-agrupado">
                 <div className="p-2 min-w-[200px] max-w-[320px]">
@@ -423,19 +443,22 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
       <div className="absolute bottom-20 left-3 right-3 sm:left-4 sm:right-auto z-[1000] bg-white/95 backdrop-blur p-3 rounded-xl shadow-lg border border-gray-200/80 max-w-[280px]">
         {locais.length === 0 && !carregando && (
           <p className="mt-1.5 text-xs text-gray-500">
-            {searchQuery.trim().length >= 2
-              ? `Nenhum preço de &quot;${searchQuery.trim()}&quot; compartilhado ainda. Compartilhe o primeiro!`
-              : 'Nenhum preço compartilhado ainda. Use "Compartilhar" no topo ou busque um produto (ex: arroz).'}
+            Nenhum preço compartilhado ainda. Use &quot;Compartilhar&quot; no topo ou busque um produto (ex: arroz).
           </p>
         )}
-        {locais.length > 0 && searchQuery.trim().length >= 2 && (
+        {locais.length > 0 && visibleLocais.length === 0 && searchQuery.trim().length >= 2 && !carregando && (
+          <p className="mt-1.5 text-xs text-amber-700 font-medium">
+            Nenhum resultado para &quot;{searchQuery.trim()}&quot;. Limpe a busca para ver os {locais.length} preço(s) no mapa.
+          </p>
+        )}
+        {visibleLocais.length > 0 && searchQuery.trim().length >= 2 && (
           <p className="mt-1.5 text-xs text-emerald-600 font-medium">
-            {locais.length} preço(s) de &quot;{searchQuery.trim()}&quot; — toque no ícone para ver a lista
+            {visibleLocais.length} de {locais.length} preço(s) com &quot;{searchQuery.trim()}&quot; — toque no ícone colorido do produto
           </p>
         )}
         {locais.length > 0 && searchQuery.trim().length < 2 && (
           <p className="mt-1.5 text-xs text-gray-500">
-            Toque em um ícone para ver todos os produtos e preços daquele local
+            Toque no círculo colorido (preços) para ver produtos; pins verdes/laranja são as lojas cadastradas
           </p>
         )}
         <button

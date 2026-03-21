@@ -1,5 +1,9 @@
 # Script de Deploy para Cloud Run
 # Execute este script após configurar gcloud CLI
+# Deploy vai para o projeto de produção (exalted-entry-480904-s9)
+
+# Projeto de produção — Cloud Run + 100 usuários
+$PROJECT_ID = "exalted-entry-480904-s9"
 
 Write-Host "🚀 Iniciando deploy do FinMemory para Cloud Run..." -ForegroundColor Cyan
 
@@ -13,15 +17,10 @@ try {
     exit 1
 }
 
-# Obter PROJECT_ID
+# Usar projeto de produção
 Write-Host "`n📋 Configuração do projeto:" -ForegroundColor Cyan
-$PROJECT_ID = gcloud config get-value project 2>&1
-if (-not $PROJECT_ID -or $PROJECT_ID -match "unset") {
-    Write-Host "❌ Nenhum projeto configurado. Configure com:" -ForegroundColor Red
-    Write-Host "   gcloud config set project SEU_PROJECT_ID" -ForegroundColor Yellow
-    exit 1
-}
-Write-Host "   Project ID: $PROJECT_ID" -ForegroundColor Green
+gcloud config set project $PROJECT_ID 2>&1 | Out-Null
+Write-Host "   Project ID: $PROJECT_ID [producao]" -ForegroundColor Green
 
 # Verificar se está autenticado
 Write-Host "`n🔐 Verificando autenticação..." -ForegroundColor Cyan
@@ -71,14 +70,19 @@ Write-Host "   Isso pode levar alguns minutos..." -ForegroundColor Yellow
 
 # Token entre aspas duplas para que = ou vírgula no valor não quebrem o parsing do gcloud
 $subs = "_COMMIT_SHA=$COMMIT_SHA,_MAPBOX_ACCESS_TOKEN=`"$MAPBOX_TOKEN`""
-Write-Host "`nExecutando: gcloud builds submit --config cloudbuild.yaml --substitutions=..." -ForegroundColor Gray
+Write-Host "`nExecutando: gcloud builds submit --project $PROJECT_ID --config cloudbuild.yaml --substitutions=..." -ForegroundColor Gray
 
 try {
-    & gcloud builds submit --config cloudbuild.yaml "--substitutions=$subs"
+    & gcloud builds submit --project $PROJECT_ID --config cloudbuild.yaml "--substitutions=$subs"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✅ Deploy concluído com sucesso!" -ForegroundColor Green
-        Write-Host "`n🌐 Sua aplicação está disponível em:" -ForegroundColor Cyan
-        Write-Host "   https://finmemory-836908221936.southamerica-east1.run.app" -ForegroundColor Yellow
+        $PROJECT_NUMBER = gcloud projects describe $PROJECT_ID --format="value(projectNumber)" 2>$null
+        if ($PROJECT_NUMBER) {
+            Write-Host "`n🌐 Sua aplicação está disponível em:" -ForegroundColor Cyan
+            Write-Host "   https://finmemory-$PROJECT_NUMBER.southamerica-east1.run.app" -ForegroundColor Yellow
+        } else {
+            Write-Host "`n🌐 Veja a URL do serviço em: Console Cloud Run (projeto $PROJECT_ID)" -ForegroundColor Cyan
+        }
     } else {
         Write-Host "`n❌ Deploy falhou. Verifique os logs acima." -ForegroundColor Red
         exit 1
