@@ -218,7 +218,7 @@ async function getAllStoresWithCoords() {
   }
   const { data, error } = await supabase
     .from('stores')
-    .select('name,lat,lng')
+    .select('id,name,lat,lng')
     .eq('active', true)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
@@ -457,9 +457,11 @@ async function applyFanOutOrFallbackCoords(key, rows, chainCoords) {
       continue;
     }
     for (const st of cap) {
+      const sid = st.id != null ? String(st.id).replace(/-/g, '').slice(-8) : `${st.lat},${st.lng}`;
+      const label = `${String(st.name || 'Loja').trim()} #${sid}`;
       expanded.push({
         ...r,
-        nome_produto: `${r.nome_produto} · ${String(st.name || 'Loja').trim()}`.slice(0, 280),
+        nome_produto: `${r.nome_produto} · ${label}`.slice(0, 280),
         lat: Number(st.lat),
         lng: Number(st.lng),
       });
