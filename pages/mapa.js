@@ -40,6 +40,8 @@ export default function MapaPage() {
   const [mapThemeId, setMapThemeId] = useState('verde');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  /** Inicia mostrando só promoções — mapa “cheio de descontos”; o utilizador pode desligar para ver tudo. */
+  const [promoOnly, setPromoOnly] = useState(true);
   const searchInputRef = useRef(null);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function MapaPage() {
       {/* Mapa em tela cheia = primeira coisa que o usuário vê */}
       <div className="fixed inset-0 w-full h-full bg-[#e5e3df]">
         <div className="absolute inset-0 w-full h-full">
-          <MapaPrecos mapThemeId={mapThemeId} searchQuery={debouncedSearch} />
+          <MapaPrecos mapThemeId={mapThemeId} searchQuery={debouncedSearch} promoOnly={promoOnly} />
         </div>
 
         {/* Banner de sucesso ao compartilhar */}
@@ -111,7 +113,19 @@ export default function MapaPage() {
                 <Map className="h-5 w-5 shrink-0" />
                 <span className="whitespace-nowrap">Mapas</span>
               </button>
-              <div className="flex-1 flex items-center min-w-0 max-w-[200px] sm:max-w-xs">
+              <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none min-h-[44px] px-2 rounded-full bg-amber-50 border border-amber-200/80">
+                <input
+                  type="checkbox"
+                  checked={promoOnly}
+                  onChange={(e) => setPromoOnly(e.target.checked)}
+                  className="rounded border-amber-300 text-amber-600 focus:ring-amber-500 w-4 h-4"
+                  aria-label="Mostrar só promoções no mapa"
+                />
+                <span className="text-xs font-semibold text-amber-900 whitespace-nowrap hidden sm:inline">
+                  Só promo
+                </span>
+              </label>
+              <div className="flex-1 flex items-center min-w-0 max-w-[160px] sm:max-w-xs">
                 <div className="w-full flex items-center bg-gray-100/90 rounded-full pl-3 pr-3 py-2 focus-within:bg-white focus-within:ring-1 focus-within:ring-[#2ECC49] transition-all">
                   <Search className="h-4 w-4 text-gray-400 shrink-0 mr-2" />
                   <input

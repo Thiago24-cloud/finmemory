@@ -1,7 +1,7 @@
 'use client';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getMapThemeById } from '../lib/colors';
@@ -246,9 +246,40 @@ function LocationMarker({ onLocationFound }) {
 }
 
 /** Busca todos os pontos recentes do mapa (sem ?q). O filtro por busca é feito no cliente — assim as ofertas da loja e os pins não “dessincronizam”. */
-async function fetchMapPoints() {
+/**
+ * Preço no mapa: encartes Dia não têm preço no JSON do site — nunca mostrar centavo fictício.
+ * Linhas promo-* ou categoria com "promo": tratar ≤ R$ 0,01 como sem valor numérico.
+ */
+function formatPrecoExibicao(preco, categoria, id) {
+  if (preco == null || preco === '') return null;
+  const n = Number(preco);
+  if (!Number.isFinite(n)) return null;
+  const promoLike =
+    String(id || '').startsWith('promo-') ||
+    String(categoria || '').toLowerCase().includes('promo');
+  if (promoLike && n <= 0.01) return null;
+  return `R$ ${n.toFixed(2)}`;
+}
+
+/**
+ * Busca pontos: com busca (q≥2) ignora viewport; sem busca envia bbox da área visível para aliviar API e DOM.
+ */
+async function fetchMapPoints(map, searchTrim) {
   try {
-    const res = await fetch('/api/map/points');
+    const params = new URLSearchParams();
+    if (searchTrim.length >= 2) {
+      params.set('q', searchTrim);
+    } else if (map) {
+      const b = map.getBounds();
+      const sw = b.getSouthWest();
+      const ne = b.getNorthEast();
+      params.set('sw_lat', sw.lat.toFixed(5));
+      params.set('sw_lng', sw.lng.toFixed(5));
+      params.set('ne_lat', ne.lat.toFixed(5));
+      params.set('ne_lng', ne.lng.toFixed(5));
+    }
+    const qs = params.toString();
+    const res = await fetch(qs ? `/api/map/points?${qs}` : '/api/map/points');
     if (!res.ok) return [];
     const json = await res.json();
     const points = json.points || [];
@@ -257,6 +288,8 @@ async function fetchMapPoints() {
       nome: p.store_name,
       produto: p.product_name,
       preco: p.price,
+      precoLabel: formatPrecoExibicao(p.price, p.category, p.id),
+      promo_image_url: p.promo_image_url || null,
       lat: Number(p.lat),
       lng: Number(p.lng),
       categoria: p.category || '',
@@ -267,6 +300,53 @@ async function fetchMapPoints() {
     console.warn('Erro ao buscar pontos do mapa:', e);
     return [];
   }
+}
+
+/** Carrega/atualiza price_points conforme mapa (debounce no pan) ou busca global */
+function PricePointsLoader({ searchQuery, setLocais, setCarregando, reloadRef }) {
+  const map = useMap();
+  const debounceRef = useRef(null);
+  const searchTrim = (searchQuery || '').trim();
+  const globalSearch = searchTrim.length >= 2;
+
+  const load = useCallback(async () => {
+    if (!map) return;
+    setCarregando(true);
+    try {
+      const points = await fetchMapPoints(map, searchTrim);
+      setLocais(points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng)));
+    } catch (error) {
+      console.error('Erro ao buscar locais:', error);
+    }
+    setCarregando(false);
+  }, [map, searchTrim, setLocais, setCarregando]);
+
+  useEffect(() => {
+    reloadRef.current = () => {
+      load();
+    };
+  }, [load, reloadRef]);
+
+  useEffect(() => {
+    if (!map) return undefined;
+    load();
+    return undefined;
+  }, [map, globalSearch, searchTrim, load]);
+
+  useEffect(() => {
+    if (!map || globalSearch) return undefined;
+    const onMoveEnd = () => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => load(), 400);
+    };
+    map.on('moveend', onMoveEnd);
+    return () => {
+      map.off('moveend', onMoveEnd);
+      clearTimeout(debounceRef.current);
+    };
+  }, [map, globalSearch, load]);
+
+  return null;
 }
 
 /** Agrupa pontos pelo mesmo local (lat/lng arredondados) para evitar marcadores empilhados. */
@@ -283,17 +363,26 @@ function groupPointsByLocation(points) {
   return Array.from(groups.values());
 }
 
-export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = '' }) {
+function isPromoPoint(p) {
+  const c = String(p.categoria || '').toLowerCase();
+  return c.includes('promo') || String(p.id || '').startsWith('promo-');
+}
+
+export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = '', promoOnly = false }) {
   const theme = getMapThemeById(mapThemeId);
   const [locais, setLocais] = useState([]);
   const [carregando, setCarregando] = useState(false);
+  const reloadPointsRef = useRef(() => {});
   const [storeNearby, setStoreNearby] = useState(null);
   const [dismissedStorePrompt, setDismissedStorePrompt] = useState(false);
 
-  /** Pins visíveis: todos os pontos ou só os que batem com a busca (evita pin sumir com texto residual na caixa). */
+  /** Pins visíveis: busca + opcional “só promoções”. */
   const visibleLocais = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const base = locais.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
+    let base = locais.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
+    if (promoOnly) {
+      base = base.filter(isPromoPoint);
+    }
     if (q.length < 2) return base;
     return base.filter(
       (p) =>
@@ -301,7 +390,7 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
         (p.nome || '').toLowerCase().includes(q) ||
         (p.categoria || '').toLowerCase().includes(q)
     );
-  }, [locais, searchQuery]);
+  }, [locais, searchQuery, promoOnly]);
 
   const handleLocationFound = useCallback((lat, lng) => {
     setDismissedStorePrompt(false);
@@ -317,20 +406,19 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
       .catch(() => setStoreNearby(null));
   }, []);
 
-  const buscarLocais = useCallback(async () => {
-    setCarregando(true);
-    try {
-      const points = await fetchMapPoints();
-      setLocais(points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng)));
-    } catch (error) {
-      console.error('Erro ao buscar locais:', error);
-    }
-    setCarregando(false);
+  const buscarLocais = useCallback(() => {
+    reloadPointsRef.current();
   }, []);
 
+  /** Atualização periódica só com aba visível (mapa mais “vivo” sem custo em background). */
   useEffect(() => {
-    buscarLocais();
-  }, [buscarLocais]);
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        reloadPointsRef.current?.();
+      }
+    }, 50000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="relative w-full h-full">
@@ -347,13 +435,27 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
           url={theme.url}
         />
         <LocationMarker onLocationFound={handleLocationFound} />
+        <PricePointsLoader
+          searchQuery={searchQuery}
+          setLocais={setLocais}
+          setCarregando={setCarregando}
+          reloadRef={reloadPointsRef}
+        />
         <StoreMarkers />
         {groupPointsByLocation(visibleLocais).map((group, idx) => {
           const first = group.points[0];
           const { main } = getCategoryColor(first.categoria, first.nome);
           const count = group.points.length;
           const customIcon = createCategoryIcon(main, count);
-          const total = group.points.reduce((s, p) => s + Number(p.preco || 0), 0);
+          const priced = group.points.filter((p) => {
+            const n = Number(p.preco);
+            if (String(p.id || '').startsWith('promo-') && (!Number.isFinite(n) || n <= 0.01)) {
+              return false;
+            }
+            return Number.isFinite(n) && n > 0;
+          });
+          const total = priced.reduce((s, p) => s + Number(p.preco), 0);
+          const showTotal = priced.length > 1;
           return (
             <Marker
               key={`${group.lat}-${group.lng}-${idx}`}
@@ -370,7 +472,7 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
                     >
                       {count === 1 ? (first.categoria || 'Outros') : `${count} itens`}
                     </span>
-                    {count > 1 && (
+                    {showTotal && (
                       <span className="text-xs font-semibold text-gray-600">
                         Total: R$ {total.toFixed(2)}
                       </span>
@@ -390,7 +492,20 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
                           {p.produto}
                         </p>
                         <p className="text-sm font-bold shrink-0" style={{ color: main }}>
-                          R$ {Number(p.preco).toFixed(2)}
+                          {p.precoLabel != null ? (
+                            p.precoLabel
+                          ) : p.promo_image_url ? (
+                            <a
+                              href={p.promo_image_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline text-emerald-700"
+                            >
+                              Ver encarte
+                            </a>
+                          ) : (
+                            'Encarte'
+                          )}
                         </p>
                       </div>
                     ))}
@@ -402,7 +517,9 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
                   )}
                   {count > 1 && (
                     <p className="text-xs text-gray-500 mt-2">
-                      Preços compartilhados pela comunidade
+                      {group.points.every((pt) => String(pt.id || '').startsWith('promo-'))
+                        ? 'Encartes: o site não envia preço por item — abra cada link para ver a imagem.'
+                        : 'Preços compartilhados pela comunidade'}
                     </p>
                   )}
                 </div>

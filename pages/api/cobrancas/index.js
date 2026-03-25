@@ -132,7 +132,10 @@ export default async function handler(req, res) {
       return res.status(500).json({
         success: false,
         error: e?.message || 'Erro ao salvar cobrança',
-        hint: e?.code === '23503' ? 'user_id precisa existir em auth.users (Supabase Auth).' : undefined,
+        hint:
+          e?.code === '23503'
+            ? 'user_id precisa existir em public.users. Rode a migração cobrancas_fk_public_users no Supabase ou peça suporte.'
+            : undefined,
       });
     }
   }

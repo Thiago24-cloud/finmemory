@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,38 @@ function pad2(n: number) {
 function toLocalISODate(d: Date) {
   // Evita shift de data por timezone (usamos YYYY-MM-DD local)
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** Mesmo id usado pela API NextAuth / tabela public.users (pode diferir de auth.users). */
+async function getPublicUserIdForCobranca(authUser: User): Promise<string | null> {
+  const email = authUser.email;
+  if (!email) return null;
+
+  const { data: row } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
+  if (row?.id) return row.id;
+
+  const name =
+    (authUser.user_metadata as { full_name?: string; name?: string } | undefined)?.full_name ||
+    (authUser.user_metadata as { name?: string } | undefined)?.name ||
+    null;
+
+  const { data: inserted, error: insErr } = await supabase
+    .from("users")
+    .insert({
+      id: authUser.id,
+      email,
+      name,
+    })
+    .select("id")
+    .single();
+
+  if (!insErr && inserted?.id) return inserted.id;
+
+  const { data: again } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
+  if (again?.id) return again.id;
+
+  console.warn("[cobrancas] public.users:", insErr);
+  return authUser.id;
 }
 
 function formatDateBR(isoDate: string) {
@@ -156,10 +189,17 @@ export function CobrancasMiniCard({
     if (!user?.id) return;
     setLoading(true);
     try {
+      const uid = await getPublicUserIdForCobranca(user);
+      if (!uid) {
+        setCobrancas([]);
+        setPagamentos([]);
+        return;
+      }
+
       const { data: cobrancasData, error: cobrancasErr } = await supabase
         .from("cobrancas")
         .select("id, titulo, valor, recorrencia, dia_vencimento, competencia, categoria, ativa")
-        .eq("user_id", user.id)
+        .eq("user_id", uid)
         .eq("ativa", true)
         .order("created_at", { ascending: false });
 
@@ -170,7 +210,7 @@ export function CobrancasMiniCard({
       const { data: pagamentosData, error: pagamentosErr } = await supabase
         .from("cobrancas_pagamentos")
         .select("id, cobranca_id, competencia, data_pagamento, forma_pagamento, obs")
-        .eq("user_id", user.id)
+        .eq("user_id", uid)
         .gte("competencia", monthStart)
         .lte("competencia", monthEnd);
 
@@ -203,12 +243,18 @@ export function CobrancasMiniCard({
     if (!user?.id || !selectedCobranca) return;
     setSaving(true);
     try {
+      const uid = await getPublicUserIdForCobranca(user);
+      if (!uid) {
+        toast.error("Não foi possível identificar seu usuário.");
+        return;
+      }
+
       const cobrancaId = selectedCobranca.id;
       const competencia = selectedCompetencia;
       const valor = Number(selectedCobranca.valor) || 0;
 
       const payloadPayment = {
-        user_id: user.id,
+        user_id: uid,
         cobranca_id: cobrancaId,
         competencia,
         data_pagamento: todayISO, // check-in => hoje (foi o que voce pediu)
@@ -224,7 +270,7 @@ export function CobrancasMiniCard({
 
       if (paymentErr) throw paymentErr;
 
-      // Cria um lançamento em "Gastos" / transacoes
+      // transacoes.user_id referencia auth.users
       const payloadTx = {
         user_id: user.id,
         estabelecimento: selectedCobranca.titulo,
@@ -259,8 +305,14 @@ export function CobrancasMiniCard({
     if (!titulo) return toast.error("Informe o titulo");
     if (!valor || valor <= 0) return toast.error("Informe o valor");
 
+    const uid = await getPublicUserIdForCobranca(user);
+    if (!uid) {
+      toast.error("Não foi possível identificar seu usuário.");
+      return;
+    }
+
     const payload = {
-      user_id: user.id,
+      user_id: uid,
       titulo,
       valor,
       recorrencia: formRecorrencia,

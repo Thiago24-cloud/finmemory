@@ -1,0 +1,22 @@
+{
+  "name": "finmemory-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FinMemory — Supermarket Promotions Agent",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "dry-run": "node agent.js --dry-run",
+    "debug": "node agent.js --headless=false --only=dia",
+    "dia": "node agent.js --only=dia",
+    "atacadao": "node agent.js --only=atacadao",
+    "assai": "node agent.js --only=assai",
+    "carrefour": "node agent.js --only=carrefour"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1",
+    "p-limit": "^3.1.0",
+    "playwright": "^1.42.0"
+  }
+}

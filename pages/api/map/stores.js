@@ -110,6 +110,37 @@ export default async function handler(req, res) {
       console.warn('Aviso: erro ao buscar promo points para tem_oferta_hoje:', promoErr.message);
     }
 
+    // Promoções do agente (promocoes_supermercados) — mesmo critério de proximidade que price_points
+    let promoAgentRows = [];
+    try {
+      const { data: agentPromos, error: agentPromoErr } = await supabase
+        .from('promocoes_supermercados')
+        .select('lat,lng,supermercado,nome_produto,expira_em')
+        .eq('ativo', true)
+        .gt('expira_em', new Date().toISOString())
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .gte('lat', latMin)
+        .lte('lat', latMax)
+        .gte('lng', lngMin)
+        .lte('lng', lngMax)
+        .limit(2000);
+      if (agentPromoErr) {
+        console.warn('Aviso: promocoes_supermercados indisponível:', agentPromoErr.message);
+      } else {
+        promoAgentRows = (agentPromos || []).map((r) => ({
+          lat: r.lat,
+          lng: r.lng,
+          category: 'Supermercado - Promoção',
+          store_name: String(r.supermercado || ''),
+          product_name: r.nome_produto,
+          created_at: new Date().toISOString(),
+        }));
+      }
+    } catch (e) {
+      console.warn('Aviso: promocoes_supermercados:', e.message);
+    }
+
     const storesBase = data || [];
     const storeOfferMap = new Map(storesBase.map((s) => [s.id, false]));
     const storeOfferCountMap = new Map(storesBase.map((s) => [s.id, 0]));
@@ -127,7 +158,12 @@ export default async function handler(req, res) {
     };
 
     // Ativa tem_oferta_hoje se existir pelo menos 1 ponto promocional recente próximo da loja.
-    const points = (promoPoints || []).filter((p) => p && p.lat != null && p.lng != null && isPromoCategory(p.category));
+    const points = [
+      ...(promoPoints || []).filter(
+        (p) => p && p.lat != null && p.lng != null && isPromoCategory(p.category)
+      ),
+      ...promoAgentRows,
+    ];
     for (const p of points) {
       const pLat = Number(p.lat);
       const pLng = Number(p.lng);

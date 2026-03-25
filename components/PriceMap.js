@@ -169,16 +169,17 @@ function createClusterMarkerElement(count, onClick) {
   return el;
 }
 
-/** Dados de teste quando não houver pontos reais no Supabase */
+/** Exemplo quando ainda não há pontos reais da API (mapa não fica vazio). */
 const FALLBACK_MARKERS = [
   { lng: -46.6555, lat: -23.5629, store: 'Drogasil Paulista', product: 'Dipirona 500mg', price: 'R$ 12,90', timeAgo: 'Há 2 horas · Caçador #4521', category: 'farmácia' },
   { lng: -46.6433, lat: -23.5505, store: 'Pão de Açúcar', product: 'Leite Integral 1L', price: 'R$ 5,90', timeAgo: 'Há 5 horas · Explorador #1234', category: 'supermercado' },
 ];
 
 function formatPrice(value) {
-  if (value == null || value === '') return 'R$ 0,00';
+  if (value == null || value === '') return '—';
   const n = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(isNaN(n) ? 0 : n);
+  if (!Number.isFinite(n)) return '—';
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 }
 
 /** Busca pontos do mapa: API (dados reais) ou fallback */
@@ -368,7 +369,16 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
         markersRef.current.push(marker);
       } else {
         const { store, product, price, timeAgo, category } = feature.properties;
-        const priceStr = typeof price === 'number' || (typeof price === 'string' && price?.trim() && !String(price).startsWith('R$')) ? formatPrice(price) : (price || 'R$ 0,00');
+        const cat = String(category || '').toLowerCase();
+        const n = typeof price === 'number' ? price : parseFloat(String(price ?? '').replace(',', '.'));
+        const legacyPennyTabloide =
+          cat.includes('promo') && Number.isFinite(n) && n === 0.01;
+        const priceStr =
+          price == null || price === '' || legacyPennyTabloide
+            ? 'Tabloide / oferta'
+            : typeof price === 'number' || (typeof price === 'string' && price?.trim() && !String(price).startsWith('R$'))
+              ? formatPrice(price)
+              : price || '—';
         const colors = getColorForLocation(store, category);
         const el = createCustomMarkerElement(colors);
         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })

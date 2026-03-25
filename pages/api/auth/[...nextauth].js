@@ -3,12 +3,12 @@ import GoogleProvider from 'next-auth/providers/google';
 import { SupabaseAdapter } from '@next-auth/supabase-adapter';
 import { createClient } from '@supabase/supabase-js';
 
-// Em produção com uma única URL (só Cloud Run): forçar sempre esta base (evita Invalid URL quando a env está antiga/errada)
-const DEFAULT_NEXTAUTH_URL = 'https://finmemory-836908221936.southamerica-east1.run.app';
+// Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.
+// Para verificação do Google, mantenha alinhado com o domínio principal.
+const DEFAULT_NEXTAUTH_URL = 'https://finmemory.com.br';
 if (typeof process !== 'undefined') {
   const url = process.env.NEXTAUTH_URL || '';
-  const isProduction = process.env.NODE_ENV === 'production';
-  if (isProduction || !url || !url.startsWith('http')) {
+  if (!url || !url.startsWith('http')) {
     process.env.NEXTAUTH_URL = DEFAULT_NEXTAUTH_URL;
   }
 }

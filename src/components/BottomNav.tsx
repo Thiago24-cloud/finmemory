@@ -1,10 +1,11 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { Map, BarChart3, PlusCircle, User } from "lucide-react";
+import { Map, BarChart3, Calculator, PlusCircle, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { icon: Map, label: "Mapa", path: "/mapa-precos" },
-  { icon: BarChart3, label: "Dashboard", path: "/dashboard" },
+  { icon: BarChart3, label: "Gastos", path: "/dashboard" },
+  { icon: Calculator, label: "Economia", path: "/calculadora" },
   { icon: PlusCircle, label: "Adicionar", path: "/add-receipt" },
   { icon: User, label: "Perfil", path: "/profile" },
 ];

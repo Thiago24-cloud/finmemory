@@ -99,14 +99,6 @@ export default function Dashboard() {
   const [trashLoading, setTrashLoading] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  // Calculadora (base editável pelo cliente)
-  const [calcBaseTouched, setCalcBaseTouched] = useState(false);
-  const [calcBase, setCalcBase] = useState(null); // base fica vazia até o usuário usar/começar
-  const [calcDisplay, setCalcDisplay] = useState('0');
-  const [calcFirst, setCalcFirst] = useState(null); // number | null
-  const [calcOp, setCalcOp] = useState(null); // '+' | '-' | '*' | '/' | null
-  const [calcAwaitingSecond, setCalcAwaitingSecond] = useState(false);
-  const [calcExpanded, setCalcExpanded] = useState(false);
 
   // Debug: Log quando transactions mudar
   useEffect(() => {
@@ -735,144 +727,8 @@ export default function Dashboard() {
     return (filteredTransactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
   }, [filteredTransactions]);
 
-  const parseCalcNumber = (value) => {
-    const raw = value == null ? '' : String(value).trim();
-    if (!raw) return null;
-    // Se tem ',' assumimos formato BR: 1.234,56 -> 1234.56
-    const cleaned = raw.includes(',')
-      ? raw.replace(/\./g, '').replace(',', '.')
-      : raw.replace(/,/g, '');
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const formatCalcNumber = (n) => {
-    if (!Number.isFinite(n)) return '0';
-    const rounded = Math.round(n * 100) / 100;
-    const isInt = Math.abs(rounded - Math.round(rounded)) < 1e-9;
-    return isInt ? String(Math.round(rounded)) : String(rounded.toFixed(2)).replace(/\.00$/, '');
-  };
-
-  const computeCalc = (a, b, op) => {
-    switch (op) {
-      case '+':
-        return a + b;
-      case '-':
-        return a - b;
-      case '*':
-        return a * b;
-      case '/':
-        return b === 0 ? 0 : a / b;
-      default:
-        return b;
-    }
-  };
-
-  // (intencionalmente) nao preenche calcBase automaticamente.
-  // A base começa vazia (sem número) e só fica com valor quando o usuário clica em "Usar".
-
   const transactionCount = (transactions || []).length;
   const userLevel = transactionCount < 10 ? 'Iniciante' : transactionCount < 50 ? 'Regular' : 'Expert';
-
-  // =============================
-  // Calculadora
-  // =============================
-  const handleCalcClear = () => {
-    setCalcDisplay('0');
-    setCalcFirst(null);
-    setCalcOp(null);
-    setCalcAwaitingSecond(false);
-    setCalcBase(null);
-    setCalcBaseTouched(false);
-  };
-
-  const handleCalcBackspace = () => {
-    setCalcDisplay((prev) => {
-      if (calcAwaitingSecond) {
-        // Se acabou de escolher um operador, volta a permitir digitar do zero.
-        setCalcAwaitingSecond(false);
-        return '0';
-      }
-      if (!prev || prev.length <= 1) return '0';
-      const next = prev.slice(0, -1);
-      return next ? next : '0';
-    });
-  };
-
-  const handleCalcDigit = (d) => {
-    setCalcDisplay((prev) => {
-      if (calcAwaitingSecond) {
-        setCalcAwaitingSecond(false);
-        return d === '.' ? '0.' : d;
-      }
-      if (prev === '0' && d !== '.') return d;
-      if (prev === '0' && d === '.') return '0.';
-      return prev + d;
-    });
-  };
-
-  const handleCalcDecimal = () => {
-    handleCalcDigit('.');
-  };
-
-  const handleCalcOperator = (nextOp) => {
-    const current = parseCalcNumber(calcDisplay) ?? 0;
-    if (calcFirst === null) {
-      setCalcFirst(current);
-      setCalcOp(nextOp);
-      setCalcAwaitingSecond(true);
-      return;
-    }
-    if (calcOp && !calcAwaitingSecond) {
-      const result = computeCalc(calcFirst, current, calcOp);
-      setCalcFirst(result);
-      setCalcDisplay(formatCalcNumber(result));
-    } else {
-      setCalcFirst(current);
-    }
-    setCalcOp(nextOp);
-    setCalcAwaitingSecond(true);
-  };
-
-  const handleCalcEquals = () => {
-    if (!calcOp || calcFirst === null) return;
-    const current = parseCalcNumber(calcDisplay) ?? 0;
-    const result = computeCalc(calcFirst, current, calcOp);
-    setCalcDisplay(formatCalcNumber(result));
-    setCalcFirst(null);
-    setCalcOp(null);
-    setCalcAwaitingSecond(true);
-  };
-
-  const handleCalcPercent = () => {
-    const current = parseCalcNumber(calcDisplay) ?? 0;
-    const baseVal = calcBase == null ? Number(totalBalance) || 0 : Number(calcBase) || 0;
-    const result = (baseVal * current) / 100;
-    setCalcDisplay(formatCalcNumber(result));
-    setCalcFirst(null);
-    setCalcOp(null);
-    setCalcAwaitingSecond(false);
-  };
-
-  const handleCalcUseBase = () => {
-    const baseVal = calcBase == null ? Number(totalBalance) || 0 : Number(calcBase) || 0;
-    setCalcBaseTouched(true);
-    setCalcBase(baseVal);
-    setCalcDisplay(formatCalcNumber(baseVal));
-    setCalcFirst(null);
-    setCalcOp(null);
-    setCalcAwaitingSecond(false);
-  };
-
-  const handleCalcApplyResultToBase = () => {
-    const current = parseCalcNumber(calcDisplay);
-    const v = current == null ? (calcBase == null ? 0 : Number(calcBase) || 0) : current;
-    setCalcBaseTouched(true);
-    setCalcBase(v);
-    setCalcFirst(null);
-    setCalcOp(null);
-    setCalcAwaitingSecond(false);
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -942,33 +798,21 @@ export default function Dashboard() {
                 <Link href="/mapa" onClick={() => { localStorage.setItem('finmemory_tip_map', '1'); setTipMapDismissed(true); }} className="inline-block mt-2 text-xs font-semibold underline">Ver mapa</Link>
               </div>
             )}
-            <div className="flex items-stretch gap-3 mb-4">
-              <div className="flex-1 min-w-0">
-                <BalanceCard
-                  balance={totalBalance}
-                  className="mb-0"
-                  label={selectedMonth ? 'Gasto do mês' : undefined}
-                />
-              </div>
-
-              {/* Foto/calculadora compacta (abre a calculadora completa) */}
-              <button
-                type="button"
-                onClick={() => setCalcExpanded(true)}
-                className="shrink-0 w-[104px] rounded-2xl border border-[#28a745]/40 bg-[#0b1220] p-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
-                aria-label="Abrir calculadora"
-              >
-                <div className="w-full h-[74px] rounded-2xl bg-[#0f172a] border border-[#28a745]/35 flex items-center justify-center relative">
-                  <div className="w-[42px] h-[42px] rounded-xl bg-[#111827] border border-[#28a745]/40 flex items-center justify-center">
-                    <Calculator className="h-5 w-5 text-[#28a745]" />
-                  </div>
-                  <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-[#28a745]" />
-                </div>
-                <div className="text-[10px] mt-2 text-center font-semibold text-white/90 leading-tight">
-                  Faça seus calculos aqui
-                </div>
-              </button>
+            <div className="mb-4">
+              <BalanceCard
+                balance={totalBalance}
+                className="mb-0"
+                label={selectedMonth ? 'Gasto do mês' : undefined}
+              />
             </div>
+
+            <Link
+              href="/calculadora"
+              className="flex items-center justify-center gap-2 w-full py-3 mb-4 rounded-2xl border border-[#28a745]/40 bg-[#0b1220] text-white font-semibold text-sm shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:bg-[#0f172a] transition-colors"
+            >
+              <Calculator className="h-5 w-5 text-[#28a745]" aria-hidden />
+              Calculadora de economia
+            </Link>
 
             {/* Cobranças do mês */}
             <CobrancasDoMes
@@ -977,113 +821,6 @@ export default function Dashboard() {
               onAfterPayment={() => loadTransactions(userId)}
             />
 
-            {/* Calculadora completa (abre ao clicar na foto) */}
-            {calcExpanded && (
-            <div className="card-lovable bg-white rounded-2xl p-4 mb-6">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#333]">Faça seus calculos aqui</p>
-                  <p className="text-xs text-[#666]">% usa o valor da base (ex.: 10% do base)</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalcExpanded(false);
-                    setCalcBaseTouched(false);
-                    setCalcBase(null);
-                    setCalcDisplay('0');
-                    setCalcFirst(null);
-                    setCalcOp(null);
-                    setCalcAwaitingSecond(false);
-                  }}
-                  className="p-2 rounded-full hover:bg-[#f8f9fa] text-[#2ECC49] hover:text-[#22a83a]"
-                  aria-label="Fechar calculadora"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="flex items-end gap-3 mb-3">
-                <div className="flex-1">
-                  <p className="text-xs text-[#666] mb-1">Base</p>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={calcBase == null ? '' : String(calcBase).replace('.', ',')}
-                    onChange={(e) => {
-                      const raw = e.target.value || '';
-                      const trimmed = raw.trim();
-                      if (!trimmed) {
-                        setCalcBaseTouched(false);
-                        setCalcBase(null);
-                        return;
-                      }
-                      const v = parseCalcNumber(trimmed);
-                      if (v == null) return;
-                      setCalcBaseTouched(true);
-                      setCalcBase(v);
-                    }}
-                    className="w-full px-3 py-2 rounded-xl border border-[#e5e7eb] bg-white text-[#333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/50"
-                    aria-label="Valor base da calculadora"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCalcUseBase}
-                  className="shrink-0 px-3 py-2 rounded-xl bg-[#e8f5e9] border border-[#c8e6c9] text-[#28a745] text-sm font-semibold hover:bg-[#c8e6c9]"
-                  aria-label="Usar base no visor"
-                >
-                  Usar
-                </button>
-              </div>
-
-              <div className="bg-background border border-border rounded-xl p-3 mb-3">
-                <p className="text-xs text-[#666] mb-1">Visor</p>
-                <div className="text-right font-bold text-2xl text-[#333] break-all">{calcDisplay}</div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2 mb-3">
-                <button type="button" onClick={handleCalcClear} className="h-10 rounded-xl border border-[#e5e7eb] bg-white text-[#333] font-semibold">AC</button>
-                <button type="button" onClick={handleCalcBackspace} className="h-10 rounded-xl border border-[#e5e7eb] bg-white text-[#333] font-semibold">DEL</button>
-                <button type="button" onClick={handleCalcPercent} className="h-10 rounded-xl border border-[#e5e7eb] bg-white text-[#333] font-semibold">%</button>
-                <button type="button" onClick={() => handleCalcOperator('/')} className="h-10 rounded-xl border border-[#e5e7eb] bg-white text-[#333] font-semibold">÷</button>
-
-                <button type="button" onClick={() => handleCalcOperator('*')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">×</button>
-                <button type="button" onClick={() => handleCalcDigit('7')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">7</button>
-                <button type="button" onClick={() => handleCalcDigit('8')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">8</button>
-                <button type="button" onClick={() => handleCalcDigit('9')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">9</button>
-
-                <button type="button" onClick={() => handleCalcOperator('-')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">−</button>
-                <button type="button" onClick={() => handleCalcDigit('4')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">4</button>
-                <button type="button" onClick={() => handleCalcDigit('5')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">5</button>
-                <button type="button" onClick={() => handleCalcDigit('6')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">6</button>
-
-                <button type="button" onClick={() => handleCalcOperator('+')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">+</button>
-                <button type="button" onClick={() => handleCalcDigit('1')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">1</button>
-                <button type="button" onClick={() => handleCalcDigit('2')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">2</button>
-                <button type="button" onClick={() => handleCalcDigit('3')} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">3</button>
-
-                <button type="button" onClick={handleCalcDecimal} className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold">.</button>
-                <button
-                  type="button"
-                  onClick={() => handleCalcDigit('0')}
-                  className="h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] font-semibold col-span-2"
-                >
-                  0
-                </button>
-                <button type="button" onClick={handleCalcEquals} className="h-10 rounded-xl bg-[#2ECC49] hover:bg-[#22a83a] text-white font-bold">=</button>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCalcApplyResultToBase}
-                className="w-full py-2 rounded-xl bg-[#2ECC49] hover:bg-[#22a83a] text-white text-sm font-semibold"
-                aria-label="Aplicar resultado na base"
-              >
-                Aplicar resultado na base
-              </button>
-            </div>
-            )}
             {/* (removido) Acesso rápido ao mapa: agora foco em Cobranças do mês */}
             {/* Filtro por mês */}
             {availableMonths.length > 0 && (

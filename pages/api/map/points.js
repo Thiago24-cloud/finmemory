@@ -40,6 +40,34 @@ function formatTimeAgo(dateStr) {
   return d.toLocaleDateString('pt-BR');
 }
 
+/** Viewport do mapa (sw/ne) — reduz payload e DOM quando o cliente envia bounds. Ignorado se houver busca textual (q). */
+function parseBboxFromQuery(query) {
+  const swLat = Number.parseFloat(query.sw_lat);
+  const swLng = Number.parseFloat(query.sw_lng);
+  const neLat = Number.parseFloat(query.ne_lat);
+  const neLng = Number.parseFloat(query.ne_lng);
+  if (![swLat, swLng, neLat, neLng].every((n) => Number.isFinite(n))) return null;
+  if (Math.abs(swLat) > 90 || Math.abs(neLat) > 90 || Math.abs(swLng) > 180 || Math.abs(neLng) > 180) {
+    return null;
+  }
+  const minLat = Math.min(swLat, neLat);
+  const maxLat = Math.max(swLat, neLat);
+  const minLng = Math.min(swLng, neLng);
+  const maxLng = Math.max(swLng, neLng);
+  if (maxLat - minLat < 0.0003 || maxLng - minLng < 0.0003) return null;
+  if (maxLat - minLat > 30 || maxLng - minLng > 30) return null;
+  return { minLat, maxLat, minLng, maxLng };
+}
+
+function applyLatLngBbox(qb, bbox) {
+  if (!bbox) return qb;
+  return qb
+    .gte('lat', bbox.minLat)
+    .lte('lat', bbox.maxLat)
+    .gte('lng', bbox.minLng)
+    .lte('lng', bbox.maxLng);
+}
+
 export default async function handler(req, res) {
   const supabase = getSupabase();
   if (!supabase) {
@@ -105,6 +133,21 @@ export default async function handler(req, res) {
 
   try {
     const q = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
+    // Com busca textual: não limitar ao viewport (usuário quer achar oferta em qualquer região).
+    const bbox = q.length >= 2 ? null : parseBboxFromQuery(req.query || {});
+    const rowLimit = bbox
+      ? Math.min(
+          500,
+          Math.max(50, Number.parseInt(process.env.MAP_POINTS_BBOX_ROW_LIMIT || '320', 10) || 320)
+        )
+      : 500;
+    const outCap = bbox
+      ? Math.min(
+          500,
+          Math.max(80, Number.parseInt(process.env.MAP_POINTS_BBOX_OUT_CAP || '320', 10) || 320)
+        )
+      : 500;
+
     // TTL padrão: 24h (preços divulgados por usuários).
     const defaultTtlHours = Math.max(
       1,
@@ -133,42 +176,51 @@ export default async function handler(req, res) {
       );
     };
 
-    // 1) Ofertas/promoções (import DIA etc.): TTL maior
+    // 1) Ofertas/promoções (import DIA etc.): TTL maior — bbox antes de order/limit (PostgREST)
     let promoQuery = applySearch(
-      supabase
-        .from('price_points')
-        .select(baseSelect)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .ilike('category', '%promo%')
-        .gte('created_at', promoCutoffIso)
-        .order('created_at', { ascending: false })
-        .limit(500)
-    );
+      applyLatLngBbox(
+        supabase
+          .from('price_points')
+          .select(baseSelect)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .ilike('category', '%promo%')
+          .gte('created_at', promoCutoffIso),
+        bbox
+      )
+    )
+      .order('created_at', { ascending: false })
+      .limit(rowLimit);
 
     // 2) Demais pontos: TTL curto (categoria sem "promo" ou nula) — duas queries para evitar edge cases do PostgREST
     let normalNullQuery = applySearch(
-      supabase
-        .from('price_points')
-        .select(baseSelect)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .is('category', null)
-        .gte('created_at', normalCutoffIso)
-        .order('created_at', { ascending: false })
-        .limit(500)
-    );
+      applyLatLngBbox(
+        supabase
+          .from('price_points')
+          .select(baseSelect)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .is('category', null)
+          .gte('created_at', normalCutoffIso),
+        bbox
+      )
+    )
+      .order('created_at', { ascending: false })
+      .limit(rowLimit);
     let normalOtherQuery = applySearch(
-      supabase
-        .from('price_points')
-        .select(baseSelect)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .not('category', 'ilike', '%promo%')
-        .gte('created_at', normalCutoffIso)
-        .order('created_at', { ascending: false })
-        .limit(500)
-    );
+      applyLatLngBbox(
+        supabase
+          .from('price_points')
+          .select(baseSelect)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .not('category', 'ilike', '%promo%')
+          .gte('created_at', normalCutoffIso),
+        bbox
+      )
+    )
+      .order('created_at', { ascending: false })
+      .limit(rowLimit);
 
     const [
       { data: promoRows, error: promoErr },
@@ -200,7 +252,71 @@ export default async function handler(req, res) {
     const merged = Array.from(byId.values()).sort(
       (a, b) => new Date(b.created_at) - new Date(a.created_at)
     );
-    const data = merged.slice(0, 500);
+    let data = merged.slice(0, outCap);
+
+    // Promoções do agente (tabloides / import) — mesma forma que price_points para o mapa
+    try {
+      let promoAgentQ = applyLatLngBbox(
+        supabase
+          .from('promocoes_supermercados')
+          .select(
+            'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url'
+          )
+          .eq('ativo', true)
+          .gt('expira_em', new Date().toISOString())
+          .not('lat', 'is', null)
+          .not('lng', 'is', null),
+        bbox
+      )
+        .order('atualizado_em', { ascending: false })
+        .limit(bbox ? Math.min(200, rowLimit) : 300);
+      const { data: promoFromAgent, error: promoTableErr } = await promoAgentQ;
+
+      if (promoTableErr) {
+        console.warn('promocoes_supermercados (mapa):', promoTableErr.message);
+      } else if (promoFromAgent && promoFromAgent.length) {
+        const label = (s) =>
+          ({
+            dia: 'Dia',
+            atacadao: 'Atacadão',
+            assai: 'Assaí',
+            carrefour: 'Carrefour',
+            paodeacucar: 'Pão de Açúcar',
+            hirota: 'Hirota',
+            lopes: 'Lopes',
+            saojorge: 'Sacolão São Jorge',
+          }[String(s || '').toLowerCase()] || String(s || 'Rede'));
+        const asPricePoints = promoFromAgent.map((r) => {
+          const raw = r.preco;
+          const priceNum =
+            raw != null && raw !== '' && !Number.isNaN(Number(raw))
+              ? Number(raw)
+              : null;
+          return {
+            id: `promo-${r.id}`,
+            product_name: r.nome_produto,
+            price: priceNum,
+            store_name: `${label(r.supermercado)} · ofertas`,
+            lat: r.lat,
+            lng: r.lng,
+            category: 'Supermercado - Promoção',
+            created_at: r.atualizado_em,
+            user_id: null,
+            imagem_url: r.imagem_url || null,
+          };
+        });
+        const byIdPromo = new Map(data.map((row) => [row.id, row]));
+        for (const row of asPricePoints) {
+          if (!byIdPromo.has(row.id)) byIdPromo.set(row.id, row);
+        }
+        data = Array.from(byIdPromo.values()).sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+        data = data.slice(0, outCap);
+      }
+    } catch (e) {
+      console.warn('promocoes_supermercados merge:', e.message);
+    }
 
     const points = (data || []).map((row) => ({
       id: row.id,
@@ -211,7 +327,8 @@ export default async function handler(req, res) {
       lng: Number(row.lng),
       category: row.category,
       time_ago: formatTimeAgo(row.created_at),
-      user_label: maskUserId(row.user_id)
+      user_label: maskUserId(row.user_id),
+      promo_image_url: row.imagem_url || null,
     }));
 
     return res.status(200).json({ points });

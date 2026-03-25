@@ -3,8 +3,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
+import Link from 'next/link';
 
 const SESSION_LOADING_TIMEOUT_MS = 5000;
+
+/** Base pública (verificação Google exige link explícito para política na home; URL absoluta evita falha de crawlers) */
+const SITE_ORIGIN = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://finmemory.com.br')
+  .trim()
+  .replace(/\/$/, '');
 
 /** POST em formulário para garantir envio do cookie CSRF (evita signin?csrf=true no Cloud Run) */
 async function signInWithGoogleForm(callbackUrl = '/mapa') {
@@ -64,33 +70,71 @@ export default function HomePage() {
   };
 
   const showLoading = status === 'loading' && !loadingTimedOut;
-  if (showLoading) {
-    return (
-      <>
-        <Head>
-          <title>Fin Memory – Carregando</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-        </Head>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-primary p-5">
-          <div className="bg-white rounded-[20px] p-10 text-center shadow-card-lovable">
-            <div className="text-4xl mb-4 animate-pulse">⏳</div>
-            <p className="text-[#666]">Carregando...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
+
+  /** Rodapé verde: sempre no HTML inicial (estado “Carregando”) */
+  const legalFooter = (
+    <nav
+      className="mt-6 w-full max-w-[600px] mx-auto text-center text-sm text-white/95"
+      aria-label="Informações legais"
+    >
+      <a
+        href={`${SITE_ORIGIN}/privacidade`}
+        className="font-medium underline underline-offset-2 hover:text-white"
+      >
+        Política de Privacidade
+      </a>
+      <span className="mx-2 text-white/50" aria-hidden>
+        ·
+      </span>
+      <a
+        href={`${SITE_ORIGIN}/termos`}
+        className="font-medium underline underline-offset-2 hover:text-white"
+      >
+        Termos de Serviço
+      </a>
+    </nav>
+  );
+
+  /** Também dentro do card branco — alguns verificadores só analisam o “miolo” da página */
+  const legalLinksInCard = (
+    <p className="text-sm text-[#666] mt-6 text-center leading-relaxed">
+      <a
+        href={`${SITE_ORIGIN}/privacidade`}
+        className="text-[#2ECC49] font-semibold underline underline-offset-2 hover:text-[#25a83c]"
+      >
+        Política de Privacidade
+      </a>
+      <span className="mx-2 text-[#ccc]" aria-hidden>
+        ·
+      </span>
+      <a
+        href={`${SITE_ORIGIN}/termos`}
+        className="text-[#2ECC49] font-semibold underline underline-offset-2 hover:text-[#25a83c]"
+      >
+        Termos de Serviço
+      </a>
+    </p>
+  );
 
   return (
     <>
       <Head>
-        <title>Fin Memory – Assistente financeiro inteligente</title>
+        <title>
+          {showLoading ? 'Fin Memory – Carregando' : 'Fin Memory – Assistente financeiro inteligente'}
+        </title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center p-5 bg-gradient-primary font-sans">
+        {showLoading ? (
+          <div className="bg-white rounded-[20px] p-10 text-center shadow-card-lovable max-w-[600px] w-full">
+            <div className="text-4xl mb-4 animate-pulse">⏳</div>
+            <p className="text-[#666]">Carregando...</p>
+            {legalLinksInCard}
+          </div>
+        ) : (
         <div className="bg-white rounded-[20px] p-8 md:p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-[600px] w-full">
           {/* Logo FinMemory */}
-          <div className="mb-8 flex justify-center">
+          <div className="mb-8 flex flex-col items-center justify-center">
             <Image
               src="/logo.png"
               alt="FinMemory"
@@ -99,6 +143,9 @@ export default function HomePage() {
               priority
               className="object-contain"
             />
+            <h1 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-[#1f2937]">
+              FinMemory
+            </h1>
           </div>
 
           {isNotRegistered && (
@@ -137,7 +184,10 @@ export default function HomePage() {
               <li>💰 Controle total de suas finanças</li>
             </ul>
           </div>
+          {legalLinksInCard}
         </div>
+        )}
+        {legalFooter}
       </div>
     </>
   );
