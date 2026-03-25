@@ -94,7 +94,7 @@ function createStoreIcon(type, temOfertaHoje = false) {
  * Carrega estabelecimentos do banco (stores) na área visível do mapa e exibe com ícone por tipo.
  * Não altera os pins de preços compartilhados (price_points).
  */
-function StoreMarkers() {
+function StoreMarkers({ storeFilterName = '' }) {
   const map = useMap();
   const [stores, setStores] = useState([]);
 
@@ -123,9 +123,14 @@ function StoreMarkers() {
     return () => map.off('moveend', fetchStoresInBounds);
   }, [map, fetchStoresInBounds]);
 
+  const q = String(storeFilterName || '').trim().toLowerCase();
+  const visibleStores = !q
+    ? stores
+    : stores.filter((s) => String(s.name || '').toLowerCase().includes(q));
+
   return (
     <>
-      {stores.map((store) => (
+      {visibleStores.map((store) => (
         <Marker
           key={store.id}
           position={[Number(store.lat), Number(store.lng)]}
@@ -211,7 +216,7 @@ function LocationMarker({ onLocationFound }) {
       map.off('locationfound', onFound);
       map.off('locationerror', onError);
     };
-  }, [map]);
+  }, [map, onLocationFound]);
 
   return (
     <>
@@ -220,7 +225,6 @@ function LocationMarker({ onLocationFound }) {
           <Popup>Você está aqui! 📍</Popup>
         </Marker>
       )}
-      {/* Botão: pedir localização só ao toque (necessário em mobile) */}
       <div style={{ position: 'absolute', top: 70, right: 10, zIndex: 1000 }}>
         <button
           type="button"
@@ -229,11 +233,7 @@ function LocationMarker({ onLocationFound }) {
           className="bg-white border border-gray-300 shadow-md rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 flex items-center gap-1.5"
           title="Centrar mapa na minha localização"
         >
-          {locating ? (
-            <>⏳ A obter...</>
-          ) : (
-            <>📍 Minha localização</>
-          )}
+          {locating ? <>⏳ A obter...</> : <>📍 Minha localização</>}
         </button>
         {error && (
           <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 shadow max-w-[220px]">
@@ -375,13 +375,31 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
   const reloadPointsRef = useRef(() => {});
   const [storeNearby, setStoreNearby] = useState(null);
   const [dismissedStorePrompt, setDismissedStorePrompt] = useState(false);
+  const [storeFilter, setStoreFilter] = useState('');
 
-  /** Pins visíveis: busca + opcional “só promoções”. */
+  /** Lojas distintas nos preços carregados (chips de filtro por nome). */
+  const storeNameOptions = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    locais.forEach((p) => {
+      const n = String(p.nome || '').trim();
+      if (!n || seen.has(n)) return;
+      seen.add(n);
+      out.push(n);
+    });
+    return out.slice(0, 12);
+  }, [locais]);
+
+  /** Pins visíveis: busca + opcional “só promoções” + filtro por loja. */
   const visibleLocais = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let base = locais.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
     if (promoOnly) {
       base = base.filter(isPromoPoint);
+    }
+    const sf = storeFilter.trim().toLowerCase();
+    if (sf) {
+      base = base.filter((p) => (p.nome || '').toLowerCase().includes(sf));
     }
     if (q.length < 2) return base;
     return base.filter(
@@ -390,7 +408,7 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
         (p.nome || '').toLowerCase().includes(q) ||
         (p.categoria || '').toLowerCase().includes(q)
     );
-  }, [locais, searchQuery, promoOnly]);
+  }, [locais, searchQuery, promoOnly, storeFilter]);
 
   const handleLocationFound = useCallback((lat, lng) => {
     setDismissedStorePrompt(false);
@@ -441,7 +459,7 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
           setCarregando={setCarregando}
           reloadRef={reloadPointsRef}
         />
-        <StoreMarkers />
+        <StoreMarkers storeFilterName={storeFilter} />
         {groupPointsByLocation(visibleLocais).map((group, idx) => {
           const first = group.points[0];
           const { main } = getCategoryColor(first.categoria, first.nome);
@@ -558,6 +576,42 @@ export default function MapaPrecosLeaflet({ mapThemeId = 'verde', searchQuery = 
       )}
 
       <div className="absolute bottom-20 left-3 right-3 sm:left-4 sm:right-auto z-[1000] bg-white/95 backdrop-blur p-3 rounded-xl shadow-lg border border-gray-200/80 max-w-[280px]">
+        {storeNameOptions.length > 0 && (
+          <div className="mb-2">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Filtrar por loja</p>
+            <div className="flex flex-wrap gap-1.5 max-h-[88px] overflow-y-auto pr-0.5">
+              <button
+                type="button"
+                onClick={() => setStoreFilter('')}
+                className={`min-h-[36px] px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                  !storeFilter
+                    ? 'bg-emerald-500 text-white border-emerald-600'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                Todas
+              </button>
+              {storeNameOptions.map((name) => {
+                const active = storeFilter === name;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setStoreFilter(active ? '' : name)}
+                    title={name}
+                    className={`min-h-[36px] max-w-[160px] truncate px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                      active
+                        ? 'bg-emerald-500 text-white border-emerald-600'
+                        : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {name.length > 22 ? `${name.slice(0, 22)}…` : name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {locais.length === 0 && !carregando && (
           <p className="mt-1.5 text-xs text-gray-500">
             Nenhum preço compartilhado ainda. Use &quot;Compartilhar&quot; no topo ou busque um produto (ex: arroz).

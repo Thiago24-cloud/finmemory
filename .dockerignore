@@ -41,3 +41,6 @@ coverage
 
 # Assets do Cursor (não necessários para produção)
 assets/
+
+# Clone de referência (não faz parte do app Next)
+_smart-receipt-scanner

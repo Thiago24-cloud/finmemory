@@ -42,6 +42,7 @@
     "src",
     "supabase/functions",
     "vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "_smart-receipt-scanner"
   ]
 }
