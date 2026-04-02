@@ -1,7 +1,10 @@
 import NextAuth from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
-import { SupabaseAdapter } from '@next-auth/supabase-adapter';
-import { createClient } from '@supabase/supabase-js';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { verifyPassword } from '../../../lib/passwordAuth';
+import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
+import { verifyTotpCode } from '../../../lib/tokens';
+import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
+import { normalizeEmail } from '../../../lib/securityPolicy';
 
 // Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.
 // Para verificação do Google, mantenha alinhado com o domínio principal.
@@ -13,41 +16,11 @@ if (typeof process !== 'undefined') {
   }
 }
 
-// Lazy initialization do Supabase - só cria quando realmente necessário
-let supabaseInstance = null;
-let supabaseConfigWarned = false;
-
-function getSupabase() {
-  if (!supabaseInstance) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!url || !key) {
-      if (!supabaseConfigWarned) {
-        supabaseConfigWarned = true;
-        console.warn('⚠️ Variáveis do Supabase não configuradas no servidor. Configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Cloud Run. Ver DEPLOY-CLOUD-RUN.md');
-      }
-      return null;
-    }
-    
-    supabaseInstance = createClient(url, key);
-  }
-  return supabaseInstance;
-}
-
 export const authOptions = {
   // Necessário atrás de proxy (Firebase Hosting → Cloud Run): NextAuth confia no host do proxy
   trustHost: true,
-  // Só cria o adapter quando as env existem (no build do Cloud Build não há SUPABASE_SERVICE_ROLE_KEY)
-  adapter:
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? SupabaseAdapter({
-          url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-          secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        })
-      : undefined,
-  // Permite vincular conta Google a usuário já existente com mesmo email (ex.: usuário criado quando linkAccount falhou por coluna faltando)
-  allowDangerousEmailAccountLinking: true,
+  // Credentials Provider funciona de forma estável com estratégia JWT.
+  adapter: undefined,
   // Cookies: sem domain para link do Cloud Run; nomes sem __Host- para evitar CSRF falhar atrás de proxy.
   useSecureCookies: true,
   cookies: {
@@ -63,19 +36,94 @@ export const authOptions = {
     state: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true, maxAge: 900 } }
   },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      authorization: {
-        params: {
-          prompt: 'consent', // força tela de consentimento para pedir permissão de e-mail
-          access_type: 'offline',
-          response_type: 'code',
-          // Permissão para LER e-mails do Gmail (obrigatório no Google Cloud Console)
-          scope: 'openid email profile https://www.googleapis.com/auth/gmail.readonly'
+    CredentialsProvider({
+      name: 'Email e senha',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Senha', type: 'password' },
+        otp: { label: 'Codigo 2FA', type: 'text' },
+      },
+      async authorize(credentials, req) {
+        const ip = getRequestIp(req);
+        const ipRate = checkRateLimit({ bucket: 'login-ip', key: ip, limit: 20, windowMs: 15 * 60 * 1000 });
+        if (!ipRate.allowed) return null;
+
+        const email = normalizeEmail(credentials?.email);
+        const password = String(credentials?.password || '');
+        const otp = String(credentials?.otp || '').trim();
+        if (!email || !password) return null;
+
+        const emailRate = checkRateLimit({ bucket: 'login-email', key: email, limit: 12, windowMs: 15 * 60 * 1000 });
+        if (!emailRate.allowed) return null;
+
+        const supabase = getSupabaseAdmin();
+        if (!supabase) return null;
+
+        const { data: localAuth, error: authErr } = await supabase
+          .from('auth_local_users')
+          .select('user_id,email,password_hash,email_verified_at,failed_login_attempts,lockout_until,totp_secret,totp_enabled_at')
+          .eq('email', email)
+          .maybeSingle();
+        if (authErr || !localAuth?.password_hash) return null;
+
+        const lockoutUntilTs = localAuth.lockout_until ? Date.parse(localAuth.lockout_until) : 0;
+        if (lockoutUntilTs && lockoutUntilTs > Date.now()) return null;
+
+        if (!verifyPassword(password, localAuth.password_hash)) {
+          const attempts = Number(localAuth.failed_login_attempts || 0) + 1;
+          const shouldLock = attempts >= 5;
+          await supabase
+            .from('auth_local_users')
+            .update({
+              failed_login_attempts: attempts,
+              lockout_until: shouldLock ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('email', email);
+          console.warn('[auth][login] invalid_password', { email, ip, attempts });
+          return null;
         }
-      }
-    })
+
+        if (!localAuth.email_verified_at) {
+          console.warn('[auth][login] email_not_verified', { email, ip });
+          return null;
+        }
+
+        if (localAuth.totp_enabled_at && localAuth.totp_secret) {
+          const validOtp = verifyTotpCode({ secret: localAuth.totp_secret, code: otp, window: 1 });
+          if (!validOtp) {
+            console.warn('[auth][login] invalid_otp', { email, ip });
+            return null;
+          }
+        }
+
+        await supabase
+          .from('auth_local_users')
+          .update({
+            failed_login_attempts: 0,
+            lockout_until: null,
+            last_login_ip: ip,
+            last_login_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('email', email);
+
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('id,email,name,created_at')
+          .eq('id', localAuth.user_id)
+          .maybeSingle();
+        if (!userRow?.id) return null;
+
+        return {
+          id: userRow.id,
+          email: userRow.email,
+          name: userRow.name || userRow.email,
+          supabaseId: userRow.id,
+          created_at: userRow.created_at,
+        };
+      },
+    }),
   ],
   
   callbacks: {
@@ -91,33 +139,31 @@ export const authOptions = {
       }
       return baseUrl;
     },
-    async signIn({ user, account, profile }) {
+    async jwt({ token, user }) {
+      const email = user?.email || token.email;
+      if (email) token.email = email;
+      const supabase = getSupabaseAdmin();
+      if (email && supabase) {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('id, created_at')
+            .eq('email', email)
+            .maybeSingle();
+          if (data?.id) {
+            token.supabaseId = data.id;
+            token.created_at = data.created_at;
+          }
+        } catch (e) {
+          console.error('jwt callback users lookup:', e?.message || e);
+        }
+      }
+      return token;
+    },
+
+    async signIn({ user, account }) {
       try {
         console.log('🔐 NextAuth SignIn callback –', user?.email, account?.provider);
-        const supabase = getSupabase();
-        if (!supabase) {
-          console.warn('⚠️ Supabase não disponível, pulando salvamento do usuário');
-          return true;
-        }
-        const userData = {
-          email: user.email,
-          name: user.name,
-          google_id: (profile && profile.sub) || user.id,
-          access_token: account.access_token,
-          refresh_token: account.refresh_token,
-          token_expiry: account.expires_at ? new Date(account.expires_at * 1000) : null,
-          last_sync: new Date()
-        };
-        const { data, error } = await supabase
-          .from('users')
-          .upsert(userData, { onConflict: 'email' })
-          .select()
-          .single();
-        if (error) {
-          console.error('❌ Supabase upsert (não bloqueia login):', error.message, error.code);
-        } else {
-          console.log('✅ User saved:', data?.id);
-        }
         return true;
       } catch (err) {
         console.error('❌ SignIn callback exception (não bloqueia login):', err?.message || err);
@@ -125,21 +171,22 @@ export const authOptions = {
       }
     },
     
-    async session({ session, user }) {
-      // strategy: 'database' — user vem do adapter (em fluxo de erro user pode ser undefined)
-      if (user?.id) {
-        session.user.id = user.id;
+    async session({ session, user, token }) {
+      if (user?.id) session.user.id = user.id;
+      if (token) {
+        if (token.supabaseId) session.user.supabaseId = token.supabaseId;
+        if (token.created_at) session.user.created_at = token.created_at;
+        if (token.sub && !session.user.id) session.user.id = token.sub;
       }
-      // Dados da nossa tabela customizada `users` (id, created_at) para compatibilidade
-      if (session?.user?.email) {
+      if (session?.user?.email && !session.user.supabaseId) {
         try {
-          const supabase = getSupabase();
+          const supabase = getSupabaseAdmin();
           if (supabase) {
             const { data } = await supabase
               .from('users')
               .select('id, created_at')
               .eq('email', session.user.email)
-              .single();
+              .maybeSingle();
             if (data) {
               session.user.supabaseId = data.id;
               session.user.created_at = data.created_at;
@@ -163,12 +210,12 @@ export const authOptions = {
   },
 
   pages: {
-    signIn: '/',
+    signIn: '/login',
     error: '/auth-error'
   },
 
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60 // 30 days
   },
   

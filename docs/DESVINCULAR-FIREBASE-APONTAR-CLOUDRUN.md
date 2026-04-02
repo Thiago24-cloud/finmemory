@@ -7,7 +7,7 @@ Seu app não usa mais Firebase Hosting. O domínio **finmemory.com.br** pode apo
 ## Passo 1 — Remover o domínio do Firebase Hosting
 
 1. Acesse o [Firebase Console](https://console.firebase.google.com/).
-2. Selecione o projeto onde **finmemory.com.br** está conectado (ex.: exalted-entry-480904-s9 ou finmemory-667c3).
+2. Selecione o projeto onde **finmemory.com.br** está conectado (produção: **exalted-entry-480904-s9**).
 3. Vá em **Hosting** → **Custom domains**.
 4. Remova **finmemory.com.br** (desconecte o domínio).
 

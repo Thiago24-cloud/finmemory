@@ -1,6 +1,14 @@
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 import { geocodeAddress } from '../../../lib/geocode';
+import {
+  INGEST_SOURCE_DIA_STORE_PAGE,
+  buildDiaGptPromoRun,
+  writePricePointsPromoRun,
+} from '../../../lib/ingest';
+
+const { buildDiaOffersExtractionPrompt } = require('../../../lib/diaOffersGptPrompt.js');
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -25,20 +33,6 @@ function stripHtmlToText(html) {
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function asNumberBR(value) {
-  if (value == null) return null;
-  const s = String(value).trim();
-  if (!s) return null;
-  // Remove "R$", espaços e tenta normalizar 1.234,56 -> 1234.56
-  const cleaned = s
-    .replace(/R\$\s*/gi, '')
-    .replace(/\s/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.');
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
 }
 
 export default async function handler(req, res) {
@@ -75,6 +69,7 @@ export default async function handler(req, res) {
 
   const botUserId = process.env.DIA_BOT_USER_ID || '00000000-0000-0000-0000-000000000000';
   const categoryBase = 'Supermercado - Promoção';
+  const runId = randomUUID();
 
   try {
     // 1) Baixa página
@@ -94,30 +89,8 @@ export default async function handler(req, res) {
     const text = stripHtmlToText(html);
     const truncated = text.slice(0, 25000); // evita estouro de tokens
 
-    // 2) Extrai promoções com GPT
-    const extractionPrompt = `Você vai extrair PROMOÇÕES ATIVAS da página de uma loja do DIA (supermercado).
-
-Regras:
-- Retorne SOMENTE JSON válido, sem markdown.
-- A página pode ter preço "De X,XX" e preço promocional "Por Y,YY". Use SEMPRE o preço promocional.
-- Cada oferta deve ser um item: produto + preço promocional.
-- Se existir validade (ex.: "Válida até 22/03/2026"), retorne em "valid_until" no formato YYYY-MM-DD. Se não existir, use null.
-- Não inclua qualquer item sem preço promocional.
-
-JSON esperado:
-{
-  "store_name": string,
-  "offers": [
-    {
-      "product_name": string,
-      "promo_price": number,
-      "valid_until": string | null
-    }
-  ]
-}
-
-Conteúdo (texto extraído do HTML):
-${truncated}`;
+    // 2) Extrai promoções com GPT (prompt partilhado com jobs/agent.js — ver lib/diaOffersGptPrompt.js)
+    const extractionPrompt = buildDiaOffersExtractionPrompt(truncated);
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -130,17 +103,17 @@ ${truncated}`;
     let jsonStr = extractJsonPayload(raw) || raw;
     const parsed = JSON.parse(jsonStr);
 
-    const storeName = String(parsed?.store_name || '').trim();
     const offers = Array.isArray(parsed?.offers) ? parsed.offers : [];
-    if (!storeName) {
-      return res.status(422).json({ error: 'store_name não foi extraído' });
-    }
+    const storeNameForGeo = String(parsed?.store_name || '').trim();
 
     // 3) Coordenadas: usa lat/lng do request se vier, senão geocoda store_name
     let lat = latProp != null ? Number(latProp) : null;
     let lng = lngProp != null ? Number(lngProp) : null;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      const coords = await geocodeAddress(`${storeName}, Brasil`);
+      if (!storeNameForGeo) {
+        return res.status(422).json({ error: 'store_name é obrigatório quando lat/lng não são enviados' });
+      }
+      const coords = await geocodeAddress(`${storeNameForGeo}, Brasil`);
       if (!coords || coords.lat == null || coords.lng == null) {
         return res.status(422).json({ error: 'Não foi possível geocodar store_name para lat/lng' });
       }
@@ -148,49 +121,45 @@ ${truncated}`;
       lng = coords.lng;
     }
 
-    // 4) Limpeza (MVP): remove promoções antigas desta store nas últimas 24h e re-insere
-    const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    await supabase
-      .from('price_points')
-      .delete()
-      .eq('store_name', storeName)
-      .gte('created_at', cutoffIso)
-      .ilike('category', '%promo%');
-
-    // 5) Insere price_points
-    const pointsToInsert = offers
-      .map((o) => {
-        const product_name = String(o?.product_name || '').trim();
-        const promo_price =
-          typeof o?.promo_price === 'number' ? o.promo_price : asNumberBR(o?.promo_price);
-        if (!product_name || promo_price == null || promo_price <= 0) return null;
-        return {
-          user_id: botUserId,
-          product_name,
-          price: promo_price,
-          store_name: storeName,
-          lat,
-          lng,
-          category: categoryBase,
-          created_at: new Date().toISOString(),
-        };
-      })
-      .filter(Boolean);
-
-    if (pointsToInsert.length === 0) {
-      return res.status(200).json({ success: true, storeName, inserted: 0, note: 'Nenhuma oferta válida extraída' });
+    const built = buildDiaGptPromoRun(parsed, {
+      lat,
+      lng,
+      runId,
+      storePageUrl: url,
+      mapCategory: categoryBase,
+    });
+    if ('error' in built) {
+      return res.status(422).json({ error: built.error });
     }
 
-    const { error: insertErr } = await supabase.from('price_points').insert(pointsToInsert);
-    if (insertErr) {
-      return res.status(500).json({ error: insertErr.message || 'Erro ao inserir price_points' });
+    const written = await writePricePointsPromoRun(supabase, built, {
+      botUserId,
+      replaceWindowHours: 24,
+    });
+    if (!written.ok) {
+      return res.status(500).json({ error: written.error });
+    }
+
+    if (written.inserted === 0) {
+      return res.status(200).json({
+        success: true,
+        ingestSource: INGEST_SOURCE_DIA_STORE_PAGE,
+        runId,
+        storeName: built.storeDisplayName,
+        inserted: 0,
+        note: 'Nenhuma oferta válida extraída',
+        offersExtracted: offers.length,
+        categoryBase,
+      });
     }
 
     return res.status(200).json({
       success: true,
-      storeName,
+      ingestSource: INGEST_SOURCE_DIA_STORE_PAGE,
+      runId,
+      storeName: built.storeDisplayName,
       offersExtracted: offers.length,
-      inserted: pointsToInsert.length,
+      inserted: written.inserted,
       categoryBase,
     });
   } catch (e) {

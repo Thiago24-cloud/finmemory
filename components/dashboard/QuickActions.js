@@ -5,13 +5,13 @@ import {
   Tags,
   Camera,
   Settings,
-  FileText,
   MapPin,
   Share2,
   PenLine,
   Users,
   List,
-  QrCode,
+  CreditCard,
+  ScanBarcode,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -39,7 +39,11 @@ export function QuickActions({ onSync, syncing, userIdReady = true, className })
           </div>
           <span className="text-xs font-medium text-[#333] whitespace-nowrap">Sincronizar</span>
         </button>
-        <Link href="/add-receipt" className={cn(primaryBtn, 'no-underline text-inherit')}>
+        <Link
+          href="/add-receipt"
+          className={cn(primaryBtn, 'no-underline text-inherit')}
+          title="Foto da nota ou QR Code NFC-e"
+        >
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-card-lovable bg-[#e8f5e9] text-[#28a745] hover:bg-[#c8e6c9]">
             <Camera className="h-7 w-7" />
           </div>
@@ -55,12 +59,13 @@ export function QuickActions({ onSync, syncing, userIdReady = true, className })
       {/* Demais ações: grid responsivo que quebra linha no desktop */}
       <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 pb-2 justify-items-center">
 
-        <Link href="/scanner" className={cn(secondaryBtn, 'no-underline text-inherit')} title="Escanear Nota Fiscal (NFC-e)">
+        <Link href="/scan-product" className={cn(secondaryBtn, 'no-underline text-inherit')} title="Ler código de barras">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
-            <QrCode className="h-5 w-5" />
+            <ScanBarcode className="h-5 w-5" />
           </div>
-          <span className="text-xs text-[#666] whitespace-nowrap">NFC-e</span>
+          <span className="text-xs text-[#666] whitespace-nowrap">Código</span>
         </Link>
+
         <Link href="/share-price" className={cn(secondaryBtn, 'no-underline text-inherit')}>
           <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
             <Share2 className="h-5 w-5" />
@@ -68,6 +73,12 @@ export function QuickActions({ onSync, syncing, userIdReady = true, className })
           <span className="text-xs text-[#666] whitespace-nowrap">Preço</span>
         </Link>
 
+        <Link href="/cartoes" className={cn(secondaryBtn, 'no-underline text-inherit')} title="Cartões (manual)">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
+            <CreditCard className="h-5 w-5" />
+          </div>
+          <span className="text-xs text-[#666] whitespace-nowrap">Cartões</span>
+        </Link>
         <Link href="/manual-entry" className={cn(secondaryBtn, 'no-underline text-inherit')}>
           <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-card-lovable bg-white text-[#666] hover:bg-[#f8f9fa] border border-[#e5e7eb]">
             <PenLine className="h-5 w-5" />

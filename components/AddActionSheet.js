@@ -1,16 +1,23 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { Camera, PenLine, MapPin } from 'lucide-react';
+import { Camera, PenLine, MapPin, ScanBarcode } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/Sheet';
 
 const actions = [
   {
     icon: Camera,
     label: 'Escanear Nota',
-    desc: 'Tire uma foto e a IA extrai tudo',
+    desc: 'Foto da nota (OCR) ou QR Code NFC-e na mesma tela',
     path: '/add-receipt',
     color: 'bg-primary/10 text-primary',
+  },
+  {
+    icon: ScanBarcode,
+    label: 'Código de barras',
+    desc: 'Ler EAN do produto — demo para lojas e histórico nas suas notas',
+    path: '/scan-product',
+    color: 'bg-[#e0f2fe] text-[#0369a1]',
   },
   {
     icon: PenLine,

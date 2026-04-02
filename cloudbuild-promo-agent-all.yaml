@@ -1,0 +1,26 @@
+# Build + push da imagem do agente de promoções (todas as redes).
+# Deploy do Cloud Run Job fica em scripts/deploy-promo-agent-all.mjs (evita gravar secrets no histórico do Build).
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'finmemory-agent/Dockerfile.all'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/finmemory-promo-agent-all:$_TAG'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/finmemory-promo-agent-all:latest'
+      - 'finmemory-agent'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/finmemory-promo-agent-all:$_TAG']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/finmemory-promo-agent-all:latest']
+
+images:
+  - 'gcr.io/$PROJECT_ID/finmemory-promo-agent-all:$_TAG'
+  - 'gcr.io/$PROJECT_ID/finmemory-promo-agent-all:latest'
+
+substitutions:
+  _TAG: 'manual'

@@ -1,7 +1,10 @@
 # Atualiza as variáveis de ambiente do Cloud Run a partir do .env.local
 # Uso: .\scripts\set-cloud-run-env.ps1
+#
+# Projeto de produção FinMemory: exalted-entry-480904-s9 (não finmemory-667c3).
 
 $ErrorActionPreference = "Stop"
+$FINMEMORY_GCP_PROJECT = "exalted-entry-480904-s9"
 $envFile = Join-Path (Get-Location) ".env.local"
 if (-not (Test-Path $envFile)) {
     Write-Host "Arquivo .env.local nao encontrado." -ForegroundColor Red
@@ -27,14 +30,14 @@ if (-not $vars["NEXTAUTH_SECRET"]) {
     Write-Host "NEXTAUTH_SECRET gerado e adicionado ao .env.local" -ForegroundColor Green
 }
 
-# URL do app: por padrão usa o link direto do Cloud Run (acesso sem domínio customizado)
+# URL do app: por padrão usa o URL canónico do serviço finmemory neste projeto
 if (-not $vars["NEXTAUTH_URL"]) {
-    $PROJECT_ID = gcloud config get-value project 2>$null
-    if ($PROJECT_ID -eq "finmemory-667c3") {
-        $vars["NEXTAUTH_URL"] = "https://finmemory-667c3.web.app"
+    $runUrl = gcloud run services describe finmemory --region=southamerica-east1 --project=$FINMEMORY_GCP_PROJECT --format="value(status.url)" 2>$null
+    if ($runUrl) {
+        $vars["NEXTAUTH_URL"] = $runUrl.TrimEnd('/')
     } else {
-        # exalted-entry-480904-s9 e outros: usar URL do Cloud Run para entrar só pelo link do Google
         $vars["NEXTAUTH_URL"] = "https://finmemory-836908221936.southamerica-east1.run.app"
+        Write-Host "Aviso: gcloud describe falhou; usando NEXTAUTH_URL fallback fixo." -ForegroundColor Yellow
     }
 }
 
@@ -63,8 +66,8 @@ if (-not $envVarsStr) {
     exit 1
 }
 
-Write-Host "Atualizando Cloud Run com variaveis de autenticacao e Supabase..." -ForegroundColor Cyan
-& gcloud run services update finmemory --region southamerica-east1 --update-env-vars $envVarsStr
+Write-Host "Atualizando Cloud Run ($FINMEMORY_GCP_PROJECT) com variaveis de autenticacao e Supabase..." -ForegroundColor Cyan
+& gcloud run services update finmemory --region southamerica-east1 --project $FINMEMORY_GCP_PROJECT --update-env-vars $envVarsStr
 if ($LASTEXITCODE -ne 0) { exit 1 }
 $url = $vars["NEXTAUTH_URL"]
 Write-Host "Cloud Run atualizado. Teste o login em: $url" -ForegroundColor Green

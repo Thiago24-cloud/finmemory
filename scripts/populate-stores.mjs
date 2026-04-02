@@ -44,7 +44,7 @@ const CITY_RADIUS_M = 2500
 // Delay entre requisições (ms) para respeitar rate limit da Google Places API
 const API_DELAY_MS = 600
 
-// Estado de São Paulo — bairros da capital + cidades da região metropolitana e interior
+// Estado de São Paulo — capital, litoral, interior e RMB (amostragem Google Places por hub)
 const AREAS = [
   { name: 'Vila Madalena', city: 'São Paulo', lat: -23.5505, lng: -46.6907, radius: 1500 },
   { name: 'Pinheiros', city: 'São Paulo', lat: -23.5629, lng: -46.6836, radius: 1500 },
@@ -65,6 +65,45 @@ const AREAS = [
   { name: 'Centro', city: 'Americana', lat: -22.7392, lng: -47.3314, radius: CITY_RADIUS_M },
   { name: 'Centro', city: 'Presidente Prudente', lat: -22.1256, lng: -51.3889, radius: CITY_RADIUS_M },
   { name: 'Centro', city: 'Marília', lat: -22.2176, lng: -49.9502, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Mogi das Cruzes', lat: -23.5228, lng: -46.1887, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Diadema', lat: -23.6868, lng: -46.6228, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Mauá', lat: -23.6677, lng: -46.4613, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Carapicuíba', lat: -23.5233, lng: -46.8408, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Barueri', lat: -23.5112, lng: -46.8766, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Itu', lat: -23.2642, lng: -47.2991, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Paulínia', lat: -22.7542, lng: -47.1482, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Limeira', lat: -22.5667, lng: -47.4011, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Araraquara', lat: -21.7948, lng: -48.1761, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'São Carlos', lat: -22.0175, lng: -47.8908, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Botucatu', lat: -22.8858, lng: -48.4450, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Jaú', lat: -22.2961, lng: -48.5578, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Franca', lat: -20.5350, lng: -47.4039, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Rio Claro', lat: -22.4110, lng: -47.5614, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Pindamonhangaba', lat: -22.9238, lng: -45.4617, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Taubaté', lat: -23.0264, lng: -45.5552, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Jacareí', lat: -23.3053, lng: -45.9657, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Praia Grande', lat: -24.0061, lng: -46.4028, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Guarujá', lat: -23.9933, lng: -46.2564, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'São Vicente', lat: -23.9603, lng: -46.3942, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Cubatão', lat: -23.8910, lng: -46.4244, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Bragança Paulista', lat: -22.9519, lng: -46.5419, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Itapetininga', lat: -23.5918, lng: -48.0485, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Araçatuba', lat: -21.2089, lng: -50.4328, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Catanduva', lat: -21.1378, lng: -48.9720, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Votuporanga', lat: -20.4225, lng: -49.9787, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Lins', lat: -21.6734, lng: -49.7431, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Assis', lat: -22.6617, lng: -50.4122, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Ourinhos', lat: -22.9792, lng: -49.8706, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Andradina', lat: -20.8961, lng: -51.3714, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Itapeva', lat: -23.9828, lng: -48.8754, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Registro', lat: -24.4871, lng: -47.8449, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Fernandópolis', lat: -20.2846, lng: -50.2464, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Cruzeiro', lat: -22.5732, lng: -44.9697, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Guaratinguetá', lat: -22.8164, lng: -45.2275, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Sertãozinho', lat: -21.1378, lng: -47.9903, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Indaiatuba', lat: -23.0906, lng: -47.2180, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Sumaré', lat: -22.8204, lng: -47.2728, radius: CITY_RADIUS_M },
+  { name: 'Centro', city: 'Hortolândia', lat: -22.8583, lng: -47.2200, radius: CITY_RADIUS_M },
 ]
 
 async function searchPlaces(lat, lng, radius, type) {

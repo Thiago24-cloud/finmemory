@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS public.promocoes_supermercados (
   atualizado_em   timestamptz NOT NULL DEFAULT now(),
   expira_em       timestamptz NOT NULL,
   ativo           boolean     DEFAULT true,
+  ingest_source   text,
+  categoria       text,
 
   UNIQUE (supermercado, nome_produto, run_id)
 );

@@ -47,5 +47,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>O FinMemory usa a câmera para ler o código de barras do produto no corredor.</string>
 </dict>
 </plist>

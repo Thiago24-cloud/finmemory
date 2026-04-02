@@ -6,6 +6,8 @@
  * Retorno: { estabelecimento, endereco, data, cnpj, total, itens, nfce_url }
  */
 
+import { extractChave44, isValidChaveNfceDv44 } from '../../lib/nfceUrl';
+
 const SEFAZ_DOMAINS = [
   'nfce.fazenda.sp.gov.br',
   'nfce.fazenda.rj.gov.br',
@@ -49,8 +51,19 @@ const SEFAZ_DOMAINS = [
 ];
 
 function normalizeNfceUrl(qrContent) {
-  const trimmed = (qrContent || '').trim();
+  let trimmed = String(qrContent || '').trim();
   if (!trimmed) return null;
+  if (trimmed.includes('%')) {
+    try {
+      trimmed = decodeURIComponent(trimmed);
+    } catch (_) {
+      /* keep trimmed */
+    }
+  }
+  const chave44 = extractChave44(trimmed);
+  if (chave44 && !/^https?:\/\//i.test(trimmed)) {
+    return `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=${chave44}`;
+  }
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (/^[pP]=/.test(trimmed)) {
     return `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?${trimmed}`;
@@ -60,6 +73,43 @@ function normalizeNfceUrl(qrContent) {
     return `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=${chave}`;
   }
   return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchNfcePage(url) {
+  const maxAttempts = 3;
+  const timeoutMs = 22000;
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await sleep(500 + attempt * 450);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (response.ok) return response;
+      if (response.status >= 500 && attempt < maxAttempts - 1) continue;
+      return response;
+    } catch (e) {
+      clearTimeout(timeout);
+      lastErr = e;
+      if (attempt < maxAttempts - 1) continue;
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
 function isSefazUrl(url) {
@@ -306,7 +356,13 @@ function parseNfceXml(xmlStr) {
       const prod = d?.prod || {};
       const desc = prod?.xProd || prod?.xProduto || 'Item';
       const price = parseMoney(prod?.vProd ?? prod?.vUnCom ?? 0) ?? 0;
-      return { name: String(desc).slice(0, 120), price };
+      const cEAN = prod?.cEAN || prod?.cEANTrib || '';
+      const gtinDigits = String(cEAN).replace(/\D/g, '');
+      const gtin =
+        gtinDigits.length >= 8 && gtinDigits.length <= 14 ? gtinDigits : null;
+      const row = { name: String(desc).slice(0, 120), price };
+      if (gtin) row.gtin = gtin;
+      return row;
     }).filter((i) => i.name && i.price >= 0);
 
     const nome = emit?.xFant || emit?.xNome || emit?.nome || '';
@@ -349,18 +405,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'URL não é de portal SEFAZ válido para NFC-e' });
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(urlToFetch, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9'
-      },
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
+    const chaveOnly = extractChave44(String(urlParam || '').trim());
+    let dvAviso = null;
+    if (chaveOnly && !isValidChaveNfceDv44(chaveOnly)) {
+      dvAviso = 'A chave de 44 dígitos parece incorreta (dígito verificador). Confira se copiou tudo.';
+    }
+
+    const response = await fetchNfcePage(urlToFetch);
 
     if (!response.ok) {
       return res.status(200).json({
@@ -371,7 +422,7 @@ export default async function handler(req, res) {
         total: null,
         itens: [],
         nfce_url: urlToFetch,
-        aviso: `Portal SEFAZ retornou HTTP ${response.status}. Tente novamente.`
+        aviso: [dvAviso, `Portal SEFAZ retornou HTTP ${response.status}. Tente novamente.`].filter(Boolean).join(' ')
       });
     }
 
@@ -393,6 +444,10 @@ export default async function handler(req, res) {
       out.cnpj = out.cnpj || fromHtml.cnpj || '';
       out.total = out.total != null ? out.total : fromHtml.total;
       out.itens = out.itens?.length ? out.itens : fromHtml.itens || [];
+    }
+
+    if (dvAviso) {
+      out.aviso = out.aviso ? `${dvAviso} ${out.aviso}` : dvAviso;
     }
 
     return res.status(200).json(out);

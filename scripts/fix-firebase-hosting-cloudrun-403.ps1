@@ -2,7 +2,7 @@
 # O agente do Firebase Hosting precisa da permissão "Cloud Run Invoker" no serviço.
 
 $ErrorActionPreference = "Stop"
-$PROJECT_ID = "finmemory-667c3"
+$PROJECT_ID = "exalted-entry-480904-s9"
 $REGION = "southamerica-east1"
 $SERVICE_NAME = "finmemory"
 
@@ -32,4 +32,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Permissao aplicada com sucesso." -ForegroundColor Green
-Write-Host "Teste novamente: https://finmemory-667c3.web.app e https://finmemory.com.br" -ForegroundColor Cyan
+Write-Host "Teste novamente: https://finmemory.com.br (ou o URL do Cloud Run do projeto $PROJECT_ID)" -ForegroundColor Cyan

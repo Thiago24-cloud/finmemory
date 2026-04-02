@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
 import { Loader2, Mail, Camera, MapPin, X, Trash2, RotateCcw, Search, Calculator } from 'lucide-react';
@@ -375,7 +375,7 @@ export default function Dashboard() {
           'Veja o arquivo DEPLOY-CLOUD-RUN.md no projeto.'
         );
       } else {
-        alert('⚠️ Você precisa conectar o Gmail primeiro!\n\nClique em "Conectar Gmail" ou faça login com Google na página inicial.');
+        alert('⚠️ Você precisa entrar primeiro.\n\nUse email e senha para acessar a sua conta.');
       }
       return;
     }
@@ -575,7 +575,7 @@ export default function Dashboard() {
   }, [userId, handleSyncEmails]);
 
   const handleConnectGmail = () => {
-    signIn('google', { callbackUrl: '/mapa' });
+    if (typeof window !== 'undefined') window.location.href = '/login?callbackUrl=/mapa';
   };
 
   const handleDisconnect = async () => {
@@ -749,18 +749,16 @@ export default function Dashboard() {
             </div>
             <div>
               <h1 className="text-2xl font-bold mb-2 text-[#333]">FinMemory</h1>
-              <p className="text-[#666]">
-                Conecte seu Gmail para buscar suas notas fiscais automaticamente
-              </p>
+              <p className="text-[#666]">Entre com email e senha para acessar seu painel.</p>
             </div>
             <button
               type="button"
               onClick={handleConnectGmail}
               className="px-6 py-3 bg-gradient-google text-white hover:opacity-90 rounded-xl font-semibold inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28a745] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa]"
-              aria-label="Conectar com Google"
+              aria-label="Entrar com email e senha"
             >
               <Mail className="h-5 w-5" aria-hidden />
-              Conectar Gmail
+              Entrar
             </button>
           </div>
         ) : (

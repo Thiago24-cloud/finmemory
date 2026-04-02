@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
+import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
 
 /**
  * GET /api/map/stores
@@ -15,6 +17,22 @@ function getSupabase() {
     supabaseInstance = createClient(url, key);
   }
   return supabaseInstance;
+}
+
+/** Não listar farmácias/drogarias como pins de estabelecimento no mapa de preços. */
+function isPharmacyStoreType(type) {
+  const t = String(type || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '');
+  if (!t) return false;
+  return (
+    t === 'pharmacy' ||
+    t === 'farmacia' ||
+    t === 'drugstore' ||
+    t.includes('farmacia') ||
+    t.includes('drogaria')
+  );
 }
 
 function distanceKm(lat1, lng1, lat2, lng2) {
@@ -68,6 +86,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Não incluir cnpj no SELECT até a migração existir em produção (evita 42703 column does not exist).
     const { data, error } = await supabase
       .from('stores')
       .select('id, name, type, address, lat, lng, neighborhood')
@@ -76,12 +95,31 @@ export default async function handler(req, res) {
       .lte('lat', latMax)
       .gte('lng', lngMin)
       .lte('lng', lngMax)
-      .limit(useBbox ? 300 : 100);
+      .limit(
+        useBbox
+          ? bboxIsStateOrMacroRegion({
+              minLat: latMin,
+              maxLat: latMax,
+              minLng: lngMin,
+              maxLng: lngMax,
+            })
+            ? Math.min(
+                2500,
+                Math.max(800, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT_LARGE || '1800', 10) || 1800)
+              )
+            : Math.min(
+                1200,
+                Math.max(400, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT || '600', 10) || 600)
+              )
+          : 100
+      );
 
     if (error) {
       console.error('Erro ao buscar stores:', error);
       return res.status(500).json({ error: error.message });
     }
+
+    const storesRows = (data || []).filter((s) => !isPharmacyStoreType(s.type));
 
     const ttlHours = 24;
     const cutoffIso = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
@@ -115,7 +153,7 @@ export default async function handler(req, res) {
     try {
       const { data: agentPromos, error: agentPromoErr } = await supabase
         .from('promocoes_supermercados')
-        .select('lat,lng,supermercado,nome_produto,expira_em')
+        .select('lat,lng,supermercado,nome_produto,expira_em,categoria')
         .eq('ativo', true)
         .gt('expira_em', new Date().toISOString())
         .not('lat', 'is', null)
@@ -131,7 +169,7 @@ export default async function handler(req, res) {
         promoAgentRows = (agentPromos || []).map((r) => ({
           lat: r.lat,
           lng: r.lng,
-          category: 'Supermercado - Promoção',
+          category: formatAgentPromoMapCategory(r.categoria),
           store_name: String(r.supermercado || ''),
           product_name: r.nome_produto,
           created_at: new Date().toISOString(),
@@ -141,7 +179,7 @@ export default async function handler(req, res) {
       console.warn('Aviso: promocoes_supermercados:', e.message);
     }
 
-    const storesBase = data || [];
+    const storesBase = storesRows;
     const storeOfferMap = new Map(storesBase.map((s) => [s.id, false]));
     const storeOfferCountMap = new Map(storesBase.map((s) => [s.id, 0]));
     const storeOfferProductsMap = new Map(storesBase.map((s) => [s.id, []]));
@@ -197,7 +235,7 @@ export default async function handler(req, res) {
     }
 
     if (useBbox) {
-      const stores = (data || []).map((s) => ({
+      const stores = storesRows.map((s) => ({
         id: s.id,
         name: s.name,
         type: s.type,
@@ -213,7 +251,7 @@ export default async function handler(req, res) {
     }
 
     const radiusKm = radiusM / 1000;
-    const withDistance = (data || [])
+    const withDistance = storesRows
       .map((s) => ({
         id: s.id,
         name: s.name,

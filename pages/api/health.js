@@ -19,6 +19,14 @@ export default async function handler(req, res) {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
+    /** Cloud Run injeta K_SERVICE / K_REVISION — útil para confirmar que vês o deploy novo. */
+    deploy:
+      process.env.K_REVISION || process.env.K_SERVICE
+        ? {
+            service: process.env.K_SERVICE || null,
+            revision: process.env.K_REVISION || null,
+          }
+        : undefined,
     checks: {
       server: 'ok',
       nextjs: 'ok',
@@ -41,6 +49,25 @@ export default async function handler(req, res) {
     health.missingEnvVars = missingEnvVars;
   } else {
     health.checks.config = 'ok';
+  }
+
+  // Diagnóstico de auth no Cloud Run (sem expor segredos — só true/false)
+  if (process.env.K_SERVICE) {
+    const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+    health.checks.authEnv = {
+      nextauthSecret: Boolean(process.env.NEXTAUTH_SECRET),
+      supabaseServiceRole: hasServiceRole,
+      googleOAuth: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+      nextauthSessionMode: hasServiceRole ? 'database+adapter' : 'jwt_fallback',
+    };
+    const authOk =
+      health.checks.authEnv.nextauthSecret &&
+      health.checks.authEnv.googleOAuth;
+    if (!authOk) {
+      health.status = 'degraded';
+      health.checks.authEnv.hint =
+        'Defina NEXTAUTH_SECRET, GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no serviço Cloud Run. Opcional: SUPABASE_SERVICE_ROLE_KEY para sessão em banco.';
+    }
   }
 
   // Status code baseado no health

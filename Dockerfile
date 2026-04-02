@@ -1,14 +1,16 @@
-# Estágio 1: Dependências
-FROM node:20-alpine AS deps
+# Estágio 1: Dependências (Node 22 — exigido por @capacitor/cli >=8)
+FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copiar arquivos de dependências
 COPY package.json package-lock.json* ./
-RUN npm ci
+# `npm ci` falha quando package-lock e package.json não estão 100% sincronizados.
+# No Cloud Build isso está bloqueando deploy; para o build do app usamos `npm install`.
+RUN npm install
 
 # Estágio 2: Builder
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Copiar dependências do estágio anterior
@@ -33,7 +35,7 @@ RUN npm run build
 RUN node scripts/verify-build.mjs || (echo "❌ Verificação do build falhou!" && exit 1)
 
 # Estágio 3: Runner (Produção)
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV production

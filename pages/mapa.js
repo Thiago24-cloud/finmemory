@@ -4,16 +4,20 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { BottomNav } from '../components/BottomNav';
 import { useRouter } from 'next/router';
-import { useSession, signIn } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import Image from 'next/image';
-import { Search, ArrowLeft, PlusCircle, Map } from 'lucide-react';
+import { Search, PlusCircle, Menu, ListChecks } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
-import { MAP_THEMES, MAP_THEME_STORAGE_KEY, getMapThemeById } from '../lib/colors';
+import { MAP_THEMES, MAP_THEME_STORAGE_KEY } from '../lib/colors';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
+
+/** Altura reservada no mapa (padding-top) — cabeçalho em duas linhas estilo Maps. */
+const MAP_HEADER_OFFSET_LOGGED_PX = 120;
+const MAP_HEADER_OFFSET_GUEST_PX = 56;
 
 export async function getServerSideProps(ctx) {
   try {
@@ -34,15 +38,17 @@ export async function getServerSideProps(ctx) {
 
 export default function MapaPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [showSharedBanner, setShowSharedBanner] = useState(false);
-  const [showMapasSheet, setShowMapasSheet] = useState(false);
+  const [showMenuSheet, setShowMenuSheet] = useState(false);
   const [mapThemeId, setMapThemeId] = useState('verde');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  /** Inicia mostrando só promoções — mapa “cheio de descontos”; o utilizador pode desligar para ver tudo. */
   const [promoOnly, setPromoOnly] = useState(true);
   const searchInputRef = useRef(null);
+
+  const wazeUi = router.isReady && router.query.waze === '1';
+  const headerOffsetPx = session ? MAP_HEADER_OFFSET_LOGGED_PX : MAP_HEADER_OFFSET_GUEST_PX;
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
@@ -52,9 +58,21 @@ export default function MapaPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem(MAP_THEME_STORAGE_KEY);
+      if (saved === 'claro') {
+        setMapThemeId('padrao');
+        window.localStorage.setItem(MAP_THEME_STORAGE_KEY, 'padrao');
+        return;
+      }
       if (saved && MAP_THEMES.some((t) => t.id === saved)) setMapThemeId(saved);
     }
   }, []);
+
+  const wazeThemeAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!router.isReady || router.query.waze !== '1' || wazeThemeAppliedRef.current) return;
+    wazeThemeAppliedRef.current = true;
+    setMapThemeId('waze');
+  }, [router.isReady, router.query.waze]);
 
   useEffect(() => {
     if (router.query.shared === '1') {
@@ -67,131 +85,190 @@ export default function MapaPage() {
   const handleSelectMapTheme = (id) => {
     setMapThemeId(id);
     if (typeof window !== 'undefined') window.localStorage.setItem(MAP_THEME_STORAGE_KEY, id);
-    setShowMapasSheet(false);
+    setShowMenuSheet(false);
   };
 
-  const handleFocusSearch = () => {
-    searchInputRef.current?.focus();
-  };
+  const pillBase =
+    'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors border whitespace-nowrap';
+  const pillInactive = wazeUi
+    ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#c5c5c5] hover:bg-[#252a38]'
+    : 'border-gray-200/90 bg-white text-gray-700 hover:bg-gray-50 shadow-sm';
+  const pillActive = wazeUi
+    ? 'border-[#2ecc71] bg-[#1e2a22] text-[#2ecc71]'
+    : 'border-[#2ECC49] bg-[#E8F5E9] text-[#1B5E20]';
 
   return (
     <>
       <Head>
         <title>FinMemory – Onde está mais barato? | App de compras e análise de custos</title>
       </Head>
-      {/* Mapa em tela cheia = primeira coisa que o usuário vê */}
-      <div className="fixed inset-0 w-full h-full bg-[#e5e3df]">
+      <div className="fixed inset-0 w-full h-full bg-[#e8e4de]">
         <div className="absolute inset-0 w-full h-full">
-          <MapaPrecos mapThemeId={mapThemeId} searchQuery={debouncedSearch} promoOnly={promoOnly} />
+          <MapaPrecos
+            mapThemeId={mapThemeId}
+            searchQuery={debouncedSearch}
+            promoOnly={promoOnly}
+            wazeUi={wazeUi}
+            headerOffsetPx={headerOffsetPx}
+          />
         </div>
 
-        {/* Banner de sucesso ao compartilhar */}
         {showSharedBanner && (
-          <div className="absolute top-14 left-4 right-4 z-30 bg-[#2ECC49] text-white px-4 py-2.5 rounded-xl text-center text-sm font-medium shadow-lg">
+          <div
+            className="absolute left-4 right-4 z-30 bg-[#2ECC49] text-white px-4 py-2.5 rounded-xl text-center text-sm font-medium shadow-lg"
+            style={{ top: headerOffsetPx + 8 }}
+          >
             Preço compartilhado! Ele já aparece no mapa.
           </div>
         )}
 
-        {/* Header flutuante sobre o mapa – minimalista */}
-        <header className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-2.5 bg-white/90 backdrop-blur-md border-b border-gray-200/80 shadow-sm">
-          {session ? (
-            <>
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-1.5 min-h-[44px] min-w-[44px] py-2 px-3 rounded-full hover:bg-gray-100 text-gray-700 transition-colors shrink-0 font-medium text-sm"
-                aria-label="Análise de gastos"
-              >
-                <ArrowLeft className="h-5 w-5 shrink-0" />
-                <span className="sm:inline hidden">Gastos</span>
-              </Link>
+        {session ? (
+          <header
+            className={`absolute top-0 left-0 right-0 z-20 flex flex-col border-b shadow-sm ${
+              wazeUi
+                ? 'border-[#1e2130] bg-[#13161f]/95 backdrop-blur-md'
+                : 'border-gray-200/80 bg-white/95 backdrop-blur-md'
+            }`}
+          >
+            <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 sm:px-4">
               <button
                 type="button"
-                onClick={() => setShowMapasSheet(true)}
-                className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-[#E8F5E9] text-[#2E7D32] hover:bg-[#C8E6C9] font-semibold text-sm transition-colors shrink-0 border border-[#2ECC49]/30"
-                aria-label="Mapas – tons e estilos do mapa"
+                onClick={() => setShowMenuSheet(true)}
+                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  wazeUi ? 'hover:bg-[#1e2130] text-[#e5e5e5]' : 'hover:bg-gray-100 text-gray-800'
+                }`}
+                aria-label="Menu do planejador de compras"
               >
-                <Map className="h-5 w-5 shrink-0" />
-                <span className="whitespace-nowrap">Mapas</span>
+                <Menu className="h-6 w-6" />
               </button>
-              <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none min-h-[44px] px-2 rounded-full bg-amber-50 border border-amber-200/80">
+              <div
+                className={`min-w-0 flex-1 flex items-center rounded-full pl-3 pr-3 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.08)] border ${
+                  wazeUi
+                    ? 'bg-[#1e2130] border-[#2a2d3a] focus-within:ring-2 focus-within:ring-[#2ecc71]/40'
+                    : 'bg-white border-gray-200/90 focus-within:ring-2 focus-within:ring-[#2ECC49]/35'
+                }`}
+              >
+                <Search className={`h-4 w-4 shrink-0 mr-2 ${wazeUi ? 'text-[#888]' : 'text-gray-400'}`} />
                 <input
-                  type="checkbox"
-                  checked={promoOnly}
-                  onChange={(e) => setPromoOnly(e.target.checked)}
-                  className="rounded border-amber-300 text-amber-600 focus:ring-amber-500 w-4 h-4"
-                  aria-label="Mostrar só promoções no mapa"
+                  ref={searchInputRef}
+                  type="search"
+                  enterKeyHint="search"
+                  placeholder="Região (ex.: Grajaú) ou produto (ex.: arroz)…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`flex-1 min-w-0 bg-transparent border-0 focus:outline-none text-sm ${
+                    wazeUi ? 'text-[#f0f0f0] placeholder-[#666]' : 'text-gray-900 placeholder-gray-500'
+                  }`}
+                  aria-label="Buscar por região ou produto no mapa"
                 />
-                <span className="text-xs font-semibold text-amber-900 whitespace-nowrap hidden sm:inline">
-                  Só promo
-                </span>
-              </label>
-              <div className="flex-1 flex items-center min-w-0 max-w-[160px] sm:max-w-xs">
-                <div className="w-full flex items-center bg-gray-100/90 rounded-full pl-3 pr-3 py-2 focus-within:bg-white focus-within:ring-1 focus-within:ring-[#2ECC49] transition-all">
-                  <Search className="h-4 w-4 text-gray-400 shrink-0 mr-2" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Buscar produto (ex: arroz)..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 min-w-0 bg-transparent border-0 text-gray-800 placeholder-gray-500 focus:outline-none text-sm"
-                    aria-label="Buscar produto no mapa"
-                  />
-                </div>
               </div>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-3 pb-2.5 pt-0.5 sm:px-4">
+              {wazeUi && (
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#2ecc71] pr-1">
+                  Waze dos preços
+                </span>
+              )}
               <button
                 type="button"
-                onClick={handleFocusSearch}
-                className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-amber-500 text-white font-medium text-sm hover:bg-amber-600 transition-colors shrink-0"
-                aria-label="Onde comprar? Buscar produto no mapa"
+                onClick={() => setPromoOnly(true)}
+                className={`${pillBase} ${promoOnly ? pillActive : pillInactive}`}
               >
-                <Search className="h-5 w-5 shrink-0" />
-                <span className="whitespace-nowrap hidden sm:inline">Onde comprar?</span>
+                Promoções
               </button>
-              <Link
-                href="/share-price"
-                className="inline-flex items-center gap-1.5 min-h-[44px] py-2 px-3 rounded-full bg-[#2ECC49] text-white font-medium text-sm hover:bg-[#22a83a] transition-colors shrink-0"
-                aria-label="Compartilhar preço"
-              >
-                <PlusCircle className="h-5 w-5 shrink-0" />
-                <span className="whitespace-nowrap hidden sm:inline">Compartilhar</span>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/" className="flex items-center gap-2 shrink-0 no-underline text-[#333]">
-                <Image src="/logo.png" alt="FinMemory" width={36} height={36} className="object-contain rounded-lg" />
-                <span className="font-bold text-lg">FinMemory</span>
-              </Link>
-              <span className="flex-1 text-xs text-gray-500 hidden sm:block">App de compras · Onde está mais barato?</span>
               <button
                 type="button"
-                onClick={() => signIn('google', { callbackUrl: '/mapa' })}
-                className="min-h-[40px] py-2 px-4 rounded-full bg-[#2ECC49] text-white font-semibold text-sm hover:bg-[#22a83a] transition-colors"
+                onClick={() => {
+                  setPromoOnly(false);
+                }}
+                className={`${pillBase} ${!promoOnly ? pillActive : pillInactive}`}
               >
-                Entrar
+                Ver tudo
               </button>
-              <Link
-                href="/dashboard"
-                className="min-h-[40px] py-2 px-3 rounded-full border border-gray-300 bg-white/80 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
-              >
-                Gastos
-              </Link>
-            </>
-          )}
-        </header>
+              {['Arroz', 'Leite', 'Café'].map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(q);
+                    searchInputRef.current?.focus();
+                  }}
+                  className={`${pillBase} ${pillInactive}`}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </header>
+        ) : (
+          <header
+            className={`absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 border-b shadow-sm ${
+              wazeUi
+                ? 'border-[#1e2130] bg-[#13161f]/95 backdrop-blur-md'
+                : 'border-gray-200/80 bg-white/90 backdrop-blur-md'
+            }`}
+          >
+            <Link href="/" className="flex items-center gap-2 shrink-0 no-underline text-[#333]">
+              <Image src="/logo.png" alt="FinMemory" width={36} height={36} className="object-contain rounded-lg" />
+              <span className="font-bold text-lg">FinMemory</span>
+            </Link>
+            <span className="flex-1 text-xs text-gray-500 hidden sm:block">Planejador de compras em tempo real</span>
+            <Link
+              href="/login?callbackUrl=/mapa"
+              className="min-h-[40px] py-2 px-4 rounded-full bg-[#2ECC49] text-white font-semibold text-sm hover:bg-[#22a83a] transition-colors no-underline"
+            >
+              Entrar
+            </Link>
+            <Link
+              href="/dashboard"
+              className="min-h-[40px] py-2 px-3 rounded-full border border-gray-300 bg-white/80 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
+            >
+              Gastos
+            </Link>
+          </header>
+        )}
 
-        {/* Sheet: Mapas – pasta principal dos tons do mapa (Notion-like: clique e escolha o visual) */}
-        <Sheet open={showMapasSheet} onOpenChange={setShowMapasSheet}>
+        <Sheet open={showMenuSheet} onOpenChange={setShowMenuSheet}>
           <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
             <SheetHeader className="mb-4">
-              <SheetTitle className="text-xl font-bold text-center text-gray-900">
-                Mapas
-              </SheetTitle>
+              <SheetTitle className="text-xl font-bold text-center text-gray-900">FinMemory no mapa</SheetTitle>
               <p className="text-sm text-gray-600 text-center">
-                Tons do mapa – escolha o visual. Sua escolha fica salva para a próxima vez.
+                Compras e preços em tempo real — atalhos e aparência do mapa.
               </p>
             </SheetHeader>
+            <div className="flex flex-col gap-2 mb-6">
+              <Link
+                href="/dashboard"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-100 no-underline"
+              >
+                <ListChecks className="h-5 w-5 text-[#2ECC49]" />
+                Gastos e análise
+              </Link>
+              <Link
+                href="/share-price"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm font-semibold text-emerald-900 hover:bg-emerald-100/80 no-underline"
+              >
+                <PlusCircle className="h-5 w-5 text-emerald-600" />
+                Compartilhar preço
+              </Link>
+              <Link
+                href="/listas"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 no-underline"
+              >
+                Listas salvas
+              </Link>
+              <Link
+                href="/shopping-list"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 no-underline"
+              >
+                Lista de compras compartilhada
+              </Link>
+            </div>
+            <p className="text-sm font-semibold text-gray-800 mb-3">Tema do mapa</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {MAP_THEMES.map((theme) => (
                 <button
@@ -204,21 +281,13 @@ export default function MapaPage() {
                       : 'border-gray-200 bg-white hover:border-[#2ECC49]/50 hover:bg-[#f0fdf4]'
                   }`}
                 >
-                  <div
-                    className="w-full h-14 rounded-xl shadow-inner"
-                    style={{ backgroundColor: theme.preview }}
-                  />
+                  <div className="w-full h-14 rounded-xl shadow-inner" style={{ backgroundColor: theme.preview }} />
                   <span className="font-semibold text-sm text-gray-900">{theme.name}</span>
                 </button>
               ))}
             </div>
           </SheetContent>
         </Sheet>
-
-        {/* Tagline: posicionamento compras → análise de custos */}
-        <p className="absolute bottom-2 left-2 right-2 sm:left-4 sm:right-auto text-[10px] sm:text-xs text-white/95 z-10 pointer-events-none drop-shadow-md max-w-md">
-          App de compras: preços e comunidade. Sua <Link href="/dashboard" className="underline pointer-events-auto hover:text-white">análise de custos</Link> em Gastos.
-        </p>
 
         <BottomNav />
       </div>

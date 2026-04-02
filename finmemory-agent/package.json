@@ -6,12 +6,17 @@
   "main": "agent.js",
   "scripts": {
     "start": "node agent.js",
+    "all": "node agent.js",
     "dry-run": "node agent.js --dry-run",
     "debug": "node agent.js --headless=false --only=dia",
     "dia": "node agent.js --only=dia",
     "atacadao": "node agent.js --only=atacadao",
     "assai": "node agent.js --only=assai",
-    "carrefour": "node agent.js --only=carrefour"
+    "carrefour": "node agent.js --only=carrefour",
+    "sonda": "node agent.js --only=sonda",
+    "prioridade1": "node agent.js --only=atacadao,assai,carrefour",
+    "prioridade2": "node agent.js --only=paodeacucar,hirota",
+    "regional": "node agent.js --only=saojorge,mambo,agape,armazemdocampo,sonda"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

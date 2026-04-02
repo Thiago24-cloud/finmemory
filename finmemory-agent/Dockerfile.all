@@ -1,0 +1,15 @@
+# Imagem completa: todas as redes em SCRAPERS (Playwright + fetch/page-data DIA).
+# Alinhar a tag à versão em finmemory-agent/package-lock.json (playwright).
+# Build (na raiz): docker build -f finmemory-agent/Dockerfile.all -t finmemory-promo-agent-all:latest finmemory-agent
+FROM mcr.microsoft.com/playwright:v1.58.2-noble
+WORKDIR /app
+COPY package.json package-lock.json ./
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN npm ci --omit=dev
+COPY agent.js ./
+ENV NODE_ENV=production
+ENV DIA_MAX_STORE_PAGES=250
+ENV DIA_REGION_PAGE_PATHS=lojas-sp-capital
+ENV CONCURRENCY=1
+# Sem --only = todas as chaves de SCRAPERS (dia, atacadao, assai, carrefour, …)
+CMD ["node", "agent.js"]

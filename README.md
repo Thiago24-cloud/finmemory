@@ -20,7 +20,7 @@ O **FinMemory** é um assistente financeiro que automaticamente detecta, process
 - **Inteligência Artificial:** OpenAI GPT-4o-mini
 - **Autenticação:** Google OAuth 2.0
 - **API de Email:** Gmail API
-- **Deploy:** Vercel
+- **Deploy:** Google Cloud Run (Docker + Cloud Build)
 
 ## 🚀 Quick Start
 
@@ -40,7 +40,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edite `.env.local` com suas credenciais. Veja [CONFIGURAR-VERCEL.md](CONFIGURAR-VERCEL.md) para detalhes.
+Edite `.env.local` com suas credenciais. Os **nomes** das variáveis são os mesmos usados no Cloud Run em produção; detalhes em [CONFIGURAR-VERCEL.md](CONFIGURAR-VERCEL.md) (guia legado de painel) e deploy em [docs/DEPLOY-GOOGLE-CLOUD-RUN.md](docs/DEPLOY-GOOGLE-CLOUD-RUN.md).
 
 ### 4. Valide Configuração
 ```bash
@@ -105,8 +105,9 @@ finmemory/
 ├── .env.example            # Exemplo de variáveis
 ├── package.json
 ├── next.config.js
-├── vercel.json
-├── CONFIGURAR-VERCEL.md    # Guia de configuração
+├── Dockerfile              # Imagem Cloud Run (Next standalone)
+├── cloudbuild.yaml         # Build + push + deploy no Run
+├── CONFIGURAR-VERCEL.md    # Referência de variáveis (legado)
 ├── CHECKLIST-DEPLOY.md     # Checklist de deploy
 ├── MELHORIAS-IMPLEMENTADAS.md  # Relatório de melhorias
 ├── RESUMO-MELHORIAS.md     # Resumo executivo
@@ -180,34 +181,34 @@ npm run validate-env # Valida variáveis de ambiente
 - valor_total (decimal)
 ```
 
-## 🚀 Deploy na Vercel
+## 🚀 Deploy no Google Cloud Run
 
-### 1. Conecte o Repositório
-1. Acesse https://vercel.com
-2. Clique em "Import Project"
-3. Conecte com GitHub
-4. Selecione o repositório `finmemory`
+Produção usa **Container Registry** + **Cloud Build** + **Cloud Run** (região `southamerica-east1`, serviço `finmemory`).
 
-### 2. Configure Variáveis de Ambiente
-Adicione as 7 variáveis obrigatórias em **Settings → Environment Variables**
+### Do zero (resumo)
 
-**Guia completo:** [CONFIGURAR-VERCEL.md](CONFIGURAR-VERCEL.md)
+1. `gcloud config set project SEU_PROJECT_ID` e ativar APIs (`run`, `cloudbuild`, `containerregistry`) — ver guia.
+2. Definir `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` e rodar na raiz:
+   ```bash
+   npm run deploy:cloud-run
+   ```
+   (equivale a `gcloud builds submit` com `cloudbuild.yaml`.)
+3. Configurar **variáveis e segredos** do runtime no **Console do Cloud Run** (OpenAI, Supabase service role, NextAuth, Google OAuth, etc.).
 
-### 3. Deploy
-A Vercel faz deploy automático a cada push na branch `main`.
+**Guia completo:** [docs/DEPLOY-GOOGLE-CLOUD-RUN.md](docs/DEPLOY-GOOGLE-CLOUD-RUN.md)
 
-**Script de validação roda automaticamente antes do build!**
+> Não utilizamos Vercel para deploy desta app; ignore `CONFIGURAR-VERCEL.md` como “painel de hosting” e use-o só como lista de variáveis se fizer sentido.
 
 ## 🐛 Troubleshooting
 
 ### Erro: "supabaseUrl é obrigatório"
-**Solução:** Configure `NEXT_PUBLIC_SUPABASE_URL` na Vercel
+**Solução:** Confirme `NEXT_PUBLIC_SUPABASE_URL` no build (Dockerfile) e/ou variáveis do serviço Cloud Run.
 
 ### Erro: "Variáveis do Google OAuth não configuradas"
-**Solução:** Configure as 3 variáveis do Google e adicione o Redirect URI no Google Console
+**Solução:** Configure as variáveis no **Cloud Run** e o Redirect URI no Google Console com a URL HTTPS do Run (ou domínio customizado).
 
 ### Erro: "OPENAI_API_KEY não configurada"
-**Solução:** Crie uma API key na OpenAI e configure na Vercel
+**Solução:** Crie uma API key na OpenAI e defina no **Cloud Run** (segredo ou variável).
 
 **Guia completo de troubleshooting:** [CONFIGURAR-VERCEL.md](CONFIGURAR-VERCEL.md#-troubleshooting-resolução-de-problemas)
 
@@ -215,8 +216,9 @@ A Vercel faz deploy automático a cada push na branch `main`.
 
 | Arquivo | Descrição |
 |---------|-----------|
-| [CONFIGURAR-VERCEL.md](CONFIGURAR-VERCEL.md) | Guia completo de configuração |
-| [CHECKLIST-DEPLOY.md](CHECKLIST-DEPLOY.md) | Checklist rápido para deploy |
+| [docs/DEPLOY-GOOGLE-CLOUD-RUN.md](docs/DEPLOY-GOOGLE-CLOUD-RUN.md) | Deploy produção (Cloud Run) |
+| [CONFIGURAR-VERCEL.md](CONFIGURAR-VERCEL.md) | Lista de variáveis (referência; hosting legado) |
+| [CHECKLIST-DEPLOY.md](CHECKLIST-DEPLOY.md) | Checklist (ajustar URLs para Cloud Run) |
 | [SETUP-ENV.md](SETUP-ENV.md) | Configuração de ambiente |
 | [MELHORIAS-IMPLEMENTADAS.md](MELHORIAS-IMPLEMENTADAS.md) | Relatório de melhorias |
 | [RESUMO-MELHORIAS.md](RESUMO-MELHORIAS.md) | Resumo executivo |
@@ -246,7 +248,7 @@ Este projeto está sob a licença MIT.
 - [Supabase](https://supabase.com/) - Backend as a Service
 - [OpenAI](https://openai.com/) - API de Inteligência Artificial
 - [Google](https://developers.google.com/) - Gmail API e OAuth
-- [Vercel](https://vercel.com/) - Plataforma de deploy
+- [Google Cloud Run](https://cloud.google.com/run) - Hospedagem da API e do Next.js em produção
 
 ## 📞 Suporte
 

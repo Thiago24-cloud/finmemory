@@ -2,6 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { geocodeAddress } from '../../../lib/geocode';
+import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
+import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
+import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
+import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
 
 /**
  * GET /api/map/points - lista pontos do mapa.
@@ -135,18 +139,27 @@ export default async function handler(req, res) {
     const q = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
     // Com busca textual: não limitar ao viewport (usuário quer achar oferta em qualquer região).
     const bbox = q.length >= 2 ? null : parseBboxFromQuery(req.query || {});
-    const rowLimit = bbox
+    const stateScale = bboxIsStateOrMacroRegion(bbox);
+    const rowLimitCeil = stateScale
       ? Math.min(
+          2000,
+          Math.max(400, Number.parseInt(process.env.MAP_POINTS_BBOX_ROW_LIMIT_LARGE || '900', 10) || 900)
+        )
+      : Math.min(
           500,
           Math.max(50, Number.parseInt(process.env.MAP_POINTS_BBOX_ROW_LIMIT || '320', 10) || 320)
-        )
-      : 500;
-    const outCap = bbox
+        );
+    const rowLimit = bbox ? rowLimitCeil : 500;
+    const outCapCeil = stateScale
       ? Math.min(
+          2500,
+          Math.max(600, Number.parseInt(process.env.MAP_POINTS_BBOX_OUT_CAP_LARGE || '1400', 10) || 1400)
+        )
+      : Math.min(
           500,
           Math.max(80, Number.parseInt(process.env.MAP_POINTS_BBOX_OUT_CAP || '320', 10) || 320)
-        )
-      : 500;
+        );
+    const outCap = bbox ? outCapCeil : 500;
 
     // TTL padrão: 24h (preços divulgados por usuários).
     const defaultTtlHours = Math.max(
@@ -165,8 +178,10 @@ export default async function handler(req, res) {
       Date.now() - promoTtlHours * 60 * 60 * 1000
     ).toISOString();
 
+    // Não incluir image_url aqui: em bases sem a migração a coluna quebra o SELECT e o mapa fica vazio.
+    // imagem_url do agente vem de promocoes_supermercados; image_url em price_points é opcional (merge abaixo).
     const baseSelect =
-      'id, product_name, price, store_name, lat, lng, category, created_at, user_id';
+      'id, product_name, price, store_name, lat, lng, category, created_at, user_id, product_id';
 
     const applySearch = (qb) => {
       if (q.length < 2) return qb;
@@ -260,7 +275,7 @@ export default async function handler(req, res) {
         supabase
           .from('promocoes_supermercados')
           .select(
-            'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url'
+            'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url, product_id, categoria'
           )
           .eq('ativo', true)
           .gt('expira_em', new Date().toISOString())
@@ -269,7 +284,7 @@ export default async function handler(req, res) {
         bbox
       )
         .order('atualizado_em', { ascending: false })
-        .limit(bbox ? Math.min(200, rowLimit) : 300);
+        .limit(bbox ? Math.min(stateScale ? 1400 : 200, rowLimit) : 300);
       const { data: promoFromAgent, error: promoTableErr } = await promoAgentQ;
 
       if (promoTableErr) {
@@ -284,7 +299,11 @@ export default async function handler(req, res) {
             paodeacucar: 'Pão de Açúcar',
             hirota: 'Hirota',
             lopes: 'Lopes',
+            sonda: 'Sonda',
             saojorge: 'Sacolão São Jorge',
+            mambo: 'Mambo',
+            agape: 'Ágape',
+            armazemdocampo: 'Armazém do Campo',
           }[String(s || '').toLowerCase()] || String(s || 'Rede'));
         const asPricePoints = promoFromAgent.map((r) => {
           const raw = r.preco;
@@ -292,16 +311,21 @@ export default async function handler(req, res) {
             raw != null && raw !== '' && !Number.isNaN(Number(raw))
               ? Number(raw)
               : null;
+          const slug = String(r.supermercado || '').toLowerCase();
+          // DIA: mesmo nome que pins em public.stores → /api/map/stores marca tem_oferta_hoje por nome.
+          const storeName =
+            slug === 'dia' ? 'Dia Supermercado' : `${label(r.supermercado)} · ofertas`;
           return {
             id: `promo-${r.id}`,
             product_name: r.nome_produto,
             price: priceNum,
-            store_name: `${label(r.supermercado)} · ofertas`,
+            store_name: storeName,
             lat: r.lat,
             lng: r.lng,
-            category: 'Supermercado - Promoção',
+            category: formatAgentPromoMapCategory(r.categoria),
             created_at: r.atualizado_em,
             user_id: null,
+            product_id: r.product_id ?? null,
             imagem_url: r.imagem_url || null,
           };
         });
@@ -318,18 +342,80 @@ export default async function handler(req, res) {
       console.warn('promocoes_supermercados merge:', e.message);
     }
 
-    const points = (data || []).map((row) => ({
-      id: row.id,
-      product_name: row.product_name,
-      price: row.price,
-      store_name: row.store_name,
-      lat: Number(row.lat),
-      lng: Number(row.lng),
-      category: row.category,
-      time_ago: formatTimeAgo(row.created_at),
-      user_label: maskUserId(row.user_id),
-      promo_image_url: row.imagem_url || null,
-    }));
+    /**
+     * Fallback de imagem no mapa:
+     * 1) bucket próprio (product_images primária)
+     * 2) imagem_url do scraping/agent
+     * 3) Open Food Facts via GTIN do produto
+     * 4) frontend exibe ícone genérico por categoria
+     */
+    let pathByProductId = new Map();
+    try {
+      const productIds = [
+        ...new Set((data || []).map((r) => r.product_id).filter(Boolean)),
+      ];
+      if (productIds.length > 0) {
+        const { data: imgRows, error: imgErr } = await supabase
+          .from('product_images')
+          .select('product_id, storage_path')
+          .in('product_id', productIds)
+          .eq('is_primary', true);
+        if (!imgErr && imgRows?.length) {
+          for (const ir of imgRows) {
+            if (ir.product_id && ir.storage_path && !pathByProductId.has(ir.product_id)) {
+              pathByProductId.set(ir.product_id, ir.storage_path);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('product_images/products (mapa):', e.message);
+    }
+
+    const points = (data || []).map((row) => {
+      let promoUrl = row.imagem_url || row.image_url || null;
+      const pid = row.product_id;
+      if (pid && pathByProductId.has(pid)) {
+        const fromCatalog = getPublicProductImageUrl(pathByProductId.get(pid));
+        if (fromCatalog) promoUrl = fromCatalog;
+      }
+      // Não usar URL sintética por GTIN (getOpenFoodFactsImageUrl): muitas devolvem 404 no <img>
+      // e impediam o enriquecimento por nome (Open Food Facts) abaixo.
+      return {
+        id: row.id,
+        product_name: row.product_name,
+        price: row.price,
+        store_name: row.store_name,
+        lat: Number(row.lat),
+        lng: Number(row.lng),
+        category: row.category,
+        time_ago: formatTimeAgo(row.created_at),
+        user_label: maskUserId(row.user_id),
+        promo_image_url: promoUrl,
+      };
+    });
+
+    // Miniatura por nome (Open Food Facts; opcional Google CSE) quando ainda falta foto exibível.
+    if (process.env.MAP_POINTS_OFF_ENRICH !== '0') {
+      const stateWide = stateScale;
+      const maxNames = stateWide
+        ? Math.min(8, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES_STATE || '8', 10) || 8)
+        : q.length >= 2
+          ? Math.min(36, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES_SEARCH || '28', 10) || 28)
+          : Math.min(32, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES || '24', 10) || 24);
+      const useCse =
+        process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
+        Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
+      try {
+        await enrichMapPointsImageUrls(points, {
+          maxUniqueNames: maxNames,
+          concurrency: stateWide ? 3 : 4,
+          useGoogleCse: useCse,
+        });
+      } catch (e) {
+        console.warn('enrichMapPointsImageUrls:', e.message);
+      }
+    }
 
     return res.status(200).json({ points });
   } catch (e) {

@@ -1,5 +1,8 @@
 # Mapa de preços — estratégia de promoções e performance
 
+Checklist operacional (priorizar redes P1/P2/P3, SQL no Supabase, comandos `npm run promo:*`): **`docs/CHECKLIST-PROMOCOES-POR-REDE.md`**.  
+URLs por rede, agregadores e o que evitar (delivery vs gôndola): **`docs/TABLOIDES-FONTES-REDES-SP.md`**.
+
 ## Como o FinMemory já funciona (base para repetir)
 
 | Camada | Papel |
@@ -34,6 +37,53 @@
 4. **Deduplicação** — Antes de inserir, apagar/atualizar ofertas da mesma loja nas últimas 24h (como no DIA) para não explodir o mapa.
 5. **Atualização** — Cloud Scheduler / cron chamando o endpoint a cada X horas (manhã + fim de tarde costuma bastar para “oferta do dia”).
 6. **Legal** — Respeitar ToS do site/rede; para redes sociais, priorizar links oficiais ou parcerias.
+
+---
+
+## Cobertura “todas as redes” (mesmo padrão do DIA / agente)
+
+Objetivo de produto: **o máximo possível** de supermercados com produtos de desconto visíveis no FinMemory (mapa + filtros), sem prometer 100% só por existir post no Instagram — isso exige **fonte técnica repetível** por rede.
+
+### Ordem de prioridade (por estabilidade)
+
+| Prioridade | Fonte | Por quê |
+|------------|--------|--------|
+| 1 | **Site oficial** — página de ofertas, loja ou encarte (HTML/PDF) | URL estável, mesmo padrão do `import-dia-offers` (fetch + texto/HTML + GPT) ou scraper Playwright em `finmemory-agent/agent.js` (`SCRAPERS.<rede>`). |
+| 2 | **API / JSON / app** — se a rede expuser catálogo ou tabloide digital | Menos frágil que layout de página; documentar endpoint e contrato. |
+| 3 | **Link em post (IG/FB)** — quando o post só **aponta** para encarte ou página no site | Tratar como (1): o job segue o link e importa do site, não do embed social. |
+| 4 | **Só Instagram/Facebook** — galeria de fotos, stories, texto solto | **Baixa prioridade para automação:** HTML dinâmico, login, anti-bot, ToS; custo alto e quebra frequente. Melhor: parceria, CSV manual, ou “link oficial do encarte” no fluxo editorial. |
+
+### Padrão de trabalho (repetir para cada nova rede)
+
+1. **Cadastro de lojas** — Garantir linhas em `public.stores` (nome + `lat`/`lng` + `type`) para a rede; sem isso o mapa não associa oferta ao pin certo (`pages/api/map/stores.js`).
+2. **Escolher veio de ingestão** —  
+   - *Site com página de loja tipo DIA* → `POST /api/scrapers/import-dia-offers` (ajustar prompt/URL se for outro domínio) **ou** novo `import-<rede>-offers.js` copiando o mesmo fluxo (segredo opcional, GPT, `price_points`, dedup 24h).  
+   - *Página nacional de ofertas* → entrada em `SCRAPERS` no `finmemory-agent/agent.js` + `node agent.js --only=<rede>` em cron.
+3. **Alinhar nomes** — `store_name` / `store_name` nas ofertas **igual** (ou muito próximo) a `stores.name` e coordenadas da loja; ver SQL de correção em `docs/DIA-MAPA-IMPORTAR-OUTRA-LOJA.md`.
+4. **Agendar** — Cloud Scheduler (ou cron) 1–2x/dia em horário de troca de oferta; manter `OPENAI_API_KEY` / Playwright onde aplicável.
+5. **Validar no app** — `/mapa`, filtro “Só promo”, pin laranja e popup da loja.
+
+### Redes já mapeadas no agente (código)
+
+Ver objeto `SCRAPERS` em `finmemory-agent/agent.js` (inclui `dia`, `atacadao`, `assai`, `carrefour`, `paodeacucar`, `hirota`, `lopes`, `sonda`, `saojorge`, `mambo`, `agape`, `armazemdocampo`, …). Para **cada** uma: manter URL atualizada, lojas em `stores`, e monitorar quando o site mudar o HTML (ajuste de seletores).
+
+| Slug (`supermercado`) | Página usada pelo scraper |
+|------------------------|---------------------------|
+| `mambo` | `mambo.com.br/lista-rapida` (site pode ser SPA — revisar seletores se vier 0 itens) |
+| `agape` | `agapedelivery.com.br/agape/promocoes-99999` |
+| `armazemdocampo` | Loja Shopify `armazemdocampo.shop/collections/all` |
+
+### Instagram / Facebook em escala
+
+- **Não** substituem site como fonte principal: usar posts só para descobrir **URL do encarte** ou campanha no **site oficial**, e importar dali.
+- Se no futuro houver parceria ou API oficial da rede, documentar aqui e fixar um único job por rede.
+
+### Definição de “pronto” por rede
+
+- [ ] Loja(s) em `stores` com coordenadas corretas  
+- [ ] Job ou POST testado em staging/produção  
+- [ ] Nome da loja nas ofertas bate com `stores`  
+- [ ] Cron ativo e alerta se 0 ofertas por X dias (opcional: `mapa-supervisor` / logs)
 
 ## Mapa fluido (implementado + recomendações)
 

@@ -12,6 +12,15 @@ Este é o fluxo oficial para repetir o que foi feito em Pinheiros (Fradique Cout
 **Código:** `pages/api/scrapers/import-dia-offers.js`  
 **Mapa (pins):** `components/MapaPrecosLeaflet.js` (agrupamento + bolha com número).
 
+### Agente `finmemory-agent` (tabloides via `page-data.json`)
+
+- `node finmemory-agent/agent.js --only=dia` lê `https://www.dia.com.br/page-data/lojas/<slug>/page-data.json` e grava **encartes** em `promocoes_supermercados` (`imagem_url`, `preco` muitas vezes **NULL**).
+- No Supabase, **`preco` / `price` não podem ser NOT NULL** — senão o insert falha e o mapa fica vazio. Migração: `supabase/migrations/20260329180000_promocoes_preco_nullable.sql` ou copiar/colar `docs/SQL-PROMOCOES-PRECO-NULLABLE.sql`.
+- Para as promoções caírem **no mesmo sítio do pin** no mapa, preencha **`stores.promo_page_url`** com a URL exata da loja (`https://www.dia.com.br/lojas/...`). O agente usa isso para **sobrescrever lat/lng** do JSON do Dia pelas coordenadas da tabela `stores`.
+- **Capital SP completa (lista do site):** por defeito o agente lê `page-data/lojas-sp-capital/page-data.json` e **só** inclui slugs `sp-sao-paulo-*` (~**121** lojas no município; o JSON traz mais nós de outras cidades, que são ignorados). `DIA_MAX_STORE_PAGES` por defeito é **250**, por isso **um único job** cobre todas as lojas da capital.
+- **Correr em produção (gravar no Supabase):** na raiz do repositório, `npm run promo:dia` (equivale a `node finmemory-agent/agent.js --only=dia`). O primeiro ciclo completo são **~121 pedidos** ao `page-data` de cada loja, em série, com pequena pausa entre lojas — prevê **vários minutos** e define o **timeout do Cloud Run Job** (ou do cron) com folga, por exemplo **≥ 3600 s** ou **5400 s** se quiseres margem para retries e latência.
+- Para voltar a incluir todos os nós do JSON (não só SP capital): `DIA_REGION_INCLUDE_ALL_NODES=1`.
+
 ---
 
 ## Pré-requisitos no Cloud Run

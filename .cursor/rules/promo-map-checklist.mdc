@@ -1,0 +1,26 @@
+---
+description: Executar checklist de promoções do mapa (SQL Supabase + agente npm + validação /mapa). Aplicar quando o utilizador pedir para o bot rodar divulgação de promoções, priorizar redes, ou executar o checklist P1/P2/P3.
+alwaysApply: false
+---
+
+# Bot — checklist de promoções no mapa
+
+Quando o utilizador pedir explicitamente para **executar o checklist de promoções**, **rodar o agente para encher o mapa**, **priorizar redes**, ou **fazer o fluxo SQL + agente** descrito na documentação:
+
+1. **Fonte da verdade:** `docs/CHECKLIST-PROMOCOES-POR-REDE.md` (ler e seguir a ordem das secções).
+
+2. **SQL (Supabase):** O assistente **não** assume acesso ao painel Supabase.  
+   - Abrir `docs/SQL-PRIORIZAR-REDES-PROMOCOES.sql`, copiar os blocos relevantes e **entregar ao utilizador** para colar no SQL Editor, **ou** executar se existir integração/MCP Supabase confirmada.  
+   - Se o utilizador colar resultados, ajudar a interpretar (qual rede tem mais lojas, onde falta dado).
+
+3. **Agente (terminal na raiz do repo):**  
+   - Verificar `finmemory-agent/node_modules` (`npm install` em `finmemory-agent` se necessário).  
+   - Preferir `npm run promo:agent:dry` antes de gravar.  
+   - Depois `npm run promo:p1`, `promo:p2`, `promo:dia` ou `promo:regional` conforme o utilizador ou o checklist (P1 primeiro se a base tiver muitas lojas nessas marcas).  
+   - Requer `SUPABASE_SERVICE_ROLE_KEY` (e URL) no `.env` ou `finmemory-agent/.env`. Reportar erros de Playwright/rede.
+
+4. **Import DIA:** Se o utilizador falar em DIA, seguir `docs/DIA-MAPA-IMPORTAR-OUTRA-LOJA.md` e a regra `dia-mapa-outra-loja` se existir.
+
+5. **Validação:** Indicar abrir `/mapa` com **Só promo** ligado; opcionalmente `GET /api/health` e smoke das APIs do mapa se o utilizador pedir verificação automática.
+
+6. **Não inventar:** Não afirmar que dados foram gravados no Supabase sem evidência (comando bem-sucedido ou resultado colado pelo utilizador).

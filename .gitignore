@@ -20,9 +20,10 @@ build/
 .vite/
 coverage/
 
-# Vercel / Netlify
+# Vercel / Netlify / Firebase
 .vercel/
 .netlify/
+.firebase/
 
 # Env files (secretos)
 .env

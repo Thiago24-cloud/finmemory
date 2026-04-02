@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { Map, BarChart3, Calculator, PlusCircle, User } from 'lucide-react';
+import { Map, BarChart3, CreditCard, PlusCircle, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AddActionSheet } from './AddActionSheet';
 import { useState } from 'react';
@@ -9,7 +9,7 @@ import { useState } from 'react';
 const tabs = [
   { icon: Map, label: 'Mapas', path: '/mapa', isAction: false },
   { icon: BarChart3, label: 'Gastos', path: '/dashboard', isAction: false },
-  { icon: Calculator, label: 'Economia', path: '/calculadora', isAction: false },
+  { icon: CreditCard, label: 'Cartões', path: '/cartoes', isAction: false },
   { icon: PlusCircle, label: 'Adicionar', path: '__action__', isAction: true },
   { icon: User, label: 'Perfil', path: '/settings', isAction: false },
 ];

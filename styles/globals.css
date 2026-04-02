@@ -170,10 +170,33 @@
   border: none !important;
 }
 
+.leaflet-marker-icon.finmemory-store-pin {
+  background: none !important;
+  border: none !important;
+}
+
 .leaflet-container {
   width: 100%;
   height: 100%;
+  /* Texto HTML sobre o mapa (tooltips/popups): evita subpixel “fuzzy” em transforms do Leaflet */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Fundo enquanto carregam os tiles (alinhado ao tema padrão / verde) */
+.leaflet-container.finmemory-map-tiles {
+  background: #e8e4de;
+}
+
+.leaflet-container.finmemory-map-tiles.finmemory-map-theme-verde {
+  background: #ebebeb;
+}
+
+.leaflet-container.finmemory-map-tiles.finmemory-map-theme-waze {
+  background: #13161f;
+}
+
+/* Evitar filter no tile-pane: contrast()/saturate() reamostram o raster e deixa ruas/nomes do mapa “borrados”. */
 
 .leaflet-popup-pane {
   z-index: 1000;
@@ -187,4 +210,138 @@
 .leaflet-popup-content {
   margin: 0;
   min-width: 200px;
+}
+
+/* Popup de ofertas — card estilo “detalhe do lugar” (hero + grelha com imagens) */
+.leaflet-popup-content:has(.finmemory-popup-maps-card) {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: min(380px, calc(100vw - 40px)) !important;
+  max-width: min(380px, calc(100vw - 40px)) !important;
+  min-width: 0 !important;
+}
+
+.leaflet-popup-content-wrapper:has(.finmemory-popup-maps-card) {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.14),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Fotos de oferta — contraste e cor ligeiramente mais vivos (sem exagerar) */
+.finmemory-offer-photo {
+  filter: saturate(1.12) contrast(1.06);
+}
+
+.leaflet-popup-content-wrapper:has(.finmemory-popup-maps-card) a.leaflet-popup-close-button {
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+  line-height: 26px;
+  padding: 0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #374151 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  top: 8px !important;
+  right: 8px !important;
+}
+
+/* Rótulos ao lado dos pins — preço: texto + halo; lojas: faixa branca (chip) */
+.leaflet-tooltip.finmemory-map-label {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #1f2937 !important;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  padding: 1px 2px !important;
+  margin: 0 !important;
+  max-width: min(220px, 52vw) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  pointer-events: none !important;
+  /* Contorno nítido em vez de blur 0 0 Npx (halo borrado sobre o mapa) */
+  text-shadow:
+    -1px -1px 0 #fff,
+    1px -1px 0 #fff,
+    -1px 1px 0 #fff,
+    1px 1px 0 #fff,
+    0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+.leaflet-tooltip.finmemory-map-label::before {
+  display: none !important;
+}
+
+.leaflet-tooltip.finmemory-map-label--price {
+  font-weight: 700 !important;
+  max-width: min(240px, 55vw) !important;
+}
+
+.leaflet-tooltip.finmemory-map-label.finmemory-map-label--store {
+  background: rgba(255, 255, 255, 0.97) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  padding: 5px 9px !important;
+  color: #111827 !important;
+  text-shadow: none !important;
+}
+
+.leaflet-tooltip.finmemory-map-label--you {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #0d47a1 !important;
+  text-shadow:
+    -1px -1px 0 #fff,
+    1px -1px 0 #fff,
+    -1px 1px 0 #fff,
+    1px 1px 0 #fff,
+    0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Painel / carrinho “Waze dos Preços” (?waze=1 no mapa) */
+.finmemory-waze-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2ecc71 #1a1d27;
+}
+.finmemory-waze-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.finmemory-waze-scroll::-webkit-scrollbar-track {
+  background: #1a1d27;
+  border-radius: 4px;
+}
+.finmemory-waze-scroll::-webkit-scrollbar-thumb {
+  background: #2ecc71;
+  border-radius: 4px;
+}
+
+/* Leitor nativo ML Kit: câmera atrás do WebView (Capacitor) */
+html.finmemory-native-barcode-scan-html {
+  background: transparent !important;
+}
+
+html.finmemory-native-barcode-scan-html body,
+html.finmemory-native-barcode-scan-html #__next {
+  background: transparent !important;
+}
+
+body.finmemory-native-barcode-scan-active {
+  background: transparent !important;
+  visibility: hidden;
+}
+
+body.finmemory-native-barcode-scan-active .finmemory-barcode-scanner-ui {
+  visibility: visible;
 }

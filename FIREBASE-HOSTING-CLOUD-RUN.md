@@ -1,135 +1,81 @@
 # Firebase Hosting + Cloud Run
 
+**Projeto GCP / Firebase de produção:** `exalted-entry-480904-s9` (FinMemory).  
+O projeto **`finmemory-667c3` está descontinuado** — não uses para deploy nem para documentação operacional.
+
 ## Erro: "Cloud Run service `finmemory` does not exist in region `southamerica-east1`"
 
 O Firebase Hosting tenta vincular ao serviço Cloud Run **no mesmo projeto GCP**. Se o serviço ainda não existir nessa região, o `firebase deploy` falha ao finalizar.
 
-## O que está configurado
+## O que precisa bater
 
-- **firebase.json**: Hosting com `public` = pasta `public` e rewrites para o Cloud Run.
-  - `serviceId`: **finmemory**
-  - `region`: **southamerica-east1**
-- **.firebaserc**: projeto padrão **finmemory-667c3** (projeto do Firebase onde o domínio finmemory.com.br está).
+- **firebase.json** (se usares Hosting): rewrites para o Cloud Run com `serviceId`: **finmemory**, `region`: **southamerica-east1**.
+- **.firebaserc**: deve apontar para o **mesmo** projeto onde está o Cloud Run (hoje: **exalted-entry-480904-s9**).
 
-## Por que dá erro ao fazer `firebase deploy`?
+## Deploy da app (Cloud Run)
 
-O Firebase está configurado para o projeto **finmemory-667c3**. O Hosting tenta usar um serviço Cloud Run "finmemory" em **southamerica-east1** nesse mesmo projeto. Se esse serviço não existir em **finmemory-667c3**, o deploy falha. O comando `firebase use finmemory-836908221936` falha porque esse ID não é um projeto Firebase válido para a sua conta (pode ser outro projeto ou número de projeto).
-
-## Passos para corrigir
-
-### 1. Ter o Cloud Run no mesmo projeto do Firebase (finmemory-667c3)
-
-O Cloud Run precisa existir **no projeto finmemory-667c3**. Se o seu app hoje está em outro projeto, é preciso fazer o deploy no **finmemory-667c3**.
-
-### 2. Criar o serviço Cloud Run (se ainda não existir)
-
-No projeto escolhido (finmemory-667c3 ou finmemory-836908221936), crie o serviço com **nome** `finmemory` e **região** `southamerica-east1`:
+O script **`npm run deploy:cloud-run`** envia o build para o projeto **`exalted-entry-480904-s9`** por defeito (ver `scripts/deploy-cloud-run.mjs`). Não depende só do `gcloud config set project`.
 
 ```powershell
-# Definir o projeto (use o mesmo do .firebaserc)
-gcloud config set project finmemory-667c3
-
-# Deploy via script (usa cloudbuild.yaml: nome finmemory, região southamerica-east1)
-.\deploy-cloud-run.ps1
+gcloud config set project exalted-entry-480904-s9
+npm run deploy:cloud-run
 ```
 
-Ou pelo Cloud Build no Console, garantindo que o serviço criado se chame **finmemory** e esteja em **southamerica-east1**.
+Ou PowerShell: `.\deploy-cloud-run.ps1` (já usa `exalted-entry-480904-s9`).
 
-### 3. Conferir nome e região no Console
+## Erro 403 Forbidden (.web.app ou domínio customizado)
 
-No [Cloud Run](https://console.cloud.google.com/run): escolha o projeto → veja o **nome** do serviço e a **região**. Se for diferente (ex.: outro nome ou região), ajuste o **firebase.json**:
-
-```json
-"run": {
-  "serviceId": "NOME_EXATO_DO_SERVICO",
-  "region": "REGIAO_EXATA"
-}
-```
-
-### 4. Rodar o deploy do Firebase
-
-Depois que o serviço `finmemory` existir em `southamerica-east1` no mesmo projeto:
-
-```bash
-firebase deploy
-```
-
----
-
-**Resumo**: Firebase Hosting e Cloud Run precisam estar no **mesmo projeto**. O serviço deve se chamar **finmemory** e estar na região **southamerica-east1** (ou então altere `serviceId`/`region` no `firebase.json` para bater com o Console).
-
----
-
-## Erro 403 Forbidden ao abrir .web.app ou o domínio customizado
-
-Se ao acessar **finmemory-667c3.web.app** ou **finmemory.com.br** aparecer *"403 Forbidden - Your client does not have permission to get URL"*, o **Firebase Hosting** está conseguindo falar com o Cloud Run, mas o **agente do Firebase Hosting** não tem permissão para invocar o serviço.
-
-**Solução:** conceder a função **Cloud Run Invoker** a **allUsers** no serviço `finmemory` (acesso público ao Cloud Run, necessário para o Hosting conseguir repassar as requisições):
+Se aparecer *"403 Forbidden - Your client does not have permission to get URL"*, o Hosting fala com o Cloud Run mas falta **Cloud Run Invoker** no serviço.
 
 ```powershell
-# Na pasta do projeto (Finmemory)
 .\scripts\fix-firebase-hosting-cloudrun-403.ps1
 ```
 
 Ou manualmente:
 
 ```bash
-gcloud config set project finmemory-667c3
-gcloud run services add-iam-policy-binding finmemory --region=southamerica-east1 --member="allUsers" --role="roles/run.invoker"
+gcloud config set project exalted-entry-480904-s9
+gcloud run services add-iam-policy-binding finmemory --region=southamerica-east1 --project=exalted-entry-480904-s9 --member="allUsers" --role="roles/run.invoker"
 ```
 
-Depois de aplicar, teste de novo **finmemory-667c3.web.app** e **finmemory.com.br**.
+Testa de novo **https://finmemory.com.br** (e o URL `*.run.app` do serviço, se usares).
 
----
+## Erro "Authentication Error - Configuration" (login)
 
-## Erro "Authentication Error - Configuration" ao fazer login
-
-Se ao clicar em login aparece **"Erro de Autenticação"** com código **Configuration**, o NextAuth está com a URL errada: o app está sendo acessado por **finmemory-667c3.web.app** (ou finmemory.com.br), mas as variáveis do Cloud Run ainda apontam para outra URL.
-
-**Solução:**
-
-1. **Definir variáveis no Cloud Run** (projeto **finmemory-667c3**) com a URL correta:
+1. **Variáveis no Cloud Run** no projeto **exalted-entry-480904-s9**:
    ```powershell
-   gcloud config set project finmemory-667c3
+   gcloud config set project exalted-entry-480904-s9
    .\scripts\set-cloud-run-env.ps1
    ```
-   O script lê o `.env.local` e atualiza o serviço **finmemory**; em projeto **finmemory-667c3** ele já define `NEXTAUTH_URL=https://finmemory-667c3.web.app` e `GOOGLE_REDIRECT_URI` correspondente.
+   O script define `NEXTAUTH_URL` a partir do URL real do serviço `finmemory` (ou fallback conhecido).
 
-2. **Incluir a URL de callback no Google (OAuth):**
-   - Abra [APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials?project=finmemory-667c3).
-   - Clique no cliente OAuth 2.0 usado pelo app (tipo "Aplicativo da Web").
-   - Em **"URIs de redirecionamento autorizados"**, adicione:
-     - `https://finmemory-667c3.web.app/api/auth/callback/google`
-     - Se usar o domínio customizado: `https://finmemory.com.br/api/auth/callback/google`
-   - Em **"Origens JavaScript autorizadas"**, adicione:
-     - `https://finmemory-667c3.web.app`
-     - `https://finmemory.com.br` (se usar)
-   - Salve.
+2. **Google OAuth** — no projeto **exalted-entry-480904-s9**: [Credentials](https://console.cloud.google.com/apis/credentials?project=exalted-entry-480904-s9)  
+   - Redirect: `https://finmemory.com.br/api/auth/callback/google` (e, se testares no Run direto, o URL `https://…run.app/api/auth/callback/google` correspondente).  
+   - Origens JS: `https://finmemory.com.br` (e o host do Run, se aplicável).
 
-3. Limpe os cookies do site (ou use uma aba anônima) e tente fazer login de novo.
+3. Limpa cookies ou aba anónima e tenta de novo.
+
+## Domínio finmemory.com.br
+
+1. Cloud Run **finmemory** em **southamerica-east1** no projeto **exalted-entry-480904-s9**.  
+2. `firebase deploy --only hosting` (ou `npm run deploy:firebase-hosting`) no mesmo projeto Firebase/GCP — ver `firebase.json` na raiz.  
+3. No [Firebase Console](https://console.firebase.google.com) → projeto ligado a **exalted-entry-480904-s9** → **Hosting** → domínio customizado **finmemory.com.br** conectado.
+
+## Ficheiros no repositório
+
+- **`firebase.json`** — rewrite `**` → Cloud Run `finmemory` (`southamerica-east1`). Assim `/api/*` (ex.: `/api/pluggy/webhook`) chega ao Next.js no Run.  
+- **`.firebaserc`** — projeto predefinido `exalted-entry-480904-s9`.
+
+Ordem típica: `npm run deploy:cloud-run` (imagem nova) → `npm run deploy:firebase-hosting` (atualiza rewrites/domínio no Hosting).
+
+## Cloudflare (DNS em frente ao Firebase)
+
+1. No **Firebase Console** → Hosting → domínios, copia os registos que o Google pede (CNAME para `finmemory.web.app` ou equivalente).  
+2. No **Cloudflare** → DNS do `finmemory.com.br`: cria/edita os registos **exatamente** como o Firebase indica (nome, destino, proxy).  
+3. **SSL/TLS** → modo **Full (strict)** (o Firebase emite o certificado do domínio).  
+4. Se algo falhar, testa com **proxy DNS só** (cinza) em vez de “proxied” (laranja) para isolar bloqueios.  
+5. **Page Rules / Cache:** evita cache agressivo em `/api/*` (ou exclui API do cache), senão podes ver respostas antigas ou erros.
 
 ---
 
-## Usar o app no domínio finmemory.com.br (revisão Google)
-
-Objetivo: acessar o app em **https://finmemory.com.br** para poder enviar à revisão do Google (Play Store, etc.).
-
-### O que já está certo
-
-1. **Cloud Run** precisa existir no projeto **finmemory-667c3** (serviço **finmemory**, região **southamerica-east1**). Se o app hoje está em outro projeto, faça o deploy no finmemory-667c3 (passo 1 abaixo).
-2. **firebase.json** já aponta o Hosting para esse serviço (`serviceId`: finmemory, `region`: southamerica-east1).
-3. **.firebaserc** está com o projeto **finmemory-667c3** (projeto do Firebase com o domínio).
-
-### Ordem dos passos
-
-1. **Criar o Cloud Run no projeto finmemory-667c3** (se ainda não existir): no terminal, `gcloud config set project finmemory-667c3` e depois `.\deploy-cloud-run.ps1`. No primeiro deploy pode ser preciso ativar Cloud Build e Cloud Run API nesse projeto no Console GCP.
-2. **Deploy do Firebase Hosting** (para o Hosting “ligar” ao Cloud Run):
-   ```bash
-   firebase deploy
-   ```
-3. **Domínio customizado no Firebase**: você disse que o domínio já está conectado. Para o app ser servido em **finmemory.com.br**, o domínio precisa estar associado ao **Hosting** (não só ao projeto):
-   - Abra: [Firebase Console](https://console.firebase.google.com) → projeto **finmemory-667c3** → **Hosting**.
-   - Em **Domínios customizados**, veja se **finmemory.com.br** (e, se quiser, **www.finmemory.com.br**) está listado e com status **Conectado**.
-   - Se não estiver: clique em **Adicionar domínio customizado**, informe **finmemory.com.br**, e siga as instruções de DNS (registro A ou CNAME conforme o Firebase indicar no seu provedor de domínio).
-
-Depois que o DNS propagar e o domínio aparecer como conectado, **https://finmemory.com.br** passa a abrir o mesmo app que está no Cloud Run, e você pode usar essa URL na revisão do Google.
+**Resumo:** Hosting e Cloud Run no **mesmo** projeto; serviço **finmemory**, região **southamerica-east1**; projeto alvo **exalted-entry-480904-s9**. Cloudflare só encaminha DNS para o destino que o **Firebase** define; o tráfego da app continua a ser servido pelo **Hosting → Cloud Run**.

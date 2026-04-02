@@ -27,6 +27,7 @@ require('dotenv').config({ path: '.env' });
 const { createClient } = require('@supabase/supabase-js');
 const OpenAIModule = require('openai');
 const OpenAI = OpenAIModule.default || OpenAIModule;
+const { buildDiaOffersExtractionPrompt } = require('../lib/diaOffersGptPrompt.js');
 
 const TTL_MS = 72 * 60 * 60 * 1000;
 
@@ -119,29 +120,7 @@ async function scrapeDia({ storeUrl }) {
   const text = stripHtmlToText(html);
   const truncated = text.slice(0, 25000);
 
-  const extractionPrompt = `Você vai extrair PROMOÇÕES ATIVAS da página de uma loja do DIA (supermercado).
-
-Regras:
-- Retorne SOMENTE JSON válido, sem markdown.
-- A página pode ter preço "De X,XX" e preço promocional "Por Y,YY". Use SEMPRE o preço promocional.
-- Cada oferta deve ser um item: produto + preço promocional.
-- Se existir validade (ex.: "Válida até 22/03/2026"), retorne em "valid_until" no formato YYYY-MM-DD. Se não existir, use null.
-- Não inclua qualquer item sem preço promocional.
-
-JSON esperado:
-{
-  "store_name": string,
-  "offers": [
-    {
-      "product_name": string,
-      "promo_price": number,
-      "valid_until": string | null
-    }
-  ]
-}
-
-Conteúdo (texto extraído do HTML):
-${truncated}`;
+  const extractionPrompt = buildDiaOffersExtractionPrompt(truncated);
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -227,6 +206,7 @@ async function run() {
         atualizado_em: runId,
         expira_em: expiraEm,
         ativo: true,
+        ingest_source: 'job_openai_dia',
       };
     })
     .filter(Boolean);

@@ -37,7 +37,7 @@ export function QrScanner({ onScan, onClose }) {
         instance = new Html5Qrcode(QR_CONTAINER_ID);
         scannerRef.current = instance;
 
-        let cameraConfig = { facingMode: { exact: 'environment' } };
+        let cameraConfig = { facingMode: { ideal: 'environment' } };
         try {
           const cameras = await instance.getCameras();
           if (cameras && cameras.length > 0) {
@@ -47,9 +47,15 @@ export function QrScanner({ onScan, onClose }) {
           }
         } catch (_) {}
 
+        const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
+          const edge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.min(560, Math.max(260, Math.floor(edge * 0.85)));
+          return { width: size, height: size };
+        };
+
         await instance.start(
           cameraConfig,
-          { fps: 20, qrbox: { width: 300, height: 300 } },
+          { fps: 12, qrbox: qrboxFunction },
           (decodedText) => {
             const cb = onScanRef.current;
             const t = (decodedText && String(decodedText).trim()) || '';
@@ -106,7 +112,7 @@ export function QrScanner({ onScan, onClose }) {
       <div
         id={QR_CONTAINER_ID}
         ref={containerRef}
-        className="min-h-[300px] w-full max-w-sm mx-auto rounded-2xl overflow-hidden bg-black [&_.qr-shaded-region]:border-4 [&_.qr-shaded-region]:border-white [&_video]:rounded-2xl [&_video]:object-cover"
+        className="min-h-[min(85vw,360px)] w-full max-w-md mx-auto rounded-2xl overflow-hidden bg-black [&_.qr-shaded-region]:border-4 [&_.qr-shaded-region]:border-white [&_video]:rounded-2xl [&_video]:object-cover"
       />
       {error && (
         <p className="text-red-600 text-sm text-center bg-red-50 py-2 px-3 rounded-xl">{error}</p>
