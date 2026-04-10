@@ -18,6 +18,36 @@ const nextConfig = {
       { source: '/apple-touch-icon-precomposed.png', destination: '/logo.png' },
     ]
   },
+  /** Reduz HTML/JSON cacheado com buildId antigo após deploy (Cloud Run). */
+  async headers() {
+    const noStore = [
+      { key: 'Cache-Control', value: 'private, no-cache, no-store, max-age=0, must-revalidate' },
+    ];
+    const appPages = [
+      '/',
+      '/login',
+      '/mapa',
+      '/dashboard',
+      '/cartoes',
+      '/add-receipt',
+      '/settings',
+      '/notifications',
+      '/scan-product',
+      '/share-price',
+      '/shopping-list',
+      '/partnership',
+      '/manual-entry',
+      '/categories',
+      '/reports',
+      '/calculadora',
+      '/listas',
+    ];
+    return [
+      ...appPages.map((source) => ({ source, headers: noStore })),
+      { source: '/_next/data/:path*', headers: noStore },
+      { source: '/transaction/:path*', headers: noStore },
+    ];
+  },
 }
 
 module.exports = nextConfig

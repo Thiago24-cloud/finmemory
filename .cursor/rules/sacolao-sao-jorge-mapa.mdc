@@ -1,0 +1,18 @@
+---
+description: Sacolão São Jorge no mapa — curadoria JSON → SQL (folheto), alinhado a stores e slug saojorge.
+alwaysApply: false
+---
+
+# Sacolão São Jorge — mapa de preços / encarte
+
+Quando o utilizador pedir para **colocar promoções do Sacolão / São Jorge no mapa**, **repetir o padrão do folheto**, **nova campanha curada**, ou **alinhar com outras redes**:
+
+1. **Fonte da verdade:** `docs/SACOLAO-SAO-JORGE-MAPA-CURADORIA.md`.
+2. **Não** executar `node` no SQL Editor do Supabase — só colar o `.sql` gerado localmente.
+3. Manter **`meta.supermercado_slug`: `saojorge`**, **`meta.unidades[]`** com `lat`/`lng`, e **`run_id`** estável por campanha; com várias unidades, o gerador usa `run_id` com sufixo `-u1`, `-u2`, …
+4. Gerar inserts com:
+   - `node scripts/generate-curadoria-promocoes-sql.mjs [json] [saida-insert.sql]`
+   - `node scripts/generate-sacolao-promotions-table-sql.mjs [json] [saida-promotions.sql]` (encarte `public.promotions`; `source` = `meta.promotions_source` ou `ingest_source` + `:promotions_vm`)
+5. Garantir linha em **`public.stores`** (nome + coordenadas) compatível com o pin; opcionalmente ajustar raio via `MAP_STORE_OFFERS_CHAIN_SLUG_RADIUS_KM` se necessário em produção.
+
+Exemplo de JSON completo no repositório: `data/curadoria/sacolao-sao-jorge-operacao-abre-mes-2026-04.json`.

@@ -1,9 +1,27 @@
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
+import { getServerSession } from 'next-auth/next';
 import { geocodeAddress } from '../../../lib/geocode';
+import { authOptions } from '../auth/[...nextauth]';
+import {
+  computeDiscountPct,
+  endOfValidDayBrazilIso,
+  flyerProductDedupeKey,
+  normalizeVisionValidDates,
+  parseFlexibleDateToIso,
+  parsePromoPriceNumber,
+} from '../../../lib/flyerVisionParse';
 
 const INGEST_PREFIX = 'vision_flyer';
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '12mb',
+    },
+  },
+};
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -24,7 +42,13 @@ function checkSecret(req) {
   return provided === secret;
 }
 
-/** Categorias pedidas ao modelo — valores fora da lista viram "Outros". */
+/** Segredo de agente OU sessão NextAuth (curadoria no browser). */
+async function checkFlyerVisionAuth(req, res) {
+  if (checkSecret(req)) return true;
+  const session = await getServerSession(req, res, authOptions);
+  return !!session?.user?.supabaseId;
+}
+
 const VISION_CATEGORIES = [
   'Hortifruti',
   'Carnes',
@@ -34,6 +58,7 @@ const VISION_CATEGORIES = [
   'Higiene',
   'Limpeza',
   'Congelados',
+  'Padaria',
   'Outros',
 ];
 
@@ -48,9 +73,6 @@ function sanitizeVisionCategory(raw) {
   return 'Outros';
 }
 
-/**
- * Resposta do modelo: objeto com products, ou JSON solto, ou array raiz (legado).
- */
 function parseVisionJsonResponse(text) {
   if (!text) return null;
   const cleaned = String(text)
@@ -87,14 +109,6 @@ function sanitizeNome(s) {
   return t.slice(0, 280);
 }
 
-function parsePromoPrice(v) {
-  if (v == null) return null;
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  const s = String(v).replace(/R\$\s*/i, '').replace(/\./g, '').replace(',', '.').trim();
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : null;
-}
-
 function formatPrecoOriginalDePor(orig, promo) {
   if (orig == null && promo == null) return null;
   const parts = [];
@@ -127,12 +141,83 @@ function buildIngestSource(supermercado, flyerKey, imageRef) {
   return `${INGEST_PREFIX}:${slug}:${key}`;
 }
 
+function buildPromotionsSourceTag(ingestSource) {
+  return `vision_flyer_api:${ingestSource}`;
+}
+
+/** Slugs em que `ILIKE '%slug%'` no nome da loja não bate com o nome de marca real. */
+const STORE_NAME_ILIKE_PATTERNS_BY_SLUG = {
+  padraosuper: [
+    '%Supermercado%Padrão%',
+    '%Supermercado%Padrao%',
+    '%Mercado%Padrão%',
+    '%Mercado%Padrao%',
+  ],
+  saojorge: ['%Sacolão%São Jorge%', '%Sacolao%Sao Jorge%', '%sacol%jorge%'],
+  pomardavilavilamadalena: [
+    '%Pomar%Vila%Madalena%',
+    '%Pomar da Vila%',
+    '%pomar%vila%madalena%',
+  ],
+};
+
+const DEFAULT_DISPLAY_STORE_NAME_BY_SLUG = {
+  padraosuper: 'Supermercado Padrão',
+};
+
+/**
+ * Procura `public.stores` por slug técnico ou padrões de nome de marca.
+ */
+async function findStoreRowForFlyerSlug(supabase, supermercado) {
+  const slug = String(supermercado || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
+  if (!slug) return null;
+
+  const patterns = [`%${slug}%`, ...(STORE_NAME_ILIKE_PATTERNS_BY_SLUG[slug] || [])];
+  for (const pattern of patterns) {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name')
+      .eq('active', true)
+      .ilike('name', pattern)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.warn('extract-flyer-vision find store ilike:', error.message);
+    }
+    if (data?.id) return data;
+  }
+  return null;
+}
+
+/** Nome amigável (ex.: body.storeName) — último recurso antes de criar loja. */
+async function findStoreByDisplayName(supabase, displayName) {
+  const n = String(displayName || '')
+    .trim()
+    .replace(/[%_\\]/g, ' ');
+  if (n.length < 3) return null;
+  const pattern = `%${n.slice(0, 80)}%`;
+  const { data, error } = await supabase
+    .from('stores')
+    .select('id, name')
+    .eq('active', true)
+    .ilike('name', pattern)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.warn('extract-flyer-vision findStoreByDisplayName:', error.message);
+  }
+  return data?.id ? data : null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!checkSecret(req)) {
-    return res.status(403).json({ error: 'Forbidden' });
+  if (!(await checkFlyerVisionAuth(req, res))) {
+    return res.status(403).json({ error: 'Forbidden — faça login ou envie x-cron-secret' });
   }
 
   const openai = getOpenAI();
@@ -154,6 +239,7 @@ export default async function handler(req, res) {
     imageMimeType,
     supermercado: superRaw,
     storeName,
+    storeId: storeIdRaw,
     flyerKey,
     replacePrevious = true,
     lat: latIn,
@@ -189,6 +275,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Informe imageUrl (https ou data:) ou imageBase64' });
   }
 
+  const flyerImageUrlForRows = visionUrl.startsWith('https://') ? visionUrl : null;
+
   let lat = latIn != null ? Number(latIn) : NaN;
   let lng = lngIn != null ? Number(lngIn) : NaN;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -213,25 +301,124 @@ export default async function handler(req, res) {
   const ttl = Number.isFinite(ttlHours) && ttlHours > 0 ? ttlHours : 72;
   const runId = new Date().toISOString();
   const nowIso = runId;
-  const expireIso = new Date(Date.now() + ttl * 3_600_000).toISOString();
+  const defaultExpireIso = new Date(Date.now() + ttl * 3_600_000).toISOString();
   const ingestSource = buildIngestSource(supermercado, flyerKey, visionUrl);
+  const promotionsSourceTag = buildPromotionsSourceTag(ingestSource);
 
-  const catList = VISION_CATEGORIES.join('|');
-  const prompt = `Você analisa uma imagem de encarte ou folheto de supermercado (Brasil).
+  let storeId = null;
+  let resolvedStoreName = storeName && String(storeName).trim() ? String(storeName).trim().slice(0, 200) : null;
+  if (storeIdRaw) {
+    const sid = String(storeIdRaw).trim();
+    const { data: st, error: stErr } = await supabase.from('stores').select('id, name').eq('id', sid).maybeSingle();
+    if (!stErr && st?.id) {
+      storeId = st.id;
+      resolvedStoreName = String(st.name || resolvedStoreName || '').slice(0, 200);
+    }
+  }
+  if (!storeId) {
+    const bySlug = await findStoreRowForFlyerSlug(supabase, supermercado);
+    if (bySlug?.id) {
+      storeId = bySlug.id;
+      resolvedStoreName = String(bySlug.name || '').slice(0, 200);
+    }
+  }
+  if (!storeId && resolvedStoreName) {
+    const byDisplay = await findStoreByDisplayName(supabase, resolvedStoreName);
+    if (byDisplay?.id) {
+      storeId = byDisplay.id;
+      resolvedStoreName = String(byDisplay.name || resolvedStoreName).slice(0, 200);
+    }
+  }
+  if (!storeId) {
+    const defaultBrand = DEFAULT_DISPLAY_STORE_NAME_BY_SLUG[supermercado] || null;
+    const newName = resolvedStoreName?.trim()
+      ? resolvedStoreName.slice(0, 200)
+      : defaultBrand || supermercado;
+    const { data: created, error: createErr } = await supabase
+      .from('stores')
+      .insert({
+        name: newName,
+        type: 'supermarket',
+        address: geocodeQuery && String(geocodeQuery).trim() ? String(geocodeQuery).trim().slice(0, 500) : null,
+        lat,
+        lng,
+        active: true,
+        needs_review: true,
+      })
+      .select('id, name')
+      .single();
+    if (createErr || !created?.id) {
+      return res.status(500).json({
+        error: createErr?.message || 'Não foi possível criar loja em stores',
+      });
+    }
+    storeId = created.id;
+    resolvedStoreName = String(created.name || newName).slice(0, 200);
+  }
+
+  const displayNameForPromotions = resolvedStoreName || 'Loja';
+  const catList = VISION_CATEGORIES.join(' | ');
+  const prompt = `Você analisa imagens de encartes e folhetos de supermercados brasileiros.
 
 Extraia TODOS os produtos com preço promocional visível.
+Cada produto = um objeto separado no array (não agrupe vários em um só).
 
-Regras:
-- Use preço promocional (ex.: "Por R$ 5,99"); se houver "De X Por Y", preencha original_price com X e promo_price com Y.
-- promo_price é obrigatório por item (número decimal, ponto como separador: 5.99).
-- original_price: número ou null se não houver preço "de/tachado".
-- unit: kg | un | L | ml | g | pct | null se não der para inferir.
-- category: exatamente uma destas strings: ${catList} (use Outros se não encaixar).
-- valid_until: data de fim da oferta no formato YYYY-MM-DD se aparecer no encarte; senão null.
-- brand: marca se clara; senão null.
+## CAMPOS OBRIGATÓRIOS POR PRODUTO:
+- product_name: nome completo (marca + descrição + gramagem)
+  Ex: "Feijão Carioca Camil Pct 1kg", "Picanha Estância 92 Peça à Vácuo"
+- promo_price: preço principal (número com ponto: 5.99). OBRIGATÓRIO.
+- category: exatamente uma de: ${catList}
 
-Responda APENAS com JSON válido neste formato (sem markdown):
-{"products":[{"product_name":"string","brand":string|null,"unit":string|null,"category":"Hortifruti","promo_price":number,"original_price":number|null,"valid_until":string|null}]}`;
+## CAMPOS OPCIONAIS:
+- original_price: preço "De" / tachado, ou null
+- club_price: preço clube/cartão fidelidade, ou null
+- club_name: nome do programa (ex: "Clube Lopes"), ou null
+- unit: kg | un | L | ml | g | pct | 100g | unid | null
+- brand: marca do produto, ou null
+- image_hint: frase curta descrevendo a embalagem/produto na imagem, ou null
+- validity_note: texto curto sobre vigência deste produto (opcional), ou null
+
+## VALIDADE — MUITO IMPORTANTE:
+Folhetos brasileiros têm 3 tipos de validade:
+1. Válido a semana toda → valid_from: "2026-04-06", valid_until: "2026-04-12", valid_dates: null
+2. Válido só em dias específicos → valid_dates: ["2026-04-06","2026-04-10"], valid_from: null, valid_until: null
+3. Válido num único dia → valid_dates: ["2026-04-07"], valid_from: null, valid_until: null
+
+Regras de validade:
+- "Segunda e Sexta, dias 06 e 10/04/2026" → valid_dates: ["2026-04-06","2026-04-10"]
+- "Sábado e Domingo, 11 e 12/04/2026" → valid_dates: ["2026-04-11","2026-04-12"]
+- "Segunda de Ofertas 06/04/2026" → valid_dates: ["2026-04-06"]
+- "Válido de 06 a 12/04/2026" → valid_from: "2026-04-06", valid_until: "2026-04-12"
+- Se não houver data visível para o produto → valid_from: null, valid_until: null, valid_dates: null
+
+## METADADOS DO ENCARTE:
+- chain_name_visible: nome do supermercado (ex: "Sacolão São Jorge")
+- encarte_valid_from: data de início geral do encarte (YYYY-MM-DD ou null)
+- encarte_valid_until: data de fim geral do encarte (YYYY-MM-DD ou null)
+
+## FORMATO DE RESPOSTA (APENAS JSON, sem markdown):
+{
+  "chain_name_visible": "Sacolão São Jorge",
+  "encarte_valid_from": "2026-04-06",
+  "encarte_valid_until": "2026-04-12",
+  "products": [
+    {
+      "product_name": "Feijão Carioca Camil Pct 1kg",
+      "brand": "Camil",
+      "unit": "pct",
+      "category": "Mercearia",
+      "promo_price": 5.98,
+      "original_price": null,
+      "club_price": null,
+      "club_name": null,
+      "valid_from": null,
+      "valid_until": null,
+      "valid_dates": ["2026-04-06"],
+      "image_hint": "embalagem vermelha feijão carioca",
+      "chain_name_visible": "Sacolão São Jorge"
+    }
+  ]
+}`;
 
   const model = process.env.OPENAI_VISION_MODEL || 'gpt-4o-mini';
   const maxTokensRaw = Number.parseInt(process.env.OPENAI_VISION_MAX_TOKENS || '4096', 10);
@@ -266,43 +453,102 @@ Responda APENAS com JSON válido neste formato (sem markdown):
     }
 
     const products = Array.isArray(parsed?.products) ? parsed.products : [];
+    const encarteFrom = parseFlexibleDateToIso(parsed?.encarte_valid_from);
+    const encarteUntil = parseFlexibleDateToIso(parsed?.encarte_valid_until);
     const seen = new Set();
-    const rows = [];
+    const agentRows = [];
+    const promotionRows = [];
 
     for (const p of products) {
       const nome = sanitizeNome(p?.product_name);
-      const promo = parsePromoPrice(p?.promo_price);
+      const promo = parsePromoPriceNumber(p?.promo_price);
       if (!nome || promo == null) continue;
-      const orig =
-        p?.original_price != null && p.original_price !== ''
-          ? parsePromoPrice(p.original_price)
-          : null;
-      const key = nome.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
 
-      let vd = null;
-      if (p?.valid_until) {
-        const vs = String(p.valid_until).trim();
-        vd = /^\d{4}-\d{2}-\d{2}$/.test(vs) ? vs : null;
+      const orig =
+        p?.original_price != null && p.original_price !== '' ? parsePromoPriceNumber(p.original_price) : null;
+      const club =
+        p?.club_price != null && p.club_price !== '' ? parsePromoPriceNumber(p.club_price) : null;
+      const unit = p?.unit != null ? String(p.unit).replace(/\s+/g, ' ').trim().slice(0, 32) || null : null;
+
+      const dk = flyerProductDedupeKey(nome, promo, unit);
+      if (seen.has(dk)) continue;
+      seen.add(dk);
+
+      let validDates = normalizeVisionValidDates(p?.valid_dates);
+      let validFrom = parseFlexibleDateToIso(p?.valid_from);
+      let validUntil = parseFlexibleDateToIso(p?.valid_until);
+      if (!validDates?.length && !validFrom && !validUntil && encarteFrom && encarteUntil) {
+        validFrom = encarteFrom;
+        validUntil = encarteUntil;
       }
 
-      rows.push({
+      let expiraEm = defaultExpireIso;
+      if (validDates?.length) {
+        const maxD = validDates.reduce((a, b) => (a > b ? a : b));
+        const endIso = endOfValidDayBrazilIso(maxD);
+        if (endIso) expiraEm = new Date(endIso).toISOString();
+      } else if (validUntil) {
+        const endIso = endOfValidDayBrazilIso(validUntil);
+        if (endIso) expiraEm = new Date(endIso).toISOString();
+      }
+
+      const discountPct = computeDiscountPct(orig, promo);
+      const imageHint =
+        p?.image_hint != null && String(p.image_hint).trim()
+          ? String(p.image_hint).replace(/\s+/g, ' ').trim().slice(0, 400)
+          : null;
+
+      let validityNote =
+        p?.validity_note != null && String(p.validity_note).trim()
+          ? String(p.validity_note).replace(/\s+/g, ' ').trim().slice(0, 400)
+          : null;
+      if (validDates?.length && !validityNote) {
+        validityNote = `Datas: ${validDates.join(', ')}`;
+      }
+
+      agentRows.push({
         supermercado,
         nome_produto: nome,
         preco: promo,
         preco_original: formatPrecoOriginalDePor(orig, promo),
         categoria: sanitizeVisionCategory(p?.category),
-        imagem_url: visionUrl.startsWith('data:') ? null : visionUrl,
-        validade: vd,
+        imagem_url: flyerImageUrlForRows,
+        validade: validUntil || null,
+        valid_from: validFrom,
+        club_price: club != null && Number.isFinite(club) ? club : null,
         lat,
         lng,
         run_id: String(runId),
         atualizado_em: nowIso,
-        expira_em: expireIso,
+        expira_em: expiraEm,
         ativo: true,
         ingest_source: ingestSource,
+        validity_note: validityNote,
       });
+
+      if (storeId) {
+        promotionRows.push({
+          product_name: nome,
+          promo_price: promo,
+          original_price: orig != null && Number.isFinite(orig) ? orig : null,
+          club_price: club != null && Number.isFinite(club) ? club : null,
+          unit,
+          category: sanitizeVisionCategory(p?.category),
+          store_name: displayNameForPromotions,
+          store_id: storeId,
+          valid_from: validDates?.length ? null : validFrom,
+          valid_until: validDates?.length ? null : validUntil,
+          valid_dates: validDates?.length ? validDates : null,
+          active: true,
+          is_individual_product: true,
+          source: promotionsSourceTag,
+          flyer_image_url: flyerImageUrlForRows,
+          product_image_url: null,
+          image_hint: imageHint,
+          discount_pct: discountPct != null ? discountPct : null,
+          validity_note: validityNote,
+        });
+      }
     }
 
     if (replacePrevious) {
@@ -313,14 +559,27 @@ Responda APENAS com JSON válido neste formato (sem markdown):
         .eq('ingest_source', ingestSource)
         .eq('ativo', true);
       if (deactErr) {
-        console.warn('extract-flyer-vision deactivate:', deactErr.message);
+        console.warn('extract-flyer-vision deactivate agent:', deactErr.message);
+      }
+
+      if (storeId && promotionRows.length) {
+        const { error: prDeact } = await supabase
+          .from('promotions')
+          .update({ active: false })
+          .eq('store_id', storeId)
+          .eq('source', promotionsSourceTag)
+          .eq('active', true);
+        if (prDeact) {
+          console.warn('extract-flyer-vision deactivate promotions:', prDeact.message);
+        }
       }
     }
 
-    if (!rows.length) {
+    if (!agentRows.length) {
       return res.status(200).json({
         ok: true,
         inserted: 0,
+        insertedPromotions: 0,
         runId,
         ingestSource,
         model,
@@ -331,25 +590,41 @@ Responda APENAS com JSON válido neste formato (sem markdown):
     }
 
     const chunkSize = 400;
-    for (let i = 0; i < rows.length; i += chunkSize) {
-      const slice = rows.slice(i, i + chunkSize);
+    for (let i = 0; i < agentRows.length; i += chunkSize) {
+      const slice = agentRows.slice(i, i + chunkSize);
       const { error: insertErr } = await supabase.from('promocoes_supermercados').insert(slice);
       if (insertErr) {
-        console.error('extract-flyer-vision insert:', insertErr);
+        console.error('extract-flyer-vision insert agent:', insertErr);
         return res.status(500).json({ error: insertErr.message });
+      }
+    }
+
+    let insertedPromotions = 0;
+    if (storeId && promotionRows.length) {
+      for (let i = 0; i < promotionRows.length; i += chunkSize) {
+        const slice = promotionRows.slice(i, i + chunkSize);
+        const { error: pErr } = await supabase.from('promotions').insert(slice);
+        if (pErr) {
+          console.error('extract-flyer-vision insert promotions:', pErr);
+          return res.status(500).json({ error: pErr.message });
+        }
+        insertedPromotions += slice.length;
       }
     }
 
     return res.status(200).json({
       ok: true,
-      inserted: rows.length,
+      inserted: agentRows.length,
+      insertedPromotions,
       runId,
       ingestSource,
+      promotionsSourceTag,
       model,
       maxTokens,
       ttlHours: ttl,
       lat,
       lng,
+      storeId: storeId || null,
     });
   } catch (e) {
     console.error('extract-flyer-vision error:', e);

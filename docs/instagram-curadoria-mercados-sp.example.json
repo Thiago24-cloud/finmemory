@@ -1,0 +1,12 @@
+[
+  {
+    "supermercado": "pomardavilavilamadalena",
+    "instagram": "@pomardavila_vila_madalena",
+    "nome_loja": "Pomar da Vila — Vila Madalena",
+    "geocode_query": "Rua Mourato Coelho, 1458, Vila Madalena, São Paulo, SP, Brasil",
+    "lat_aprox": -23.5547,
+    "lng_aprox": -46.6912,
+    "escopo": "SOMENTE esta unidade. Posts/capturas que o utilizador enviar para o FinMemory referem-se a esta loja até nova instrução explícita para outra filial (outro slug + outra linha neste JSON).",
+    "notas": "Bio IG: horários seg-sáb 7h-22h, dom/feriado 8h-21h. WhatsApp público na bio: wa.me/5511934942266. Confirmar lat/lng no Google Maps na fachada antes de gravar em public.stores."
+  }
+]

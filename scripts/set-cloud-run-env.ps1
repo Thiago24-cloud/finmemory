@@ -60,6 +60,19 @@ foreach ($k in $required) {
         Write-Host "Aviso: $k nao definido no .env.local" -ForegroundColor Yellow
     }
 }
+
+# Opcional: Pluggy (Open Finance) — só envia se existir no .env.local
+$pluggyOptional = @(
+    "PLUGGY_CLIENT_ID", "PLUGGY_CLIENT_SECRET", "PLUGGY_WEBHOOK_SECRET",
+    "PLUGGY_WIDGET_SANDBOX_CONNECTOR_ONLY", "PLUGGY_SANDBOX_CONNECTOR_ID"
+)
+foreach ($k in $pluggyOptional) {
+    if ($vars[$k]) {
+        $v = $vars[$k] -replace '"', '\"'
+        $pairs += "$k=$v"
+    }
+}
+
 $envVarsStr = $pairs -join ","
 if (-not $envVarsStr) {
     Write-Host "Nenhuma variavel para atualizar." -ForegroundColor Red

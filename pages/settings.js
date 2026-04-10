@@ -3,14 +3,21 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, Settings, LogOut, FileText, Shield } from 'lucide-react';
+import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import ProximityAlertsSettings from '../components/ProximityAlertsSettings';
+import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
 
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
+const UpgradePlus = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const pwaUi = usePWAInstallUIOptional();
+  const userId =
+    session?.user?.supabaseId ||
+    (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
   const [twoFaEnabled, setTwoFaEnabled] = useState(false);
   const [totpSecret, setTotpSecret] = useState('');
   const [totpCode, setTotpCode] = useState('');
@@ -97,6 +104,42 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {status === 'authenticated' && userId ? (
+          <ProximityAlertsSettings userId={userId} />
+        ) : null}
+
+        {status === 'authenticated' && session?.user ? (
+          <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="text-base font-semibold text-gray-900">FinMemory Plus</h2>
+            <p className="mt-1 mb-3 text-sm text-gray-500">
+              Assinatura no Stripe — apoia o projeto e desbloqueia benefícios Plus.
+            </p>
+            <UpgradePlus
+              userId={session.user.supabaseId}
+              userEmail={session.user.email}
+              className="w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white"
+            >
+              Assinar FinMemory Plus
+            </UpgradePlus>
+          </div>
+        ) : null}
+
+        {pwaUi?.installEntryVisible ? (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+            <button
+              type="button"
+              onClick={() => pwaUi.openInstallAssistant()}
+              className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors text-left text-gray-900"
+            >
+              <Smartphone className="h-5 w-5 text-[#2ECC49]" />
+              <div>
+                <span className="font-medium block">Instalar app na tela inicial</span>
+                <span className="text-xs text-gray-500">Atalho como um app — abre em um toque</span>
+              </div>
+            </button>
+          </div>
+        ) : null}
+
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <Link href="/privacidade" className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-200 text-gray-900">
             <Shield className="h-5 w-5 text-gray-500" />
@@ -157,17 +200,15 @@ export default function SettingsPage() {
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-base font-semibold text-gray-900">Open Finance (Pluggy)</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Conecte seu banco para importar seus dados financeiros. Em conta trial da Pluggy, o fluxo usa o conector
-              sandbox <span className="text-gray-700 font-medium">Pluggy Bank</span> (evita erro ao escolher banco real).
+              Conecte seu banco pelo Open Finance (PicPay, Nubank, etc.) para importar movimentações no dashboard.
+              Depois de conectar, as transações sincronizam automaticamente.
             </p>
           </div>
           <div className="p-4">
             {status === 'authenticated' ? (
               <ConnectBank
                 onSuccess={() => {
-                  if (typeof window !== 'undefined') {
-                    alert('Banco conectado com sucesso. Você pode começar a sincronizar seus dados.');
-                  }
+                  router.push('/dashboard');
                 }}
                 onError={(e) => {
                   const msg = e?.message || 'Falha ao conectar banco.';

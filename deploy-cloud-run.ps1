@@ -49,27 +49,42 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "`n📦 Tag da imagem: $COMMIT_SHA" -ForegroundColor Cyan
 
-# Ler token Mapbox do .env.local (para o mapa funcionar no Cloud Run)
+# Ler NEXT_PUBLIC_* do .env depois .env.local (último sobrescreve — igual ao Node/dotenv)
+$SUPABASE_URL = ""
+$SUPABASE_ANON = ""
 $MAPBOX_TOKEN = ""
-if (Test-Path ".env.local") {
-    $content = Get-Content ".env.local" -Raw
-    if ($content -match 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN\s*=\s*(.+)') {
-        $MAPBOX_TOKEN = $Matches[1].Trim().Trim('"').Trim("'").Trim()
-    }
-    if ($MAPBOX_TOKEN) {
-        Write-Host "   🗺️  Token Mapbox encontrado no .env.local" -ForegroundColor Green
+foreach ($envFile in @(".env", ".env.local")) {
+    if (-not (Test-Path $envFile)) { continue }
+    Get-Content $envFile | ForEach-Object {
+        $line = $_
+        if ($line -match '^\s*NEXT_PUBLIC_SUPABASE_URL\s*=\s*(.+)$') {
+            $SUPABASE_URL = $Matches[1].Trim().Trim('"').Trim("'")
+        }
+        if ($line -match '^\s*NEXT_PUBLIC_SUPABASE_ANON_KEY\s*=\s*(.+)$') {
+            $SUPABASE_ANON = $Matches[1].Trim().Trim('"').Trim("'")
+        }
+        if ($line -match '^\s*NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN\s*=\s*(.+)$') {
+            $MAPBOX_TOKEN = $Matches[1].Trim().Trim('"').Trim("'")
+        }
     }
 }
-if (-not $MAPBOX_TOKEN) {
-    Write-Host "   ⚠️  NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN não encontrado no .env.local - mapa ficará desabilitado no deploy" -ForegroundColor Yellow
+if (-not $SUPABASE_URL -or -not $SUPABASE_ANON) {
+    Write-Host "❌ Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no .env ou .env.local" -ForegroundColor Red
+    exit 1
+}
+Write-Host "   ✅ Supabase (URL + anon) carregado do .env" -ForegroundColor Green
+if ($MAPBOX_TOKEN) {
+    Write-Host "   🗺️  Token Mapbox encontrado" -ForegroundColor Green
+} else {
+    Write-Host "   ⚠️  NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN vazio — mapa pode falhar no build" -ForegroundColor Yellow
 }
 
 # Opção 1: Cloud Build (recomendado - não precisa Docker local)
 Write-Host "`n🔨 Iniciando build via Cloud Build..." -ForegroundColor Cyan
 Write-Host "   Isso pode levar alguns minutos..." -ForegroundColor Yellow
 
-# Token entre aspas duplas para que = ou vírgula no valor não quebrem o parsing do gcloud
-$subs = "_COMMIT_SHA=$COMMIT_SHA,_MAPBOX_ACCESS_TOKEN=`"$MAPBOX_TOKEN`""
+# Inclui Supabase + Mapbox (Dockerfile não embute mais chaves — ver cloudbuild.yaml)
+$subs = "_COMMIT_SHA=$COMMIT_SHA,_NEXT_PUBLIC_SUPABASE_URL=`"$SUPABASE_URL`",_NEXT_PUBLIC_SUPABASE_ANON_KEY=`"$SUPABASE_ANON`",_MAPBOX_ACCESS_TOKEN=`"$MAPBOX_TOKEN`""
 Write-Host "`nExecutando: gcloud builds submit --project $PROJECT_ID --config cloudbuild.yaml --substitutions=..." -ForegroundColor Gray
 
 try {

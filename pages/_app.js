@@ -5,6 +5,9 @@ import { Toaster } from 'sonner';
 import AnalyticsProvider from '../components/AnalyticsProvider';
 import ClientOnly from '../components/ClientOnly';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { DeployRecovery } from '../components/DeployRecovery';
+import PWAInstallProvider from '../components/PWAInstallProvider';
+import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import '../styles/globals.css';
 
@@ -37,10 +40,14 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
   return (
     <ErrorBoundary>
       <SessionProvider session={session}>
-        <AnalyticsProvider>
-          <Component {...pageProps} />
-          <Toaster richColors position="top-center" />
-        </AnalyticsProvider>
+        <PWAInstallProvider>
+          <ServiceWorkerRegister />
+          <DeployRecovery />
+          <AnalyticsProvider>
+            <Component {...pageProps} />
+            <Toaster richColors position="top-center" />
+          </AnalyticsProvider>
+        </PWAInstallProvider>
         <ClientOnly>
           <SafeGoogleAnalytics />
         </ClientOnly>

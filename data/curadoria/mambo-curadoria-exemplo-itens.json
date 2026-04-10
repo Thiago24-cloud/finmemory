@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "nome_produto": "Exemplo produto curadoria",
+      "preco": 9.99,
+      "categoria": "Supermercado - Promoção"
+    }
+  ]
+}

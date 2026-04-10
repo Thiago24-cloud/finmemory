@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { verifyTotpCode } from '../../../lib/tokens';
 import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { normalizeEmail } from '../../../lib/securityPolicy';
+import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 
 // Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.
 // Para verificação do Google, mantenha alinhado com o domínio principal.
@@ -161,13 +162,18 @@ export const authOptions = {
       return token;
     },
 
-    async signIn({ user, account }) {
+    async signIn({ user }) {
       try {
-        console.log('🔐 NextAuth SignIn callback –', user?.email, account?.provider);
+        const allowlist = getPrivateBetaAllowlistFromEnv();
+        if (!isEmailAllowedInPrivateBeta(user?.email, allowlist)) {
+          console.warn('[auth] signIn bloqueado (lista de acesso):', user?.email);
+          return false;
+        }
+        console.log('🔐 NextAuth SignIn callback –', user?.email);
         return true;
       } catch (err) {
-        console.error('❌ SignIn callback exception (não bloqueia login):', err?.message || err);
-        return true;
+        console.error('❌ SignIn callback exception:', err?.message || err);
+        return false;
       }
     },
     

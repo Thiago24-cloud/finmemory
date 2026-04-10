@@ -69,3 +69,4 @@ Pré-requisitos: `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE
 
 - `docs/MAPA-PRECOS-PROMOCOES-ESTRATEGIA.md` — estratégia completa e tabela de URLs dos scrapers.
 - `docs/SUPABASE-COPIAR-COLAR-MAPA-PROMOCOES.sql` — schema e índices.
+- **Curadoria manual (folheto / Instagram capturado):** Sacolão São Jorge — `docs/SACOLAO-SAO-JORGE-MAPA-CURADORIA.md` (JSON → `generate-curadoria-promocoes-sql.mjs`, Supabase só recebe o SQL gerado).

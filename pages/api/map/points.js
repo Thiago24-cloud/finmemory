@@ -1,11 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
+import { isExcludedFromPriceMapStoreName } from '../../../lib/mapExcludedMapStores';
 import { geocodeAddress } from '../../../lib/geocode';
 import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
 import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
 import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
+import { hydratePointsFromImageCache } from '../../../lib/mapProductImageCache';
+import { applyPeerPromoImageReuse } from '../../../lib/reuseMapProductImages';
+import { isLikelyNonProductScraperTitle } from '../../../lib/mapStoreChainMatch';
 
 /**
  * GET /api/map/points - lista pontos do mapa.
@@ -262,11 +266,24 @@ export default async function handler(req, res) {
       ...(normalNullRows || []),
       ...(normalOtherRows || []),
     ]) {
-      if (row?.id) byId.set(row.id, row);
+      if (!row?.id) continue;
+      if (isExcludedFromPriceMapStoreName(row.store_name)) continue;
+      if (isLikelyNonProductScraperTitle(row.product_name)) continue;
+      byId.set(row.id, row);
     }
-    const merged = Array.from(byId.values()).sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
-    );
+    /** Promoções primeiro ao aplicar outCap — evita “sumirem” quando há muitos preços normais na mesma área. */
+    const isPromoRow = (row) => {
+      const c = String(row?.category || '').toLowerCase();
+      if (c.includes('promo')) return true;
+      if (String(row?.id || '').startsWith('promo-')) return true;
+      return false;
+    };
+    const merged = Array.from(byId.values()).sort((a, b) => {
+      const pa = isPromoRow(a) ? 1 : 0;
+      const pb = isPromoRow(b) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
     let data = merged.slice(0, outCap);
 
     // Promoções do agente (tabloides / import) — mesma forma que price_points para o mapa
@@ -293,7 +310,6 @@ export default async function handler(req, res) {
         const label = (s) =>
           ({
             dia: 'Dia',
-            atacadao: 'Atacadão',
             assai: 'Assaí',
             carrefour: 'Carrefour',
             paodeacucar: 'Pão de Açúcar',
@@ -304,8 +320,11 @@ export default async function handler(req, res) {
             mambo: 'Mambo',
             agape: 'Ágape',
             armazemdocampo: 'Armazém do Campo',
+            padraosuper: 'Supermercado Padrão',
           }[String(s || '').toLowerCase()] || String(s || 'Rede'));
-        const asPricePoints = promoFromAgent.map((r) => {
+        const asPricePoints = promoFromAgent
+          .filter((r) => !isLikelyNonProductScraperTitle(r.nome_produto))
+          .map((r) => {
           const raw = r.preco;
           const priceNum =
             raw != null && raw !== '' && !Number.isNaN(Number(raw))
@@ -331,11 +350,15 @@ export default async function handler(req, res) {
         });
         const byIdPromo = new Map(data.map((row) => [row.id, row]));
         for (const row of asPricePoints) {
+          if (isExcludedFromPriceMapStoreName(row.store_name)) continue;
           if (!byIdPromo.has(row.id)) byIdPromo.set(row.id, row);
         }
-        data = Array.from(byIdPromo.values()).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
+        data = Array.from(byIdPromo.values()).sort((a, b) => {
+          const pa = isPromoRow(a) ? 1 : 0;
+          const pb = isPromoRow(b) ? 1 : 0;
+          if (pa !== pb) return pb - pa;
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
         data = data.slice(0, outCap);
       }
     } catch (e) {
@@ -394,6 +417,14 @@ export default async function handler(req, res) {
         promo_image_url: promoUrl,
       };
     });
+
+    applyPeerPromoImageReuse(points);
+
+    try {
+      await hydratePointsFromImageCache(supabase, points);
+    } catch (e) {
+      console.warn('hydratePointsFromImageCache:', e.message);
+    }
 
     // Miniatura por nome (Open Food Facts; opcional Google CSE) quando ainda falta foto exibível.
     if (process.env.MAP_POINTS_OFF_ENRICH !== '0') {

@@ -592,21 +592,13 @@ export default function AddReceipt() {
               <>
                 <button
                   type="button"
-                  onClick={async () => {
-                    try {
-                      const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment' },
-                      });
-                      stream.getTracks().forEach((t) => t.stop());
-                    } catch (_) {}
-                    setNfceCameraOpen(true);
-                  }}
+                  onClick={() => setNfceCameraOpen(true)}
                   className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd]"
                 >
-                  Abrir câmera para escanear QR
+                  Escanear QR da NFC-e
                 </button>
                 <p className="text-xs text-[#6b7280] mt-3 m-0">
-                  O navegador pode pedir permissão. Prefira a câmera traseira. Para <strong>tirar foto</strong> da nota e ler o QR do arquivo, use a aba «Foto da nota».
+                  No telefone, use <strong>tirar foto do QR</strong> (câmera nativa). No computador, pode usar câmera ao vivo ou enviar uma foto do QR.
                 </p>
               </>
             ) : (

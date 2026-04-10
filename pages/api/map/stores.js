@@ -1,6 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
+import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
+import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
+import { hydratePointsFromImageCache } from '../../../lib/mapProductImageCache';
+import {
+  applyNormKeyImageLookup,
+  applyPeerPromoImageReuse,
+  buildImageUrlByNormKeyFromPairs,
+} from '../../../lib/reuseMapProductImages';
+import { isExcludedFromPriceMapStoreName } from '../../../lib/mapExcludedMapStores';
+import { parsePriceToNumber } from '../../../lib/parseMapPrice';
+import { productNameForThumbnailSearch } from '../../../lib/mapOfferDisplay';
+import { isPomarDaVilaCuratedStoreName, isSacolaoSaoJorgeCuratedStoreName } from '../../../lib/storeLogos';
+import {
+  inferChainSlugFromPromoStoreName,
+  isLikelyNonProductScraperTitle,
+  normalizeMapChainText,
+  promoStoreNamesLooselyAlign,
+  storeNormalizedMatchesChainSlug,
+} from '../../../lib/mapStoreChainMatch';
+import { isPromotionEligibleForMapPin, todayIsoSaoPaulo } from '../../../lib/promotionValidity';
 
 /**
  * GET /api/map/stores
@@ -33,6 +53,44 @@ function isPharmacyStoreType(type) {
     t.includes('farmacia') ||
     t.includes('drogaria')
   );
+}
+
+/**
+ * Supermercados e padarias só entram no JSON do mapa se tiverem oferta/promo ativa no app
+ * (price_points promocionais recentes ou promocoes_supermercados). Outros tipos (ex.: restaurante) seguem visíveis.
+ */
+function isSupermarketOrBakeryMapType(type) {
+  const t = String(type || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '');
+  if (!t) return false;
+  if (t === 'bakery' || t === 'padaria') return true;
+  if (t === 'supermarket' || t === 'supermercado') return true;
+  if (t.includes('supermercado') || t.includes('hipermercado')) return true;
+  if (t.includes('padaria') || t.includes('panificadora')) return true;
+  return false;
+}
+
+/** Alinha `stores.name` ↔ `price_points.store_name` (acentos, cedilha, “São”/“Sao”). */
+function normalizeStoreNameMatchKey(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Itens em `offer_preview` por loja no GET /api/map/stores (popup do pin + pílula).
+ * O contador `offer_count` pode ser maior; lista completa em GET /api/map/store-offers.
+ */
+function getStoreOfferPreviewLimit() {
+  const raw = Number.parseInt(process.env.MAP_STORE_OFFER_PREVIEW_LIMIT || '80', 10);
+  if (!Number.isFinite(raw)) return 80;
+  return Math.min(250, Math.max(16, raw));
 }
 
 function distanceKm(lat1, lng1, lat2, lng2) {
@@ -86,8 +144,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Não incluir cnpj no SELECT até a migração existir em produção (evita 42703 column does not exist).
-    const { data, error } = await supabase
+    const ttlHours = 24;
+    const cutoffIso = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
+    const promoThresholdKm = Number(process.env.MAP_STORE_OFFERS_RADIUS_KM) || 1.25;
+    const chainSlugRadiusKm =
+      Number.parseFloat(process.env.MAP_STORE_OFFERS_CHAIN_SLUG_RADIUS_KM || '') || 2.5;
+
+    const isPromoCategory = (cat) => {
+      const s = cat == null ? '' : String(cat).toLowerCase();
+      return s.includes('promo');
+    };
+
+    const storeLimit = useBbox
+      ? bboxIsStateOrMacroRegion({
+          minLat: latMin,
+          maxLat: latMax,
+          minLng: lngMin,
+          maxLng: lngMax,
+        })
+        ? Math.min(
+            2500,
+            Math.max(800, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT_LARGE || '1800', 10) || 1800)
+          )
+        : Math.min(
+            1200,
+            Math.max(400, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT || '600', 10) || 600)
+          )
+      : 100;
+
+    const storesQuery = supabase
       .from('stores')
       .select('id, name, type, address, lat, lng, neighborhood')
       .eq('active', true)
@@ -95,46 +180,14 @@ export default async function handler(req, res) {
       .lte('lat', latMax)
       .gte('lng', lngMin)
       .lte('lng', lngMax)
-      .limit(
-        useBbox
-          ? bboxIsStateOrMacroRegion({
-              minLat: latMin,
-              maxLat: latMax,
-              minLng: lngMin,
-              maxLng: lngMax,
-            })
-            ? Math.min(
-                2500,
-                Math.max(800, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT_LARGE || '1800', 10) || 1800)
-              )
-            : Math.min(
-                1200,
-                Math.max(400, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT || '600', 10) || 600)
-              )
-          : 100
-      );
+      .limit(storeLimit);
 
-    if (error) {
-      console.error('Erro ao buscar stores:', error);
-      return res.status(500).json({ error: error.message });
-    }
-
-    const storesRows = (data || []).filter((s) => !isPharmacyStoreType(s.type));
-
-    const ttlHours = 24;
-    const cutoffIso = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
-    const promoThresholdKm = 0.6; // distância máxima para considerar que o ponto pertence à loja
-
-    const isPromoCategory = (cat) => {
-      const s = cat == null ? '' : String(cat).toLowerCase();
-      return s.includes('promo');
-    };
-
-    // Busca pontos promocionais recentes na mesma área para saber quais lojas ficam "laranja"
-    // (MVP: não depende de nova coluna no schema; usa created_at + categoria).
-    const { data: promoPoints, error: promoErr } = await supabase
+    // Sem image_url: em projetos sem migração da coluna o SELECT falha e o endpoint inteiro quebra.
+    const promoPointsQuery = supabase
       .from('price_points')
-      .select('lat,lng,category,store_name,product_name,created_at')
+      .select(
+        'id, lat, lng, category, store_name, product_name, created_at, price, product_id'
+      )
       .not('lat', 'is', null)
       .not('lng', 'is', null)
       .gte('created_at', cutoffIso)
@@ -144,98 +197,329 @@ export default async function handler(req, res) {
       .lte('lng', lngMax)
       .limit(2000);
 
+    const agentPromoQuery = supabase
+      .from('promocoes_supermercados')
+      .select(
+        'id, lat, lng, supermercado, nome_produto, expira_em, atualizado_em, categoria, preco, imagem_url, product_id'
+      )
+      .eq('ativo', true)
+      .gt('expira_em', new Date().toISOString())
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .limit(2000);
+
+    const [{ data, error }, { data: promoPoints, error: promoErr }, { data: agentPromos, error: agentPromoErr }] =
+      await Promise.all([storesQuery, promoPointsQuery, agentPromoQuery]);
+
+    if (error) {
+      console.error('Erro ao buscar stores:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
     if (promoErr) {
       console.warn('Aviso: erro ao buscar promo points para tem_oferta_hoje:', promoErr.message);
     }
+    if (agentPromoErr) {
+      console.warn('Aviso: promocoes_supermercados indisponível:', agentPromoErr.message);
+    }
 
-    // Promoções do agente (promocoes_supermercados) — mesmo critério de proximidade que price_points
+    const storesRows = (data || [])
+      .filter((s) => !isPharmacyStoreType(s.type))
+      .filter((s) => !isExcludedFromPriceMapStoreName(s.name));
+
     let promoAgentRows = [];
-    try {
-      const { data: agentPromos, error: agentPromoErr } = await supabase
-        .from('promocoes_supermercados')
-        .select('lat,lng,supermercado,nome_produto,expira_em,categoria')
-        .eq('ativo', true)
-        .gt('expira_em', new Date().toISOString())
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .gte('lat', latMin)
-        .lte('lat', latMax)
-        .gte('lng', lngMin)
-        .lte('lng', lngMax)
-        .limit(2000);
-      if (agentPromoErr) {
-        console.warn('Aviso: promocoes_supermercados indisponível:', agentPromoErr.message);
-      } else {
-        promoAgentRows = (agentPromos || []).map((r) => ({
-          lat: r.lat,
-          lng: r.lng,
-          category: formatAgentPromoMapCategory(r.categoria),
-          store_name: String(r.supermercado || ''),
-          product_name: r.nome_produto,
-          created_at: new Date().toISOString(),
-        }));
-      }
-    } catch (e) {
-      console.warn('Aviso: promocoes_supermercados:', e.message);
+    if (agentPromos?.length) {
+      promoAgentRows = agentPromos.filter((r) => !isLikelyNonProductScraperTitle(r.nome_produto)).map((r) => ({
+        id: `promo-${r.id}`,
+        lat: r.lat,
+        lng: r.lng,
+        category: formatAgentPromoMapCategory(r.categoria),
+        store_name: String(r.supermercado || ''),
+        agent_supermercado_slug: String(r.supermercado || '')
+          .toLowerCase()
+          .trim() || null,
+        product_name: r.nome_produto,
+        created_at: r.atualizado_em || r.expira_em || new Date().toISOString(),
+        price: r.preco,
+        product_id: r.product_id ?? null,
+        imagem_url: r.imagem_url || null,
+        image_url: null,
+      }));
     }
 
     const storesBase = storesRows;
+    const storeById = new Map(storesBase.map((s) => [s.id, s]));
     const storeOfferMap = new Map(storesBase.map((s) => [s.id, false]));
     const storeOfferCountMap = new Map(storesBase.map((s) => [s.id, 0]));
-    const storeOfferProductsMap = new Map(storesBase.map((s) => [s.id, []]));
+    /** @type {Map<string, Map<string, object>>} */
+    const storeOfferPreviewMap = new Map();
 
-    const attachOffer = (storeId, productName) => {
+    const attachOffer = (store, p) => {
+      const storeId = store.id;
       storeOfferMap.set(storeId, true);
       storeOfferCountMap.set(storeId, (storeOfferCountMap.get(storeId) || 0) + 1);
-      const current = storeOfferProductsMap.get(storeId) || [];
-      const prod = String(productName || '').trim();
-      if (prod && !current.includes(prod) && current.length < 6) {
-        current.push(prod);
-        storeOfferProductsMap.set(storeId, current);
+      const key =
+        (p.id != null && String(p.id).trim() !== '' && String(p.id)) ||
+        `synthetic:${String(p.product_name || '').slice(0, 60)}|${Number(p.lat).toFixed(4)}|${Number(p.lng).toFixed(4)}`;
+      const bucket = storeOfferPreviewMap.get(storeId) || new Map();
+      if (!bucket.has(key)) {
+        bucket.set(key, {
+          id: p.id ?? key,
+          product_name: p.product_name,
+          price: p.price,
+          category: p.category,
+          created_at: p.created_at,
+          image_url: null,
+          imagem_url: p.imagem_url ?? null,
+          product_id: p.product_id ?? null,
+          display_store_name: store.name,
+        });
       }
+      storeOfferPreviewMap.set(storeId, bucket);
     };
 
-    // Ativa tem_oferta_hoje se existir pelo menos 1 ponto promocional recente próximo da loja.
+    /** Nome normalizado (sem acento) → loja (primeira ocorrência) — evita loop O(S) por ponto. */
+    const storeByExactName = new Map();
+    for (const s of storesBase) {
+      const n = normalizeStoreNameMatchKey(s.name);
+      if (n && !storeByExactName.has(n)) storeByExactName.set(n, s);
+    }
+
+    /** Grade espacial ~0,5 km: só compara distância com lojas na célula vizinha (evita O(P×S)). */
+    const CELL_LAT = 0.005;
+    const CELL_LNG = 0.005;
+    const storeBuckets = new Map();
+    for (const s of storesBase) {
+      const sLat = Number(s.lat);
+      const sLng = Number(s.lng);
+      if (Number.isNaN(sLat) || Number.isNaN(sLng)) continue;
+      const key = `${Math.floor(sLat / CELL_LAT)}:${Math.floor(sLng / CELL_LNG)}`;
+      if (!storeBuckets.has(key)) storeBuckets.set(key, []);
+      storeBuckets.get(key).push(s);
+    }
+
+    /** Ofertas em `public.promotions` para o pin: período do encarte (ver isPromotionEligibleForMapPin); o painel usa isPromotionActiveOnDate. */
+    let promoFromTableRows = [];
+    const storeIdsForPromotions = storesBase.map((s) => s.id).filter(Boolean);
+    if (storeIdsForPromotions.length) {
+      const todaySp = todayIsoSaoPaulo();
+      const chunkSize = 120;
+      for (let i = 0; i < storeIdsForPromotions.length; i += chunkSize) {
+        const chunk = storeIdsForPromotions.slice(i, i + chunkSize);
+        const { data: prs, error: prErr } = await supabase
+          .from('promotions')
+          .select(
+            'id, product_name, promo_price, category, valid_from, valid_until, valid_dates, created_at, store_id, product_image_url, flyer_image_url'
+          )
+          .eq('active', true)
+          .eq('is_individual_product', true)
+          .in('store_id', chunk)
+          .limit(600);
+        if (prErr) {
+          console.warn('stores promotions:', prErr.message);
+          continue;
+        }
+        for (const r of prs || []) {
+          if (!isPromotionEligibleForMapPin(r, todaySp)) continue;
+          const st = storeById.get(r.store_id);
+          if (!st) continue;
+          const sLat = Number(st.lat);
+          const sLng = Number(st.lng);
+          if (Number.isNaN(sLat) || Number.isNaN(sLng)) continue;
+          if (isLikelyNonProductScraperTitle(r.product_name)) continue;
+          const slug = inferChainSlugFromPromoStoreName(st.name);
+          promoFromTableRows.push({
+            id: `ptbl-${r.id}`,
+            lat: sLat,
+            lng: sLng,
+            category: formatAgentPromoMapCategory(r.category),
+            store_name: String(st.name || ''),
+            agent_supermercado_slug: slug,
+            product_name: r.product_name,
+            created_at: r.created_at || new Date().toISOString(),
+            price: r.promo_price != null ? Number(r.promo_price) : null,
+            product_id: null,
+            imagem_url: r.product_image_url || r.flyer_image_url || null,
+            image_url: null,
+          });
+        }
+      }
+    }
+
+    // Ativa tem_oferta_hoje: promoções OU price_points com nome de loja igual ao cadastro (Quick Add / curadoria).
     const points = [
-      ...(promoPoints || []).filter(
-        (p) => p && p.lat != null && p.lng != null && isPromoCategory(p.category)
-      ),
-      ...promoAgentRows,
+      ...(promoPoints || []).filter((p) => {
+        if (!p || p.lat == null || p.lng == null) return false;
+        if (isExcludedFromPriceMapStoreName(p.store_name)) return false;
+        const sn = normalizeStoreNameMatchKey(p.store_name);
+        if (sn && storeByExactName.has(sn)) return true;
+        return isPromoCategory(p.category);
+      }),
+      ...promoAgentRows.filter((p) => !isExcludedFromPriceMapStoreName(p.store_name)),
+      ...promoFromTableRows.filter((p) => !isExcludedFromPriceMapStoreName(p.store_name)),
     ];
     for (const p of points) {
+      if (isLikelyNonProductScraperTitle(p.product_name)) continue;
       const pLat = Number(p.lat);
       const pLng = Number(p.lng);
       if (Number.isNaN(pLat) || Number.isNaN(pLng)) continue;
 
-      // 1) Tentativa rápida por nome (se bater, evita cálculo de distância)
-      const pStoreName = (p.store_name || '').toLowerCase();
-      let matched = false;
+      const pStoreName = normalizeStoreNameMatchKey(p.store_name);
       if (pStoreName) {
-        for (const s of storesBase) {
-          if (String(s.name || '').toLowerCase() === pStoreName) {
-            attachOffer(s.id, p.product_name);
-            matched = true;
-            break;
+        const byName = storeByExactName.get(pStoreName);
+        if (byName) {
+          attachOffer(byName, p);
+          continue;
+        }
+      }
+
+      const fx = Math.floor(pLat / CELL_LAT);
+      const fy = Math.floor(pLng / CELL_LNG);
+      const chainSlug =
+        p.agent_supermercado_slug ||
+        inferChainSlugFromPromoStoreName(p.store_name) ||
+        null;
+      /* 5×5: vários candidatos no raio — escolhe o mais próximo cuja rede bate com a oferta */
+      let bestStore = null;
+      let bestD = Infinity;
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -2; dy <= 2; dy++) {
+          const list = storeBuckets.get(`${fx + dx}:${fy + dy}`);
+          if (!list) continue;
+          for (const s of list) {
+            const sLat = Number(s.lat);
+            const sLng = Number(s.lng);
+            if (Number.isNaN(sLat) || Number.isNaN(sLng)) continue;
+            const d = distanceKm(sLat, sLng, pLat, pLng);
+            const sNorm = normalizeMapChainText(s.name);
+            const chainMatch =
+              chainSlug && storeNormalizedMatchesChainSlug(sNorm, chainSlug);
+            const maxDistKm = chainMatch
+              ? Math.max(promoThresholdKm, chainSlugRadiusKm)
+              : promoThresholdKm;
+            if (d > maxDistKm) continue;
+            if (chainSlug) {
+              if (!storeNormalizedMatchesChainSlug(sNorm, chainSlug)) continue;
+            } else if (!promoStoreNamesLooselyAlign(s.name, p.store_name)) {
+              continue;
+            }
+            if (d < bestD) {
+              bestD = d;
+              bestStore = s;
+            }
           }
         }
       }
-      if (matched) continue;
-
-      // 2) Caso não bata o nome, usa distância entre lat/lng
-      for (const s of storesBase) {
-        const sLat = Number(s.lat);
-        const sLng = Number(s.lng);
-        if (Number.isNaN(sLat) || Number.isNaN(sLng)) continue;
-        const d = distanceKm(sLat, sLng, pLat, pLng);
-        if (d <= promoThresholdKm) {
-          attachOffer(s.id, p.product_name);
-          break;
-        }
-      }
+      if (bestStore) attachOffer(bestStore, p);
     }
 
-    if (useBbox) {
-      const stores = storesRows.map((s) => ({
+    const storesVisible = storesRows.filter((s) => {
+      if (!isSupermarketOrBakeryMapType(s.type)) return true;
+      if (isPomarDaVilaCuratedStoreName(s.name)) return true;
+      if (isSacolaoSaoJorgeCuratedStoreName(s.name)) return true;
+      return !!storeOfferMap.get(s.id);
+    });
+
+    const offerPreviewCap = getStoreOfferPreviewLimit();
+    /** Pré-visualização no pin (cap configurável); painel completo via GET /api/map/store-offers. */
+    const finalizeOfferPreview = (storeId) => {
+      const bucket = storeOfferPreviewMap.get(storeId);
+      if (!bucket || bucket.size === 0) return [];
+      return [...bucket.values()]
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        .slice(0, offerPreviewCap);
+    };
+
+    let pathByProductId = new Map();
+    try {
+      const allPreview = [];
+      for (const s of storesVisible) {
+        for (const row of finalizeOfferPreview(s.id)) allPreview.push(row);
+      }
+      const productIds = [
+        ...new Set([
+          ...allPreview.map((r) => r.product_id).filter(Boolean),
+          ...(promoPoints || []).map((p) => p.product_id).filter(Boolean),
+          ...(agentPromos || []).map((r) => r.product_id).filter(Boolean),
+        ]),
+      ];
+      if (productIds.length > 0) {
+        const { data: imgRows, error: imgErr } = await supabase
+          .from('product_images')
+          .select('product_id, storage_path')
+          .in('product_id', productIds)
+          .eq('is_primary', true);
+        if (!imgErr && imgRows?.length) {
+          for (const ir of imgRows) {
+            if (ir.product_id && ir.storage_path && !pathByProductId.has(ir.product_id)) {
+              pathByProductId.set(ir.product_id, ir.storage_path);
+            }
+          }
+        }
+      }
+      const reusePairs = [];
+      for (const r of agentPromos || []) {
+        reusePairs.push({ product_name: r.nome_produto, url: r.imagem_url || null });
+      }
+      for (const row of promoPoints || []) {
+        let url = row.image_url || null;
+        const pid = row.product_id;
+        if (pid && pathByProductId.has(pid)) {
+          const fromCat = getPublicProductImageUrl(pathByProductId.get(pid));
+          if (fromCat) url = fromCat;
+        }
+        reusePairs.push({ product_name: row.product_name, url });
+      }
+      const urlByNormKey = buildImageUrlByNormKeyFromPairs(reusePairs);
+
+      for (const row of allPreview) {
+        let promoUrl = row.imagem_url || row.image_url || null;
+        const pid = row.product_id;
+        if (pid && pathByProductId.has(pid)) {
+          const fromCatalog = getPublicProductImageUrl(pathByProductId.get(pid));
+          if (fromCatalog) promoUrl = fromCatalog;
+        }
+        row.promo_image_url = promoUrl;
+      }
+      applyPeerPromoImageReuse(allPreview);
+      applyNormKeyImageLookup(allPreview, urlByNormKey);
+      try {
+        await hydratePointsFromImageCache(supabase, allPreview);
+      } catch (e) {
+        console.warn('stores hydratePointsFromImageCache:', e.message);
+      }
+      if (process.env.MAP_STORES_OFF_ENRICH !== '0' && allPreview.length > 0) {
+        const useCse =
+          process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
+          Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
+        const cap = Number.parseInt(process.env.MAP_STORES_MAX_OFF_NAMES || '150', 10) || 150;
+        await enrichMapPointsImageUrls(allPreview, {
+          maxUniqueNames: Math.min(200, Math.max(allPreview.length, cap)),
+          concurrency: 4,
+          useGoogleCse: useCse,
+          nameForSearch: (p) => productNameForThumbnailSearch(p.product_name),
+        });
+      }
+    } catch (e) {
+      console.warn('stores offer_preview imagens:', e.message);
+    }
+
+    const buildStorePayload = (s) => {
+      const preview = finalizeOfferPreview(s.id);
+      const headlineRow = preview.find((o) => parsePriceToNumber(o.price) != null);
+      let pinHeadlinePrice = null;
+      if (headlineRow) {
+        pinHeadlinePrice = parsePriceToNumber(headlineRow.price);
+      }
+      const offer_products = preview.map((o) => {
+        const sid = String(o.id || '').replace(/-/g, '').slice(0, 8);
+        return `${o.product_name} · ${s.name} #${sid}`;
+      });
+      return {
         id: s.id,
         name: s.name,
         type: s.type,
@@ -245,24 +529,43 @@ export default async function handler(req, res) {
         neighborhood: s.neighborhood,
         tem_oferta_hoje: !!storeOfferMap.get(s.id),
         offer_count: storeOfferCountMap.get(s.id) || 0,
-        offer_products: storeOfferProductsMap.get(s.id) || []
-      }));
+        /** Preço mais recente no pin (estilo Google Maps / Airbnb). */
+        pin_headline_price: pinHeadlinePrice,
+        pin_headline_product: headlineRow?.product_name
+          ? String(headlineRow.product_name).slice(0, 80)
+          : null,
+        offer_products,
+        offer_preview: preview.map(
+          ({
+            id,
+            product_name,
+            price,
+            category,
+            promo_image_url,
+            display_store_name,
+            product_id,
+          }) => ({
+            id,
+            product_name,
+            price,
+            category,
+            promo_image_url: promo_image_url ?? null,
+            display_store_name,
+            product_id: product_id ?? null,
+          })
+        ),
+      };
+    };
+
+    if (useBbox) {
+      const stores = storesVisible.map((s) => buildStorePayload(s));
       return res.status(200).json({ stores });
     }
 
     const radiusKm = radiusM / 1000;
-    const withDistance = storesRows
+    const withDistance = storesVisible
       .map((s) => ({
-        id: s.id,
-        name: s.name,
-        type: s.type,
-        address: s.address,
-        lat: s.lat,
-        lng: s.lng,
-        neighborhood: s.neighborhood,
-        tem_oferta_hoje: !!storeOfferMap.get(s.id),
-        offer_count: storeOfferCountMap.get(s.id) || 0,
-        offer_products: storeOfferProductsMap.get(s.id) || [],
+        ...buildStorePayload(s),
         distance_km: distanceKm(lat, lng, s.lat, s.lng)
       }))
       .filter((s) => s.distance_km <= radiusKm)

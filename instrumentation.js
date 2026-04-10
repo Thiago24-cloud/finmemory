@@ -1,9 +1,9 @@
 /**
- * Next.js instrumentation – roda quando o servidor inicia.
- * Evita que unhandledRejection (ex.: "window is not defined" em código que roda no servidor) derrube o processo.
+ * Next.js instrumentation – roda quando o servidor inicia (Node).
+ * Também é avaliado no contexto Edge (middleware): aí não existe process.on — não registar listeners.
  */
 export async function register() {
-  if (typeof process === 'undefined') return;
+  if (typeof process === 'undefined' || typeof process.on !== 'function') return;
   process.on('unhandledRejection', (reason) => {
     const msg = reason?.message ?? String(reason);
     console.warn('[instrumentation] unhandledRejection:', msg);

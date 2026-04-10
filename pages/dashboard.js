@@ -14,6 +14,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/S
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
+import { DashboardOnboardingTour } from '../components/onboarding/DashboardOnboardingTour';
+import {
+  isDashboardOnboardingDoneLocal,
+  setDashboardOnboardingDoneLocal,
+} from '../lib/dashboardOnboardingStorage';
+import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
+import OpenFinanceTransactionList from '../components/OpenFinance/TransactionList';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
 let supabaseInstance = null;
@@ -83,6 +90,7 @@ export async function getServerSideProps(ctx) {
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
+  const openFinance = useOpenFinanceSummary({ enabled: status === 'authenticated' });
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -99,6 +107,7 @@ export default function Dashboard() {
   const [trashLoading, setTrashLoading] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
 
   // Debug: Log quando transactions mudar
   useEffect(() => {
@@ -184,6 +193,34 @@ export default function Dashboard() {
       fetchUserId().catch((err) => console.warn('fetchUserId:', err?.message || err));
     }
   }, [session]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !userId) return undefined;
+    if (typeof window !== 'undefined' && isDashboardOnboardingDoneLocal(userId)) {
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/user/onboarding', { credentials: 'include' });
+        if (r.ok) {
+          const j = await r.json();
+          if (!cancelled && j.showTour === true) setOnboardingTourOpen(true);
+          return;
+        }
+        if (r.status === 401) return;
+      } catch (_) {
+        /* rede */
+      }
+      // Fallback: erro de servidor ou rede — uma vez por browser (ex.: coluna ainda não no PostgREST)
+      if (!cancelled && typeof window !== 'undefined' && !isDashboardOnboardingDoneLocal(userId)) {
+        setOnboardingTourOpen(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, status]);
 
   const loadTransactions = useCallback(async (uid) => {
     if (!uid) {
@@ -804,6 +841,80 @@ export default function Dashboard() {
               />
             </div>
 
+            <section
+              className="mb-6 rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
+              aria-label="Open Finance"
+            >
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-[#333] m-0">Open Finance</h2>
+                  <p className="text-xs text-[#666] mt-0.5 m-0">Contas e movimentos do banco (Pluggy).</p>
+                </div>
+                <Link
+                  href="/settings"
+                  className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap shrink-0 hover:underline"
+                >
+                  Configurar
+                </Link>
+              </div>
+              {openFinance.error && (
+                <p className="text-xs text-red-600 mb-3">
+                  {openFinance.error?.message || 'Erro ao carregar Open Finance.'}
+                </p>
+              )}
+              {openFinance.data?.syncing && (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-3">
+                  A sincronizar dados com a instituição… os valores podem atualizar em instantes.
+                </p>
+              )}
+              {!openFinance.loading && (openFinance.data?.accounts || []).length > 0 && (
+                <ul className="space-y-2 mb-4">
+                  {(openFinance.data.accounts || []).map((a) => {
+                    const bal =
+                      a.balance != null && Number.isFinite(Number(a.balance))
+                        ? new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: a.currency_code || 'BRL',
+                          }).format(Number(a.balance))
+                        : '—';
+                    return (
+                      <li
+                        key={a.id}
+                        className="flex items-center justify-between gap-2 text-sm py-2 border-b border-[#f0f0f0] last:border-0"
+                      >
+                        <span className="text-[#333] font-medium truncate">{a.name || 'Conta'}</span>
+                        <span className="text-[#333] tabular-nums shrink-0">{bal}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {!openFinance.loading && openFinance.data?.month && (
+                <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+                    <p className="text-emerald-800 font-medium m-0 mb-0.5">Receitas (mês)</p>
+                    <p className="text-emerald-900 font-semibold m-0">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                        openFinance.data.month.incomeTotal || 0
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2">
+                    <p className="text-red-800 font-medium m-0 mb-0.5">Despesas (mês)</p>
+                    <p className="text-red-900 font-semibold m-0">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                        openFinance.data.month.expenseTotal || 0
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <OpenFinanceTransactionList
+                transactions={openFinance.data?.recentTransactions}
+                loading={openFinance.loading}
+              />
+            </section>
+
             <Link
               href="/calculadora"
               className="flex items-center justify-center gap-2 w-full py-3 mb-4 rounded-2xl border border-[#28a745]/40 bg-[#0b1220] text-white font-semibold text-sm shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:bg-[#0f172a] transition-colors"
@@ -846,8 +957,8 @@ export default function Dashboard() {
                 </select>
               </div>
             )}
-            <p className="text-sm font-medium text-[#666] mb-2">Ações rápidas</p>
-            <QuickActions onSync={() => handleSyncEmails(false)} syncing={syncing} userIdReady={!!userId} className="mb-4" />
+            <p className="text-sm font-semibold text-neutral-800 tracking-tight mb-3">Ações rápidas</p>
+            <QuickActions className="mb-4" />
 
             {/* Lixeira: notas excluídas – restaurar por engano */}
             <button
@@ -1144,6 +1255,16 @@ export default function Dashboard() {
         >
           <Camera className="h-7 w-7" />
         </a>
+      )}
+
+      {onboardingTourOpen && (
+        <DashboardOnboardingTour
+          userId={userId}
+          onComplete={() => {
+            if (userId) setDashboardOnboardingDoneLocal(userId);
+            setOnboardingTourOpen(false);
+          }}
+        />
       )}
     </div>
   );

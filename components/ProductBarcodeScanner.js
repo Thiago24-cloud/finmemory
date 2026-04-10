@@ -6,7 +6,7 @@ import { NativeBarcodeScanner } from './NativeBarcodeScanner';
 
 /**
  * No app Capacitor (Android/iOS): ML Kit via @capacitor-mlkit/barcode-scanning.
- * No browser / PWA web: html5-qrcode (BarcodeScanner).
+ * No browser / PWA web: ZXing (BarcodeScanner — captura nativa no mobile, vídeo no desktop).
  */
 export function ProductBarcodeScanner({ onScan, onClose }) {
   const [phase, setPhase] = useState('checking'); // checking | native | web

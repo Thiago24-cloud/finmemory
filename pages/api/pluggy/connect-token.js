@@ -1,5 +1,6 @@
 import { PluggyClient } from 'pluggy-sdk';
 import { getServerSession } from 'next-auth/next';
+import { pluggyClientId, pluggyClientSecret } from '../../../lib/pluggyEnv';
 import { authOptions } from '../auth/[...nextauth]';
 
 /** @param {string | undefined} raw */
@@ -52,8 +53,8 @@ export default async function handler(req, res) {
   /** Mesmo id nos webhooks item/* (clientUserId) — preferir UUID Supabase. */
   const pluggyClientUserId = session.user.supabaseId || session.user.email;
 
-  const clientId = process.env.PLUGGY_CLIENT_ID;
-  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
+  const clientId = pluggyClientId();
+  const clientSecret = pluggyClientSecret();
   if (!clientId || !clientSecret) {
     return res.status(500).json({
       error: 'Pluggy não configurado (defina PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET)',
@@ -66,8 +67,12 @@ export default async function handler(req, res) {
       clientUserId: pluggyClientUserId,
     });
 
-    /** Em trial, só conectores sandbox (ex.: Pluggy Bank). Produção com bancos reais: defina PLUGGY_WIDGET_SANDBOX_CONNECTOR_ONLY=false */
-    const useSandboxConnectorOnly = process.env.PLUGGY_WIDGET_SANDBOX_CONNECTOR_ONLY !== 'false';
+    /**
+     * Padrão: produção — lista conectores reais (Nubank, Itaú, etc.).
+     * Trial / dev só Pluggy Bank: PLUGGY_WIDGET_SANDBOX_CONNECTOR_ONLY=true no .env.local ou Cloud Run.
+     * O cliente recebe useSandboxConnectorOnly na resposta JSON (não lê esta env).
+     */
+    const useSandboxConnectorOnly = process.env.PLUGGY_WIDGET_SANDBOX_CONNECTOR_ONLY === 'true';
     let sandboxConnectorId = null;
     if (useSandboxConnectorOnly) {
       try {

@@ -20,13 +20,17 @@ COPY . .
 # Variáveis de ambiente para build
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Variáveis públicas do Supabase (hardcoded - são públicas, vão para o navegador de qualquer forma)
-ENV NEXT_PUBLIC_SUPABASE_URL=https://faxqrkxqfwjdavorxien.supabase.co
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZheHFya3hxZndqZGF2b3J4aWVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NTE4NTYsImV4cCI6MjA4MTQyNzg1Nn0.nXGv3FGwFJWWTRLwEgBRgOmj-RJu-pv7vvZYmyiO_3s
-
-# Mapbox (token público - passado no build pelo Cloud Build)
+# NEXT_PUBLIC_* embutidas no bundle — não colocar literais aqui (aparecem no log do Docker / no repo).
+# Passar via Cloud Build: --build-arg a partir de .env (ver scripts/deploy-cloud-run.mjs).
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+# Muda no cliente a cada build → novo URL do SW (?v=) e menos chunks 404 após deploy
+ARG NEXT_PUBLIC_BUILD_ID=dev
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=$NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+ENV NEXT_PUBLIC_BUILD_ID=$NEXT_PUBLIC_BUILD_ID
 
 # Build da aplicação
 RUN npm run build

@@ -175,6 +175,17 @@
   border: none !important;
 }
 
+/* Pin de loja com logo (círculo + Clearbit) — sem caixa branca do Leaflet */
+.leaflet-marker-icon.finmemory-store-pin--brand {
+  background: none !important;
+  border: none !important;
+}
+
+.leaflet-marker-icon.custom-pin-price--brand {
+  background: none !important;
+  border: none !important;
+}
+
 .leaflet-container {
   width: 100%;
   height: 100%;
@@ -249,25 +260,59 @@
   right: 8px !important;
 }
 
-/* Rótulos ao lado dos pins — preço: texto + halo; lojas: faixa branca (chip) */
+/* Popup de loja (pins stores) — hero + grelha como pin de ofertas */
+.leaflet-popup-content:has(.finmemory-popup-store-offers) {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: min(304px, calc(100vw - 32px)) !important;
+  max-width: min(304px, calc(100vw - 32px)) !important;
+  min-width: 0 !important;
+}
+
+.leaflet-popup-content-wrapper:has(.finmemory-popup-store-offers) {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.14),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.leaflet-popup-content-wrapper:has(.finmemory-popup-store-offers) a.leaflet-popup-close-button {
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+  line-height: 26px;
+  padding: 0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #374151 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  top: 8px !important;
+  right: 8px !important;
+}
+
+/* Rótulos ao lado dos pins — loja/preço: texto colorido + halo (inline); “Você” e outros: cinza + halo */
 .leaflet-tooltip.finmemory-map-label {
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  color: #1f2937 !important;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
   line-height: 1.2 !important;
   padding: 1px 2px !important;
   margin: 0 !important;
-  max-width: min(220px, 52vw) !important;
+  max-width: min(280px, 58vw) !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   pointer-events: none !important;
-  /* Contorno nítido em vez de blur 0 0 Npx (halo borrado sobre o mapa) */
+}
+
+.leaflet-tooltip.finmemory-map-label:not(.finmemory-map-label--store):not(.finmemory-map-label--price) {
+  color: #1f2937 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
   text-shadow:
     -1px -1px 0 #fff,
     1px -1px 0 #fff,
@@ -280,21 +325,18 @@
   display: none !important;
 }
 
-.leaflet-tooltip.finmemory-map-label--price {
-  font-weight: 700 !important;
-  max-width: min(240px, 55vw) !important;
+.leaflet-tooltip.finmemory-map-label--price,
+.leaflet-tooltip.finmemory-map-label--store {
+  padding: 1px 2px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  max-width: none !important;
+  /* text-shadow e cor vêm do span (getMapPinOpenAirLabelStyle) */
 }
 
-.leaflet-tooltip.finmemory-map-label.finmemory-map-label--store {
-  background: rgba(255, 255, 255, 0.97) !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  border-radius: 8px !important;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.06) !important;
-  padding: 5px 9px !important;
-  color: #111827 !important;
-  text-shadow: none !important;
+.finmemory-map-label-text {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 .leaflet-tooltip.finmemory-map-label--you {
@@ -344,4 +386,26 @@ body.finmemory-native-barcode-scan-active {
 
 body.finmemory-native-barcode-scan-active .finmemory-barcode-scanner-ui {
   visibility: visible;
+}
+
+/* Assistente PWA — entrada do bottom sheet */
+@keyframes fm-pwa-sheet-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fm-pwa-sheet-panel {
+  animation: fm-pwa-sheet-up 0.35s ease-out;
+}
+
+@media (min-width: 640px) {
+  .fm-pwa-sheet-panel {
+    animation: none;
+  }
 }

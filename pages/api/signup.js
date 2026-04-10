@@ -5,6 +5,7 @@ import { generateOpaqueToken } from '../../lib/tokens';
 import { sendSecurityEmail } from '../../lib/securityEmail';
 import { isValidEmail, normalizeEmail, validatePasswordStrength } from '../../lib/securityPolicy';
 import { mergeVerifyTokenHashes } from '../../lib/emailVerifyTokens';
+import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../lib/privateBetaAllowlist';
 
 /**
  * POST /api/signup
@@ -37,6 +38,10 @@ export default async function handler(req, res) {
   }
 
   const normalized = normalizeEmail(email);
+  const allowlist = getPrivateBetaAllowlistFromEnv();
+  if (!isEmailAllowedInPrivateBeta(normalized, allowlist)) {
+    return res.status(403).json({ error: 'Cadastro não disponível neste momento.' });
+  }
   const emailRate = checkRateLimit({ bucket: 'signup-email', key: normalized, limit: 5, windowMs: 60 * 60 * 1000 });
   if (!emailRate.allowed) {
     return res.status(429).json({ error: 'Muitas tentativas para esse email. Tente mais tarde.' });

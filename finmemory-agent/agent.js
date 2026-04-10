@@ -13,7 +13,7 @@
  *   node agent.js --dry-run
  *   node agent.js --headless=false
  *
- * Redes: dia | atacadao | assai | carrefour | paodeacucar | hirota | lopes | sonda | saojorge | mambo | agape | armazemdocampo
+ * Redes: dia | assai | carrefour | paodeacucar | hirota | lopes | sonda | saojorge | mambo | agape | armazemdocampo
  *
  * Env: SUPABASE_URL + SUPABASE_SERVICE_KEY (service_role) ou SUPABASE_SERVICE_ROLE_KEY
  *      TTL_HOURS (default 72), CONCURRENCY (default 1), LOG_LEVEL
@@ -23,6 +23,9 @@
  *      Em lojas-sp-capital o JSON mistura cidades do estado; por defeito só entram slugs sp-sao-paulo-* (município São Paulo). DIA_REGION_INCLUDE_ALL_NODES=1 inclui todos os nós.
  *      DIA_SKIP_REGION_LIST=1 — não expandir listagens (só env + Supabase + default).
  *      PROMO_FANOUT_MAX_STORES — ofertas nacionais replicadas por loja em public.stores
+ *      OPENAI_API_KEY — expande encartes (tipo encarte, imagem https) em produtos via Vision antes de gravar
+ *      SKIP_ENCARTE_VISION=1 — desliga a expansão; ENCARTE_VISION_MAX_FLYERS (default 24) — máx. imagens únicas por rede/run
+ *      OPENAI_VISION_MODEL / OPENAI_VISION_MAX_TOKENS — opcionais (default gpt-4o-mini / 4096)
  *
  * Estratégia de conteúdo: tudo o que a rede coloca no site (ofertas, vitrines, encartes, destaques)
  * conta como “divulgação pública” — não é catálogo completo; o mapa trata como camada promocional.
@@ -74,7 +77,6 @@ const ENV = {
 
 /** Ofertas do site nacional → uma cópia por loja no mapa (exceto lopes/dia, que têm outra lógica). */
 const FANOUT_CHAINS = new Set([
-  'atacadao',
   'assai',
   'carrefour',
   'paodeacucar',
@@ -88,7 +90,6 @@ const FANOUT_CHAINS = new Set([
 
 const CHAIN_STORE_ALIASES = {
   dia: ['dia'],
-  atacadao: ['atacadao', 'atacadão'],
   assai: ['assai'],
   carrefour: ['carrefour'],
   paodeacucar: ['pao de acucar', 'acucar', 'minuto pao de acucar'],
@@ -263,6 +264,19 @@ function mergePublicityImages(existing, extra, maxAdd = 45) {
 function isLikelyJunkOffer(name, price) {
   const n = normalizeText(name);
   if (!n || n.length < 4) return true;
+  if (/\bentrega agendada\b/.test(n)) return true;
+  if (/\bentrega rapida\b/.test(n) || /\bentrega rápida\b/.test(n)) return true;
+  if (/\bclique e retire\b/.test(n)) return true;
+  if (/\bdivulgacao\b/.test(n) && !/\b(kg|g|l|ml|un|pct|pack)\b/.test(n)) return true;
+  if (/\br\$\s*[\d.,\s]+\s*$/.test(n)) {
+    const head = n.replace(/\br\$\s*[\d.,\s]+\s*$/, '').trim();
+    const looksLikeStoreBanner =
+      (/\bsupermarket\b/.test(head) && /\bmambo\b/.test(head)) ||
+      /\bvila madalena\b/.test(head) ||
+      (/\bmambo\b/.test(head) &&
+        /\b(deputado|lacerda|franco|morumbi|brooklin|higienopolis|higienópolis|leopoldina)\b/.test(head));
+    if (head.length >= 18 && looksLikeStoreBanner) return true;
+  }
   const generic = [
     'ofertas',
     'oferta',
@@ -613,11 +627,18 @@ function buildPromoRowsFromRaw(raw, scraper, runId, now, expireAt, chainCoords, 
       p.lng != null && Number.isFinite(Number(p.lng)) ? Number(p.lng) : null;
     const gtinRaw =
       p.gtin != null && String(p.gtin).trim() ? String(p.gtin).trim() : null;
+    let precoOriginalOut = null;
+    if (p.preco_original_display != null && String(p.preco_original_display).trim()) {
+      precoOriginalOut = String(p.preco_original_display).trim();
+    } else if (p.preco != null) {
+      precoOriginalOut = String(p.preco);
+    }
+
     rows.push({
       supermercado: scraper.key,
       nome_produto,
       preco: price,
-      preco_original: p.preco != null ? String(p.preco) : null,
+      preco_original: precoOriginalOut,
       imagem_url: p.imagem ?? null,
       validade: vd,
       lat: latP ?? (deferCoords ? null : chainCoords[scraper.key]?.lat ?? null),
@@ -628,9 +649,98 @@ function buildPromoRowsFromRaw(raw, scraper, runId, now, expireAt, chainCoords, 
       ativo: true,
       gtin: gtinRaw,
       ingest_source: source,
+      categoria:
+        p.categoria != null && String(p.categoria).trim()
+          ? String(p.categoria).trim().slice(0, 120)
+          : null,
     });
   }
   return rows;
+}
+
+/**
+ * Itens `tipo: encarte` com imagem https → produtos individuais (GPT-4o Vision), sem reutilizar URL do folheto.
+ * Sem OPENAI_API_KEY ou com SKIP_ENCARTE_VISION=1, mantém o raw original.
+ */
+async function expandEncartesWithVision(raw, chainKey) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || /^1|true|yes$/i.test(String(process.env.SKIP_ENCARTE_VISION || '').trim())) {
+    return raw;
+  }
+
+  const maxParsed = Number(process.env.ENCARTE_VISION_MAX_FLYERS);
+  const maxFlyers = Math.max(
+    1,
+    Math.min(200, Number.isFinite(maxParsed) && maxParsed > 0 ? maxParsed : 24)
+  );
+
+  const encarteHttps = (p) =>
+    p &&
+    p.tipo === 'encarte' &&
+    p.imagem &&
+    String(p.imagem).trim().startsWith('https://');
+
+  const encarteItems = raw.filter(encarteHttps);
+  if (!encarteItems.length) return raw;
+
+  const nonEncarte = raw.filter((p) => !encarteHttps(p));
+
+  let extractProductsFromEncarteImage;
+  try {
+    ({ extractProductsFromEncarteImage } = require('./lib/encarteVisionExtract.cjs'));
+  } catch (e) {
+    log.warn(`encarte vision: módulo ausente (${e.message})`);
+    return raw;
+  }
+
+  const byUrl = new Map();
+  for (const item of encarteItems) {
+    const u = String(item.imagem).trim();
+    if (!byUrl.has(u)) byUrl.set(u, item);
+  }
+
+  const uniqueUrls = [...byUrl.keys()];
+  const toProcess = uniqueUrls.slice(0, maxFlyers);
+  const skippedUrls = uniqueUrls.slice(maxFlyers);
+
+  const fromVision = [];
+  let nProducts = 0;
+
+  for (let i = 0; i < toProcess.length; i++) {
+    const url = toProcess[i];
+    const parent = byUrl.get(url);
+    const { products, error } = await extractProductsFromEncarteImage(url, { apiKey });
+    if (error) {
+      log.warn(`    encarte vision [${chainKey}]: ${error}`);
+      fromVision.push(parent);
+      continue;
+    }
+    if (!products.length) {
+      log.warn(`    encarte vision [${chainKey}]: 0 produtos — mantém imagem do encarte`);
+      fromVision.push(parent);
+      continue;
+    }
+    nProducts += products.length;
+    for (const pr of products) {
+      fromVision.push({
+        nome: pr.product_name,
+        preco: pr.promo_price,
+        imagem: null,
+        validade: pr.valid_until || parent.validade || null,
+        tipo: 'vision_product',
+        categoria: pr.category,
+        preco_original_display: pr.preco_original_display,
+      });
+    }
+    if (i < toProcess.length - 1) await sleep(350, 900);
+  }
+
+  const skippedItems = skippedUrls.map((u) => byUrl.get(u));
+  log.info(
+    `    🧠 encarte vision [${chainKey}]: ${toProcess.length} imagem(ns) → ${nProducts} produto(s); ${skippedUrls.length} imagem(ns) fora do limite`
+  );
+
+  return [...nonEncarte, ...fromVision, ...skippedItems];
 }
 
 /** Preenche product_id quando existe produto com o mesmo GTIN em public.products (mapa usa imagem do bucket). */
@@ -1027,36 +1137,6 @@ const SCRAPERS = {
     label: 'Supermercado Dia',
     /** Várias lojas: `runDiaMulti` (não usa este fetch). */
     usePageData: true,
-  },
-
-  atacadao: {
-    key: 'atacadao',
-    label: 'Atacadão',
-    url: 'https://www.atacadao.com.br/ofertas',
-    run: async (page) => {
-      await page.goto('https://www.atacadao.com.br/ofertas', {
-        waitUntil: 'domcontentloaded',
-        timeout: 90_000,
-      });
-      await sleep(1500, 3000);
-      await autoScroll(page);
-      return page.evaluate(() => {
-        const items = [];
-        const sel =
-          '[class*="product-card"],[class*="ProductCard"],[class*="product-item"],[data-testid*="product"]';
-        document.querySelectorAll(sel).forEach((card) => {
-          const nome = card.querySelector(
-            '[class*="name"],[class*="title"],h2,h3'
-          )?.innerText?.trim();
-          const preco = card
-            .querySelector('[class*="price"],[class*="Price"]')
-            ?.innerText?.trim();
-          const imagem = card.querySelector('img')?.src;
-          if (nome && preco) items.push({ nome, preco, imagem });
-        });
-        return items;
-      });
-    },
   },
 
   assai: {
@@ -1666,7 +1746,6 @@ async function runScraper(key, context, runId, now, expireAt, chainCoords = {}) 
           'mambo',
           'agape',
           'armazemdocampo',
-          'atacadao',
           'carrefour',
           'paodeacucar',
           'hirota',
@@ -1703,6 +1782,10 @@ async function runScraper(key, context, runId, now, expireAt, chainCoords = {}) 
     }
     log.info(`    📦 ${raw.length} produtos`);
   }
+
+  if (!raw.length) return;
+
+  raw = await expandEncartesWithVision(raw, scraper.key);
 
   if (!raw.length) return;
 

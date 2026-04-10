@@ -2,6 +2,30 @@ import { createClient } from '@supabase/supabase-js';
 import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
 import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
+import { hydratePointsFromImageCache } from '../../../lib/mapProductImageCache';
+import {
+  applyNormKeyImageLookup,
+  applyPeerPromoImageReuse,
+  buildImageUrlByNormKeyFromPairs,
+} from '../../../lib/reuseMapProductImages';
+import { isExcludedFromPriceMapStoreName } from '../../../lib/mapExcludedMapStores';
+import { parsePriceToNumber } from '../../../lib/parseMapPrice';
+import {
+  displayPromoProductName,
+  productNameForThumbnailSearch,
+} from '../../../lib/mapOfferDisplay';
+import {
+  inferChainSlugFromPromoStoreName,
+  inferChainSlugFromStoreDisplayName,
+  isLikelyNonProductScraperTitle,
+  normalizeMapChainText,
+  promoStoreNamesLooselyAlign,
+  storeNormalizedMatchesChainSlug,
+} from '../../../lib/mapStoreChainMatch';
+import {
+  isPromotionEligibleForMapPin,
+  todayIsoSaoPaulo,
+} from '../../../lib/promotionValidity';
 
 /**
  * GET /api/map/store-offers?store_id=UUID
@@ -33,6 +57,45 @@ function distanceKm(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
+function sortKeyPromotionValidity(row) {
+  const vd = row?.valid_dates;
+  if (Array.isArray(vd) && vd.length > 0) {
+    return vd.reduce((mx, d) => {
+      const s = String(d).slice(0, 10);
+      return s > mx ? s : mx;
+    }, '0000-00-00');
+  }
+  const vu = row?.valid_until;
+  if (vu != null && vu !== '') return String(vu).slice(0, 10);
+  return '9999-12-31';
+}
+
+function sortPromotionTableRows(rows) {
+  const list = Array.isArray(rows) ? [...rows] : [];
+  const far = '9999-12-31';
+  list.sort((a, b) => {
+    const va = sortKeyPromotionValidity(a) || far;
+    const vb = sortKeyPromotionValidity(b) || far;
+    if (va !== vb) return va.localeCompare(vb);
+    const pa = Number(a.promo_price);
+    const pb = Number(b.promo_price);
+    if (Number.isFinite(pa) && Number.isFinite(pb) && pa !== pb) return pa - pb;
+    return String(a.product_name || '').localeCompare(String(b.product_name || ''), 'pt-BR');
+  });
+  return list;
+}
+
+function dedupKeyForStoreOfferRow(row) {
+  if (row?.id != null && row.id !== '') {
+    return row.source === 'agent_promotions' ? `agent:${String(row.id)}` : `pp:${String(row.id)}`;
+  }
+  const ts = row.created_at != null ? String(row.created_at) : '';
+  const lat = Number(row.lat);
+  const lng = Number(row.lng);
+  const name = normalizeMapChainText(row.product_name || '');
+  return `noid:${row.source || 'x'}:${Number.isFinite(lat) ? lat : ''}:${Number.isFinite(lng) ? lng : ''}:${name}:${ts}`;
+}
+
 function maskUserId(userId) {
   if (!userId || typeof userId !== 'string') return 'Explorador';
   const last4 = userId.replace(/-/g, '').slice(-4);
@@ -57,7 +120,6 @@ function agentLabel(slug) {
   const s = String(slug || '').toLowerCase();
   const map = {
     dia: 'Dia',
-    atacadao: 'Atacadão',
     assai: 'Assaí',
     carrefour: 'Carrefour',
     paodeacucar: 'Pão de Açúcar',
@@ -68,18 +130,10 @@ function agentLabel(slug) {
     mambo: 'Mambo',
     agape: 'Ágape',
     armazemdocampo: 'Armazém do Campo',
+    pomardavilavilamadalena: 'Pomar da Vila',
+    padraosuper: 'Supermercado Padrão',
   };
   return map[s] || String(slug || 'Rede');
-}
-
-function normalizeText(value) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 export default async function handler(req, res) {
@@ -98,30 +152,58 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data: store, error: storeErr } = await supabase
+    /** Mesmo núcleo que GET /api/map/stores — evita 404 em projetos sem migrações de colunas opcionais. */
+    const storeColsNarrow =
+      'id, name, type, lat, lng, address, neighborhood';
+    const storeColsWide = `${storeColsNarrow}, phone, website, photo_url, weekday_hours, promo_page_url`;
+
+    let { data: store, error: storeErr } = await supabase
       .from('stores')
-      .select('id, name, type, lat, lng')
+      .select(storeColsWide)
       .eq('id', storeId)
       .eq('active', true)
       .maybeSingle();
 
+    if (storeErr) {
+      const r2 = await supabase
+        .from('stores')
+        .select(storeColsNarrow)
+        .eq('id', storeId)
+        .eq('active', true)
+        .maybeSingle();
+      store = r2.data;
+      storeErr = r2.error;
+    }
+
     if (storeErr || !store) {
+      if (storeErr) {
+        console.warn('store-offers stores:', storeErr.message);
+      }
+      return res.status(404).json({ error: 'Loja não encontrada' });
+    }
+    if (isExcludedFromPriceMapStoreName(store.name)) {
       return res.status(404).json({ error: 'Loja não encontrada' });
     }
 
+    const todaySp = todayIsoSaoPaulo();
     let tablePromotions = [];
     try {
       const { data: promData, error: promErr } = await supabase
         .from('promotions')
-        .select('id, product_name, promo_price, original_price, unit, category')
+        .select(
+          'id, product_name, promo_price, original_price, unit, category, valid_from, valid_until, valid_dates, validity_note, club_price, flyer_image_url, product_image_url, image_hint, discount_pct, created_at, source, encarte_queue_id'
+        )
         .eq('store_id', storeId)
         .eq('active', true)
-        .order('created_at', { ascending: false })
-        .limit(300);
+        .eq('is_individual_product', true)
+        .limit(500);
       if (promErr) {
         console.warn('store-offers promotions:', promErr.message);
       } else {
-        tablePromotions = promData || [];
+        const raw = promData || [];
+        tablePromotions = sortPromotionTableRows(
+          raw.filter((r) => isPromotionEligibleForMapPin(r, todaySp))
+        );
       }
     } catch (e) {
       console.warn('store-offers promotions:', e.message);
@@ -131,35 +213,36 @@ export default async function handler(req, res) {
     const sLng = Number(store.lng);
     if (Number.isNaN(sLat) || Number.isNaN(sLng)) {
       return res.status(200).json({
-        store: { id: store.id, name: store.name, type: store.type },
+        store,
         offers: [],
         promotions: tablePromotions,
       });
     }
 
-    const delta = 0.018;
+    const delta = 0.05;
     const latMin = sLat - delta;
     const latMax = sLat + delta;
     const lngMin = sLng - delta;
     const lngMax = sLng + delta;
-    const promoThresholdKm = Math.max(
-      0.08,
-      Number.parseFloat(process.env.MAP_STORE_OFFERS_RADIUS_KM || '0.25') || 0.25
-    );
+    /** Rede do pin (se reconhecida): filtra `promocoes_supermercados` por slug para não perder ofertas por `limit` global na bbox. */
+    const storeChainSlug = inferChainSlugFromStoreDisplayName(store.name);
+    /** Raio oferta↔pin (km). 1.25 absorve pequeno desvio GPS / cadastro vs fan-out do agente. */
+    const promoThresholdKm = Number(process.env.MAP_STORE_OFFERS_RADIUS_KM) || 1.25;
+    /** Curadoria/agente podem usar coords de referência ~1–2 km do pin OSM/Google do `stores`. */
+    const chainSlugRadiusKm =
+      Number.parseFloat(process.env.MAP_STORE_OFFERS_CHAIN_SLUG_RADIUS_KM || '') || 2.5;
 
-    const defaultTtlHours = Math.max(
-      1,
-      Number.parseInt(process.env.MAP_DEFAULT_TTL_HOURS || '24', 10) || 24
-    );
     const promoTtlHours = Math.max(
       1,
       Number.parseInt(process.env.MAP_STORE_OFFERS_PROMO_TTL_HOURS || '24', 10) || 24
     );
+    /** Só para `price_points` (divulgação/import categoria promo). O agente usa `expira_em` (ex.: 72h). */
     const promoCutoffIso = new Date(Date.now() - promoTtlHours * 60 * 60 * 1000).toISOString();
 
-    const baseSelect = 'id, product_name, price, store_name, lat, lng, category, created_at, user_id, product_id';
+    const baseSelect =
+      'id, product_name, price, store_name, lat, lng, category, created_at, user_id, product_id';
 
-    const { data: promoRows, error: promoErr } = await supabase
+    const promoQ = supabase
       .from('price_points')
       .select(baseSelect)
       .not('lat', 'is', null)
@@ -171,17 +254,38 @@ export default async function handler(req, res) {
       .gte('lng', lngMin)
       .lte('lng', lngMax)
       .order('created_at', { ascending: false })
-      .limit(800);
+      .limit(2000);
+
+    const reuseQ = supabase
+      .from('price_points')
+      .select('product_name, product_id, created_at')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .gte('created_at', promoCutoffIso)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .order('created_at', { ascending: false })
+      .limit(2000);
+
+    const [{ data: promoRows, error: promoErr }, { data: reusePts, error: reuseErr }] = await Promise.all([
+      promoQ,
+      reuseQ,
+    ]);
 
     if (promoErr) {
       console.error('store-offers price_points:', promoErr);
       return res.status(500).json({ error: promoErr.message });
     }
+    if (reuseErr) {
+      console.warn('store-offers reuse price_points:', reuseErr.message);
+    }
 
     let merged = [...(promoRows || [])].map((r) => ({ ...r, source: 'price_points' }));
 
     try {
-      const { data: promoFromAgent, error: agentErr } = await supabase
+      let agentQ = supabase
         .from('promocoes_supermercados')
         .select(
           'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url, product_id, categoria'
@@ -194,24 +298,37 @@ export default async function handler(req, res) {
         .lte('lat', latMax)
         .gte('lng', lngMin)
         .lte('lng', lngMax)
-        .gte('atualizado_em', promoCutoffIso)
-        .order('atualizado_em', { ascending: false })
-        .limit(600);
+        .order('atualizado_em', { ascending: false });
+      if (storeChainSlug) {
+        agentQ = agentQ.eq('supermercado', storeChainSlug).limit(4000);
+      } else {
+        agentQ = agentQ.limit(1000);
+      }
+      const { data: promoFromAgent, error: agentErr } = await agentQ;
 
       if (agentErr) {
         console.warn('store-offers agent:', agentErr.message);
       } else if (promoFromAgent?.length) {
         const asPricePoints = promoFromAgent.map((r) => {
           const raw = r.preco;
-          const priceNum =
-            raw != null && raw !== '' && !Number.isNaN(Number(raw)) ? Number(raw) : null;
-          const slug = String(r.supermercado || '').toLowerCase();
+          const priceNum = parsePriceToNumber(raw);
+          const slug = String(r.supermercado || '').toLowerCase().trim();
           const storeName = slug === 'dia' ? 'Dia Supermercado' : `${agentLabel(r.supermercado)} · ofertas`;
+          const nome =
+            r.nome_produto != null && String(r.nome_produto).trim() !== ''
+              ? String(r.nome_produto).trim()
+              : 'Oferta';
+          const rowId =
+            r.id != null && r.id !== ''
+              ? `promo-${r.id}`
+              : `promo-noid-${normalizeMapChainText(String(r.nome_produto || ''))}-${String(r.lat)}-${String(r.lng)}`;
           return {
-            id: `promo-${r.id}`,
-            product_name: r.nome_produto,
+            // Prefixo explícito para nunca colidir com id de price_points no Map de dedupe
+            id: rowId,
+            product_name: nome,
             price: priceNum,
             store_name: storeName,
+            agent_supermercado_slug: slug || null,
             lat: r.lat,
             lng: r.lng,
             category: formatAgentPromoMapCategory(r.categoria),
@@ -228,8 +345,11 @@ export default async function handler(req, res) {
       console.warn('store-offers promocoes_supermercados:', e.message);
     }
 
+    console.log('[store-offers] total merged:', merged.length);
+    console.log('[store-offers] store:', store.name, store.lat, store.lng);
+
     const storeNameLower = String(store.name || '').toLowerCase();
-    const normalizedStoreName = normalizeText(store.name);
+    const normalizedStoreName = normalizeMapChainText(store.name);
     const isPaoStore = /(pao de acucar|minuto pao de acucar)/.test(normalizedStoreName);
 
     const belongs = (row) => {
@@ -237,33 +357,67 @@ export default async function handler(req, res) {
       const pLng = Number(row.lng);
       if (Number.isNaN(pLat) || Number.isNaN(pLng)) return false;
       const pStoreName = (row.store_name || '').toLowerCase();
-      const normalizedPointStoreName = normalizeText(row.store_name);
+      const normalizedPointStoreName = normalizeMapChainText(row.store_name);
       if (pStoreName && pStoreName === storeNameLower) return true;
+
+      const slug =
+        row.agent_supermercado_slug ||
+        inferChainSlugFromPromoStoreName(row.store_name) ||
+        null;
+
+      const chainSlugMatchesStore =
+        Boolean(slug) && storeNormalizedMatchesChainSlug(normalizedStoreName, slug);
+      const maxKm = chainSlugMatchesStore
+        ? Math.max(promoThresholdKm, chainSlugRadiusKm)
+        : promoThresholdKm;
+
       const distance = distanceKm(sLat, sLng, pLat, pLng);
-      if (distance > promoThresholdKm) return false;
-      if (isPaoStore && normalizedPointStoreName.includes('dia supermercado')) return false;
+      if (distance > maxKm) return false;
+
       if (isPaoStore) {
+        if (slug === 'dia') return false;
+        if (slug === 'paodeacucar') {
+          return storeNormalizedMatchesChainSlug(normalizedStoreName, 'paodeacucar');
+        }
+        if (slug) return false;
         const sameBrand =
           normalizedPointStoreName.includes('pao de acucar') ||
-          normalizedPointStoreName.includes('minuto pao de acucar');
-        if (!sameBrand) return false;
+          normalizedPointStoreName.includes('minuto pao');
+        if (sameBrand) {
+          return storeNormalizedMatchesChainSlug(normalizedStoreName, 'paodeacucar');
+        }
+        return promoStoreNamesLooselyAlign(store.name, row.store_name);
       }
-      return true;
+
+      if (slug) {
+        return storeNormalizedMatchesChainSlug(normalizedStoreName, slug);
+      }
+
+      return promoStoreNamesLooselyAlign(store.name, row.store_name);
     };
 
     const filtered = merged.filter(belongs);
 
-    const byId = new Map();
+    console.log('[store-offers] after belongs filter:', filtered.length);
+
+    const byDedupKey = new Map();
     for (const row of filtered) {
-      if (row?.id != null) byId.set(row.id, row);
+      const dedupKey = dedupKeyForStoreOfferRow(row);
+      byDedupKey.set(dedupKey, row);
     }
-    const deduped = Array.from(byId.values()).sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
-    );
+    const deduped = Array.from(byDedupKey.values())
+      .filter((row) => !isLikelyNonProductScraperTitle(row.product_name))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     let pathByProductId = new Map();
+    let urlByNormKey = new Map();
     try {
-      const productIds = [...new Set(deduped.map((r) => r.product_id).filter(Boolean))];
+      const productIds = [
+        ...new Set([
+          ...deduped.map((r) => r.product_id).filter(Boolean),
+          ...(reusePts || []).map((r) => r.product_id).filter(Boolean),
+        ]),
+      ];
       if (productIds.length > 0) {
         const { data: imgRows, error: imgErr } = await supabase
           .from('product_images')
@@ -278,6 +432,23 @@ export default async function handler(req, res) {
           }
         }
       }
+      const reusePairs = [];
+      for (const row of deduped) {
+        reusePairs.push({
+          product_name: row.product_name,
+          url: row.imagem_url || row.image_url || null,
+        });
+      }
+      for (const row of reusePts || []) {
+        let url = row.image_url || null;
+        const pid = row.product_id;
+        if (pid && pathByProductId.has(pid)) {
+          const fromCat = getPublicProductImageUrl(pathByProductId.get(pid));
+          if (fromCat) url = fromCat;
+        }
+        reusePairs.push({ product_name: row.product_name, url });
+      }
+      urlByNormKey = buildImageUrlByNormKeyFromPairs(reusePairs);
     } catch (e) {
       console.warn('store-offers catalog images:', e.message);
     }
@@ -291,8 +462,8 @@ export default async function handler(req, res) {
       }
       return {
         id: row.id,
-        product_name: row.product_name,
-        price: row.price,
+        product_name: displayPromoProductName(row.product_name),
+        price: parsePriceToNumber(row.price),
         store_name: row.store_name,
         lat: Number(row.lat),
         lng: Number(row.lng),
@@ -305,23 +476,37 @@ export default async function handler(req, res) {
       };
     });
 
+    applyPeerPromoImageReuse(offers);
+    applyNormKeyImageLookup(offers, urlByNormKey);
+
+    try {
+      await hydratePointsFromImageCache(supabase, offers);
+    } catch (e) {
+      console.warn('store-offers hydratePointsFromImageCache:', e.message);
+    }
+
     if (process.env.MAP_POINTS_OFF_ENRICH !== '0') {
       const useCse =
         process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
         Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
       try {
+        const cap = Number.parseInt(process.env.MAP_STORE_OFFERS_MAX_NAMES || '150', 10) || 150;
         await enrichMapPointsImageUrls(offers, {
-          maxUniqueNames: 32,
+          maxUniqueNames: Math.min(200, Math.max(offers.length, cap)),
           concurrency: 4,
           useGoogleCse: useCse,
+          nameForSearch: (p) => productNameForThumbnailSearch(p.product_name),
         });
       } catch (e) {
         console.warn('store-offers enrichMapPointsImageUrls:', e.message);
       }
     }
 
+    console.log('[store-offers] final offers count:', offers.length);
+    console.log('[store-offers] promotions count:', tablePromotions.length);
+
     return res.status(200).json({
-      store: { id: store.id, name: store.name, type: store.type },
+      store,
       offers,
       promotions: tablePromotions,
     });

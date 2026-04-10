@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "loja": "Padrão Supermercados — Pinheiros (Rua Fernão Dias × Rua Martim Carrasco)",
+    "supermercado_slug": "padraosuper",
+    "endereco_ref": "Esquina Fernão Dias e Martim Carrasco, Pinheiros, São Paulo, SP",
+    "lat": -23.56475,
+    "lng": -46.68825,
+    "validade_encarte_ate": "2026-04-15",
+    "expira_em": "2026-04-15T23:59:59-03:00",
+    "atualizado_em": "2026-04-07T12:00:00-03:00",
+    "run_id": "curadoria-padrao-pinheiros-fernao-martim-2026-04-07",
+    "ingest_source": "curadoria_json:padrao_pinheiros_fernao_martim:2026-04-07",
+    "notas": "Alinhe lat/lng com public.stores deste pin. Preencha produtos[]; depois: node scripts/generate-curadoria-promocoes-sql.mjs data/curadoria/padrao-pinheiros-fernao-martim.json"
+  },
+  "produtos": []
+}

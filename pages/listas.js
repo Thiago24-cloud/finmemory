@@ -41,35 +41,44 @@ export default function ListasSalvasPage() {
       setLoading(false);
       return;
     }
+    let activePartnership = null;
     const { data: memberRow } = await supabase
       .from('partnership_members')
       .select('partnership_id')
       .eq('user_id', userId)
       .limit(1)
       .maybeSingle();
-    if (!memberRow) {
-      setPartnership(null);
-      setLists([]);
-      setLoading(false);
-      return;
+    if (memberRow) {
+      const { data: p } = await supabase
+        .from('partnerships')
+        .select('id')
+        .eq('id', memberRow.partnership_id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (p) activePartnership = p;
     }
-    const { data: p } = await supabase
-      .from('partnerships')
-      .select('id')
-      .eq('id', memberRow.partnership_id)
-      .eq('status', 'active')
-      .maybeSingle();
-    setPartnership(p || null);
-    if (p) {
-      const { data: rows } = await supabase
+    setPartnership(activePartnership);
+
+    const { data: personal } = await supabase
+      .from('shopping_lists')
+      .select('id, total, items, created_at, created_by')
+      .eq('owner_user_id', userId)
+      .is('partnership_id', null)
+      .order('created_at', { ascending: false });
+
+    let shared = [];
+    if (activePartnership) {
+      const { data: s } = await supabase
         .from('shopping_lists')
         .select('id, total, items, created_at, created_by')
-        .eq('partnership_id', p.id)
+        .eq('partnership_id', activePartnership.id)
         .order('created_at', { ascending: false });
-      setLists(Array.isArray(rows) ? rows : []);
-    } else {
-      setLists([]);
+      shared = Array.isArray(s) ? s : [];
     }
+
+    const combined = [...(personal || []), ...shared];
+    combined.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    setLists(combined);
     setLoading(false);
   };
 
@@ -93,28 +102,6 @@ export default function ListasSalvasPage() {
     return null;
   }
 
-  if (!partnership) {
-    return (
-      <div className="min-h-screen bg-background p-5 pb-24">
-        <div className="max-w-md mx-auto">
-          <Link href="/dashboard" className="inline-flex items-center gap-2 text-[#666] hover:text-[#333] text-sm mb-6">
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Link>
-          <div className="bg-white rounded-xl p-6 shadow-card-lovable text-center">
-            <p className="text-[#666] mb-4">Precisa de uma parceria ativa para ver as listas salvas.</p>
-            <Link
-              href="/partnership"
-              className="inline-block py-3 px-4 bg-[#2ECC49] text-white font-semibold rounded-xl hover:bg-[#22a83a]"
-            >
-              Ir para Parceria
-            </Link>
-          </div>
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#f8f9fa] p-5 pb-24">
       <div className="max-w-md mx-auto">
@@ -125,7 +112,9 @@ export default function ListasSalvasPage() {
           <ListOrdered className="h-6 w-6 text-[#2ECC49]" />
           <h1 className="text-xl font-bold text-[#333]">Listas salvas</h1>
         </div>
-        <p className="text-sm text-[#666] mb-6">Histórico do carrinho do mapa (data, itens e total).</p>
+        <p className="text-sm text-[#666] mb-6">
+          Histórico do carrinho do mapa (data, itens e total). Com parceria ativa também aparecem as listas compartilhadas.
+        </p>
 
         <div className="space-y-4">
           {normalizedLists.map((row) => (
@@ -171,7 +160,7 @@ export default function ListasSalvasPage() {
           href="/shopping-list"
           className="mt-8 block text-center text-sm text-[#2ECC49] font-medium underline"
         >
-          Abrir lista de compras compartilhada
+          Abrir lista de compras
         </Link>
       </div>
       <BottomNav />

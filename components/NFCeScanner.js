@@ -74,7 +74,7 @@ export function NFCeScanner({ userId, onSuccess, onClose }) {
     status === 'success' ? 'Salvo!' : '';
 
   return (
-    <div className="space-y-4 [&_.qr-shaded-region]:border-dashed [&_.qr-shaded-region]:border-[#eab308]">
+    <div className="space-y-4">
       <QrScanner
         onScan={handleScan}
         onClose={handleClose}

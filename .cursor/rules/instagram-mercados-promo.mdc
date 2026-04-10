@@ -1,0 +1,23 @@
+---
+description: Promoções de mercados só no Instagram (feed e stories), descoberta em SP, Pomar da Vila e similares — o que o sistema faz e o que não faz.
+alwaysApply: false
+---
+
+# Instagram — mercados em SP e mapa de preços
+
+Quando o usuário pedir para o **robô** “ver Instagram”, **stories**, **mercado ou mercadinho em São Paulo**, ou citar **Pomar da Vila / Morato** como exemplo de oferta que não entrou no app:
+
+1. **Fonte da verdade:** `docs/INSTAGRAM-MERCADINHOS-SP.md` — ler antes de propor código de coleta automática (scraping).
+
+2. **Expectativa correta:** O **finmemory-agent** não monitoriza Instagram. **Stories de contas de terceiros** não têm API estável sem parceria com a Meta. Não prometer automação em massa no IG.
+
+3. **O que implementar ou orientar:**  
+   - **Cadastro:** `public.stores` com nome e coordenadas.  
+   - **Entrada por imagem:** `POST /api/promotions/extract-flyer-vision` com **`imageBase64`** (captura de post ou story), identificador `supermercado`, `geocodeQuery` ou `lat`/`lng`, `flyerKey`; cabeçalho `X-Cron-Secret` se estiver configurado.  
+   - **Grandes redes com site:** orientar para `docs/CHECKLIST-PROMOCOES-POR-REDE.md` e `npm run promo:*`, não para o Instagram.
+
+4. **Parceria:** Se pedirem “pegar tudo sozinho”, explicar que o caminho viável é **conta comercial (Business) autorizada** ou **fonte estável** (site, encarte, planilha).
+
+5. **Conta Instagram do próprio utilizador ligada ao app:** Abordagem válida e mais segura (OAuth, token no servidor); **não** prometer que a API da Meta reproduz a **barra de pesquisa** do app para vasculhar SP. Bot de **DM** = mensagens **para** a página deles; é diferente de ler feed de terceiros. Ver secção 5 em `docs/INSTAGRAM-MERCADINHOS-SP.md`.
+
+6. **Seguir mercados + feed humano:** O utilizador **vê** o feed na app IG; o servidor **não** lê esse feed sozinho. Fluxo documentado: secção “Fluxo acordado” em `docs/INSTAGRAM-MERCADINHOS-SP.md` + modelo `docs/instagram-curadoria-mercados-sp.example.json` (lista `@`, slug, `geocode_query` da bio, captura → `extract-flyer-vision`).

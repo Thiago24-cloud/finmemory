@@ -77,6 +77,7 @@ Ver objeto `SCRAPERS` em `finmemory-agent/agent.js` (inclui `dia`, `atacadao`, `
 
 - **Não** substituem site como fonte principal: usar posts só para descobrir **URL do encarte** ou campanha no **site oficial**, e importar dali.
 - Se no futuro houver parceria ou API oficial da rede, documentar aqui e fixar um único job por rede.
+- **Feed e stories só no IG (ex.: mercadinhos em SP):** o agente **não** lê stories; fluxo suportado = loja em `stores` + `POST /api/promotions/extract-flyer-vision` com **imagem** (de preferência `imageBase64` a partir de captura de tela). Roteiro: **`docs/INSTAGRAM-MERCADINHOS-SP.md`**.
 
 ### Definição de “pronto” por rede
 

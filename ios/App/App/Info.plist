@@ -49,5 +49,13 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>O FinMemory usa a câmera para ler o código de barras do produto no corredor.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O FinMemory compara a sua posição com pontos do mapa de preços para mostrar um aviso local quando estiver dentro do raio que você configurou (300–500 m) de uma loja que, segundo os dados do mapa, tem produto com nome semelhante a um item pendente da sua lista de compras. Não vendemos a sua localização.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Para enviar esse aviso com a app em segundo plano ou fechada, o FinMemory precisa de acesso contínuo à localização. O uso é só para calcular distância aos pontos do mapa e respeita o raio que você escolheu; os dados não são vendidos a terceiros.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

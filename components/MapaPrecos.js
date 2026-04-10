@@ -11,15 +11,18 @@ export default function MapaPrecos({
   promoOnly = false,
   wazeUi = false,
   headerOffsetPx = 120,
+  /** Quando o mapa vai até ao topo (padding 0), posição dos painéis / botão GPS — ver pages/mapa.js */
+  overlayTopPx,
 }) {
   return (
-    <div className="fixed inset-0 w-full h-full z-0">
+    <div className="fixed inset-0 z-0 h-full w-full">
       <LeafletMap
         mapThemeId={mapThemeId}
         searchQuery={searchQuery}
         promoOnly={promoOnly}
         wazeUi={wazeUi}
         headerOffsetPx={headerOffsetPx}
+        overlayTopPx={overlayTopPx}
       />
     </div>
   );

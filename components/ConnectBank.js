@@ -14,6 +14,7 @@ export default function ConnectBank({ onSuccess, onError }) {
   const [widgetSandbox, setWidgetSandbox] = useState({
     connectorId: null,
     restrictConnector: false,
+    includeSandbox: false,
   });
   const [loading, setLoading] = useState(false);
 
@@ -32,13 +33,20 @@ export default function ConnectBank({ onSuccess, onError }) {
         throw new Error('Resposta sem accessToken');
       }
       setConnectToken(data.accessToken);
+      /**
+       * Modo só Pluggy Bank vem do servidor (PLUGGY_WIDGET_SANDBOX_CONNECTOR_ONLY === 'true').
+       * Não usar process.env.PLUGGY_* aqui: no browser o Next só expõe NEXT_PUBLIC_*.
+       * restrictConnector + connectorIds + includeSandbox alinham com o modo sandbox da Pluggy.
+       */
+      const sandboxConnectorOnly = Boolean(data.useSandboxConnectorOnly);
       const rawId = data.sandboxConnectorId;
       const n =
         typeof rawId === 'number' ? rawId : typeof rawId === 'string' ? Number(rawId) : NaN;
       const connectorId = Number.isFinite(n) && n > 0 ? n : null;
       setWidgetSandbox({
         connectorId,
-        restrictConnector: Boolean(data.useSandboxConnectorOnly && connectorId),
+        restrictConnector: Boolean(sandboxConnectorOnly && connectorId),
+        includeSandbox: sandboxConnectorOnly,
       });
     } catch (e) {
       onError?.(e instanceof Error ? e : new Error(String(e)));
@@ -53,7 +61,7 @@ export default function ConnectBank({ onSuccess, onError }) {
       if (!itemId) {
         onError?.(new Error('Item sem id na resposta do Pluggy'));
         setConnectToken(null);
-        setWidgetSandbox({ connectorId: null, restrictConnector: false });
+        setWidgetSandbox({ connectorId: null, restrictConnector: false, includeSandbox: false });
         return;
       }
       try {
@@ -67,12 +75,26 @@ export default function ConnectBank({ onSuccess, onError }) {
         if (!res.ok) {
           throw new Error(data.error || `Erro ao guardar conexão (${res.status})`);
         }
+        try {
+          const syncRes = await fetch('/api/pluggy/sync-transactions', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId }),
+          });
+          const syncJson = await syncRes.json().catch(() => ({}));
+          if (!syncRes.ok) {
+            console.warn('[ConnectBank] Sincronização Pluggy:', syncJson?.error || syncRes.status);
+          }
+        } catch (syncErr) {
+          console.warn('[ConnectBank] Sincronização Pluggy:', syncErr);
+        }
         onSuccess?.(itemId);
       } catch (e) {
         onError?.(e instanceof Error ? e : new Error(String(e)));
       } finally {
         setConnectToken(null);
-        setWidgetSandbox({ connectorId: null, restrictConnector: false });
+        setWidgetSandbox({ connectorId: null, restrictConnector: false, includeSandbox: false });
       }
     },
     [onSuccess, onError]
@@ -83,14 +105,14 @@ export default function ConnectBank({ onSuccess, onError }) {
       const msg = pluggyError?.message || 'Erro no Pluggy Connect';
       onError?.(new Error(msg));
       setConnectToken(null);
-      setWidgetSandbox({ connectorId: null, restrictConnector: false });
+      setWidgetSandbox({ connectorId: null, restrictConnector: false, includeSandbox: false });
     },
     [onError]
   );
 
   const handleClose = useCallback(() => {
     setConnectToken(null);
-    setWidgetSandbox({ connectorId: null, restrictConnector: false });
+    setWidgetSandbox({ connectorId: null, restrictConnector: false, includeSandbox: false });
   }, []);
 
   return (
@@ -107,7 +129,7 @@ export default function ConnectBank({ onSuccess, onError }) {
       {connectToken ? (
         <PluggyConnect
           connectToken={connectToken}
-          includeSandbox
+          includeSandbox={widgetSandbox.includeSandbox}
           connectorIds={
             widgetSandbox.restrictConnector && widgetSandbox.connectorId != null
               ? [widgetSandbox.connectorId]

@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       } else {
         const { data: created, error: insErr } = await supabase
           .from('products')
-          .insert({ gtin, name })
+          .insert({ gtin, name, source: 'user' })
           .select('id')
           .single();
         if (insErr) {

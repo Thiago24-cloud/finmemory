@@ -180,7 +180,7 @@ export default function ScanProductPage() {
                 }}
               />
               <div className="pt-2 border-t border-[#eee]">
-                <p className="text-xs font-semibold text-[#374151] m-0 mb-2">Câmera falhou? Digite o código</p>
+                <p className="text-xs font-semibold text-[#374151] m-0 mb-2">Digitar código (EAN / UPC)</p>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -246,6 +246,9 @@ export default function ScanProductPage() {
                         </h2>
                         {off?.brands && (
                           <p className="text-sm text-[#666] mt-1 m-0">{off.brands}</p>
+                        )}
+                        {off?.source === 'cosmos' && (
+                          <p className="text-xs text-[#9ca3af] mt-1.5 m-0">Fonte: Cosmos Bluesoft</p>
                         )}
                         {!off?.name && (
                           <p className="text-sm text-[#666] mt-2 m-0">

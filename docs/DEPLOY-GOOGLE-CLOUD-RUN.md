@@ -79,21 +79,22 @@ npm run deploy:cloud-run
 
 ```bash
 COMMIT_SHA=$(git rev-parse HEAD)   # no PowerShell: git rev-parse HEAD
+# Incluir _NEXT_PUBLIC_SUPABASE_URL e _NEXT_PUBLIC_SUPABASE_ANON_KEY (mesmos valores do .env local).
 gcloud builds submit \
   --config=cloudbuild.yaml \
-  --substitutions=_COMMIT_SHA=$COMMIT_SHA,_MAPBOX_ACCESS_TOKEN="pk.eyJ..."
+  --substitutions=_COMMIT_SHA=$COMMIT_SHA,_NEXT_PUBLIC_SUPABASE_URL="https://SEU.supabase.co",_NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ...",_MAPBOX_ACCESS_TOKEN="pk.eyJ..."
 ```
 
 No **PowerShell** puro:
 
 ```powershell
 $sha = git rev-parse HEAD
-gcloud builds submit --config=cloudbuild.yaml --substitutions="_COMMIT_SHA=$sha,_MAPBOX_ACCESS_TOKEN=pk.eyJ..."
+gcloud builds submit --config=cloudbuild.yaml --substitutions="_COMMIT_SHA=$sha,_NEXT_PUBLIC_SUPABASE_URL=https://SEU.supabase.co,_NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...,_MAPBOX_ACCESS_TOKEN=pk.eyJ..."
 ```
 
 O `cloudbuild.yaml`:
 
-1. Faz `docker build` com `--build-arg NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`.
+1. Faz `docker build` com `--build-arg` para `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (valores via substituições; o `Dockerfile` não embute chaves).
 2. Dá push em `gcr.io/$PROJECT_ID/finmemory:$_COMMIT_SHA` e `:latest`.
 3. Executa `gcloud run deploy finmemory` com a imagem versionada.
 

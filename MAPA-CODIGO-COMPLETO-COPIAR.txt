@@ -1,0 +1,3804 @@
+
+========== pages\mapa.js ==========
+
+import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import Head from 'next/head';
+import Link from 'next/link';
+import { BottomNav } from '../components/BottomNav';
+import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import Image from 'next/image';
+import { Search, PlusCircle, Menu, ListChecks } from 'lucide-react';
+import { authOptions } from './api/auth/[...nextauth]';
+import { canAccess } from '../lib/access-server';
+import { MAP_THEMES, MAP_THEME_STORAGE_KEY } from '../lib/colors';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
+
+const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
+
+/** Altura reservada no mapa (padding-top) — cabeçalho em duas linhas estilo Maps. */
+const MAP_HEADER_OFFSET_LOGGED_PX = 120;
+const MAP_HEADER_OFFSET_GUEST_PX = 56;
+
+export async function getServerSideProps(ctx) {
+  try {
+    const session = await getServerSession(ctx.req, ctx.res, authOptions);
+    if (!session?.user?.email) {
+      return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };
+    }
+    const allowed = await canAccess(session.user.email);
+    if (!allowed) {
+      return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    return { props: {} };
+  } catch (err) {
+    console.error('[mapa getServerSideProps]', err);
+    return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };
+  }
+}
+
+export default function MapaPage() {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const [showSharedBanner, setShowSharedBanner] = useState(false);
+  const [showMenuSheet, setShowMenuSheet] = useState(false);
+  const [mapThemeId, setMapThemeId] = useState('verde');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [promoOnly, setPromoOnly] = useState(true);
+  const searchInputRef = useRef(null);
+
+  const wazeUi = router.isReady && router.query.waze === '1';
+  const headerOffsetPx = session ? MAP_HEADER_OFFSET_LOGGED_PX : MAP_HEADER_OFFSET_GUEST_PX;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem(MAP_THEME_STORAGE_KEY);
+      if (saved === 'claro') {
+        setMapThemeId('padrao');
+        window.localStorage.setItem(MAP_THEME_STORAGE_KEY, 'padrao');
+        return;
+      }
+      if (saved && MAP_THEMES.some((t) => t.id === saved)) setMapThemeId(saved);
+    }
+  }, []);
+
+  const wazeThemeAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!router.isReady || router.query.waze !== '1' || wazeThemeAppliedRef.current) return;
+    wazeThemeAppliedRef.current = true;
+    setMapThemeId('waze');
+  }, [router.isReady, router.query.waze]);
+
+  useEffect(() => {
+    if (router.query.shared === '1') {
+      setShowSharedBanner(true);
+      const t = setTimeout(() => setShowSharedBanner(false), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [router.query.shared]);
+
+  const handleSelectMapTheme = (id) => {
+    setMapThemeId(id);
+    if (typeof window !== 'undefined') window.localStorage.setItem(MAP_THEME_STORAGE_KEY, id);
+    setShowMenuSheet(false);
+  };
+
+  const pillBase =
+    'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors border whitespace-nowrap';
+  const pillInactive = wazeUi
+    ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#c5c5c5] hover:bg-[#252a38]'
+    : 'border-gray-200/90 bg-white text-gray-700 hover:bg-gray-50 shadow-sm';
+  const pillActive = wazeUi
+    ? 'border-[#2ecc71] bg-[#1e2a22] text-[#2ecc71]'
+    : 'border-[#2ECC49] bg-[#E8F5E9] text-[#1B5E20]';
+
+  return (
+    <>
+      <Head>
+        <title>FinMemory – Onde está mais barato? | App de compras e análise de custos</title>
+      </Head>
+      <div className="fixed inset-0 w-full h-full bg-[#e8e4de]">
+        <div className="absolute inset-0 w-full h-full">
+          <MapaPrecos
+            mapThemeId={mapThemeId}
+            searchQuery={debouncedSearch}
+            promoOnly={promoOnly}
+            wazeUi={wazeUi}
+            headerOffsetPx={headerOffsetPx}
+          />
+        </div>
+
+        {showSharedBanner && (
+          <div
+            className="absolute left-4 right-4 z-30 bg-[#2ECC49] text-white px-4 py-2.5 rounded-xl text-center text-sm font-medium shadow-lg"
+            style={{ top: headerOffsetPx + 8 }}
+          >
+            Preço compartilhado! Ele já aparece no mapa.
+          </div>
+        )}
+
+        {session ? (
+          <header
+            className={`absolute top-0 left-0 right-0 z-20 flex flex-col border-b shadow-sm ${
+              wazeUi
+                ? 'border-[#1e2130] bg-[#13161f]/95 backdrop-blur-md'
+                : 'border-gray-200/80 bg-white/95 backdrop-blur-md'
+            }`}
+          >
+            <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 sm:px-4">
+              <button
+                type="button"
+                onClick={() => setShowMenuSheet(true)}
+                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  wazeUi ? 'hover:bg-[#1e2130] text-[#e5e5e5]' : 'hover:bg-gray-100 text-gray-800'
+                }`}
+                aria-label="Menu do planejador de compras"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <div
+                className={`min-w-0 flex-1 flex items-center rounded-full pl-3 pr-3 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.08)] border ${
+                  wazeUi
+                    ? 'bg-[#1e2130] border-[#2a2d3a] focus-within:ring-2 focus-within:ring-[#2ecc71]/40'
+                    : 'bg-white border-gray-200/90 focus-within:ring-2 focus-within:ring-[#2ECC49]/35'
+                }`}
+              >
+                <Search className={`h-4 w-4 shrink-0 mr-2 ${wazeUi ? 'text-[#888]' : 'text-gray-400'}`} />
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  enterKeyHint="search"
+                  placeholder="Região (ex.: Grajaú) ou produto (ex.: arroz)…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`flex-1 min-w-0 bg-transparent border-0 focus:outline-none text-sm ${
+                    wazeUi ? 'text-[#f0f0f0] placeholder-[#666]' : 'text-gray-900 placeholder-gray-500'
+                  }`}
+                  aria-label="Buscar por região ou produto no mapa"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-3 pb-2.5 pt-0.5 sm:px-4">
+              {wazeUi && (
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#2ecc71] pr-1">
+                  Waze dos preços
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setPromoOnly(true)}
+                className={`${pillBase} ${promoOnly ? pillActive : pillInactive}`}
+              >
+                Promoções
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPromoOnly(false);
+                }}
+                className={`${pillBase} ${!promoOnly ? pillActive : pillInactive}`}
+              >
+                Ver tudo
+              </button>
+              {['Arroz', 'Leite', 'Café'].map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(q);
+                    searchInputRef.current?.focus();
+                  }}
+                  className={`${pillBase} ${pillInactive}`}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </header>
+        ) : (
+          <header
+            className={`absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 border-b shadow-sm ${
+              wazeUi
+                ? 'border-[#1e2130] bg-[#13161f]/95 backdrop-blur-md'
+                : 'border-gray-200/80 bg-white/90 backdrop-blur-md'
+            }`}
+          >
+            <Link href="/" className="flex items-center gap-2 shrink-0 no-underline text-[#333]">
+              <Image src="/logo.png" alt="FinMemory" width={36} height={36} className="object-contain rounded-lg" />
+              <span className="font-bold text-lg">FinMemory</span>
+            </Link>
+            <span className="flex-1 text-xs text-gray-500 hidden sm:block">Planejador de compras em tempo real</span>
+            <Link
+              href="/login?callbackUrl=/mapa"
+              className="min-h-[40px] py-2 px-4 rounded-full bg-[#2ECC49] text-white font-semibold text-sm hover:bg-[#22a83a] transition-colors no-underline"
+            >
+              Entrar
+            </Link>
+            <Link
+              href="/dashboard"
+              className="min-h-[40px] py-2 px-3 rounded-full border border-gray-300 bg-white/80 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
+            >
+              Gastos
+            </Link>
+          </header>
+        )}
+
+        <Sheet open={showMenuSheet} onOpenChange={setShowMenuSheet}>
+          <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
+            <SheetHeader className="mb-4">
+              <SheetTitle className="text-xl font-bold text-center text-gray-900">FinMemory no mapa</SheetTitle>
+              <p className="text-sm text-gray-600 text-center">
+                Compras e preços em tempo real — atalhos e aparência do mapa.
+              </p>
+            </SheetHeader>
+            <div className="flex flex-col gap-2 mb-6">
+              <Link
+                href="/dashboard"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-100 no-underline"
+              >
+                <ListChecks className="h-5 w-5 text-[#2ECC49]" />
+                Gastos e análise
+              </Link>
+              <Link
+                href="/share-price"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm font-semibold text-emerald-900 hover:bg-emerald-100/80 no-underline"
+              >
+                <PlusCircle className="h-5 w-5 text-emerald-600" />
+                Compartilhar preço
+              </Link>
+              <Link
+                href="/shopping-list"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 no-underline"
+              >
+                Lista de compras (mapa + anotações)
+              </Link>
+              <Link
+                href="/listas"
+                onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 no-underline"
+              >
+                Histórico de listas do mapa
+              </Link>
+            </div>
+            <p className="text-sm font-semibold text-gray-800 mb-3">Tema do mapa</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {MAP_THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => handleSelectMapTheme(theme.id)}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-left ${
+                    mapThemeId === theme.id
+                      ? 'border-[#2ECC49] bg-[#E8F5E9] text-gray-900 ring-2 ring-[#2ECC49]/30'
+                      : 'border-gray-200 bg-white hover:border-[#2ECC49]/50 hover:bg-[#f0fdf4]'
+                  }`}
+                >
+                  <div className="w-full h-14 rounded-xl shadow-inner" style={{ backgroundColor: theme.preview }} />
+                  <span className="font-semibold text-sm text-gray-900">{theme.name}</span>
+                </button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <BottomNav />
+      </div>
+    </>
+  );
+}
+
+========== components\MapaPrecos.js ==========
+
+'use client';
+
+import dynamic from 'next/dynamic';
+import 'leaflet/dist/leaflet.css';
+
+const LeafletMap = dynamic(() => import('./MapaPrecosLeaflet'), { ssr: false });
+
+export default function MapaPrecos({
+  mapThemeId = 'padrao',
+  searchQuery = '',
+  promoOnly = false,
+  wazeUi = false,
+  headerOffsetPx = 120,
+}) {
+  return (
+    <div className="fixed inset-0 w-full h-full z-0">
+      <LeafletMap
+        mapThemeId={mapThemeId}
+        searchQuery={searchQuery}
+        promoOnly={promoOnly}
+        wazeUi={wazeUi}
+        headerOffsetPx={headerOffsetPx}
+      />
+    </div>
+  );
+}
+
+========== components\MapaPrecosLeaflet.js ==========
+
+'use client';
+
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { promoShelfLabel, stripFanoutProductSuffix } from '../lib/mapOfferDisplay';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useSession } from 'next-auth/react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { ShoppingCart, Loader2, Check, X } from 'lucide-react';
+import { getMapThemeById, getCategoryColor, getStorePinMainColor } from '../lib/colors';
+import { SAO_PAULO_STATE_CENTER, SAO_PAULO_STATE_ZOOM } from '../lib/saoPauloStateMap';
+import { getSupabase } from '../lib/supabase';
+
+/** Vista inicial: Estado de São Paulo (zoom out); o utilizador aproxima para bairro/cidade. */
+const DEFAULT_MAP_CENTER = Object.freeze([...SAO_PAULO_STATE_CENTER]);
+const DEFAULT_MAP_ZOOM = SAO_PAULO_STATE_ZOOM;
+
+/** Com zoom baixo, esconder nomes ao lado dos pins (menos poluição, como no Google Maps). Busca ativa mostra nomes. */
+const MAP_LABEL_MIN_ZOOM = 15;
+
+function useMapZoom() {
+  const map = useMap();
+  const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
+  useEffect(() => {
+    if (!map) return undefined;
+    const update = () => setZoom(map.getZoom());
+    update();
+    map.on('zoomend', update);
+    map.on('zoom', update);
+    return () => {
+      map.off('zoomend', update);
+      map.off('zoom', update);
+    };
+  }, [map]);
+  return zoom;
+}
+
+/** Uma única chamada a useMap — para componentes que precisam do mapa e do zoom. */
+function useMapAndZoom() {
+  const map = useMap();
+  const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
+  useEffect(() => {
+    if (!map) return undefined;
+    const update = () => setZoom(map.getZoom());
+    update();
+    map.on('zoomend', update);
+    map.on('zoom', update);
+    return () => {
+      map.off('zoomend', update);
+      map.off('zoom', update);
+    };
+  }, [map]);
+  return { map, zoom };
+}
+
+const DEFAULT_ICON = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+/** Pin de preço no mapa. Vários itens no mesmo lugar → bolha maior com o total (ex.: 29), para não “sumir” atrás do pin da loja. */
+function createCategoryIcon(hexColor, bundleCount = 1) {
+  const n = Math.max(1, Number(bundleCount) || 1);
+  const isBundle = n > 1;
+  const size = isBundle ? 42 : 32;
+  const half = size / 2;
+  const label = isBundle
+    ? `<span style="font-size:14px;font-weight:800;color:#fff;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);">${n}</span>`
+    : '';
+  return L.divIcon({
+    className: 'custom-pin custom-pin-price',
+    html: `<div style="background:${hexColor};width:${size}px;height:${size}px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;">${label}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half]
+  });
+}
+
+/** Mapeia tipo da loja (API) para categoria do formulário de partilha */
+function storeTypeToCategory(type) {
+  if (!type) return 'Supermercado';
+  const t = String(type).toLowerCase();
+  if (t === 'pharmacy') return 'Farmácia';
+  if (t === 'bakery') return 'Padaria';
+  return 'Supermercado';
+}
+
+/** Texto ao lado do pin (estilo Google Maps): curto para não poluir. */
+function truncateMapLabel(text, max = 36) {
+  const s = String(text || '').trim();
+  if (!s) return '';
+  if (s.length <= max) return s;
+  return `${s.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/** Rótulo permanente para grupo de preços no mesmo local */
+function priceGroupMapLabel(group) {
+  const first = group.points[0];
+  const name = String(group.nome || first?.nome || '').trim();
+  const n = group.points.length;
+  if (!name) {
+    if (n > 1) return `${n} itens`;
+    return truncateMapLabel(first?.produto || 'Preço', 36);
+  }
+  if (n > 1) return `${truncateMapLabel(name, 30)} · ${n} itens`;
+  return truncateMapLabel(name, 36);
+}
+
+/** Rótulo para exibição no mapa (estabelecimentos do banco) */
+function storeTypeLabel(type) {
+  if (!type) return 'Comércio';
+  const t = String(type).toLowerCase();
+  if (t === 'supermarket') return 'Supermercado';
+  if (t === 'pharmacy') return 'Farmácia';
+  if (t === 'bakery') return 'Padaria';
+  if (t === 'restaurant') return 'Restaurante';
+  return 'Comércio';
+}
+
+/** Glifo em traço (dentro do círculo branco) — estilo aplicativo de mapas. */
+function storePinGlyphPaths(type) {
+  const t = String(type || '').toLowerCase();
+  if (t === 'supermarket') {
+    return '<path d="M-4.5 -1.5h9l-.9 6.2h-7.2l-1-6.2zm1.8 0v-1.8a2.2 2.2 0 114.4 0v1.8"/>';
+  }
+  if (t === 'pharmacy') {
+    return '<path d="M0 -4v8M-4 0h8"/>';
+  }
+  if (t === 'bakery') {
+    return '<path d="M-5.5 2.5a5.5 3.2 0 0111 0"/><path d="M-6 3h12"/>';
+  }
+  if (t === 'restaurant') {
+    return '<path d="M-5.5 -4.5v11M-6.5 -4.5v2.2M-4.5 -4.5v2.2M5 -4.5l1.6 11"/>';
+  }
+  return '<path d="M-6.5 -1l6.5-3.2 6.5 3.2v8.5h-13z"/><path d="M-3.5 4.5h7"/>';
+}
+
+/**
+ * Pin de loja: gota + lente branca + ícone em traço; oferta = ponto âmbar (cor do tipo mantida).
+ */
+function createStoreIcon(type, temOfertaHoje = false, storeKey = '') {
+  const pinColor = getStorePinMainColor(type, storeKey);
+  const glyph = storePinGlyphPaths(type);
+  const promo = temOfertaHoje
+    ? '<circle cx="23.5" cy="4" r="3" fill="#FBBF24" stroke="#fff" stroke-width="1.15"/>'
+    : '';
+  const html = `<div class="finmemory-store-pin-wrap" style="line-height:0;">
+<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<path fill="${pinColor}" stroke="rgba(255,255,255,0.88)" stroke-width="1"
+  style="filter:drop-shadow(0 1.5px 2.5px rgba(0,0,0,.2))"
+  d="M14 1.2C6.9 1.2 1 7.1 1 14.1c0 7.4 10.8 18.6 13 20.9 2.2-2.3 13-13.5 13-20.9C27 7.1 21.1 1.2 14 1.2z"/>
+<circle cx="14" cy="12.2" r="5.35" fill="#fff"/>
+<g transform="translate(14 12.2)" fill="none" stroke="${pinColor}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
+${glyph}
+</g>
+${promo}
+</svg></div>`;
+  return L.divIcon({
+    className: 'custom-pin finmemory-store-pin',
+    html,
+    iconSize: [28, 36],
+    iconAnchor: [14, 34],
+    popupAnchor: [0, -30]
+  });
+}
+
+/**
+ * Carrega estabelecimentos do banco (stores) na área visível do mapa e exibe com ícone por tipo.
+ * Não altera os pins de preços compartilhados (price_points).
+ */
+function StoreMarkers({ storeFilterName = '', searchQuery = '', onRequestStoreShop }) {
+  const { map, zoom } = useMapAndZoom();
+  const searchActive = searchQuery.trim().length >= 2;
+  const showPinLabels = zoom >= MAP_LABEL_MIN_ZOOM || searchActive;
+  const [stores, setStores] = useState([]);
+  const lastFittedSearchRef = useRef('');
+  const storeFetchDebounceRef = useRef(null);
+
+  const fetchStoresInBounds = useCallback(() => {
+    const bounds = map.getBounds();
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const params = new URLSearchParams({
+      sw_lat: sw.lat.toFixed(5),
+      sw_lng: sw.lng.toFixed(5),
+      ne_lat: ne.lat.toFixed(5),
+      ne_lng: ne.lng.toFixed(5)
+    });
+    fetch(`/api/map/stores?${params}`)
+      .then((res) => (res.ok ? res.json() : { stores: [] }))
+      .then((data) => {
+        if (Array.isArray(data.stores)) setStores(data.stores);
+      })
+      .catch(() => setStores([]));
+  }, [map]);
+
+  useEffect(() => {
+    if (!map) return undefined;
+    const run = () => {
+      clearTimeout(storeFetchDebounceRef.current);
+      storeFetchDebounceRef.current = setTimeout(() => fetchStoresInBounds(), 400);
+    };
+    fetchStoresInBounds();
+    map.on('moveend', run);
+    return () => {
+      map.off('moveend', run);
+      clearTimeout(storeFetchDebounceRef.current);
+    };
+  }, [map, fetchStoresInBounds]);
+
+  /** Pesquisa aplica-se ao nome da loja (ex.: "Dia"); se nenhuma loja bater, mostra todas (ex.: "arroz" é produto). */
+  const effectiveQuery = String(storeFilterName || searchQuery || '')
+    .trim()
+    .toLowerCase();
+
+  const visibleStores = useMemo(() => {
+    if (effectiveQuery.length < 2) return stores;
+    const matched = stores.filter((s) => String(s.name || '').toLowerCase().includes(effectiveQuery));
+    return matched.length > 0 ? matched : stores;
+  }, [stores, effectiveQuery]);
+
+  /** Centrar no(s) pin(s) quando a busca coincide com nome de loja (estilo “encontrar no mapa”). */
+  useEffect(() => {
+    if (!map || effectiveQuery.length < 2) {
+      if (effectiveQuery.length < 2) lastFittedSearchRef.current = '';
+      return;
+    }
+    const matched = stores.filter((s) => String(s.name || '').toLowerCase().includes(effectiveQuery));
+    if (matched.length === 0) return;
+    if (lastFittedSearchRef.current === effectiveQuery) return;
+    lastFittedSearchRef.current = effectiveQuery;
+    try {
+      if (matched.length === 1) {
+        const s = matched[0];
+        map.flyTo([Number(s.lat), Number(s.lng)], Math.max(map.getZoom(), 15), { duration: 0.45 });
+        return;
+      }
+      const bounds = L.latLngBounds(matched.map((s) => [Number(s.lat), Number(s.lng)]));
+      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 17, animate: true, duration: 0.45 });
+    } catch (e) {
+      console.warn('fitBounds lojas (busca):', e);
+    }
+  }, [map, stores, effectiveQuery]);
+
+  return (
+    <>
+      {visibleStores.map((store) => (
+        <StoreMarkerItem key={store.id} store={store} showPinLabels={showPinLabels} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * Ícone Leaflet estável: recriar divIcon a cada render faz setIcon() e o popup fecha sozinho.
+ */
+function StoreMarkerItem({ store, showPinLabels, onRequestStoreShop }) {
+  const icon = useMemo(
+    () => createStoreIcon(store.type, !!store.tem_oferta_hoje, store.id),
+    [store.type, store.tem_oferta_hoje, store.id]
+  );
+
+  return (
+    /** Acima dos círculos de preço/promo (2500); senão milhares de ofertas DIA tapam os pins de loja. */
+    <Marker position={[Number(store.lat), Number(store.lng)]} icon={icon} zIndexOffset={3500}>
+      {showPinLabels && (
+        <Tooltip
+          permanent
+          direction="right"
+          offset={[12, 0]}
+          opacity={1}
+          interactive={false}
+          className="finmemory-map-label finmemory-map-label--store"
+        >
+          {truncateMapLabel(store.name, 40)}
+        </Tooltip>
+      )}
+      <Popup>
+        <div
+          className="p-2 min-w-[180px]"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <span
+            className="inline-block px-2 py-0.5 rounded text-xs font-semibold text-white mb-1"
+            style={{
+              backgroundColor: getStorePinMainColor(store.type, store.id),
+              boxShadow: store.tem_oferta_hoje ? 'inset 0 0 0 2px #FBBF24' : undefined
+            }}
+          >
+            {storeTypeLabel(store.type)}
+          </span>
+          <h3 className="font-bold text-gray-900 text-sm mt-1">{store.name}</h3>
+          {store.address && <p className="text-xs text-gray-600 mt-0.5">{store.address}</p>}
+          {store.neighborhood && <p className="text-xs text-gray-500">{store.neighborhood}</p>}
+          {store.tem_oferta_hoje && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-amber-700">
+                Ofertas ativas: {store.offer_count || 0}
+              </p>
+              {Array.isArray(store.offer_products) && store.offer_products.length > 0 && (
+                <ul
+                  className="mt-1 max-h-[220px] overflow-y-auto space-y-1 text-xs text-gray-700 pl-4 list-disc pr-1"
+                  style={{ touchAction: 'pan-y', scrollbarGutter: 'stable' }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                >
+                  {store.offer_products.map((prod, i) => (
+                    <li key={`${store.id}-offer-${i}`}>{prod}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          {typeof onRequestStoreShop === 'function' && (
+            <button
+              type="button"
+              className="mt-3 w-full py-2 px-3 rounded-lg bg-[#2ECC49] text-white text-xs font-semibold hover:bg-[#22a83a] shadow-sm"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRequestStoreShop(store);
+              }}
+            >
+              Ver promoções / Montar cesta
+            </button>
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
+/**
+ * Localização no mapa: só pede ao utilizador depois de um toque no botão.
+ * Em muitos telemóveis o browser bloqueia GPS se for pedido ao abrir a página.
+ * onLocationFound(lat, lng) é chamado quando a localização é obtida (para geo-fencing).
+ */
+function LocationMarker({ onLocationFound, headerOffsetPx = 56 }) {
+  const [position, setPosition] = useState(null);
+  const [error, setError] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const { map, zoom } = useMapAndZoom();
+  const showYouLabel = zoom >= MAP_LABEL_MIN_ZOOM;
+  const onLocationFoundRef = useRef(onLocationFound);
+  onLocationFoundRef.current = onLocationFound;
+
+  const requestLocation = useCallback(() => {
+    if (!map) return;
+    setError(null);
+    setLocating(true);
+    // setView: false — um único flyTo no handler evita animação dupla e “pulos” do mapa
+    map.locate({ setView: false, watch: false, maxZoom: 16, timeout: 15000, enableHighAccuracy: true });
+  }, [map]);
+
+  useEffect(() => {
+    if (!map) return;
+    const onFound = (e) => {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      setPosition([lat, lng]);
+      setError(null);
+      setLocating(false);
+      map.flyTo(e.latlng, Math.max(map.getZoom(), 15));
+      onLocationFoundRef.current?.(lat, lng);
+    };
+    const onError = (e) => {
+      setLocating(false);
+      const msg = e?.message || '';
+      if (msg.includes('Permission denied') || msg.includes('denied')) {
+        setError('Permissão negada. Ative a localização nas definições do navegador/site.');
+      } else if (msg.includes('timeout') || msg.includes('unavailable')) {
+        setError('Tempo esgotado. Verifique se o GPS está ligado e tente de novo.');
+      } else {
+        setError('Não foi possível obter a localização. Ative o GPS e tente tocar em "Minha localização".');
+      }
+    };
+    map.on('locationfound', onFound);
+    map.on('locationerror', onError);
+    return () => {
+      map.off('locationfound', onFound);
+      map.off('locationerror', onError);
+    };
+  }, [map]);
+
+  return (
+    <>
+      {position && (
+        <Marker position={position} icon={DEFAULT_ICON} zIndexOffset={5000}>
+          {showYouLabel && (
+            <Tooltip
+              permanent
+              direction="right"
+              offset={[14, -28]}
+              opacity={1}
+              interactive={false}
+              className="finmemory-map-label finmemory-map-label--you"
+            >
+              Você está aqui
+            </Tooltip>
+          )}
+          <Popup>Você está aqui! 📍</Popup>
+        </Marker>
+      )}
+      <div style={{ position: 'absolute', top: headerOffsetPx + 8, right: 10, zIndex: 1000 }}>
+        <button
+          type="button"
+          onClick={requestLocation}
+          disabled={locating}
+          className="bg-white border border-gray-300 shadow-md rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 flex items-center gap-1.5"
+          title="Centrar mapa na minha localização"
+        >
+          {locating ? <>⏳ A obter...</> : <>📍 Minha localização</>}
+        </button>
+        {error && (
+          <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 shadow max-w-[220px]">
+            {error}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** Busca todos os pontos recentes do mapa (sem ?q). O filtro por busca é feito no cliente — assim as ofertas da loja e os pins não “dessincronizam”. */
+/**
+ * Preço no mapa: encartes Dia não têm preço no JSON do site — nunca mostrar centavo fictício.
+ * Linhas promo-* ou categoria com "promo": tratar ≤ R$ 0,01 como sem valor numérico.
+ */
+function formatPrecoExibicao(preco, categoria, id) {
+  if (preco == null || preco === '') return null;
+  const n = Number(preco);
+  if (!Number.isFinite(n)) return null;
+  const promoLike =
+    String(id || '').startsWith('promo-') ||
+    String(categoria || '').toLowerCase().includes('promo');
+  if (promoLike && n <= 0.01) return null;
+  return `R$ ${n.toFixed(2)}`;
+}
+
+/** Soma no carrinho / orçamento: ignora promo sem preço real. */
+function numericPriceForSum(preco, categoria, id) {
+  if (preco == null || preco === '') return null;
+  const n = Number(preco);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const promoLike =
+    String(id || '').startsWith('promo-') ||
+    String(categoria || '').toLowerCase().includes('promo');
+  if (promoLike && n <= 0.01) return null;
+  return n;
+}
+
+/**
+ * Busca pontos: modo produto (q) = global; modo mapa = bbox da área visível.
+ * @param {{ type: 'none' | 'product' | 'region', q?: string }} searchIntent
+ */
+async function fetchMapPoints(map, searchIntent) {
+  try {
+    const params = new URLSearchParams();
+    if (searchIntent.type === 'product' && searchIntent.q) {
+      params.set('q', searchIntent.q);
+    } else if (map) {
+      const b = map.getBounds();
+      const sw = b.getSouthWest();
+      const ne = b.getNorthEast();
+      params.set('sw_lat', sw.lat.toFixed(5));
+      params.set('sw_lng', sw.lng.toFixed(5));
+      params.set('ne_lat', ne.lat.toFixed(5));
+      params.set('ne_lng', ne.lng.toFixed(5));
+    }
+    const qs = params.toString();
+    const res = await fetch(qs ? `/api/map/points?${qs}` : '/api/map/points');
+    if (!res.ok) return [];
+    const json = await res.json();
+    const points = json.points || [];
+    return points.map((p) => ({
+      id: p.id,
+      nome: p.store_name,
+      produto: p.product_name,
+      preco: p.price,
+      precoLabel: formatPrecoExibicao(p.price, p.category, p.id),
+      promo_image_url: p.promo_image_url || null,
+      lat: Number(p.lat),
+      lng: Number(p.lng),
+      categoria: p.category || '',
+      time_ago: p.time_ago,
+      user_label: p.user_label
+    }));
+  } catch (e) {
+    console.warn('Erro ao buscar pontos do mapa:', e);
+    return [];
+  }
+}
+
+/**
+ * Após resolver bairro/cidade (geocode), ajusta o mapa à região; no moveend libera modo “viewport”.
+ */
+function MapRegionFly({ searchQuery, searchIntent, onRegionFitted }) {
+  const map = useMap();
+  const regionKeyRef = useRef('');
+
+  useEffect(() => {
+    regionKeyRef.current = '';
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (searchIntent.type !== 'region') {
+      regionKeyRef.current = '';
+    }
+  }, [searchIntent.type]);
+
+  useEffect(() => {
+    if (!map || searchIntent.type !== 'region' || !searchIntent.bbox) return;
+
+    const b = searchIntent.bbox;
+    const key = `${b.sw_lat},${b.sw_lng},${b.ne_lat},${b.ne_lng}`;
+    if (regionKeyRef.current === key) return;
+    regionKeyRef.current = key;
+
+    const bounds = L.latLngBounds([b.sw_lat, b.sw_lng], [b.ne_lat, b.ne_lng]);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      onRegionFitted();
+    };
+
+    const fallback = setTimeout(finish, 1200);
+    map.once('moveend', () => {
+      clearTimeout(fallback);
+      finish();
+    });
+    map.fitBounds(bounds, { padding: [44, 44], maxZoom: 14, animate: true });
+  }, [map, searchIntent, onRegionFitted]);
+
+  return null;
+}
+
+/** Carrega pontos: busca por produto (global) ou por área visível (região / pan). */
+function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }) {
+  const map = useMap();
+  const debounceRef = useRef(null);
+  const productMode = searchIntent.type === 'product';
+
+  const load = useCallback(async () => {
+    if (!map) return;
+    if (searchIntent.type === 'region') return;
+    setCarregando(true);
+    try {
+      const points = await fetchMapPoints(map, searchIntent);
+      setLocais(points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng)));
+    } catch (error) {
+      console.error('Erro ao buscar locais:', error);
+    }
+    setCarregando(false);
+  }, [map, searchIntent, setLocais, setCarregando]);
+
+  useEffect(() => {
+    reloadRef.current = () => {
+      load();
+    };
+  }, [load, reloadRef]);
+
+  useEffect(() => {
+    if (!map) return undefined;
+    load();
+    return undefined;
+  }, [map, searchIntent, load]);
+
+  useEffect(() => {
+    if (!map || productMode) return undefined;
+    const onMoveEnd = () => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => load(), 400);
+    };
+    map.on('moveend', onMoveEnd);
+    return () => {
+      map.off('moveend', onMoveEnd);
+      clearTimeout(debounceRef.current);
+    };
+  }, [map, productMode, load]);
+
+  return null;
+}
+
+/** Agrupa pontos pelo mesmo local (lat/lng arredondados) para evitar marcadores empilhados. */
+function groupPointsByLocation(points) {
+  const groups = new Map();
+  const round = (n) => Number(n).toFixed(5);
+  points.forEach((p) => {
+    const key = `${round(p.lat)}_${round(p.lng)}`;
+    if (!groups.has(key)) {
+      groups.set(key, { lat: p.lat, lng: p.lng, points: [], nome: p.nome });
+    }
+    groups.get(key).points.push(p);
+  });
+  return Array.from(groups.values());
+}
+
+function isPromoPoint(p) {
+  const c = String(p.categoria || '').toLowerCase();
+  return c.includes('promo') || String(p.id || '').startsWith('promo-');
+}
+
+function categoryFallbackGlyph(category) {
+  const c = String(category || '').toLowerCase();
+  if (c.includes('farm')) return '💊';
+  if (c.includes('padar')) return '🥖';
+  if (c.includes('restaur')) return '🍽️';
+  if (c.includes('açougue') || c.includes('acougue')) return '🥩';
+  if (c.includes('bebida')) return '🥤';
+  if (c.includes('higiene') || c.includes('beleza')) return '🧴';
+  return '🛒';
+}
+
+/** URL que não deve ser carregada como <img> (PDF / encarte). Evitar "folder" solto — aparece em paths de CDN e bloqueava fotos. */
+function isEncarteOrNonImageUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const u = url.trim().toLowerCase();
+  if (u.includes('.pdf') || /[?&]format=pdf\b/.test(u)) return true;
+  return /\/encarte\/|encarte\.|tablo[ií]de|folheto|ofertas\/pdf|\/folheto\//i.test(u);
+}
+
+function isDisplayableImageUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  if (isEncarteOrNonImageUrl(url)) return false;
+  const u = url.trim().toLowerCase();
+  if (/\.(webp|jpg|jpeg|png|gif|avif|svg)(\?|#|$|&)/i.test(u)) return true;
+  if (
+    /imgur|cloudinary|imgix|supabase.*\/storage|googleusercontent|twimg|gpa\.digital|paodeacucar|dia\.com\.br|cdn|akamai|cloudfront|openfoodfacts\.org/i.test(
+      u
+    )
+  ) {
+    return true;
+  }
+  return /^https?:\/\//i.test(u) && !/\.(pdf|zip)(\?|$)/i.test(u);
+}
+
+function uniqueDisplayableImageUrls(points) {
+  const seen = new Set();
+  const out = [];
+  for (const p of points) {
+    const u = p.promo_image_url;
+    if (!u || !isDisplayableImageUrl(u)) continue;
+    const key = String(u).trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+/** Categoria “de prateleira” para filtro estilo Waze (último segmento após " - "). */
+function offerShelfCategory(offer) {
+  const c = String(offer.category || '').trim();
+  if (!c) return 'Outros';
+  const parts = c
+    .split(/\s*-\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) return parts[parts.length - 1];
+  return c;
+}
+
+function formatBRLPriceNum(n) {
+  return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function promotionEncarteDiscountPct(original, promo) {
+  const o = Number(original);
+  const p = Number(promo);
+  if (!Number.isFinite(o) || !Number.isFinite(p) || o <= p || o <= 0) return null;
+  return Math.round((1 - p / o) * 100);
+}
+
+/** Linhas de `public.promotions` (store_id + active) no painel ao abrir pin da loja. */
+function PromotionEncarteCard({ row, wazeUi, accentHex, selected, onToggle }) {
+  const glyph = categoryFallbackGlyph(row.category);
+  const pct = promotionEncarteDiscountPct(row.original_price, row.promo_price);
+  const orig = row.original_price != null ? Number(row.original_price) : null;
+  const promo = Number(row.promo_price);
+  const showOrig = Number.isFinite(orig) && orig > promo;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle?.();
+        }
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle?.();
+      }}
+      className={`relative flex cursor-pointer flex-col overflow-hidden rounded-xl border text-left transition-[box-shadow] ${
+        wazeUi ? 'border-[#2a2d3a] bg-[#1a1d27]' : 'border-gray-100 bg-white shadow-sm'
+      } ${
+        selected
+          ? wazeUi
+            ? 'shadow-[0_0_18px_rgba(46,204,113,0.25)] ring-2 ring-[#2ecc71] ring-offset-2 ring-offset-[#13161f]'
+            : 'shadow-md ring-[3px] ring-[#2ECC49] ring-offset-2 ring-offset-white'
+          : ''
+      }`}
+    >
+      {selected ? (
+        <span
+          className={`absolute left-1.5 top-1.5 z-[2] flex h-6 w-6 items-center justify-center rounded-full shadow-md ${
+            wazeUi ? 'bg-[#2ecc71] text-[#0f1117]' : 'bg-[#2ECC49] text-white'
+          }`}
+          aria-hidden
+        >
+          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+        </span>
+      ) : null}
+      {pct != null ? (
+        <span
+          className="absolute right-1.5 top-1.5 z-[1] rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm"
+          style={{ backgroundColor: accentHex }}
+        >
+          −{pct}%
+        </span>
+      ) : null}
+      <div
+        className={`flex aspect-[4/3] min-h-[72px] items-center justify-center text-4xl ${
+          wazeUi ? 'bg-[#161922]' : 'bg-gradient-to-br from-gray-100 to-gray-200'
+        }`}
+      >
+        <span aria-hidden>{glyph}</span>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col p-2">
+        <p
+          className={`min-h-[2.75rem] text-[11px] font-semibold leading-snug line-clamp-3 ${
+            wazeUi ? 'text-[#f0f0f0]' : 'text-gray-900'
+          }`}
+          title={row.product_name}
+        >
+          {row.product_name}
+        </p>
+        {showOrig ? (
+          <p
+            className={`mt-0.5 text-[11px] tabular-nums line-through ${
+              wazeUi ? 'text-[#666]' : 'text-gray-400'
+            }`}
+          >
+            R$ {formatBRLPriceNum(orig)}
+          </p>
+        ) : null}
+        <p className="mt-auto pt-1 text-[13px] font-bold tabular-nums" style={{ color: accentHex }}>
+          R$ {formatBRLPriceNum(promo)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Card de oferta no painel escuro “Waze dos Preços” (dados reais da API). */
+function WazeOfferCard({ offer, selected, onToggle, accentHex }) {
+  const [imgBroken, setImgBroken] = useState(false);
+  const shelf =
+    promoShelfLabel(offer.category) || offerShelfCategory(offer);
+  const glyph = categoryFallbackGlyph(offer.category);
+  const displayName = stripFanoutProductSuffix(offer.product_name);
+  const priceNum = numericPriceForSum(offer.price, offer.category, offer.id);
+  const url = offer.promo_image_url;
+  const showImg = url && isDisplayableImageUrl(url) && !isEncarteOrNonImageUrl(url) && !imgBroken;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={`relative cursor-pointer rounded-xl border border-[#2a2d3a] bg-[#1a1d27] p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+        selected
+          ? 'shadow-[0_0_18px_rgba(46,204,113,0.25)] ring-2 ring-[#2ecc71] ring-offset-2 ring-offset-[#13161f]'
+          : ''
+      }`}
+    >
+      {priceNum != null && priceNum > 0 ? (
+        <div className="absolute right-2 top-2 rounded-full bg-[#2ecc71] px-2 py-0.5 text-[10px] font-bold text-[#0f1117]">
+          PROMO
+        </div>
+      ) : (
+        <div className="absolute right-2 top-2 rounded-full bg-[#2a2d3a] px-2 py-0.5 text-[10px] font-semibold text-[#888]">
+          Oferta
+        </div>
+      )}
+      {selected ? (
+        <div className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#2ecc71] text-[11px] font-bold text-[#0f1117]">
+          ✓
+        </div>
+      ) : null}
+      <div className="mb-1.5 flex min-h-[72px] items-center justify-center overflow-hidden rounded-lg bg-[#161922]">
+        {showImg ? (
+          <img
+            src={url}
+            alt=""
+            className="finmemory-offer-photo max-h-20 w-full object-cover"
+            loading="lazy"
+            onError={() => setImgBroken(true)}
+          />
+        ) : (
+          <span className="text-3xl" aria-hidden>
+            {glyph}
+          </span>
+        )}
+      </div>
+      <p
+        className="mb-1 line-clamp-2 text-left text-xs font-semibold leading-snug text-[#f0f0f0]"
+        title={offer.product_name}
+      >
+        {displayName}
+      </p>
+      <p className="mb-1.5 text-left text-[11px] text-[#888]">{shelf}</p>
+      {priceNum != null && priceNum > 0 ? (
+        <p className="text-base font-bold tabular-nums" style={{ color: accentHex }}>
+          R$ {formatBRLPriceNum(priceNum)}
+        </p>
+      ) : (
+        <p className="text-left text-xs text-[#888]">Preço no encarte / loja</p>
+      )}
+    </div>
+  );
+}
+
+/** Hero com carrossel quando há várias fotos; autoplay leve + pontos e setas. */
+function HeroOfferCarousel({ sources, storeTitle, count }) {
+  const [idx, setIdx] = useState(0);
+  const [brokenByUrl, setBrokenByUrl] = useState(() => ({}));
+
+  const n = sources.length;
+  const safeIdx = n ? idx % n : 0;
+  const currentUrl = n ? sources[safeIdx] : '';
+
+  useEffect(() => {
+    setIdx(0);
+    setBrokenByUrl({});
+  }, [sources]);
+
+  useEffect(() => {
+    if (n <= 1) return undefined;
+    const t = setInterval(() => {
+      setIdx((i) => (i + 1) % n);
+    }, 5200);
+    return () => clearInterval(t);
+  }, [n]);
+
+  const markBroken = (url) => {
+    setBrokenByUrl((prev) => ({ ...prev, [url]: true }));
+    if (n > 1) {
+      setIdx((i) => (i + 1) % n);
+    }
+  };
+
+  const showSlide = currentUrl && !brokenByUrl[currentUrl];
+
+  const go = (delta, e) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    if (n <= 1) return;
+    setIdx((i) => (i + delta + n * 10) % n);
+  };
+
+  return (
+    <div className="relative h-[152px] w-full overflow-hidden bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200">
+      {n === 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-300/90 to-slate-400/80">
+          <span className="text-5xl drop-shadow-sm" aria-hidden>
+            🛒
+          </span>
+        </div>
+      )}
+
+      {n > 0 && showSlide && (
+        <img
+          src={currentUrl}
+          alt=""
+          className="finmemory-offer-photo absolute inset-0 h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => markBroken(currentUrl)}
+        />
+      )}
+
+      {n > 0 && !showSlide && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-300/90 to-slate-400/80">
+          <span className="text-5xl drop-shadow-sm" aria-hidden>
+            🛒
+          </span>
+          <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-white/90">Foto indisponível</span>
+        </div>
+      )}
+
+      {n > 1 && (
+        <>
+          <button
+            type="button"
+            className="absolute left-1.5 top-1/2 z-[2] -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/35 text-lg font-bold text-white shadow-md backdrop-blur-[2px] transition hover:bg-black/50"
+            aria-label="Imagem anterior"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => go(-1, e)}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="absolute right-1.5 top-1/2 z-[2] -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/35 text-lg font-bold text-white shadow-md backdrop-blur-[2px] transition hover:bg-black/50"
+            aria-label="Próxima imagem"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => go(1, e)}
+          >
+            ›
+          </button>
+          <div
+            className="absolute bottom-[52px] left-0 right-0 z-[2] flex justify-center gap-1.5 px-8"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {sources.map((u, i) => (
+              <button
+                key={u}
+                type="button"
+                aria-label={`Ir para imagem ${i + 1}`}
+                aria-current={i === safeIdx ? 'true' : undefined}
+                className={`h-1.5 rounded-full transition-all ${i === safeIdx ? 'w-5 bg-white shadow-sm' : 'w-1.5 bg-white/45 hover:bg-white/70'}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIdx(i);
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-black/70 via-black/30 to-transparent pt-20 pb-3 px-3">
+        <p className="text-[15px] font-bold text-white leading-tight drop-shadow-md line-clamp-2">{storeTitle}</p>
+        <p className="text-[11px] font-medium text-white/90 mt-0.5">
+          {count} {count === 1 ? 'oferta' : 'ofertas'} em destaque
+          {n > 1 ? ` · ${safeIdx + 1}/${n} fotos` : ''}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Miniatura do produto — imagem real ou placeholder (estilo vitrine). */
+function ProductOfferThumb({ point, accentHex, priceSlot, selected, interactive, onActivate }) {
+  const [broken, setBroken] = useState(false);
+  const url = point.promo_image_url;
+  const encarteOnly = url && isEncarteOrNonImageUrl(url);
+  const tryImage = url && isDisplayableImageUrl(url) && !encarteOnly;
+  const fallbackGlyph = categoryFallbackGlyph(point.categoria);
+  const displayName = stripFanoutProductSuffix(point.produto);
+  const shelf = promoShelfLabel(point.categoria);
+
+  const Wrapper = 'div';
+  const wrapProps = interactive
+    ? {
+        role: 'button',
+        tabIndex: 0,
+        onClick: (e) => {
+          e.stopPropagation();
+          onActivate?.();
+        },
+        onKeyDown: (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onActivate?.();
+          }
+        },
+        onMouseDown: (e) => e.stopPropagation(),
+      }
+    : {};
+
+  return (
+    <Wrapper
+      {...wrapProps}
+      className={`rounded-xl border border-gray-100/90 bg-white shadow-sm overflow-hidden flex flex-col text-left w-full relative transition-[box-shadow] ${
+        interactive ? 'cursor-pointer hover:opacity-95' : ''
+      } ${
+        selected
+          ? 'ring-[3px] ring-[#2ECC49] ring-offset-2 ring-offset-white shadow-md'
+          : ''
+      }`}
+    >
+      {selected && (
+        <span
+          className="absolute top-1.5 right-1.5 z-[2] flex h-6 w-6 items-center justify-center rounded-full bg-[#2ECC49] text-white shadow-md"
+          aria-hidden
+        >
+          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+        </span>
+      )}
+      <div
+        className="relative aspect-[4/3] w-full bg-gradient-to-br from-gray-100 to-gray-200"
+        style={{ minHeight: '88px' }}
+      >
+        {encarteOnly && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute inset-0 z-[1] flex flex-col items-center justify-center bg-gradient-to-br from-amber-100/95 to-amber-200/90 p-2 text-center transition hover:from-amber-50 hover:to-amber-100"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="rounded-full bg-amber-500/95 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
+              Encarte
+            </span>
+            <span className="mt-2 text-2xl" aria-hidden>
+              📄
+            </span>
+            <span className="mt-1 text-[9px] font-semibold text-amber-900/90 leading-tight">PDF ou folheto — toque para abrir</span>
+          </a>
+        )}
+        {!encarteOnly && tryImage && !broken && (
+          <img
+            src={url}
+            alt=""
+            className="finmemory-offer-photo absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={() => setBroken(true)}
+          />
+        )}
+        {!encarteOnly && (!tryImage || broken) && (
+          <div
+            className="absolute inset-0 flex items-center justify-center text-lg font-bold text-white"
+            style={{
+              background: `linear-gradient(135deg, ${accentHex}dd 0%, ${accentHex} 100%)`,
+            }}
+            aria-hidden
+          >
+            <span className="text-3xl opacity-95 drop-shadow-sm">{fallbackGlyph}</span>
+          </div>
+        )}
+      </div>
+      <div className="p-2 flex flex-col flex-1 min-h-0">
+        <p className="text-[11px] font-semibold text-gray-900 leading-snug line-clamp-3 min-h-[2.75rem]" title={point.produto}>
+          {displayName}
+        </p>
+        {shelf ? (
+          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 truncate">
+            {shelf}
+          </p>
+        ) : null}
+        <div className="mt-auto pt-1.5 text-[12px] font-bold leading-tight" style={{ color: accentHex }}>
+          {priceSlot}
+        </div>
+        {interactive && onActivate ? (
+          <button
+            type="button"
+            className={`mt-2 w-full rounded-lg py-1.5 text-[11px] font-bold transition-colors ${
+              selected
+                ? 'bg-[#2ECC49] text-white hover:bg-[#22a83a]'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onActivate();
+            }}
+          >
+            {selected ? '✓ Na cesta — toque para remover' : '+ Cesta'}
+          </button>
+        ) : null}
+      </div>
+    </Wrapper>
+  );
+}
+
+/**
+ * Card estilo “detalhe do lugar” do Google Maps: hero com imagem, título, grelha de ofertas com fotos.
+ */
+function MapsStyleOfferPopup({ group, accentHex, cartOfferIdSet, onMapPointCartToggle }) {
+  const first = group.points[0];
+  const count = group.points.length;
+  const storeTitle = String(group.nome || first?.nome || 'Ofertas').trim();
+
+  const heroSources = useMemo(() => uniqueDisplayableImageUrls(group.points), [group.points]);
+
+  const priced = useMemo(
+    () =>
+      group.points.filter((p) => {
+        const n = Number(p.preco);
+        if (String(p.id || '').startsWith('promo-') && (!Number.isFinite(n) || n <= 0.01)) {
+          return false;
+        }
+        return Number.isFinite(n) && n > 0;
+      }),
+    [group.points]
+  );
+  const total = priced.reduce((s, p) => s + Number(p.preco), 0);
+  const showTotal = priced.length > 1;
+
+  const allPromoIds = group.points.every((pt) => String(pt.id || '').startsWith('promo-'));
+
+  return (
+    <div
+      className="finmemory-popup-maps-card text-left select-none"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+    >
+      <HeroOfferCarousel sources={heroSources} storeTitle={storeTitle} count={count} />
+
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center justify-between gap-2 mb-2.5">
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm"
+            style={{ backgroundColor: accentHex }}
+          >
+            {count === 1
+              ? promoShelfLabel(first?.categoria) ||
+                (String(first?.categoria || '').toLowerCase().includes('promo') ? 'Promoção' : '') ||
+                first?.categoria ||
+                'Oferta'
+              : `${count} itens`}
+          </span>
+          {showTotal && (
+            <span className="text-[12px] font-semibold text-gray-600 tabular-nums">Total R$ {total.toFixed(2)}</span>
+          )}
+        </div>
+
+        <div
+          className="grid grid-cols-2 gap-2 max-h-[min(320px,45vh)] overflow-y-auto pr-0.5 -mr-0.5"
+          style={{ touchAction: 'pan-y', scrollbarGutter: 'stable' }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onWheel={(e) => e.stopPropagation()}
+        >
+          {group.points.map((p, i) => {
+            const priceSlot =
+              p.precoLabel != null ? (
+                p.precoLabel
+              ) : p.promo_image_url ? (
+                <a
+                  href={p.promo_image_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-emerald-700 font-semibold text-[11px]"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Ver encarte
+                </a>
+              ) : (
+                <span className="text-gray-500 text-[11px]">Encarte</span>
+              );
+
+            return (
+              <ProductOfferThumb
+                key={p.id || i}
+                point={p}
+                accentHex={accentHex}
+                priceSlot={priceSlot}
+                interactive={Boolean(onMapPointCartToggle)}
+                selected={cartOfferIdSet?.has(String(p.id))}
+                onActivate={() => onMapPointCartToggle?.(p)}
+              />
+            );
+          })}
+        </div>
+
+        {onMapPointCartToggle ? (
+          <p className="text-[10px] text-emerald-700 font-medium mt-2 px-0.5 leading-snug">
+            Toque no card ou em <strong>+ Cesta</strong> para adicionar ao carrinho (abre à direita). Encarte em PDF: use o botão no card.
+          </p>
+        ) : null}
+
+        {(first?.time_ago || first?.user_label) && count === 1 && (
+          <p className="text-[10px] text-gray-500 mt-2.5 px-0.5">
+            {[first.time_ago, first.user_label].filter(Boolean).join(' · ')}
+          </p>
+        )}
+        {count > 1 && (
+          <p className="text-[10px] text-gray-500 mt-2.5 leading-snug px-0.5">
+            {allPromoIds
+              ? 'Imagens e preços vêm do site da rede quando disponíveis. Sem foto? Toque em Ver encarte.'
+              : 'Preços partilhados pela comunidade FinMemory.'}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Pins de preço: rótulos só com zoom alto ou durante busca — mapa menos carregado. */
+function PriceMarkersLayer({ groups, searchQuery, cartOfferIdSet, onMapPointCartToggle }) {
+  return (
+    <>
+      {groups.map((group) => (
+        <PriceGroupMarker
+          key={`pg-${Number(group.lat).toFixed(5)}_${Number(group.lng).toFixed(5)}`}
+          group={group}
+          searchQuery={searchQuery}
+          cartOfferIdSet={cartOfferIdSet}
+          onMapPointCartToggle={onMapPointCartToggle}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Ícone memoizado + key estável — evita setIcon() e fechamento do popup ao atualizar pontos. */
+function PriceGroupMarker({ group, searchQuery, cartOfferIdSet, onMapPointCartToggle }) {
+  const zoom = useMapZoom();
+  const searchActive = searchQuery.trim().length >= 2;
+  const showPinLabels = zoom >= MAP_LABEL_MIN_ZOOM || searchActive;
+
+  const first = group.points[0];
+  const catMix = useMemo(() => {
+    const set = new Set(group.points.map((p) => String(p.categoria || '').trim()).filter(Boolean));
+    return [...set].sort((a, b) => a.localeCompare(b, 'pt')).join('|');
+  }, [group.points]);
+  const { main } = getCategoryColor(catMix || first.categoria, first.nome);
+  const count = group.points.length;
+
+  const customIcon = useMemo(
+    () => createCategoryIcon(main, count),
+    [main, count]
+  );
+
+  return (
+    <Marker position={[group.lat, group.lng]} icon={customIcon} zIndexOffset={2500}>
+      {showPinLabels && (
+        <Tooltip
+          permanent
+          direction="right"
+          offset={[14, 0]}
+          opacity={1}
+          interactive={false}
+          className="finmemory-map-label finmemory-map-label--price"
+        >
+          {priceGroupMapLabel(group)}
+        </Tooltip>
+      )}
+      <Popup className="mapa-precos-popup-agrupado finmemory-popup-price-offers">
+        <MapsStyleOfferPopup
+          group={group}
+          accentHex={main}
+          cartOfferIdSet={cartOfferIdSet}
+          onMapPointCartToggle={onMapPointCartToggle}
+        />
+      </Popup>
+    </Marker>
+  );
+}
+
+export default function MapaPrecosLeaflet({
+  mapThemeId = 'padrao',
+  searchQuery = '',
+  promoOnly = false,
+  wazeUi = false,
+  headerOffsetPx = 56,
+}) {
+  const theme = getMapThemeById(mapThemeId);
+  const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
+  const [locais, setLocais] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+  const reloadPointsRef = useRef(() => {});
+  const [storeNearby, setStoreNearby] = useState(null);
+  const [dismissedStorePrompt, setDismissedStorePrompt] = useState(false);
+
+  const [shopOpen, setShopOpen] = useState(false);
+  const [shopStore, setShopStore] = useState(null);
+  const [shopOffers, setShopOffers] = useState([]);
+  const [shopPromotions, setShopPromotions] = useState([]);
+  /** IDs dos cards da tabela `promotions` selecionados no painel da loja (toggle por toque). */
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopErr, setShopErr] = useState('');
+  const [promoCart, setPromoCart] = useState([]);
+  const [budgetCap, setBudgetCap] = useState(50);
+  const [savingList, setSavingList] = useState(false);
+  const [saveBanner, setSaveBanner] = useState('');
+  const [shopFilterCat, setShopFilterCat] = useState('Todos');
+
+  /**
+   * none = área visível; product = busca global por texto de produto/loja;
+   * region = aguardando fitBounds (MapRegionFly); depois volta a none.
+   */
+  const [mapSearchIntent, setMapSearchIntent] = useState({ type: 'none' });
+  const mapSearchResolveGenRef = useRef(0);
+
+  useEffect(() => {
+    const t = (searchQuery || '').trim();
+    const gen = ++mapSearchResolveGenRef.current;
+    if (t.length < 2) {
+      setMapSearchIntent({ type: 'none' });
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/map/geocode-region?q=${encodeURIComponent(t)}`);
+      const data = await res.json().catch(() => ({}));
+      if (cancelled || gen !== mapSearchResolveGenRef.current) return;
+      if (data.ok && data.bbox) {
+        setMapSearchIntent({
+          type: 'region',
+          bbox: data.bbox,
+          center: data.center,
+          label: data.label,
+        });
+      } else {
+        setMapSearchIntent({ type: 'product', q: t });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery]);
+
+  const handleRegionFitted = useCallback(() => {
+    setMapSearchIntent({ type: 'none' });
+  }, []);
+
+  const mapContainerStyle = useMemo(
+    () => ({ height: '100%', width: '100%', paddingTop: `${headerOffsetPx}px` }),
+    [headerOffsetPx]
+  );
+
+  /** Em busca por região (bairro/cidade), não filtrar o texto “Grajaú” nos nomes de produto. */
+  const applyProductTextFilter = mapSearchIntent.type === 'product';
+
+  /** Pins visíveis: busca de produto + opcional “só promoções” + filtro por loja. */
+  const visibleLocais = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let base = locais.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
+    if (promoOnly) {
+      base = base.filter(isPromoPoint);
+    }
+    if (!applyProductTextFilter || q.length < 2) return base;
+    return base.filter(
+      (p) =>
+        (p.produto || '').toLowerCase().includes(q) ||
+        (p.nome || '').toLowerCase().includes(q) ||
+        (p.categoria || '').toLowerCase().includes(q)
+    );
+  }, [locais, searchQuery, promoOnly, applyProductTextFilter]);
+
+  const priceGroups = useMemo(() => groupPointsByLocation(visibleLocais), [visibleLocais]);
+
+  const handleLocationFound = useCallback((lat, lng) => {
+    setDismissedStorePrompt(false);
+    fetch(`/api/map/stores?lat=${lat}&lng=${lng}&radius=150`)
+      .then((res) => (res.ok ? res.json() : { stores: [] }))
+      .then((data) => {
+        if (Array.isArray(data.stores) && data.stores.length > 0) {
+          setStoreNearby(data.stores[0]);
+        } else {
+          setStoreNearby(null);
+        }
+      })
+      .catch(() => setStoreNearby(null));
+  }, []);
+
+  const handleRequestStoreShop = useCallback((store) => {
+    setShopStore(store);
+    setShopOpen(true);
+    setShopFilterCat('Todos');
+    setShopLoading(true);
+    setShopErr('');
+    setShopOffers([]);
+    setShopPromotions([]);
+    setSelectedItems([]);
+    fetch(`/api/map/store-offers?store_id=${encodeURIComponent(store.id)}`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Erro ao carregar ofertas');
+        setShopOffers(Array.isArray(data.offers) ? data.offers : []);
+        setShopPromotions(Array.isArray(data.promotions) ? data.promotions : []);
+      })
+      .catch((e) => setShopErr(e.message || 'Erro ao carregar ofertas'))
+      .finally(() => setShopLoading(false));
+  }, []);
+
+  const toggleSelectedPromotionItem = useCallback((id) => {
+    const sid = String(id);
+    setSelectedItems((prev) =>
+      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
+    );
+  }, []);
+
+  const shopAccent = useMemo(() => {
+    if (!shopStore) return '#2ECC49';
+    const { main } = getCategoryColor('Supermercado - Promoção', shopStore.name);
+    return main;
+  }, [shopStore]);
+
+  const toggleCartOffer = useCallback(
+    (offer, storeLabelOverride) => {
+      const id = String(offer.id);
+      const storeLabel = storeLabelOverride || shopStore?.name || 'Loja';
+      setPromoCart((prev) => {
+        const ix = prev.findIndex((x) => x.offerId === id);
+        if (ix >= 0) return prev.filter((_, i) => i !== ix);
+        const priceNum = numericPriceForSum(offer.price, offer.category, offer.id);
+        return prev.concat({
+          offerId: id,
+          productName: offer.product_name,
+          storeLabel,
+          priceNum,
+          precoLabel: formatPrecoExibicao(offer.price, offer.category, offer.id),
+        });
+      });
+    },
+    [shopStore]
+  );
+
+  const toggleCartFromMapPoint = useCallback(
+    (p) => {
+      toggleCartOffer(
+        {
+          id: p.id,
+          product_name: p.produto,
+          category: p.categoria,
+          price: p.preco,
+        },
+        p.nome
+      );
+    },
+    [toggleCartOffer]
+  );
+
+  const cartTotalNumeric = useMemo(
+    () => promoCart.reduce((s, x) => s + (typeof x.priceNum === 'number' ? x.priceNum : 0), 0),
+    [promoCart]
+  );
+
+  const budgetStatusColor = useMemo(() => {
+    const t = cartTotalNumeric;
+    if (t <= 40) return '#2ECC49';
+    if (t <= 50) return '#eab308';
+    return '#ef4444';
+  }, [cartTotalNumeric]);
+
+  const barWidthPct = useMemo(() => {
+    const cap = Math.max(10, Number(budgetCap) || 50);
+    return Math.min(100, (cartTotalNumeric / cap) * 100);
+  }, [cartTotalNumeric, budgetCap]);
+
+  const cartOfferIdSet = useMemo(() => new Set(promoCart.map((x) => x.offerId)), [promoCart]);
+
+  const selectedPromotionRowsOrdered = useMemo(() => {
+    const byId = new Map(shopPromotions.map((r) => [String(r.id), r]));
+    return selectedItems.map((id) => byId.get(id)).filter(Boolean);
+  }, [selectedItems, shopPromotions]);
+
+  const selectedEncarteTotal = useMemo(
+    () =>
+      selectedPromotionRowsOrdered.reduce((s, r) => {
+        const n = Number(r.promo_price);
+        return s + (Number.isFinite(n) ? n : 0);
+      }, 0),
+    [selectedPromotionRowsOrdered]
+  );
+
+  const encarteBudgetBarColor = useMemo(() => {
+    const t = selectedEncarteTotal;
+    if (t <= 40) return '#2ECC49';
+    if (t <= 50) return '#eab308';
+    return '#ef4444';
+  }, [selectedEncarteTotal]);
+
+  const encarteBarWidthPct = useMemo(() => {
+    const cap = 50;
+    return Math.min(100, (selectedEncarteTotal / cap) * 100);
+  }, [selectedEncarteTotal]);
+
+  const shopOfferShelfCats = useMemo(() => {
+    if (!shopOffers.length) return ['Todos'];
+    const set = new Set(shopOffers.map((o) => offerShelfCategory(o)));
+    return ['Todos', ...[...set].sort((a, b) => a.localeCompare(b, 'pt'))];
+  }, [shopOffers]);
+
+  const filteredShopOffers = useMemo(() => {
+    if (!wazeUi || shopFilterCat === 'Todos') return shopOffers;
+    return shopOffers.filter((o) => offerShelfCategory(o) === shopFilterCat);
+  }, [shopOffers, shopFilterCat, wazeUi]);
+
+  const latestOfferObservedAt = useMemo(() => {
+    let latest = null;
+    for (const o of shopOffers) {
+      const d = o?.observed_at ? new Date(o.observed_at) : null;
+      if (!d || Number.isNaN(d.getTime())) continue;
+      if (!latest || d > latest) latest = d;
+    }
+    return latest;
+  }, [shopOffers]);
+
+  const latestOfferObservedLabel = useMemo(() => {
+    if (!latestOfferObservedAt) return '';
+    return latestOfferObservedAt.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, [latestOfferObservedAt]);
+
+  const handleSaveShoppingList = useCallback(async () => {
+    setSaveBanner('');
+    const userId =
+      session?.user?.supabaseId ||
+      (typeof window !== 'undefined' ? window.localStorage.getItem('user_id') : null);
+    if (!userId) {
+      setSaveBanner('Faça login para salvar na lista.');
+      return;
+    }
+    if (promoCart.length === 0) return;
+    const supabase = getSupabase();
+    if (!supabase) {
+      setSaveBanner('Não foi possível conectar.');
+      return;
+    }
+    setSavingList(true);
+    try {
+      const { data: memberRow, error: e1 } = await supabase
+        .from('partnership_members')
+        .select('partnership_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (e1 || !memberRow) {
+        setSaveBanner('Você precisa de uma parceria ativa.');
+        return;
+      }
+      const { data: p, error: e2 } = await supabase
+        .from('partnerships')
+        .select('id')
+        .eq('id', memberRow.partnership_id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (e2 || !p) {
+        setSaveBanner('Parceria não encontrada.');
+        return;
+      }
+      const itemsPayload = promoCart.map(
+        ({ offerId, productName, storeLabel, priceNum, precoLabel }) => ({
+          offerId: String(offerId),
+          productName,
+          storeLabel,
+          priceNum: typeof priceNum === 'number' && Number.isFinite(priceNum) ? priceNum : null,
+          precoLabel: precoLabel || null,
+        })
+      );
+      const total = itemsPayload.reduce(
+        (s, x) => s + (typeof x.priceNum === 'number' ? x.priceNum : 0),
+        0
+      );
+      const { data: listRow, error: insErr } = await supabase
+        .from('shopping_lists')
+        .insert({
+          partnership_id: p.id,
+          created_by: userId,
+          total,
+          items: itemsPayload,
+        })
+        .select('id')
+        .single();
+      if (insErr) throw insErr;
+      const groupId = listRow?.id;
+      if (groupId) {
+        const rows = promoCart.map(({ offerId, productName, storeLabel, priceNum, precoLabel }) => ({
+          partnership_id: p.id,
+          added_by: userId,
+          name: productName || 'Item',
+          quantity: 1,
+          source_type: 'map',
+          unit_price: typeof priceNum === 'number' && Number.isFinite(priceNum) ? priceNum : null,
+          price_label: precoLabel || null,
+          store_label: storeLabel || null,
+          map_offer_id: offerId != null ? String(offerId) : null,
+          shopping_list_group_id: groupId,
+        }));
+        const { error: itemsErr } = await supabase.from('shopping_list_items').insert(rows);
+        if (itemsErr) {
+          await supabase.from('shopping_lists').delete().eq('id', groupId);
+          throw itemsErr;
+        }
+      }
+      setPromoCart([]);
+      router.push('/shopping-list');
+    } catch (e) {
+      setSaveBanner(e.message || 'Não foi possível salvar.');
+    } finally {
+      setSavingList(false);
+    }
+  }, [session, promoCart, router]);
+
+  /** Atualização periódica só com aba visível (mapa mais “vivo” sem custo em background). */
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        reloadPointsRef.current?.();
+      }
+    }, 50000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="relative w-full h-full">
+      <MapContainer
+        center={DEFAULT_MAP_CENTER}
+        zoom={DEFAULT_MAP_ZOOM}
+        style={mapContainerStyle}
+        className={`z-0 finmemory-map-tiles finmemory-map-theme-${theme.id}`}
+      >
+        <TileLayer
+          attribution={
+            theme.attribution ||
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; CARTO'
+          }
+          url={theme.url}
+          detectRetina={theme.id === 'verde' || theme.id === 'waze'}
+        />
+        <LocationMarker onLocationFound={handleLocationFound} headerOffsetPx={headerOffsetPx} />
+        <MapRegionFly
+          searchQuery={searchQuery}
+          searchIntent={mapSearchIntent}
+          onRegionFitted={handleRegionFitted}
+        />
+        <PricePointsLoader
+          searchIntent={mapSearchIntent}
+          setLocais={setLocais}
+          setCarregando={setCarregando}
+          reloadRef={reloadPointsRef}
+        />
+        {/* Preços primeiro; lojas depois + z-index maior — evita círculos de promo cobrirem estabelecimentos */}
+        <PriceMarkersLayer
+          groups={priceGroups}
+          searchQuery={searchQuery}
+          cartOfferIdSet={cartOfferIdSet}
+          onMapPointCartToggle={toggleCartFromMapPoint}
+        />
+        <StoreMarkers searchQuery={searchQuery} onRequestStoreShop={handleRequestStoreShop} />
+      </MapContainer>
+
+      {/* Geo-fencing: "Você está perto de [loja]. Gostaria de compartilhar um preço?" */}
+      {storeNearby && !dismissedStorePrompt && (
+        <div className="absolute left-3 right-3 sm:left-4 sm:right-4 bottom-36 sm:bottom-44 z-[1001] max-w-[320px]">
+          <div className="bg-white rounded-xl shadow-lg border border-emerald-200 p-4 flex flex-col gap-3">
+            <p className="text-sm text-gray-800 font-medium">
+              Você está perto de <span className="font-semibold text-emerald-700">{storeNearby.name}</span>.
+              <br />
+              Gostaria de compartilhar um preço?
+            </p>
+            <div className="flex gap-2">
+              <a
+                href={`/share-price?store=${encodeURIComponent(storeNearby.name)}&category=${encodeURIComponent(storeTypeToCategory(storeNearby.type))}`}
+                className="flex-1 py-2 px-3 rounded-lg bg-emerald-500 text-white text-sm font-semibold text-center hover:bg-emerald-600 no-underline"
+              >
+                Sim, compartilhar
+              </a>
+              <button
+                type="button"
+                onClick={() => setDismissedStorePrompt(true)}
+                className="py-2 px-3 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200"
+              >
+                Agora não
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promoCart.length > 0 && (
+        <div
+          style={{ top: headerOffsetPx }}
+          className={`absolute z-[1006] flex w-[min(100vw-1rem,280px)] max-h-[min(70vh,440px)] flex-col rounded-xl shadow-xl backdrop-blur-md ${
+            selectedItems.length > 0 ? 'right-2 sm:right-[292px]' : 'right-2'
+          } ${
+            wazeUi
+              ? 'border border-[#1e2130] bg-[#13161f]/98'
+              : 'border border-gray-200 bg-white/95'
+          }`}
+        >
+          <div
+            className={`flex flex-shrink-0 items-center gap-2 border-b px-3 py-2 ${
+              wazeUi ? 'border-[#1e2130]' : 'border-gray-100'
+            }`}
+          >
+            <ShoppingCart className={`h-4 w-4 shrink-0 ${wazeUi ? 'text-[#2ecc71]' : 'text-[#2ECC49]'}`} />
+            <span className={`text-sm font-bold ${wazeUi ? 'text-[#f0f0f0]' : 'text-gray-900'}`}>
+              Carrinho
+            </span>
+          </div>
+          <div
+            className={`finmemory-waze-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2 ${
+              wazeUi ? '' : ''
+            }`}
+          >
+            {promoCart.map((line) => (
+              <div
+                key={line.offerId}
+                className={`flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs ${
+                  wazeUi ? 'border-b border-[#1a1d27] bg-transparent' : 'bg-gray-50'
+                }`}
+              >
+                <span className={`line-clamp-2 flex-1 ${wazeUi ? 'text-[#e5e5e5]' : 'text-gray-800'}`}>
+                  {line.productName}
+                </span>
+                <span
+                  className={`shrink-0 font-semibold tabular-nums ${
+                    wazeUi ? 'text-[#2ecc71]' : 'text-gray-700'
+                  }`}
+                >
+                  {line.priceNum != null ? `R$ ${line.priceNum.toFixed(2)}` : '—'}
+                </span>
+                <button
+                  type="button"
+                  className={`shrink-0 px-1 font-bold leading-none ${
+                    wazeUi ? 'text-[#555] hover:text-red-400' : 'text-red-500 hover:text-red-700'
+                  }`}
+                  aria-label="Remover"
+                  onClick={() =>
+                    setPromoCart((prev) => prev.filter((x) => x.offerId !== line.offerId))
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <div
+            className={`flex-shrink-0 space-y-2 border-t p-2 ${
+              wazeUi ? 'border-[#1e2130] bg-[#111419]' : 'border-gray-100'
+            }`}
+          >
+            <div
+              className={`flex justify-between text-xs font-semibold ${
+                wazeUi ? 'text-[#888]' : 'text-gray-800'
+              }`}
+            >
+              <span>Total (só itens com preço)</span>
+              <span
+                className="tabular-nums"
+                style={wazeUi ? { color: cartTotalNumeric > 50 ? '#e74c3c' : '#2ecc71' } : undefined}
+              >
+                R$ {cartTotalNumeric.toFixed(2)}
+              </span>
+            </div>
+            <div className="space-y-1">
+              <div
+                className={`flex items-center justify-between gap-2 text-[10px] ${
+                  wazeUi ? 'text-[#888]' : 'text-gray-500'
+                }`}
+              >
+                <span>Orçamento (barra)</span>
+                <label className="inline-flex items-center gap-1">
+                  <span className="sr-only">Teto em reais</span>
+                  <span>R$</span>
+                  <input
+                    type="number"
+                    min={10}
+                    max={500}
+                    value={budgetCap}
+                    onChange={(e) => setBudgetCap(Number(e.target.value) || 50)}
+                    className={`w-14 rounded border px-1 text-right text-xs ${
+                      wazeUi
+                        ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#f0f0f0]'
+                        : 'border-gray-200 text-gray-800'
+                    }`}
+                  />
+                </label>
+              </div>
+              <div className={`h-1.5 overflow-hidden rounded-md ${wazeUi ? 'bg-[#1e2130]' : 'bg-gray-200'}`}>
+                <div
+                  className="h-full rounded-md transition-all duration-300"
+                  style={{ width: `${barWidthPct}%`, backgroundColor: budgetStatusColor }}
+                />
+              </div>
+              <p className={`text-[10px] leading-snug ${wazeUi ? 'text-[#555]' : 'text-gray-500'}`}>
+                Verde até R$40 · amarelo até R$50 · vermelho se passar (referência fixa).
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={savingList || sessionStatus === 'loading'}
+              onClick={handleSaveShoppingList}
+              className={`w-full rounded-lg py-2 text-xs font-bold transition-colors disabled:opacity-50 ${
+                wazeUi
+                  ? 'bg-[#2ecc71] text-[#0f1117] hover:bg-[#27ae60]'
+                  : 'bg-[#2ECC49] font-semibold text-white hover:bg-[#22a83a]'
+              }`}
+            >
+              {savingList ? 'Salvando…' : 'Salvar lista'}
+            </button>
+            {saveBanner ? (
+              <p className={`text-center text-[10px] ${wazeUi ? 'text-[#ccc]' : 'text-gray-700'}`}>
+                {saveBanner}
+              </p>
+            ) : null}
+            <Link
+              href="/shopping-list"
+              className={`block text-center text-[10px] font-medium underline ${
+                wazeUi ? 'text-[#2ecc71]' : 'text-emerald-600'
+              }`}
+            >
+              Abrir lista de compras (mapa + anotações)
+            </Link>
+            <Link
+              href="/listas"
+              className={`block text-center text-[10px] font-medium underline ${
+                wazeUi ? 'text-[#888]' : 'text-gray-500'
+              }`}
+            >
+              Histórico de listas do mapa
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {selectedItems.length > 0 && (
+        <aside
+          style={{
+            top: headerOffsetPx,
+            height: `calc(100dvh - ${headerOffsetPx}px)`,
+          }}
+          className={`fixed right-0 z-[1005] flex w-[min(280px,calc(100vw-0.5rem))] flex-col border-l shadow-[0_0_24px_rgba(0,0,0,0.12)] ${
+            wazeUi ? 'border-[#2a2d3a] bg-[#13161f]' : 'border-gray-200 bg-white'
+          }`}
+          aria-label="Produtos selecionados do encarte"
+        >
+          <div
+            className={`flex flex-shrink-0 flex-col gap-0.5 border-b px-3 py-2.5 ${
+              wazeUi ? 'border-[#1e2130]' : 'border-gray-100'
+            }`}
+          >
+            <h3 className={`text-sm font-bold ${wazeUi ? 'text-[#f0f0f0]' : 'text-gray-900'}`}>
+              Seleção (encarte)
+            </h3>
+            <p className={`text-[11px] ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}>
+              {selectedPromotionRowsOrdered.length} item(ns)
+            </p>
+          </div>
+          <div
+            className={`finmemory-waze-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2 ${
+              wazeUi ? '' : ''
+            }`}
+          >
+            {selectedPromotionRowsOrdered.map((row) => (
+              <div
+                key={row.id}
+                className={`flex items-start gap-2 rounded-lg px-2 py-2 text-xs ${
+                  wazeUi ? 'border border-[#2a2d3a] bg-[#1a1d27]' : 'border border-gray-100 bg-gray-50'
+                }`}
+              >
+                <span
+                  className={`min-w-0 flex-1 leading-snug ${wazeUi ? 'text-[#e5e5e5]' : 'text-gray-800'}`}
+                  title={row.product_name}
+                >
+                  {row.product_name}
+                </span>
+                <span
+                  className={`shrink-0 font-semibold tabular-nums ${
+                    wazeUi ? 'text-[#2ecc71]' : 'text-emerald-700'
+                  }`}
+                >
+                  R$ {formatBRLPriceNum(row.promo_price)}
+                </span>
+                <button
+                  type="button"
+                  className={`shrink-0 rounded p-0.5 leading-none ${
+                    wazeUi ? 'text-[#888] hover:bg-[#2a2d3a] hover:text-red-400' : 'text-gray-500 hover:bg-gray-200 hover:text-red-600'
+                  }`}
+                  aria-label="Remover da seleção"
+                  onClick={() => toggleSelectedPromotionItem(row.id)}
+                >
+                  <X className="h-4 w-4" strokeWidth={2.5} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div
+            className={`flex flex-shrink-0 flex-col gap-2 border-t p-3 ${
+              wazeUi ? 'border-[#1e2130] bg-[#111419]' : 'border-gray-100 bg-gray-50/80'
+            }`}
+          >
+            <div
+              className={`flex items-center justify-between text-sm font-bold ${
+                wazeUi ? 'text-[#f0f0f0]' : 'text-gray-900'
+              }`}
+            >
+              <span>Total</span>
+              <span className="tabular-nums" style={{ color: encarteBudgetBarColor }}>
+                R$ {selectedEncarteTotal.toFixed(2)}
+              </span>
+            </div>
+            <div className={`h-2 overflow-hidden rounded-full ${wazeUi ? 'bg-[#1e2130]' : 'bg-gray-200'}`}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${encarteBarWidthPct}%`,
+                  backgroundColor: encarteBudgetBarColor,
+                }}
+              />
+            </div>
+            <p className={`text-[10px] leading-snug ${wazeUi ? 'text-[#666]' : 'text-gray-500'}`}>
+              Verde até R$40 · amarelo até R$50 · vermelho acima (referência R$50 na barra).
+            </p>
+          </div>
+        </aside>
+      )}
+
+      {wazeUi && !shopOpen && (
+        <div className="pointer-events-none absolute bottom-24 left-1/2 z-[999] max-w-[min(92vw,420px)] -translate-x-1/2 px-2">
+          <div className="pointer-events-auto rounded-xl border border-[#2a2d3a] bg-[#13161f]/92 px-4 py-3 text-center text-[13px] text-[#888] shadow-lg backdrop-blur-md">
+            Toque no pin da loja e use <span className="font-semibold text-[#2ecc71]">Ver promoções / Montar cesta</span>
+          </div>
+        </div>
+      )}
+
+      {shopOpen && (
+        <>
+          <button
+            type="button"
+            className={`fixed inset-0 z-[1003] cursor-default border-0 p-0 ${wazeUi ? 'bg-black/70' : 'bg-black/50'}`}
+            aria-label="Fechar painel"
+            onClick={() => setShopOpen(false)}
+          />
+          <div
+            className={`fixed inset-x-0 bottom-0 z-[1004] flex flex-col shadow-[0_-8px_40px_rgba(0,0,0,0.35)] ${
+              wazeUi
+                ? `max-h-[min(62vh,720px)] rounded-t-2xl border-t border-[#2a2d3a] bg-[#13161f] sm:max-h-[min(88vh,760px)] ${
+                    promoCart.length > 0 || selectedItems.length > 0
+                      ? 'sm:mr-[min(300px,calc(100vw-0.5rem))]'
+                      : ''
+                  }`
+                : `max-h-[min(88vh,640px)] rounded-t-3xl border-t border-gray-200 bg-white shadow-[0_-8px_32px_rgba(0,0,0,0.12)] ${
+                    promoCart.length > 0 || selectedItems.length > 0
+                      ? 'sm:mr-[min(300px,calc(100vw-0.5rem))]'
+                      : ''
+                  }`
+            }`}
+          >
+            <div
+              className={`flex flex-shrink-0 items-center justify-between px-4 pb-2 pt-3 ${
+                wazeUi ? 'border-b border-[#1e2130]' : 'border-b border-gray-100'
+              }`}
+            >
+              <div className="min-w-0 pr-2">
+                <p className={`text-xs font-semibold ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}>
+                  {wazeUi ? 'Waze dos Preços · compra em tempo real' : 'Compra em tempo real'}
+                </p>
+                <h2 className={`truncate text-lg font-bold ${wazeUi ? 'text-[#f0f0f0]' : 'text-gray-900'}`}>
+                  {shopStore?.name}
+                </h2>
+                {wazeUi && shopStore?.address ? (
+                  <p className="mt-0.5 truncate text-[11px] text-[#888]">{shopStore.address}</p>
+                ) : null}
+                {latestOfferObservedLabel ? (
+                  <p className={`mt-0.5 text-[11px] ${wazeUi ? 'text-amber-300' : 'text-amber-700'}`}>
+                    Ultima verificacao no mapa: {latestOfferObservedLabel}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className={`shrink-0 rounded-full p-2 ${
+                  wazeUi ? 'text-[#888] hover:bg-[#1e2130]' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+                aria-label="Fechar"
+                onClick={() => setShopOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {wazeUi && shopOffers.length > 0 ? (
+              <div className="finmemory-waze-scroll flex flex-shrink-0 gap-1.5 overflow-x-auto px-4 py-2.5">
+                {shopOfferShelfCats.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setShopFilterCat(c)}
+                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      shopFilterCat === c
+                        ? 'border-[#2ecc71] bg-[#2ecc71] text-[#0f1117]'
+                        : 'border-[#2a2d3a] bg-[#1a1d27] text-[#888] hover:border-[#2ecc71] hover:text-[#2ecc71]'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div
+              className={`min-h-0 flex-1 overflow-y-auto px-3 pb-8 ${wazeUi ? 'finmemory-waze-scroll' : ''}`}
+            >
+              <div
+                className={`mb-2 mt-2 flex items-center justify-between rounded-lg px-2.5 py-2 text-[11px] ${
+                  wazeUi
+                    ? 'border border-[#2a2d3a] bg-[#1a1d27] text-[#bbb]'
+                    : 'border border-amber-200 bg-amber-50 text-amber-900'
+                }`}
+              >
+                <span>Precos podem variar na loja fisica. Compare antes de fechar compra.</span>
+                <a
+                  href={`/share-price?store=${encodeURIComponent(shopStore?.name || '')}&category=${encodeURIComponent('Supermercado - Promoção')}`}
+                  className={`ml-3 shrink-0 rounded-full px-2.5 py-1 font-semibold no-underline ${
+                    wazeUi ? 'bg-[#2ecc71] text-[#0f1117]' : 'bg-amber-500 text-white'
+                  }`}
+                >
+                  Preco diferente
+                </a>
+              </div>
+              {shopLoading && (
+                <div className="flex justify-center py-12">
+                  <Loader2
+                    className={`h-8 w-8 animate-spin ${wazeUi ? 'text-[#2ecc71]' : 'text-[#2ECC49]'}`}
+                  />
+                </div>
+              )}
+              {shopErr ? (
+                <p className={`py-4 text-sm ${wazeUi ? 'text-red-400' : 'text-red-600'}`}>{shopErr}</p>
+              ) : null}
+              {!shopLoading && !shopErr && shopOffers.length === 0 && shopPromotions.length === 0 ? (
+                <p className={`py-6 text-center text-sm ${wazeUi ? 'text-[#888]' : 'text-gray-600'}`}>
+                  Nenhuma promoção encontrada para esta loja nesta região.
+                </p>
+              ) : null}
+              {!shopLoading && shopPromotions.length > 0 ? (
+                <>
+                  <p
+                    className={`mb-2 px-0.5 text-xs font-semibold ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}
+                  >
+                    Promoções (encarte)
+                  </p>
+                  <div
+                    className={`grid grid-cols-2 gap-2 pb-3 ${wazeUi ? 'gap-2.5 sm:grid-cols-3' : ''}`}
+                  >
+                    {shopPromotions.map((row) => (
+                      <PromotionEncarteCard
+                        key={row.id}
+                        row={row}
+                        wazeUi={wazeUi}
+                        accentHex={shopAccent}
+                        selected={selectedItems.includes(String(row.id))}
+                        onToggle={() => toggleSelectedPromotionItem(row.id)}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : null}
+              {!shopLoading && shopOffers.length > 0 ? (
+                <>
+                  <div
+                    className={`mb-3 overflow-hidden rounded-xl ${
+                      wazeUi ? 'border border-[#2a2d3a]' : ''
+                    }`}
+                  >
+                    <HeroOfferCarousel
+                      sources={uniqueDisplayableImageUrls(
+                        shopOffers.map((o) => ({
+                          promo_image_url: o.promo_image_url,
+                          categoria: o.category,
+                          id: o.id,
+                          produto: o.product_name,
+                        }))
+                      )}
+                      storeTitle={shopStore?.name || ''}
+                      count={shopOffers.length}
+                    />
+                  </div>
+                  {wazeUi ? (
+                    <div className="grid grid-cols-2 gap-2.5 pb-4 sm:grid-cols-3">
+                      {filteredShopOffers.map((offer) => (
+                        <WazeOfferCard
+                          key={offer.id}
+                          offer={offer}
+                          selected={cartOfferIdSet.has(String(offer.id))}
+                          onToggle={() => toggleCartOffer(offer)}
+                          accentHex="#2ecc71"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 pb-4">
+                      {shopOffers.map((offer, i) => {
+                        const pt = {
+                          id: offer.id,
+                          produto: offer.product_name,
+                          categoria: offer.category || '',
+                          promo_image_url: offer.promo_image_url,
+                        };
+                        const label = formatPrecoExibicao(offer.price, offer.category, offer.id);
+                        const priceSlot =
+                          label != null ? (
+                            label
+                          ) : offer.promo_image_url ? (
+                            <a
+                              href={offer.promo_image_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] font-semibold text-emerald-700 underline"
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Ver encarte
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-gray-500">Preço no encarte</span>
+                          );
+                        return (
+                          <ProductOfferThumb
+                            key={offer.id || i}
+                            point={pt}
+                            accentHex={shopAccent}
+                            priceSlot={priceSlot}
+                            selected={cartOfferIdSet.has(String(offer.id))}
+                            interactive
+                            onActivate={() => toggleCartOffer(offer)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+========== pages\api\map\stores.js ==========
+
+import { createClient } from '@supabase/supabase-js';
+import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
+import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
+
+/**
+ * GET /api/map/stores
+ * Modo 1 (próximos): ?lat=-23.55&lng=-46.63&radius=2000 → lojas próximas (sugestão / geo-fencing).
+ * Modo 2 (mapa): ?sw_lat=&sw_lng=&ne_lat=&ne_lng= → lojas na área visível do mapa (bbox).
+ */
+let supabaseInstance = null;
+
+function getSupabase() {
+  if (!supabaseInstance) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    supabaseInstance = createClient(url, key);
+  }
+  return supabaseInstance;
+}
+
+/** Não listar farmácias/drogarias como pins de estabelecimento no mapa de preços. */
+function isPharmacyStoreType(type) {
+  const t = String(type || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '');
+  if (!t) return false;
+  return (
+    t === 'pharmacy' ||
+    t === 'farmacia' ||
+    t === 'drugstore' ||
+    t.includes('farmacia') ||
+    t.includes('drogaria')
+  );
+}
+
+function distanceKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const supabase = getSupabase();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Configuração do servidor incompleta' });
+  }
+
+  const swLat = parseFloat(req.query.sw_lat);
+  const swLng = parseFloat(req.query.sw_lng);
+  const neLat = parseFloat(req.query.ne_lat);
+  const neLng = parseFloat(req.query.ne_lng);
+  const useBbox = !Number.isNaN(swLat) && !Number.isNaN(swLng) && !Number.isNaN(neLat) && !Number.isNaN(neLng);
+
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  const radiusM = Math.min(Number(req.query.radius) || 2000, 5000);
+
+  let latMin, latMax, lngMin, lngMax;
+
+  if (useBbox) {
+    latMin = Math.min(swLat, neLat);
+    latMax = Math.max(swLat, neLat);
+    lngMin = Math.min(swLng, neLng);
+    lngMax = Math.max(swLng, neLng);
+  } else {
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return res.status(400).json({ error: 'Use lat/lng/radius ou sw_lat/sw_lng/ne_lat/ne_lng (bbox)' });
+    }
+    const delta = (radiusM / 1000) / 111;
+    latMin = lat - delta;
+    latMax = lat + delta;
+    lngMin = lng - delta;
+    lngMax = lng + delta;
+  }
+
+  try {
+    // Não incluir cnpj no SELECT até a migração existir em produção (evita 42703 column does not exist).
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name, type, address, lat, lng, neighborhood')
+      .eq('active', true)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .limit(
+        useBbox
+          ? bboxIsStateOrMacroRegion({
+              minLat: latMin,
+              maxLat: latMax,
+              minLng: lngMin,
+              maxLng: lngMax,
+            })
+            ? Math.min(
+                2500,
+                Math.max(800, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT_LARGE || '1800', 10) || 1800)
+              )
+            : Math.min(
+                1200,
+                Math.max(400, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT || '600', 10) || 600)
+              )
+          : 100
+      );
+
+    if (error) {
+      console.error('Erro ao buscar stores:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const storesRows = (data || []).filter((s) => !isPharmacyStoreType(s.type));
+
+    const ttlHours = 24;
+    const cutoffIso = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
+    const promoThresholdKm = 0.6; // distância máxima para considerar que o ponto pertence à loja
+
+    const isPromoCategory = (cat) => {
+      const s = cat == null ? '' : String(cat).toLowerCase();
+      return s.includes('promo');
+    };
+
+    // Busca pontos promocionais recentes na mesma área para saber quais lojas ficam "laranja"
+    // (MVP: não depende de nova coluna no schema; usa created_at + categoria).
+    const { data: promoPoints, error: promoErr } = await supabase
+      .from('price_points')
+      .select('lat,lng,category,store_name,product_name,created_at')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .gte('created_at', cutoffIso)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .limit(2000);
+
+    if (promoErr) {
+      console.warn('Aviso: erro ao buscar promo points para tem_oferta_hoje:', promoErr.message);
+    }
+
+    // Promoções do agente (promocoes_supermercados) — mesmo critério de proximidade que price_points
+    let promoAgentRows = [];
+    try {
+      const { data: agentPromos, error: agentPromoErr } = await supabase
+        .from('promocoes_supermercados')
+        .select('lat,lng,supermercado,nome_produto,expira_em,categoria')
+        .eq('ativo', true)
+        .gt('expira_em', new Date().toISOString())
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .gte('lat', latMin)
+        .lte('lat', latMax)
+        .gte('lng', lngMin)
+        .lte('lng', lngMax)
+        .limit(2000);
+      if (agentPromoErr) {
+        console.warn('Aviso: promocoes_supermercados indisponível:', agentPromoErr.message);
+      } else {
+        promoAgentRows = (agentPromos || []).map((r) => ({
+          lat: r.lat,
+          lng: r.lng,
+          category: formatAgentPromoMapCategory(r.categoria),
+          store_name: String(r.supermercado || ''),
+          product_name: r.nome_produto,
+          created_at: new Date().toISOString(),
+        }));
+      }
+    } catch (e) {
+      console.warn('Aviso: promocoes_supermercados:', e.message);
+    }
+
+    const storesBase = storesRows;
+    const storeOfferMap = new Map(storesBase.map((s) => [s.id, false]));
+    const storeOfferCountMap = new Map(storesBase.map((s) => [s.id, 0]));
+    const storeOfferProductsMap = new Map(storesBase.map((s) => [s.id, []]));
+
+    const attachOffer = (storeId, productName) => {
+      storeOfferMap.set(storeId, true);
+      storeOfferCountMap.set(storeId, (storeOfferCountMap.get(storeId) || 0) + 1);
+      const current = storeOfferProductsMap.get(storeId) || [];
+      const prod = String(productName || '').trim();
+      if (prod && !current.includes(prod) && current.length < 6) {
+        current.push(prod);
+        storeOfferProductsMap.set(storeId, current);
+      }
+    };
+
+    // Ativa tem_oferta_hoje se existir pelo menos 1 ponto promocional recente próximo da loja.
+    const points = [
+      ...(promoPoints || []).filter(
+        (p) => p && p.lat != null && p.lng != null && isPromoCategory(p.category)
+      ),
+      ...promoAgentRows,
+    ];
+    for (const p of points) {
+      const pLat = Number(p.lat);
+      const pLng = Number(p.lng);
+      if (Number.isNaN(pLat) || Number.isNaN(pLng)) continue;
+
+      // 1) Tentativa rápida por nome (se bater, evita cálculo de distância)
+      const pStoreName = (p.store_name || '').toLowerCase();
+      let matched = false;
+      if (pStoreName) {
+        for (const s of storesBase) {
+          if (String(s.name || '').toLowerCase() === pStoreName) {
+            attachOffer(s.id, p.product_name);
+            matched = true;
+            break;
+          }
+        }
+      }
+      if (matched) continue;
+
+      // 2) Caso não bata o nome, usa distância entre lat/lng
+      for (const s of storesBase) {
+        const sLat = Number(s.lat);
+        const sLng = Number(s.lng);
+        if (Number.isNaN(sLat) || Number.isNaN(sLng)) continue;
+        const d = distanceKm(sLat, sLng, pLat, pLng);
+        if (d <= promoThresholdKm) {
+          attachOffer(s.id, p.product_name);
+          break;
+        }
+      }
+    }
+
+    if (useBbox) {
+      const stores = storesRows.map((s) => ({
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        address: s.address,
+        lat: s.lat,
+        lng: s.lng,
+        neighborhood: s.neighborhood,
+        tem_oferta_hoje: !!storeOfferMap.get(s.id),
+        offer_count: storeOfferCountMap.get(s.id) || 0,
+        offer_products: storeOfferProductsMap.get(s.id) || []
+      }));
+      return res.status(200).json({ stores });
+    }
+
+    const radiusKm = radiusM / 1000;
+    const withDistance = storesRows
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        address: s.address,
+        lat: s.lat,
+        lng: s.lng,
+        neighborhood: s.neighborhood,
+        tem_oferta_hoje: !!storeOfferMap.get(s.id),
+        offer_count: storeOfferCountMap.get(s.id) || 0,
+        offer_products: storeOfferProductsMap.get(s.id) || [],
+        distance_km: distanceKm(lat, lng, s.lat, s.lng)
+      }))
+      .filter((s) => s.distance_km <= radiusKm)
+      .sort((a, b) => a.distance_km - b.distance_km)
+      .slice(0, 30)
+      .map(({ distance_km, ...rest }) => ({ ...rest, distance_km: Math.round(distance_km * 100) / 100 }));
+
+    return res.status(200).json({ stores: withDistance });
+  } catch (e) {
+    console.error('Erro em /api/map/stores:', e);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+========== pages\api\map\points.js ==========
+
+import { createClient } from '@supabase/supabase-js';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
+import { geocodeAddress } from '../../../lib/geocode';
+import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
+import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
+import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
+import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
+
+/**
+ * GET /api/map/points - lista pontos do mapa.
+ * POST /api/map/points - divulgar preço (requer login; usa service role para evitar RLS).
+ * user_id é mascarado como "Explorador #XXXX" no GET.
+ */
+let supabaseInstance = null;
+
+function getSupabase() {
+  if (!supabaseInstance) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    supabaseInstance = createClient(url, key);
+  }
+  return supabaseInstance;
+}
+
+function maskUserId(userId) {
+  if (!userId || typeof userId !== 'string') return 'Explorador';
+  const last4 = userId.replace(/-/g, '').slice(-4);
+  return `Explorador #${last4}`;
+}
+
+function formatTimeAgo(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 60) return `Há ${diffMins} min`;
+  if (diffHours < 24) return `Há ${diffHours}h`;
+  if (diffDays < 7) return `Há ${diffDays} dia(s)`;
+  return d.toLocaleDateString('pt-BR');
+}
+
+/** Viewport do mapa (sw/ne) — reduz payload e DOM quando o cliente envia bounds. Ignorado se houver busca textual (q). */
+function parseBboxFromQuery(query) {
+  const swLat = Number.parseFloat(query.sw_lat);
+  const swLng = Number.parseFloat(query.sw_lng);
+  const neLat = Number.parseFloat(query.ne_lat);
+  const neLng = Number.parseFloat(query.ne_lng);
+  if (![swLat, swLng, neLat, neLng].every((n) => Number.isFinite(n))) return null;
+  if (Math.abs(swLat) > 90 || Math.abs(neLat) > 90 || Math.abs(swLng) > 180 || Math.abs(neLng) > 180) {
+    return null;
+  }
+  const minLat = Math.min(swLat, neLat);
+  const maxLat = Math.max(swLat, neLat);
+  const minLng = Math.min(swLng, neLng);
+  const maxLng = Math.max(swLng, neLng);
+  if (maxLat - minLat < 0.0003 || maxLng - minLng < 0.0003) return null;
+  if (maxLat - minLat > 30 || maxLng - minLng > 30) return null;
+  return { minLat, maxLat, minLng, maxLng };
+}
+
+function applyLatLngBbox(qb, bbox) {
+  if (!bbox) return qb;
+  return qb
+    .gte('lat', bbox.minLat)
+    .lte('lat', bbox.maxLat)
+    .gte('lng', bbox.minLng)
+    .lte('lng', bbox.maxLng);
+}
+
+export default async function handler(req, res) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Configuração do servidor incompleta' });
+  }
+
+  if (req.method === 'POST') {
+    const session = await getServerSession(req, res, authOptions);
+    const userId = session?.user?.supabaseId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Faça login para compartilhar preços.' });
+    }
+    const { product_name, price, store_name, lat, lng, category } = req.body || {};
+    if (!product_name || typeof product_name !== 'string' || !product_name.trim()) {
+      return res.status(400).json({ error: 'Informe o nome do produto.' });
+    }
+    if (price === undefined || price === null || isNaN(parseFloat(price))) {
+      return res.status(400).json({ error: 'Informe o preço.' });
+    }
+    if (!store_name || typeof store_name !== 'string' || !store_name.trim()) {
+      return res.status(400).json({ error: 'Informe o nome da loja.' });
+    }
+    const storeNameStr = String(store_name).trim();
+    // Priorizar o endereço da loja (onde o preço foi visto), não a localização de quem divulgou
+    let latNum = NaN;
+    let lngNum = NaN;
+    const coordsFromGeocode = await geocodeAddress(`${storeNameStr}, Brasil`) || await geocodeAddress(`${storeNameStr}, São Paulo, Brasil`);
+    if (coordsFromGeocode && coordsFromGeocode.lat != null && coordsFromGeocode.lng != null) {
+      latNum = coordsFromGeocode.lat;
+      lngNum = coordsFromGeocode.lng;
+    }
+    if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+      latNum = parseFloat(lat);
+      lngNum = parseFloat(lng);
+    }
+    if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+      return res.status(400).json({ error: 'Não foi possível localizar a loja. Informe o endereço completo ou ative a localização.' });
+    }
+    try {
+      const { error: insertErr } = await supabase.from('price_points').insert({
+        user_id: userId,
+        product_name: String(product_name).trim(),
+        price: parseFloat(price),
+        store_name: storeNameStr,
+        lat: latNum,
+        lng: lngNum,
+        category: category && String(category).trim() ? String(category).trim() : null
+      });
+      if (insertErr) {
+        console.error('Erro ao inserir price_point:', insertErr);
+        return res.status(500).json({ error: insertErr.message || 'Erro ao salvar.' });
+      }
+      return res.status(201).json({ success: true });
+    } catch (e) {
+      console.error('POST /api/map/points:', e);
+      return res.status(500).json({ error: e.message || 'Erro ao salvar.' });
+    }
+  }
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const q = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
+    // Com busca textual: não limitar ao viewport (usuário quer achar oferta em qualquer região).
+    const bbox = q.length >= 2 ? null : parseBboxFromQuery(req.query || {});
+    const stateScale = bboxIsStateOrMacroRegion(bbox);
+    const rowLimitCeil = stateScale
+      ? Math.min(
+          2000,
+          Math.max(400, Number.parseInt(process.env.MAP_POINTS_BBOX_ROW_LIMIT_LARGE || '900', 10) || 900)
+        )
+      : Math.min(
+          500,
+          Math.max(50, Number.parseInt(process.env.MAP_POINTS_BBOX_ROW_LIMIT || '320', 10) || 320)
+        );
+    const rowLimit = bbox ? rowLimitCeil : 500;
+    const outCapCeil = stateScale
+      ? Math.min(
+          2500,
+          Math.max(600, Number.parseInt(process.env.MAP_POINTS_BBOX_OUT_CAP_LARGE || '1400', 10) || 1400)
+        )
+      : Math.min(
+          500,
+          Math.max(80, Number.parseInt(process.env.MAP_POINTS_BBOX_OUT_CAP || '320', 10) || 320)
+        );
+    const outCap = bbox ? outCapCeil : 500;
+
+    // TTL padrão: 24h (preços divulgados por usuários).
+    const defaultTtlHours = Math.max(
+      1,
+      Number.parseInt(process.env.MAP_DEFAULT_TTL_HOURS || '24', 10) || 24
+    );
+    // Promoções (ex.: import DIA — category com "promo") ficam mais tempo no ar.
+    const promoTtlHours = Math.max(
+      defaultTtlHours,
+      Number.parseInt(process.env.MAP_PROMO_TTL_HOURS || '168', 10) || 168
+    );
+    const normalCutoffIso = new Date(
+      Date.now() - defaultTtlHours * 60 * 60 * 1000
+    ).toISOString();
+    const promoCutoffIso = new Date(
+      Date.now() - promoTtlHours * 60 * 60 * 1000
+    ).toISOString();
+
+    // Não incluir image_url aqui: em bases sem a migração a coluna quebra o SELECT e o mapa fica vazio.
+    // imagem_url do agente vem de promocoes_supermercados; image_url em price_points é opcional (merge abaixo).
+    const baseSelect =
+      'id, product_name, price, store_name, lat, lng, category, created_at, user_id, product_id';
+
+    const applySearch = (qb) => {
+      if (q.length < 2) return qb;
+      const pattern = `%${q}%`;
+      return qb.or(
+        `product_name.ilike.${pattern},store_name.ilike.${pattern},category.ilike.${pattern}`
+      );
+    };
+
+    // 1) Ofertas/promoções (import DIA etc.): TTL maior — bbox antes de order/limit (PostgREST)
+    let promoQuery = applySearch(
+      applyLatLngBbox(
+        supabase
+          .from('price_points')
+          .select(baseSelect)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .ilike('category', '%promo%')
+          .gte('created_at', promoCutoffIso),
+        bbox
+      )
+    )
+      .order('created_at', { ascending: false })
+      .limit(rowLimit);
+
+    // 2) Demais pontos: TTL curto (categoria sem "promo" ou nula) — duas queries para evitar edge cases do PostgREST
+    let normalNullQuery = applySearch(
+      applyLatLngBbox(
+        supabase
+          .from('price_points')
+          .select(baseSelect)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .is('category', null)
+          .gte('created_at', normalCutoffIso),
+        bbox
+      )
+    )
+      .order('created_at', { ascending: false })
+      .limit(rowLimit);
+    let normalOtherQuery = applySearch(
+      applyLatLngBbox(
+        supabase
+          .from('price_points')
+          .select(baseSelect)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .not('category', 'ilike', '%promo%')
+          .gte('created_at', normalCutoffIso),
+        bbox
+      )
+    )
+      .order('created_at', { ascending: false })
+      .limit(rowLimit);
+
+    const [
+      { data: promoRows, error: promoErr },
+      { data: normalNullRows, error: normalNullErr },
+      { data: normalOtherRows, error: normalOtherErr },
+    ] = await Promise.all([promoQuery, normalNullQuery, normalOtherQuery]);
+
+    if (promoErr) {
+      console.error('Erro ao buscar price_points (promo):', promoErr);
+      return res.status(500).json({ error: promoErr.message });
+    }
+    if (normalNullErr) {
+      console.error('Erro ao buscar price_points (normal null):', normalNullErr);
+      return res.status(500).json({ error: normalNullErr.message });
+    }
+    if (normalOtherErr) {
+      console.error('Erro ao buscar price_points (normal):', normalOtherErr);
+      return res.status(500).json({ error: normalOtherErr.message });
+    }
+
+    const byId = new Map();
+    for (const row of [
+      ...(promoRows || []),
+      ...(normalNullRows || []),
+      ...(normalOtherRows || []),
+    ]) {
+      if (row?.id) byId.set(row.id, row);
+    }
+    const merged = Array.from(byId.values()).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+    let data = merged.slice(0, outCap);
+
+    // Promoções do agente (tabloides / import) — mesma forma que price_points para o mapa
+    try {
+      let promoAgentQ = applyLatLngBbox(
+        supabase
+          .from('promocoes_supermercados')
+          .select(
+            'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url, product_id, categoria'
+          )
+          .eq('ativo', true)
+          .gt('expira_em', new Date().toISOString())
+          .not('lat', 'is', null)
+          .not('lng', 'is', null),
+        bbox
+      )
+        .order('atualizado_em', { ascending: false })
+        .limit(bbox ? Math.min(stateScale ? 1400 : 200, rowLimit) : 300);
+      const { data: promoFromAgent, error: promoTableErr } = await promoAgentQ;
+
+      if (promoTableErr) {
+        console.warn('promocoes_supermercados (mapa):', promoTableErr.message);
+      } else if (promoFromAgent && promoFromAgent.length) {
+        const label = (s) =>
+          ({
+            dia: 'Dia',
+            atacadao: 'Atacadão',
+            assai: 'Assaí',
+            carrefour: 'Carrefour',
+            paodeacucar: 'Pão de Açúcar',
+            hirota: 'Hirota',
+            lopes: 'Lopes',
+            sonda: 'Sonda',
+            saojorge: 'Sacolão São Jorge',
+            mambo: 'Mambo',
+            agape: 'Ágape',
+            armazemdocampo: 'Armazém do Campo',
+          }[String(s || '').toLowerCase()] || String(s || 'Rede'));
+        const asPricePoints = promoFromAgent.map((r) => {
+          const raw = r.preco;
+          const priceNum =
+            raw != null && raw !== '' && !Number.isNaN(Number(raw))
+              ? Number(raw)
+              : null;
+          const slug = String(r.supermercado || '').toLowerCase();
+          // DIA: mesmo nome que pins em public.stores → /api/map/stores marca tem_oferta_hoje por nome.
+          const storeName =
+            slug === 'dia' ? 'Dia Supermercado' : `${label(r.supermercado)} · ofertas`;
+          return {
+            id: `promo-${r.id}`,
+            product_name: r.nome_produto,
+            price: priceNum,
+            store_name: storeName,
+            lat: r.lat,
+            lng: r.lng,
+            category: formatAgentPromoMapCategory(r.categoria),
+            created_at: r.atualizado_em,
+            user_id: null,
+            product_id: r.product_id ?? null,
+            imagem_url: r.imagem_url || null,
+          };
+        });
+        const byIdPromo = new Map(data.map((row) => [row.id, row]));
+        for (const row of asPricePoints) {
+          if (!byIdPromo.has(row.id)) byIdPromo.set(row.id, row);
+        }
+        data = Array.from(byIdPromo.values()).sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+        data = data.slice(0, outCap);
+      }
+    } catch (e) {
+      console.warn('promocoes_supermercados merge:', e.message);
+    }
+
+    /**
+     * Fallback de imagem no mapa:
+     * 1) bucket próprio (product_images primária)
+     * 2) imagem_url do scraping/agent
+     * 3) Open Food Facts via GTIN do produto
+     * 4) frontend exibe ícone genérico por categoria
+     */
+    let pathByProductId = new Map();
+    try {
+      const productIds = [
+        ...new Set((data || []).map((r) => r.product_id).filter(Boolean)),
+      ];
+      if (productIds.length > 0) {
+        const { data: imgRows, error: imgErr } = await supabase
+          .from('product_images')
+          .select('product_id, storage_path')
+          .in('product_id', productIds)
+          .eq('is_primary', true);
+        if (!imgErr && imgRows?.length) {
+          for (const ir of imgRows) {
+            if (ir.product_id && ir.storage_path && !pathByProductId.has(ir.product_id)) {
+              pathByProductId.set(ir.product_id, ir.storage_path);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('product_images/products (mapa):', e.message);
+    }
+
+    const points = (data || []).map((row) => {
+      let promoUrl = row.imagem_url || row.image_url || null;
+      const pid = row.product_id;
+      if (pid && pathByProductId.has(pid)) {
+        const fromCatalog = getPublicProductImageUrl(pathByProductId.get(pid));
+        if (fromCatalog) promoUrl = fromCatalog;
+      }
+      // Não usar URL sintética por GTIN (getOpenFoodFactsImageUrl): muitas devolvem 404 no <img>
+      // e impediam o enriquecimento por nome (Open Food Facts) abaixo.
+      return {
+        id: row.id,
+        product_name: row.product_name,
+        price: row.price,
+        store_name: row.store_name,
+        lat: Number(row.lat),
+        lng: Number(row.lng),
+        category: row.category,
+        time_ago: formatTimeAgo(row.created_at),
+        user_label: maskUserId(row.user_id),
+        promo_image_url: promoUrl,
+      };
+    });
+
+    // Miniatura por nome (Open Food Facts; opcional Google CSE) quando ainda falta foto exibível.
+    if (process.env.MAP_POINTS_OFF_ENRICH !== '0') {
+      const stateWide = stateScale;
+      const maxNames = stateWide
+        ? Math.min(8, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES_STATE || '8', 10) || 8)
+        : q.length >= 2
+          ? Math.min(36, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES_SEARCH || '28', 10) || 28)
+          : Math.min(32, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES || '24', 10) || 24);
+      const useCse =
+        process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
+        Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
+      try {
+        await enrichMapPointsImageUrls(points, {
+          maxUniqueNames: maxNames,
+          concurrency: stateWide ? 3 : 4,
+          useGoogleCse: useCse,
+        });
+      } catch (e) {
+        console.warn('enrichMapPointsImageUrls:', e.message);
+      }
+    }
+
+    return res.status(200).json({ points });
+  } catch (e) {
+    console.error('Erro em /api/map/points:', e);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+========== pages\api\map\store-offers.js ==========
+
+import { createClient } from '@supabase/supabase-js';
+import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
+import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
+import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
+
+/**
+ * GET /api/map/store-offers?store_id=UUID
+ * Ofertas/promoções ligadas à loja (nome ou proximidade), mesmo critério de /api/map/stores.
+ */
+let supabaseInstance = null;
+
+function getSupabase() {
+  if (!supabaseInstance) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    supabaseInstance = createClient(url, key);
+  }
+  return supabaseInstance;
+}
+
+function distanceKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function maskUserId(userId) {
+  if (!userId || typeof userId !== 'string') return 'Explorador';
+  const last4 = userId.replace(/-/g, '').slice(-4);
+  return `Explorador #${last4}`;
+}
+
+function formatTimeAgo(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 60) return `Há ${diffMins} min`;
+  if (diffHours < 24) return `Há ${diffHours}h`;
+  if (diffDays < 7) return `Há ${diffDays} dia(s)`;
+  return d.toLocaleDateString('pt-BR');
+}
+
+function agentLabel(slug) {
+  const s = String(slug || '').toLowerCase();
+  const map = {
+    dia: 'Dia',
+    atacadao: 'Atacadão',
+    assai: 'Assaí',
+    carrefour: 'Carrefour',
+    paodeacucar: 'Pão de Açúcar',
+    hirota: 'Hirota',
+    lopes: 'Lopes',
+    sonda: 'Sonda',
+    saojorge: 'Sacolão São Jorge',
+    mambo: 'Mambo',
+    agape: 'Ágape',
+    armazemdocampo: 'Armazém do Campo',
+  };
+  return map[s] || String(slug || 'Rede');
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const storeId = typeof req.query.store_id === 'string' ? req.query.store_id.trim() : '';
+  if (!storeId) {
+    return res.status(400).json({ error: 'Informe store_id' });
+  }
+
+  const supabase = getSupabase();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Configuração do servidor incompleta' });
+  }
+
+  try {
+    const { data: store, error: storeErr } = await supabase
+      .from('stores')
+      .select('id, name, type, lat, lng')
+      .eq('id', storeId)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (storeErr || !store) {
+      return res.status(404).json({ error: 'Loja não encontrada' });
+    }
+
+    let tablePromotions = [];
+    try {
+      const { data: promData, error: promErr } = await supabase
+        .from('promotions')
+        .select('id, product_name, promo_price, original_price, unit, category')
+        .eq('store_id', storeId)
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(300);
+      if (promErr) {
+        console.warn('store-offers promotions:', promErr.message);
+      } else {
+        tablePromotions = promData || [];
+      }
+    } catch (e) {
+      console.warn('store-offers promotions:', e.message);
+    }
+
+    const sLat = Number(store.lat);
+    const sLng = Number(store.lng);
+    if (Number.isNaN(sLat) || Number.isNaN(sLng)) {
+      return res.status(200).json({
+        store: { id: store.id, name: store.name, type: store.type },
+        offers: [],
+        promotions: tablePromotions,
+      });
+    }
+
+    const delta = 0.018;
+    const latMin = sLat - delta;
+    const latMax = sLat + delta;
+    const lngMin = sLng - delta;
+    const lngMax = sLng + delta;
+    const promoThresholdKm = Math.max(
+      0.08,
+      Number.parseFloat(process.env.MAP_STORE_OFFERS_RADIUS_KM || '0.25') || 0.25
+    );
+
+    const promoTtlHours = Math.max(
+      1,
+      Number.parseInt(process.env.MAP_STORE_OFFERS_PROMO_TTL_HOURS || '24', 10) || 24
+    );
+    /** Só para `price_points` (divulgação/import categoria promo). O agente usa `expira_em` (ex.: 72h). */
+    const promoCutoffIso = new Date(Date.now() - promoTtlHours * 60 * 60 * 1000).toISOString();
+
+    const baseSelect = 'id, product_name, price, store_name, lat, lng, category, created_at, user_id, product_id';
+
+    const { data: promoRows, error: promoErr } = await supabase
+      .from('price_points')
+      .select(baseSelect)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .ilike('category', '%promo%')
+      .gte('created_at', promoCutoffIso)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .order('created_at', { ascending: false })
+      .limit(800);
+
+    if (promoErr) {
+      console.error('store-offers price_points:', promoErr);
+      return res.status(500).json({ error: promoErr.message });
+    }
+
+    let merged = [...(promoRows || [])].map((r) => ({ ...r, source: 'price_points' }));
+
+    try {
+      const { data: promoFromAgent, error: agentErr } = await supabase
+        .from('promocoes_supermercados')
+        .select(
+          'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url, product_id, categoria'
+        )
+        .eq('ativo', true)
+        .gt('expira_em', new Date().toISOString())
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .gte('lat', latMin)
+        .lte('lat', latMax)
+        .gte('lng', lngMin)
+        .lte('lng', lngMax)
+        .order('atualizado_em', { ascending: false })
+        .limit(600);
+
+      if (agentErr) {
+        console.warn('store-offers agent:', agentErr.message);
+      } else if (promoFromAgent?.length) {
+        const asPricePoints = promoFromAgent.map((r) => {
+          const raw = r.preco;
+          const priceNum =
+            raw != null && raw !== '' && !Number.isNaN(Number(raw)) ? Number(raw) : null;
+          const slug = String(r.supermercado || '').toLowerCase();
+          const storeName = slug === 'dia' ? 'Dia Supermercado' : `${agentLabel(r.supermercado)} · ofertas`;
+          return {
+            id: `promo-${r.id}`,
+            product_name: r.nome_produto,
+            price: priceNum,
+            store_name: storeName,
+            lat: r.lat,
+            lng: r.lng,
+            category: formatAgentPromoMapCategory(r.categoria),
+            created_at: r.atualizado_em,
+            user_id: null,
+            product_id: r.product_id ?? null,
+            imagem_url: r.imagem_url || null,
+            source: 'agent_promotions',
+          };
+        });
+        merged = merged.concat(asPricePoints);
+      }
+    } catch (e) {
+      console.warn('store-offers promocoes_supermercados:', e.message);
+    }
+
+    const storeNameLower = String(store.name || '').toLowerCase();
+    const normalizedStoreName = normalizeText(store.name);
+    const isPaoStore = /(pao de acucar|minuto pao de acucar)/.test(normalizedStoreName);
+
+    const belongs = (row) => {
+      const pLat = Number(row.lat);
+      const pLng = Number(row.lng);
+      if (Number.isNaN(pLat) || Number.isNaN(pLng)) return false;
+      const pStoreName = (row.store_name || '').toLowerCase();
+      const normalizedPointStoreName = normalizeText(row.store_name);
+      if (pStoreName && pStoreName === storeNameLower) return true;
+      const distance = distanceKm(sLat, sLng, pLat, pLng);
+      if (distance > promoThresholdKm) return false;
+      if (isPaoStore && normalizedPointStoreName.includes('dia supermercado')) return false;
+      if (isPaoStore) {
+        const sameBrand =
+          normalizedPointStoreName.includes('pao de acucar') ||
+          normalizedPointStoreName.includes('minuto pao de acucar');
+        if (!sameBrand) return false;
+      }
+      return true;
+    };
+
+    const filtered = merged.filter(belongs);
+
+    const byId = new Map();
+    for (const row of filtered) {
+      if (row?.id != null) byId.set(row.id, row);
+    }
+    const deduped = Array.from(byId.values()).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+
+    let pathByProductId = new Map();
+    try {
+      const productIds = [...new Set(deduped.map((r) => r.product_id).filter(Boolean))];
+      if (productIds.length > 0) {
+        const { data: imgRows, error: imgErr } = await supabase
+          .from('product_images')
+          .select('product_id, storage_path')
+          .in('product_id', productIds)
+          .eq('is_primary', true);
+        if (!imgErr && imgRows?.length) {
+          for (const ir of imgRows) {
+            if (ir.product_id && ir.storage_path && !pathByProductId.has(ir.product_id)) {
+              pathByProductId.set(ir.product_id, ir.storage_path);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('store-offers catalog images:', e.message);
+    }
+
+    const offers = deduped.map((row) => {
+      let promoUrl = row.imagem_url || row.image_url || null;
+      const pid = row.product_id;
+      if (pid && pathByProductId.has(pid)) {
+        const fromCatalog = getPublicProductImageUrl(pathByProductId.get(pid));
+        if (fromCatalog) promoUrl = fromCatalog;
+      }
+      return {
+        id: row.id,
+        product_name: row.product_name,
+        price: row.price,
+        store_name: row.store_name,
+        lat: Number(row.lat),
+        lng: Number(row.lng),
+        category: row.category,
+        time_ago: formatTimeAgo(row.created_at),
+        observed_at: row.created_at,
+        user_label: maskUserId(row.user_id),
+        promo_image_url: promoUrl,
+        source: row.source || 'unknown',
+      };
+    });
+
+    if (process.env.MAP_POINTS_OFF_ENRICH !== '0') {
+      const useCse =
+        process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
+        Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
+      try {
+        await enrichMapPointsImageUrls(offers, {
+          maxUniqueNames: 32,
+          concurrency: 4,
+          useGoogleCse: useCse,
+        });
+      } catch (e) {
+        console.warn('store-offers enrichMapPointsImageUrls:', e.message);
+      }
+    }
+
+    return res.status(200).json({
+      store: { id: store.id, name: store.name, type: store.type },
+      offers,
+      promotions: tablePromotions,
+    });
+  } catch (e) {
+    console.error('GET /api/map/store-offers:', e);
+    return res.status(500).json({ error: e.message || 'Erro ao carregar ofertas' });
+  }
+}
+
+========== pages\api\map\geocode-region.js ==========
+
+import { geocodeRegionQuery } from '../../../lib/geocodeRegion';
+
+/**
+ * GET /api/map/geocode-region?q=Grajaú
+ * Resolve um nome de região (bairro, cidade, etc.) para centro + bbox no Brasil.
+ */
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (q.length < 2) {
+    return res.status(400).json({ ok: false, error: 'Informe pelo menos 2 caracteres.' });
+  }
+
+  try {
+    const result = await geocodeRegionQuery(q);
+    if (!result) {
+      return res.status(200).json({ ok: false });
+    }
+    return res.status(200).json({
+      ok: true,
+      label: result.label,
+      center: result.center,
+      bbox: result.bbox,
+    });
+  } catch (e) {
+    console.error('[geocode-region]', e);
+    return res.status(500).json({ ok: false, error: e.message || 'Erro ao geocodificar.' });
+  }
+}
+
+========== lib\mapOfferDisplay.js ==========
+
+/**
+ * Texto de ofertas no mapa — limpeza de sufixos técnicos e rótulo de categoria legível.
+ */
+
+/** Sufixo do fan-out do agente: mesmo produto em várias lojas → "Nome · Pão de Açúcar #4baee29b". */
+const FANOUT_SUFFIX_RE = /\s·\s[^·]+?\s#[0-9a-fA-F]{8}$/;
+
+export function stripFanoutProductSuffix(name) {
+  const s = String(name || '').trim();
+  if (!s) return s;
+  const cleaned = s.replace(FANOUT_SUFFIX_RE, '').trim();
+  return cleaned || s;
+}
+
+/**
+ * Categoria para exibir no card (ex.: "Bebidas" a partir de "Supermercado - Promoção · Bebidas").
+ */
+export function promoShelfLabel(category) {
+  const c = String(category || '').trim();
+  if (!c) return '';
+  const m = c.match(/Supermercado\s*-\s*Promoção\s*·\s*(.+)/i);
+  if (m) return m[1].trim().slice(0, 40);
+  const parts = c
+    .split(/\s*-\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) return parts[parts.length - 1].slice(0, 40);
+  return c.length > 24 ? '' : c;
+}
+
+========== lib\mapPromoCategory.js ==========
+
+/**
+ * Categoria exibida no mapa para linhas de `promocoes_supermercados`.
+ * Mantém o prefixo "Supermercado - Promoção" para cores, soma de promo e filtros.
+ */
+const MAP_PROMO_BASE = 'Supermercado - Promoção';
+
+export function formatAgentPromoMapCategory(categoriaDb) {
+  const s = String(categoriaDb || '').replace(/\s+/g, ' ').trim();
+  if (!s) return MAP_PROMO_BASE;
+  return `${MAP_PROMO_BASE} · ${s.slice(0, 100)}`;
+}
+
+========== lib\saoPauloStateMap.js ==========
+
+/**
+ * Mapa de preços em escala do Estado de São Paulo (viewport inicial + heurística de API).
+ * Limites administrativos são aproximados (bbox ~ WGS84).
+ */
+
+/** Centro aproximado do estado (interior entre capital e Campinas). */
+export const SAO_PAULO_STATE_CENTER = Object.freeze([-22.55, -48.62]);
+
+/** Zoom Leaflet que mostra praticamente todo o território paulista. */
+export const SAO_PAULO_STATE_ZOOM = 7;
+
+export const SAO_PAULO_STATE_BOUNDS = Object.freeze({
+  minLat: -25.38,
+  maxLat: -19.78,
+  minLng: -53.2,
+  maxLng: -44.05,
+});
+
+/**
+ * Viewport “grande” (estado / macro-região): APIs podem subir limites de linhas por bbox.
+ * Heurística: metade ou mais da extensão típica do estado em lat OU lng.
+ */
+export function bboxIsStateOrMacroRegion(bbox) {
+  if (!bbox || typeof bbox !== 'object') return false;
+  const latSpan = Math.abs(bbox.maxLat - bbox.minLat);
+  const lngSpan = Math.abs(bbox.maxLng - bbox.minLng);
+  return latSpan >= 2.0 || lngSpan >= 3.0;
+}
+
+========== lib\colors.js ==========
+
+/**
+ * Cores vivas do FinMemory – destaque estratégico por tipo de comércio.
+ * Usado no mapa (pins, popups), no histórico (Gastos) e em relatórios.
+ */
+
+/** Cores vivas por tipo de estabelecimento – destaque estratégico (restaurante, lanchonete, mercado, etc.) */
+export const CATEGORY_COLORS = {
+  supermercado: { main: '#D32F2F', bg: '#FFEBEE', label: 'Supermercado' },
+  mercado:      { main: '#D32F2F', bg: '#FFEBEE', label: 'Mercado' },
+  restaurante:  { main: '#F57C00', bg: '#FFF3E0', label: 'Restaurante' },
+  lanchonete:   { main: '#FF9800', bg: '#FFF8E1', label: 'Lanchonete' },
+  padaria:      { main: '#795548', bg: '#EFEBE9', label: 'Padaria' },
+  farmácia:     { main: '#00796B', bg: '#E0F2F1', label: 'Farmácia' },
+  bar:          { main: '#512DA8', bg: '#EDE7F6', label: 'Bar' },
+  açougue:      { main: '#B71C1C', bg: '#FFEBEE', label: 'Açougue' },
+  posto:        { main: '#0D47A1', bg: '#E3F2FD', label: 'Posto' },
+  combustível:  { main: '#0D47A1', bg: '#E3F2FD', label: 'Combustível' },
+  eletrônicos:  { main: '#01579B', bg: '#E1F5FE', label: 'Eletrônicos' },
+  roupas:       { main: '#880E4F', bg: '#FCE4EC', label: 'Roupas' },
+  vestuário:    { main: '#880E4F', bg: '#FCE4EC', label: 'Vestuário' },
+  serviços:     { main: '#4A148C', bg: '#F3E5F5', label: 'Serviços' },
+  transporte:  { main: '#004D40', bg: '#E0F2F1', label: 'Transporte' },
+  uber:         { main: '#263238', bg: '#ECEFF1', label: 'Uber' },
+  alimentação:  { main: '#E65100', bg: '#FFF8E1', label: 'Alimentação' },
+  default:      { main: '#2E7D32', bg: '#E8F5E9', label: 'Outros' },
+};
+
+/** Paleta para categorias sem palavra-chave — cores bem distintas (determinísticas por texto). */
+const DYNAMIC_FALLBACK = [
+  { main: '#2563EB', bg: '#EFF6FF' },
+  { main: '#7C3AED', bg: '#F5F3FF' },
+  { main: '#DB2777', bg: '#FDF2F8' },
+  { main: '#0891B2', bg: '#ECFEFF' },
+  { main: '#059669', bg: '#ECFDF5' },
+  { main: '#4F46E5', bg: '#EEF2FF' },
+  { main: '#CA8A04', bg: '#FEFCE8' },
+  { main: '#BE185D', bg: '#FDF2F8' },
+  { main: '#0D9488', bg: '#F0FDFA' },
+  { main: '#B45309', bg: '#FFFBEB' },
+  { main: '#65A30D', bg: '#F7FEE7' },
+  { main: '#9333EA', bg: '#FAF5FF' },
+  { main: '#E11D48', bg: '#FFF1F2' },
+  { main: '#0284C7', bg: '#F0F9FF' },
+];
+
+/** Variações de vermelho/laranja para supermercado/mercado — mesmo “tipo” mas pins mais distintos no mapa. */
+const SUPERMARKET_PIN_VARIANTS = [
+  '#B71C1C', '#C62828', '#D32F2F', '#E53935', '#F4511E', '#FB8C00', '#F57C00', '#E65100',
+];
+
+function hashStringToIndex(seed, modulo) {
+  let h = 0;
+  const s = String(seed || '');
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+  }
+  return Math.abs(h) % modulo;
+}
+
+/**
+ * Retorna a cor do tipo de comércio (main e bg) a partir de categoria/nome.
+ * Promoções e encartes têm cor própria; supermercado/mercado variam por loja+categoria;
+ * “Outros” usa paleta dinâmica em vez de um único verde.
+ */
+export function getCategoryColor(category, merchantName = '') {
+  const text = `${(category || '')} ${(merchantName || '')}`.toLowerCase();
+
+  // Antes de “supermercado” genérico — encartes/promos com cor própria
+  if (/\b(promo|promoç|promoção|encarte|oferta)\b/.test(text) && !/\bsem\s+(promo|oferta)\b/i.test(text)) {
+    return { main: '#9333EA', bg: '#F3E8FF', label: 'Promoção' };
+  }
+
+  for (const [key, colors] of Object.entries(CATEGORY_COLORS)) {
+    if (key === 'default') continue;
+    if (text.includes(key)) {
+      if (key === 'supermercado' || key === 'mercado') {
+        const idx = hashStringToIndex(`${category || ''}\0${merchantName || ''}`, SUPERMARKET_PIN_VARIANTS.length);
+        return { ...colors, main: SUPERMARKET_PIN_VARIANTS[idx] };
+      }
+      if (key === 'restaurante' || key === 'lanchonete' || key === 'alimentação') {
+        const warm = ['#E65100', '#F57C00', '#FB8C00', '#FF9800', '#F9A825', '#FDD835'];
+        const wi = hashStringToIndex(`${category || ''}\0${merchantName || ''}`, warm.length);
+        return { ...colors, main: warm[wi] };
+      }
+      if (key === 'farmácia' || key === 'padaria') {
+        const cool = key === 'farmácia'
+          ? ['#00695C', '#00796B', '#00897B', '#009688', '#26A69A']
+          : ['#5D4037', '#6D4C41', '#795548', '#8D6E63', '#A1887F'];
+        const ci = hashStringToIndex(`${category || ''}\0${merchantName || ''}`, cool.length);
+        return { ...colors, main: cool[ci] };
+      }
+      return colors;
+    }
+  }
+
+  const fi = hashStringToIndex(`${category || ''}\0${merchantName || ''}`, DYNAMIC_FALLBACK.length);
+  const pick = DYNAMIC_FALLBACK[fi];
+  return { main: pick.main, bg: pick.bg, label: CATEGORY_COLORS.default.label };
+}
+
+/** Tons por `stores.type` — pin principal no mapa (estilo aplicativo de mapas). */
+const STORE_TYPE_PIN_PALETTES = {
+  supermarket: ['#1A73E8', '#1967D2', '#1558B0', '#0D47A1', '#4285F4', '#039BE5', '#0277BD', '#00838F'],
+  pharmacy: ['#0F766E', '#0D9488', '#0E7490', '#115E59', '#0891B2', '#047857', '#0D9488', '#134E4A'],
+  bakery: ['#B45309', '#C2410C', '#D97706', '#CA8A04', '#A16207', '#EA580C', '#9A3412', '#F97316'],
+  restaurant: ['#DC2626', '#E11D48', '#DB2777', '#EA580C', '#F43F5E', '#BE123C', '#B91C1C', '#C2185B'],
+};
+
+const STORE_PIN_GENERIC = [
+  '#5B21B6', '#6D28D9', '#7C3AED', '#4338CA', '#4F46E5', '#6366F1',
+  '#475569', '#64748B', '#0EA5E9', '#0284C7', '#92400E', '#15803D', '#A21CAF',
+];
+
+/**
+ * Cor principal do pin de loja (teardrop + popup). Varia por loja dentro do mesmo tipo.
+ * @param {string} [type] — ex.: supermarket, pharmacy, bakery, restaurant
+ * @param {string} [stableKey] — ex.: id ou nome da loja
+ */
+export function getStorePinMainColor(type, stableKey = '') {
+  const t = String(type || '').toLowerCase();
+  const seed = `${t}\0${String(stableKey || '')}`;
+  const pick = (arr) => arr[hashStringToIndex(seed, arr.length)];
+  if (t === 'supermarket') return pick(STORE_TYPE_PIN_PALETTES.supermarket);
+  if (t === 'pharmacy') return pick(STORE_TYPE_PIN_PALETTES.pharmacy);
+  if (t === 'bakery') return pick(STORE_TYPE_PIN_PALETTES.bakery);
+  if (t === 'restaurant') return pick(STORE_TYPE_PIN_PALETTES.restaurant);
+  return pick(STORE_PIN_GENERIC);
+}
+
+/** Chave no localStorage para o tema do mapa escolhido */
+export const MAP_THEME_STORAGE_KEY = 'finmemory_map_theme';
+
+/**
+ * Temas do mapa – tons de cor do fundo do mapa (TileLayer).
+ * A pessoa clica em "Mapas" e escolhe um dos estilos.
+ */
+/** Tons do mapa – pasta "Mapas": usuário clica e escolhe o visual (como subpasta que complementa a tela principal). */
+export const MAP_THEMES = [
+  {
+    id: 'padrao',
+    name: 'Ruas em destaque',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    preview: '#e8e4de',
+    attribution:
+      '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, Maxar, Earthstar Geographics, GIS User Community',
+  },
+  {
+    id: 'verde',
+    name: 'Verde',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    preview: '#C8E6C9',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  },
+  {
+    id: 'waze',
+    name: 'Waze dos Preços',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    preview: '#13161f',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  },
+];
+
+export function getMapThemeById(id) {
+  return MAP_THEMES.find((t) => t.id === id) || MAP_THEMES[0];
+}

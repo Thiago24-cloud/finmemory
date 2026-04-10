@@ -1,0 +1,57 @@
+[
+  {
+    "slug": "brooklin",
+    "name": "Mambo Brooklin",
+    "address": "Avenida Vereador José Diniz, 2329 - Santo Amaro, São Paulo - SP, 04603-001",
+    "neighborhood": "Brooklin",
+    "lat": -23.6249644,
+    "lng": -46.6830379,
+    "place_id": "manual-mambo-brooklin-jose-diniz-2329"
+  },
+  {
+    "slug": "morumbi",
+    "name": "Mambo Morumbi",
+    "address": "Avenida Giovanni Gronchi, 2799 - Morumbi, São Paulo - SP, 05651-002",
+    "neighborhood": "Morumbi",
+    "lat": -23.6064089,
+    "lng": -46.7250062,
+    "place_id": "manual-mambo-morumbi-gronchi-2799"
+  },
+  {
+    "slug": "vila-madalena",
+    "name": "Mambo Vila Madalena",
+    "address": "Rua Deputado Lacerda Franco, 553 - Pinheiros, São Paulo - SP, 05418-001",
+    "neighborhood": "Pinheiros",
+    "lat": -23.5606538,
+    "lng": -46.6928092,
+    "place_id": "manual-mambo-vm-lacerda-franco-553"
+  },
+  {
+    "slug": "vila-romana",
+    "name": "Mambo Vila Romana",
+    "address": "Rua Aurélia, 1973 - Vila Romana, São Paulo - SP, 05046-000",
+    "neighborhood": "Vila Romana",
+    "lat": -23.5394445,
+    "lng": -46.6971548,
+    "place_id": "manual-mambo-vila-romana-aurelia-1973",
+    "note": "OSM tem o POI em 1971 na mesma rua; ajuste lat/lng no mapa se precisar."
+  },
+  {
+    "slug": "higienopolis",
+    "name": "Mambo Higienópolis",
+    "address": "Avenida Angélica, 546 - Santa Cecília, São Paulo - SP, 01228-000",
+    "neighborhood": "Higienópolis",
+    "lat": -23.5458958,
+    "lng": -46.6577897,
+    "place_id": "manual-mambo-higienopolis-angelica-546"
+  },
+  {
+    "slug": "leopoldina",
+    "name": "Mambo Leopoldina",
+    "address": "Rua Aliança Liberal, 322 - Vila Leopoldina, São Paulo - SP, 05088-000",
+    "neighborhood": "Vila Leopoldina",
+    "lat": -23.5222182,
+    "lng": -46.7250521,
+    "place_id": "manual-mambo-leopoldina-alianca-liberal-322"
+  }
+]
