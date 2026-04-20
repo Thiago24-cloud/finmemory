@@ -74,3 +74,9 @@ teste-pre-deploy.md
 
 # Vídeos de teste (evitar arquivos grandes no repo)
 Testes do FinMemory.mp4
+
+# Local-only secrets / temp artifacts
+android/keystore
+supabase/.temp/
+print mambo .png
+_smart-receipt-scanner/
