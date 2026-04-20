@@ -25,6 +25,22 @@ export async function getServerSideProps(ctx) {
 export default function AdminHomePage() {
   const cards = [
     {
+      href: '/admin/map-thumbnail-rules',
+      title: 'Miniaturas — treino e regras',
+      desc:
+        'Keywords + URL HTTPS opcional por regra (prioridade no mapa), depois repositório, depois APIs. Mesma página onde defines confiança nas fotos.',
+      ready: true,
+      badge: 'Atualizado',
+    },
+    {
+      href: '/admin/product-image-curator',
+      title: 'Curador de imagens (Google)',
+      desc:
+        'Produtos sem foto: busca até 3 imagens (fundo branco png) no Custom Search e grava com um clique no Storage + repositório do mapa.',
+      ready: true,
+      badge: 'Novo',
+    },
+    {
       href: '/admin/quick-add',
       title: 'Quick Add — mapa',
       desc: 'Loja + produtos/preços no mapa (stream SSE).',
@@ -61,6 +77,10 @@ export default function AdminHomePage() {
             <div>
               <h1 className="text-xl font-bold tracking-tight">Painel operacional</h1>
               <p className="text-sm text-gray-600">Mapa de preços e curadoria — mesmo deploy que o app.</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Atalho no celular: com esta página aberta (já logado), Safari/Chrome → compartilhar → Adicionar à tela
+                inicial — o atalho abre em <code className="rounded bg-black/5 px-1">/admin</code>, não na home do app.
+              </p>
             </div>
             <Link
               href="/dashboard"
@@ -79,7 +99,14 @@ export default function AdminHomePage() {
                     href={c.href}
                     className="block rounded-2xl border border-black/10 bg-white p-5 shadow-sm transition hover:border-[#2ECC49]/40 hover:shadow-md"
                   >
-                    <h2 className="font-semibold text-[#111]">{c.title}</h2>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="font-semibold text-[#111]">{c.title}</h2>
+                      {c.badge ? (
+                        <span className="rounded-full bg-[#2ECC49]/15 px-2.5 py-0.5 text-xs font-semibold text-[#1d8f35]">
+                          {c.badge}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="mt-2 text-sm text-gray-600">{c.desc}</p>
                     <span className="mt-3 inline-block text-sm font-medium text-[#2ECC49]">Abrir →</span>
                   </Link>

@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../lib/supabaseAdmin';
+import { checkoutPlanOrDefault, stripePriceIdsFromEnv } from '../../lib/stripePlanPrice';
 
 function baseUrl() {
   return (
@@ -14,7 +15,8 @@ function baseUrl() {
 
 /**
  * POST /api/create-checkout-session
- * Cria sessão Stripe Checkout (assinatura FinMemory Plus). Utilizador vem da sessão NextAuth.
+ * Body JSON opcional: { "plan": "plus" | "pro" | "familia" } (default plus).
+ * Price IDs só vêm de variáveis de ambiente no servidor.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -22,16 +24,26 @@ export default async function handler(req, res) {
   }
 
   const secret = process.env.STRIPE_SECRET_KEY;
-  const priceId = process.env.STRIPE_PLUS_PRICE_ID || process.env.STRIPE_PRICE_ID;
-  if (!secret || !priceId) {
-    return res.status(500).json({ error: 'Stripe não configurado no servidor.' });
+  if (!secret) {
+    return res.status(500).json({ error: 'Stripe não configurado no servidor (STRIPE_SECRET_KEY).' });
+  }
+
+  const plan = checkoutPlanOrDefault(
+    typeof req.body === 'object' && req.body !== null ? req.body.plan : undefined
+  );
+  const prices = stripePriceIdsFromEnv();
+  const priceId = prices[plan];
+  if (!priceId) {
+    return res.status(500).json({
+      error: `Stripe: defina o Price ID para o plano "${plan}" (STRIPE_${String(plan).toUpperCase()}_PRICE_ID ou NEXT_PUBLIC_STRIPE_${String(plan).toUpperCase()}_PRICE_ID).`,
+    });
   }
 
   const session = await getServerSession(req, res, authOptions);
   const userId = session?.user?.supabaseId;
   const email = session?.user?.email;
   if (!userId || !email) {
-    return res.status(401).json({ error: 'Faça login para assinar o FinMemory Plus.' });
+    return res.status(401).json({ error: 'Faça login para assinar um plano FinMemory.' });
   }
 
   const origin = baseUrl();
@@ -75,9 +87,9 @@ export default async function handler(req, res) {
       locale: 'pt-BR',
       success_url: `${origin}/dashboard?stripe=success`,
       cancel_url: `${origin}/dashboard?stripe=cancel`,
-      metadata: { user_id: userId },
+      metadata: { user_id: userId, plan },
       subscription_data: {
-        metadata: { user_id: userId },
+        metadata: { user_id: userId, plan },
       },
       allow_promotion_codes: true,
     });

@@ -3,6 +3,8 @@ import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { createPluggyServerClient, syncTransactionsForItem } from '../../../lib/pluggySyncTransactions';
 import { syncOpenFinanceForItem } from '../../../lib/pluggySyncOpenFinance';
+import { refreshConnectorAndPruneDuplicates } from '../../../lib/pluggyPruneDuplicateItems';
+import { autoLinkPluggyTransactionsForUser } from '../../../lib/autoLinkPluggyTransactions';
 
 /**
  * POST /api/pluggy/sync-transactions
@@ -48,11 +50,35 @@ export default async function handler(req, res) {
   }
 
   try {
+    const { pluggyConnectorId } = await refreshConnectorAndPruneDuplicates(
+      supabase,
+      pluggy,
+      userId,
+      trimmed
+    );
+    if (pluggyConnectorId != null) {
+      await supabase
+        .from('bank_connections')
+        .update({ pluggy_connector_id: pluggyConnectorId, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('item_id', trimmed);
+    }
+  } catch (e) {
+    console.warn('[pluggy/sync-transactions] prune:', e?.message || e);
+  }
+
+  try {
     const [result, openFinance] = await Promise.all([
       syncTransactionsForItem(supabase, pluggy, userId, trimmed),
       syncOpenFinanceForItem(supabase, pluggy, userId, trimmed),
     ]);
-    return res.status(200).json({ ok: true, ...result, openFinance });
+    const autoLink = await autoLinkPluggyTransactionsForUser(supabase, userId);
+    return res.status(200).json({
+      ok: true,
+      ...result,
+      openFinance,
+      autoLink: { linked: autoLink.ok ? autoLink.linked : 0, ok: autoLink.ok },
+    });
   } catch (e) {
     console.error('[pluggy/sync-transactions]', e);
     return res.status(500).json({ error: e?.message || 'Falha ao sincronizar transações' });

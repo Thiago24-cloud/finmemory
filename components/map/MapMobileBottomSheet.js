@@ -1,4 +1,6 @@
-import { useCallback, useRef } from 'react';
+'use client';
+
+import { useCallback, useEffect, useRef } from 'react';
 
 const DRAG_THRESHOLD = 48;
 const TAP_MAX_DY = 16;
@@ -12,6 +14,7 @@ const TAP_MAX_DY = 16;
  * @param {React.ReactNode} p.children
  * @param {number} [p.peekDvh]
  * @param {number} [p.expandedDvh]
+ * @param {(m: { snap: string; bottomInsetPx: number }) => void} [p.onVisualMetrics] — reserva de padding no mapa (área útil acima da folha)
  */
 export default function MapMobileBottomSheet({
   snap,
@@ -20,6 +23,7 @@ export default function MapMobileBottomSheet({
   children,
   peekDvh = 35,
   expandedDvh = 92,
+  onVisualMetrics,
 }) {
   const dragY0 = useRef(null);
   const snapRef = useRef(snap);
@@ -118,6 +122,29 @@ export default function MapMobileBottomSheet({
   );
 
   const maxDvh = snap === 'expanded' ? expandedDvh : peekDvh;
+
+  const onVisualMetricsRef = useRef(onVisualMetrics);
+  onVisualMetricsRef.current = onVisualMetrics;
+
+  const reportMetrics = useCallback(() => {
+    const fn = onVisualMetricsRef.current;
+    if (!fn) return;
+    const dvh = snapRef.current === 'expanded' ? expandedDvh : peekDvh;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const bottomInsetPx = vh > 0 ? Math.round((dvh / 100) * vh) : 0;
+    fn({ snap: snapRef.current, bottomInsetPx });
+  }, [expandedDvh, peekDvh]);
+
+  useEffect(() => {
+    reportMetrics();
+  }, [snap, reportMetrics]);
+
+  useEffect(() => {
+    if (!onVisualMetricsRef.current) return undefined;
+    const onResize = () => reportMetrics();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [reportMetrics]);
 
   return (
     <>

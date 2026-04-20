@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import { ExpressionValueField } from '../components/ui/ExpressionValueField';
 import { getSupabase } from '../lib/supabase';
 import { createPricePointsFromTransaction } from '../lib/autoPricePoints';
 
@@ -115,18 +116,15 @@ export default function ManualEntryPage() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-[#333] mb-1">Valor total (R$) *</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={total}
-              onChange={(e) => setTotal(e.target.value)}
-              placeholder="0,00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
-              required
-            />
-          </div>
+          <ExpressionValueField
+            label="Valor total (R$)"
+            value={total}
+            onChange={setTotal}
+            mode="money"
+            placeholder="0,00"
+            required
+            hint="Toque no campo: teclado do app com + − × ÷ (sem sair para a calculadora do telemóvel)."
+          />
           <div>
             <label className="block text-sm font-medium text-[#333] mb-1">Data</label>
             <input

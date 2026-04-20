@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Loader2, Trash2 } from 'lucide-react';
 import { getSupabase } from '../../../lib/supabase';
+import { ExpressionValueField } from '../../../components/ui/ExpressionValueField';
 
 export default function EditTransactionPage() {
   const router = useRouter();
@@ -188,18 +189,15 @@ export default function EditTransactionPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[#333] mb-1">Valor total (R$)</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={form.total}
-              onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
-              placeholder="0,00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent"
-              required
-            />
-          </div>
+          <ExpressionValueField
+            label="Valor total (R$)"
+            value={form.total}
+            onChange={(v) => setForm((f) => ({ ...f, total: v }))}
+            mode="money"
+            placeholder="0,00"
+            required
+            hint="Teclado com operações para somar antes de gravar."
+          />
 
           <div>
             <label className="block text-sm font-medium text-[#333] mb-1">Data</label>

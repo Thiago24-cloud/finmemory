@@ -8,7 +8,7 @@ import {
   applyPeerPromoImageReuse,
   buildImageUrlByNormKeyFromPairs,
 } from '../../../lib/reuseMapProductImages';
-import { isExcludedFromPriceMapStoreName } from '../../../lib/mapExcludedMapStores';
+import { isExcludedFromPriceMapPoint } from '../../../lib/mapExcludedMapStores';
 import { parsePriceToNumber } from '../../../lib/parseMapPrice';
 import {
   displayPromoProductName,
@@ -26,6 +26,7 @@ import {
   isPromotionEligibleForMapPin,
   todayIsoSaoPaulo,
 } from '../../../lib/promotionValidity';
+import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
 
 /**
  * GET /api/map/store-offers?store_id=UUID
@@ -181,7 +182,7 @@ export default async function handler(req, res) {
       }
       return res.status(404).json({ error: 'Loja não encontrada' });
     }
-    if (isExcludedFromPriceMapStoreName(store.name)) {
+    if (isExcludedFromPriceMapPoint({ store_name: store.name, lat: store.lat, lng: store.lng })) {
       return res.status(404).json({ error: 'Loja não encontrada' });
     }
 
@@ -240,7 +241,7 @@ export default async function handler(req, res) {
     const promoCutoffIso = new Date(Date.now() - promoTtlHours * 60 * 60 * 1000).toISOString();
 
     const baseSelect =
-      'id, product_name, price, store_name, lat, lng, category, created_at, user_id, product_id';
+      'id, product_name, price, store_name, lat, lng, category, created_at, atualizado_em, user_id, product_id';
 
     const promoQ = supabase
       .from('price_points')
@@ -460,16 +461,17 @@ export default async function handler(req, res) {
         const fromCatalog = getPublicProductImageUrl(pathByProductId.get(pid));
         if (fromCatalog) promoUrl = fromCatalog;
       }
+      const observedIso = row.atualizado_em || row.created_at;
       return {
         id: row.id,
-        product_name: displayPromoProductName(row.product_name),
+        product_name: displayPromoProductName(row.product_name, row.store_name),
         price: parsePriceToNumber(row.price),
         store_name: row.store_name,
         lat: Number(row.lat),
         lng: Number(row.lng),
         category: row.category,
-        time_ago: formatTimeAgo(row.created_at),
-        observed_at: row.created_at,
+        time_ago: formatTimeAgo(observedIso),
+        observed_at: observedIso,
         user_label: maskUserId(row.user_id),
         promo_image_url: promoUrl,
         source: row.source || 'unknown',
@@ -505,6 +507,7 @@ export default async function handler(req, res) {
     console.log('[store-offers] final offers count:', offers.length);
     console.log('[store-offers] promotions count:', tablePromotions.length);
 
+    sanitizeMapPointsPromoImagesHttpsOnly(offers);
     return res.status(200).json({
       store,
       offers,

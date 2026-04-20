@@ -28,7 +28,7 @@ O token Mapbox é lido em **build time** e no **servidor** (`getServerSideProps`
 O arquivo **`.env`** na raiz já usa o projeto Supabase do Lovable:
 
 ```env
-VITE_SUPABASE_URL=https://yvtlxlcnyzqcwglqwjap.supabase.co
+VITE_SUPABASE_URL=https://faxqrkxqfwjdavorxien.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...
 ```
 

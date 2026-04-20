@@ -8,6 +8,8 @@ import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
 import Image from 'next/image';
 import { cn } from '../lib/utils';
+import { parseMoneyInput } from '../lib/parseMoneyInput';
+import { ExpressionValueField } from '../components/ui/ExpressionValueField';
 
 /**
  * Página de captura e processamento de nota fiscal via OCR.
@@ -425,7 +427,10 @@ export default function AddReceipt() {
         merchant_name: formData.merchant_name || '',
         merchant_cnpj: formData.merchant_cnpj || '',
         merchant_address: formData.merchant_address || '',
-        total_amount: parseFloat(formData.total_amount) || 0,
+        total_amount: (() => {
+          const n = parseMoneyInput(formData.total_amount);
+          return n != null && !Number.isNaN(n) && Number.isFinite(n) ? n : 0;
+        })(),
         items: Array.isArray(formData.items) ? formData.items : [],
         category: formData.category || '',
         payment_method: formData.payment_method || '',
@@ -807,14 +812,15 @@ export default function AddReceipt() {
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-[#374151] mb-1.5">Valor Total *</label>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <ExpressionValueField
+                    label="Valor Total"
                     value={formData.total_amount}
-                    onChange={(e) => updateField('total_amount', e.target.value)}
-                    className="w-full py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
-                    placeholder="0.00"
+                    onChange={(v) => updateField('total_amount', v)}
+                    mode="money"
+                    placeholder="0,00"
+                    required
+                    inputClassName="py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
+                    hint="Teclado com + − × ÷."
                   />
                 </div>
               </div>
@@ -867,14 +873,29 @@ export default function AddReceipt() {
                       className="flex-[2] py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
                       placeholder="Nome do item"
                     />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={item.price || ''}
-                      onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
-                      className="flex-1 min-w-[80px] py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
-                      placeholder="0.00"
-                    />
+                    <div className="flex-1 min-w-[88px]">
+                      <ExpressionValueField
+                        value={
+                          item.price != null && Number(item.price) !== 0
+                            ? Number(item.price).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                              })
+                            : ''
+                        }
+                        onChange={(v) => {
+                          const n = parseMoneyInput(v);
+                          updateItem(
+                            index,
+                            'price',
+                            n != null && !Number.isNaN(n) && Number.isFinite(n) ? n : 0
+                          );
+                        }}
+                        mode="money"
+                        placeholder="0,00"
+                        inputClassName="py-3 px-3 border border-[#e5e7eb] rounded-lg text-base box-border"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => removeItem(index)}

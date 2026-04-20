@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Calculator } from "lucide-react";
+import { ExpressionValueField } from "./ui/ExpressionValueField";
 
 const PRIMARY = "#22c55e";
 
@@ -105,47 +106,43 @@ export function CalculadoraEconomia() {
         </div>
 
         <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <label htmlFor="ce-atual" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Preço atual (R$)
-          </label>
-          <input
+          <ExpressionValueField
             id="ce-atual"
-            inputMode="decimal"
-            type="text"
+            label="Preço atual (R$)"
             placeholder="0,00"
             value={precoAtualStr}
-            onChange={(e) => setPrecoAtualStr(e.target.value)}
-            className={inputClass}
+            onChange={setPrecoAtualStr}
+            mode="money"
+            inputClassName={inputClass}
+            hint="Toque no campo para somar valores (ex.: 20+15,5) sem abrir a calculadora do sistema."
           />
         </div>
 
         <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <label htmlFor="ce-outro" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Preço no outro lugar (R$)
-          </label>
-          <input
+          <ExpressionValueField
             id="ce-outro"
-            inputMode="decimal"
-            type="text"
+            label="Preço no outro lugar (R$)"
             placeholder="0,00"
             value={precoOutroStr}
-            onChange={(e) => setPrecoOutroStr(e.target.value)}
-            className={inputClass}
+            onChange={setPrecoOutroStr}
+            mode="money"
+            inputClassName={inputClass}
+            hint="Mesmo teclado com + − × ÷ para somar itens antes de preencher."
           />
         </div>
 
         <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <label htmlFor="ce-freq" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Compras por mês
-          </label>
-          <input
+          <ExpressionValueField
             id="ce-freq"
-            inputMode="numeric"
-            type="text"
+            label="Compras por mês"
             placeholder="1"
             value={freqStr}
-            onChange={(e) => setFreqStr(e.target.value.replace(/\D/g, ""))}
-            className={inputClass}
+            onChange={setFreqStr}
+            mode="integer"
+            integerMin={1}
+            integerMax={500}
+            inputClassName={inputClass}
+            hint="Apenas números inteiros (1 a 500)."
           />
         </div>
       </div>

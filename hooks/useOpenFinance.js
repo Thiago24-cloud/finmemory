@@ -14,10 +14,11 @@ async function fetchSummary(accountId) {
 
 /**
  * Resumo Open Finance: contas, transações recentes, totais do mês, flag syncing.
- * @param {{ enabled?: boolean }} [options] — enabled=false evita fetch (ex.: utilizador não autenticado).
+ * @param {{ enabled?: boolean; accountId?: string | null }} [options] — accountId filtra transações e totais do mês.
  */
 export function useOpenFinanceSummary(options = {}) {
   const enabled = options.enabled !== false;
+  const accountId = options.accountId != null && options.accountId !== '' ? options.accountId : null;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState(null);
@@ -27,7 +28,7 @@ export function useOpenFinanceSummary(options = {}) {
     setLoading(true);
     setError(null);
     try {
-      const json = await fetchSummary(null);
+      const json = await fetchSummary(accountId);
       setData(json);
     } catch (e) {
       setError(e);
@@ -35,7 +36,7 @@ export function useOpenFinanceSummary(options = {}) {
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, accountId]);
 
   useEffect(() => {
     if (!enabled) {

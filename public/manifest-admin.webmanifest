@@ -1,0 +1,25 @@
+{
+  "name": "FinMemory — Painel",
+  "short_name": "FM Painel",
+  "description": "Painel operacional FinMemory (mapa, miniaturas, quick add)",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f1ec",
+  "theme_color": "#2ECC49",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -12,7 +12,13 @@ import {
   getMapQuickAddSupabase,
   resolveQuickAddAuth,
 } from '../../../lib/mapQuickAddCore';
-import { resolveThumbnailForQuickAddInsert } from '../../../lib/mapProductImageCache';
+import {
+  buildPricePointInsertRows,
+  getQuickAddInsertChunkSize,
+  getQuickAddThumbConcurrency,
+  insertPricePointsInChunks,
+  resolveQuickAddThumbnailsParallel,
+} from '../../../lib/quickAddPricePointsBulk';
 import { sseTryFlushRes } from '../../../lib/sseTryFlushRes';
 
 /**
@@ -200,58 +206,76 @@ export default async function handler(req, res) {
       message: storeNameForPoints,
     });
 
-    send({ step: 'products', status: 'pending', message: 'Inserindo preços…', data: { progress: 0 } });
+    send({
+      step: 'products',
+      status: 'pending',
+      message: 'A resolver miniaturas em paralelo…',
+      data: { progress: 2 },
+    });
 
-    let inserted = 0;
-    const failures = [];
-    const total = products.length;
     const thumbMemo = new Map();
+    const thumbConc = getQuickAddThumbConcurrency();
+    const chunkSize = getQuickAddInsertChunkSize();
 
-    for (let i = 0; i < products.length; i += 1) {
-      const p = products[i];
-      const progress = Math.round(((i + 1) / total) * 100);
+    const imageUrls = await resolveQuickAddThumbnailsParallel(
+      supabase,
+      products,
+      storeNameForPoints,
+      thumbMemo,
+      thumbConc,
+      (done, tot) => {
+        const pct = Math.round((done / Math.max(1, tot)) * 38);
+        send({
+          step: 'products',
+          status: 'pending',
+          message: `Miniaturas ${done}/${tot}`,
+          data: { progress: Math.min(40, 2 + pct) },
+        });
+      }
+    );
+
+    const rows = buildPricePointInsertRows(products, imageUrls, {
+      userId: auth.userId,
+      storeName: storeNameForPoints,
+      lat,
+      lng,
+      category,
+    });
+
+    send({
+      step: 'products',
+      status: 'pending',
+      message: `A gravar ${rows.length} preço(s) em lotes de ${chunkSize}…`,
+      data: { progress: 42 },
+    });
+
+    const ins = await insertPricePointsInChunks(supabase, rows, {
+      chunkSize,
+      continueOnError,
+      onChunk: (upTo, totalRows) => {
+        const pct = 42 + Math.round((upTo / Math.max(1, totalRows)) * 56);
+        send({
+          step: 'products',
+          status: 'pending',
+          message: `Gravados ${upTo}/${totalRows}`,
+          data: { progress: Math.min(99, pct) },
+        });
+      },
+    });
+
+    if (ins.fatal && !continueOnError) {
       send({
         step: 'products',
-        status: 'pending',
-        message: `${i + 1}/${total} ${p.product_name}`,
-        data: { progress },
+        status: 'error',
+        message: ins.fatal.message || 'Insert em lote falhou',
       });
-
-      let imageUrl = null;
-      try {
-        imageUrl = await resolveThumbnailForQuickAddInsert(
-          supabase,
-          p.product_name,
-          storeNameForPoints,
-          thumbMemo
-        );
-      } catch (imgErr) {
-        console.warn('admin quick-add image:', imgErr?.message || imgErr);
-      }
-
-      const { error: insErr } = await supabase.from('price_points').insert({
-        user_id: auth.userId,
-        product_name: p.product_name,
-        price: p.price,
-        store_name: storeNameForPoints,
-        lat,
-        lng,
-        category,
-        image_url: imageUrl || null,
-      });
-
-      if (insErr) {
-        failures.push({ index: i + 1, name: p.product_name, message: insErr.message });
-        if (!continueOnError) {
-          send({ step: 'products', status: 'error', message: insErr.message });
-          send({ step: 'fatal', message: insErr.message });
-          res.end();
-          return;
-        }
-      } else {
-        inserted += 1;
-      }
+      send({ step: 'fatal', message: ins.fatal.message || 'Insert em lote falhou' });
+      res.end();
+      return;
     }
+
+    const inserted = ins.inserted;
+    const failures = ins.failures;
 
     send({
       step: 'products',

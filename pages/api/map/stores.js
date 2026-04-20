@@ -9,10 +9,11 @@ import {
   applyPeerPromoImageReuse,
   buildImageUrlByNormKeyFromPairs,
 } from '../../../lib/reuseMapProductImages';
-import { isExcludedFromPriceMapStoreName } from '../../../lib/mapExcludedMapStores';
+import { isExcludedFromPriceMapPoint } from '../../../lib/mapExcludedMapStores';
 import { parsePriceToNumber } from '../../../lib/parseMapPrice';
-import { productNameForThumbnailSearch } from '../../../lib/mapOfferDisplay';
+import { displayPromoProductName, productNameForThumbnailSearch } from '../../../lib/mapOfferDisplay';
 import { isPomarDaVilaCuratedStoreName, isSacolaoSaoJorgeCuratedStoreName } from '../../../lib/storeLogos';
+import { pickStoreLogoFromCacheRows } from '../../../lib/mapStoreLogoCache';
 import {
   inferChainSlugFromPromoStoreName,
   isLikelyNonProductScraperTitle,
@@ -21,6 +22,13 @@ import {
   storeNormalizedMatchesChainSlug,
 } from '../../../lib/mapStoreChainMatch';
 import { isPromotionEligibleForMapPin, todayIsoSaoPaulo } from '../../../lib/promotionValidity';
+import { normalizeStoreNameMatchKey } from '../../../lib/mapStoreNameNormalize';
+import {
+  fetchActiveMapPinSuppressions,
+  isStoreRowSuppressedByPinRules,
+} from '../../../lib/mapPinLocationSuppressions';
+import { fetchCuratedPinOptOutStoreIds } from '../../../lib/mapCuratedPinOptOut';
+import { httpsPromoImageUrlForMapJson } from '../../../lib/httpsPromoImageUrlForMap';
 
 /**
  * GET /api/map/stores
@@ -70,17 +78,6 @@ function isSupermarketOrBakeryMapType(type) {
   if (t.includes('supermercado') || t.includes('hipermercado')) return true;
   if (t.includes('padaria') || t.includes('panificadora')) return true;
   return false;
-}
-
-/** Alinha `stores.name` ↔ `price_points.store_name` (acentos, cedilha, “São”/“Sao”). */
-function normalizeStoreNameMatchKey(name) {
-  return String(name || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 /**
@@ -174,7 +171,7 @@ export default async function handler(req, res) {
 
     const storesQuery = supabase
       .from('stores')
-      .select('id, name, type, address, lat, lng, neighborhood')
+      .select('id, name, type, address, lat, lng, neighborhood, photo_url')
       .eq('active', true)
       .gte('lat', latMin)
       .lte('lat', latMax)
@@ -227,9 +224,24 @@ export default async function handler(req, res) {
       console.warn('Aviso: promocoes_supermercados indisponível:', agentPromoErr.message);
     }
 
+    let pinSuppressions = [];
+    try {
+      pinSuppressions = await fetchActiveMapPinSuppressions(supabase);
+    } catch (e) {
+      console.warn('stores pin suppressions:', e?.message || e);
+    }
+
+    let curatedPinOptOutIds = new Set();
+    try {
+      curatedPinOptOutIds = await fetchCuratedPinOptOutStoreIds(supabase);
+    } catch (e) {
+      console.warn('stores curated pin opt-out:', e?.message || e);
+    }
+
     const storesRows = (data || [])
       .filter((s) => !isPharmacyStoreType(s.type))
-      .filter((s) => !isExcludedFromPriceMapStoreName(s.name));
+      .filter((s) => !isExcludedFromPriceMapPoint({ store_name: s.name, lat: s.lat, lng: s.lng }))
+      .filter((s) => !isStoreRowSuppressedByPinRules(s, pinSuppressions));
 
     let promoAgentRows = [];
     if (agentPromos?.length) {
@@ -354,13 +366,13 @@ export default async function handler(req, res) {
     const points = [
       ...(promoPoints || []).filter((p) => {
         if (!p || p.lat == null || p.lng == null) return false;
-        if (isExcludedFromPriceMapStoreName(p.store_name)) return false;
+        if (isExcludedFromPriceMapPoint(p)) return false;
         const sn = normalizeStoreNameMatchKey(p.store_name);
         if (sn && storeByExactName.has(sn)) return true;
         return isPromoCategory(p.category);
       }),
-      ...promoAgentRows.filter((p) => !isExcludedFromPriceMapStoreName(p.store_name)),
-      ...promoFromTableRows.filter((p) => !isExcludedFromPriceMapStoreName(p.store_name)),
+      ...promoAgentRows.filter((p) => !isExcludedFromPriceMapPoint(p)),
+      ...promoFromTableRows.filter((p) => !isExcludedFromPriceMapPoint(p)),
     ];
     for (const p of points) {
       if (isLikelyNonProductScraperTitle(p.product_name)) continue;
@@ -419,6 +431,9 @@ export default async function handler(req, res) {
 
     const storesVisible = storesRows.filter((s) => {
       if (!isSupermarketOrBakeryMapType(s.type)) return true;
+      if (curatedPinOptOutIds.has(String(s.id))) {
+        return !!storeOfferMap.get(s.id);
+      }
       if (isPomarDaVilaCuratedStoreName(s.name)) return true;
       if (isSacolaoSaoJorgeCuratedStoreName(s.name)) return true;
       return !!storeOfferMap.get(s.id);
@@ -508,6 +523,23 @@ export default async function handler(req, res) {
       console.warn('stores offer_preview imagens:', e.message);
     }
 
+    /** Logos gravados no Quick Add (map_store_logo_cache) — match por nome normalizado. */
+    let storeLogoCacheRows = [];
+    try {
+      let { data: slData, error: slErr } = await supabase
+        .from('map_store_logo_cache')
+        .select('norm_key, image_url, updated_at')
+        .limit(500);
+      if (slErr && /updated_at|column/i.test(slErr.message || '')) {
+        const r2 = await supabase.from('map_store_logo_cache').select('norm_key, image_url').limit(500);
+        slData = r2.data;
+        slErr = r2.error;
+      }
+      if (!slErr && Array.isArray(slData)) storeLogoCacheRows = slData;
+    } catch (e) {
+      console.warn('stores map_store_logo_cache:', e?.message || e);
+    }
+
     const buildStorePayload = (s) => {
       const preview = finalizeOfferPreview(s.id);
       const headlineRow = preview.find((o) => parsePriceToNumber(o.price) != null);
@@ -516,9 +548,15 @@ export default async function handler(req, res) {
         pinHeadlinePrice = parsePriceToNumber(headlineRow.price);
       }
       const offer_products = preview.map((o) => {
-        const sid = String(o.id || '').replace(/-/g, '').slice(0, 8);
-        return `${o.product_name} · ${s.name} #${sid}`;
+        const clean = displayPromoProductName(o.product_name, s.name);
+        const n = parsePriceToNumber(o.price);
+        if (n != null) {
+          const brl = n.toFixed(2).replace('.', ',');
+          return `${clean} — R$ ${brl}`;
+        }
+        return clean;
       });
+      const pinLogoFromCache = pickStoreLogoFromCacheRows(s.name, storeLogoCacheRows);
       return {
         id: s.id,
         name: s.name,
@@ -527,12 +565,13 @@ export default async function handler(req, res) {
         lat: s.lat,
         lng: s.lng,
         neighborhood: s.neighborhood,
+        photo_url: httpsPromoImageUrlForMapJson(s.photo_url) || null,
         tem_oferta_hoje: !!storeOfferMap.get(s.id),
         offer_count: storeOfferCountMap.get(s.id) || 0,
         /** Preço mais recente no pin (estilo Google Maps / Airbnb). */
         pin_headline_price: pinHeadlinePrice,
         pin_headline_product: headlineRow?.product_name
-          ? String(headlineRow.product_name).slice(0, 80)
+          ? String(displayPromoProductName(headlineRow.product_name, s.name)).slice(0, 80)
           : null,
         offer_products,
         offer_preview: preview.map(
@@ -546,14 +585,15 @@ export default async function handler(req, res) {
             product_id,
           }) => ({
             id,
-            product_name,
+            product_name: displayPromoProductName(product_name, s.name),
             price,
             category,
-            promo_image_url: promo_image_url ?? null,
+            promo_image_url: httpsPromoImageUrlForMapJson(promo_image_url),
             display_store_name,
             product_id: product_id ?? null,
           })
         ),
+        pin_logo_url: pinLogoFromCache || null,
       };
     };
 

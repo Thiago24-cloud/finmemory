@@ -116,6 +116,35 @@ export default function QuickAdd() {
   const [cacheMsg, setCacheMsg] = useState('');
   const [cacheBusy, setCacheBusy] = useState(false);
 
+  const [cacheLogoStoreName, setCacheLogoStoreName] = useState('');
+  const [cacheLogoUrl, setCacheLogoUrl] = useState('');
+  const [cacheLogoMsg, setCacheLogoMsg] = useState('');
+  const [cacheLogoBusy, setCacheLogoBusy] = useState(false);
+
+  const [clearPromoStoreName, setClearPromoStoreName] = useState('');
+  const [clearPromoConfirm, setClearPromoConfirm] = useState(false);
+  const [clearPromoMsg, setClearPromoMsg] = useState('');
+  const [clearPromoBusy, setClearPromoBusy] = useState(false);
+
+  const [removePinScope, setRemovePinScope] = useState<'address' | 'all'>('address');
+  const [removePinStoreName, setRemovePinStoreName] = useState('');
+  const [removePinAddress, setRemovePinAddress] = useState('');
+  const [removePinConfirm, setRemovePinConfirm] = useState(false);
+  const [removePinConfirmAllNames, setRemovePinConfirmAllNames] = useState(false);
+  const [removePinClearPromoPoints, setRemovePinClearPromoPoints] = useState(false);
+  const [removePinBlacklistCoords, setRemovePinBlacklistCoords] = useState(false);
+  const [removePinConfirmBlacklist, setRemovePinConfirmBlacklist] = useState(false);
+  const [removePinCuratedOptOut, setRemovePinCuratedOptOut] = useState(false);
+  const [removePinConfirmCuratedOptOut, setRemovePinConfirmCuratedOptOut] = useState(false);
+  const [removePinMsg, setRemovePinMsg] = useState('');
+  const [removePinBusy, setRemovePinBusy] = useState(false);
+
+  const [curatedOptStoreId, setCuratedOptStoreId] = useState('');
+  const [curatedOptNote, setCuratedOptNote] = useState('');
+  const [curatedOptConfirm, setCuratedOptConfirm] = useState(false);
+  const [curatedOptMsg, setCuratedOptMsg] = useState('');
+  const [curatedOptBusy, setCuratedOptBusy] = useState(false);
+
   const selectedPreset: CuradoriaPreset | undefined = CURADORIA_STORE_PRESETS.find((p) => p.id === presetId);
 
   function updateStep(key: string, status: StepStatus, message: string) {
@@ -361,6 +390,196 @@ export default function QuickAdd() {
     }
   }
 
+  async function saveStoreLogoToRepository() {
+    setCacheLogoMsg('');
+    setCacheLogoBusy(true);
+    try {
+      const res = await fetch('/api/map/cache-store-logo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_name: cacheLogoStoreName.trim(),
+          image_url: cacheLogoUrl.trim(),
+        }),
+        credentials: 'include',
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) {
+        setCacheLogoMsg(j.error || `HTTP ${res.status}`);
+        return;
+      }
+      setCacheLogoMsg(
+        'Gravado com proteção manual: o logo não é sobrescrito por fluxos automáticos; a URL inclui versão para evitar cache antigo no browser.'
+      );
+      setCacheLogoUrl('');
+    } catch (e: unknown) {
+      setCacheLogoMsg(e instanceof Error ? e.message : 'Erro de rede');
+    } finally {
+      setCacheLogoBusy(false);
+    }
+  }
+
+  async function clearStoreMapPromos() {
+    setClearPromoMsg('');
+    setClearPromoBusy(true);
+    try {
+      const res = await fetch('/api/admin/clear-store-map-promos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_name: clearPromoStoreName.trim(),
+          confirm: true,
+        }),
+        credentials: 'include',
+      });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        matches?: { id: string; name: string }[];
+        price_points_deleted?: number;
+        promotions_deactivated?: number;
+        promocoes_supermercados_deactivated?: number;
+        matched_store_names?: string[];
+      };
+      if (res.status === 409 && j.matches?.length) {
+        setClearPromoMsg(
+          `${j.error || 'Ambíguo.'} Lojas: ${j.matches.map((m) => m.name).join(' · ')}`
+        );
+        return;
+      }
+      if (!res.ok) {
+        setClearPromoMsg(j.error || `HTTP ${res.status}`);
+        return;
+      }
+      if (j.ok) {
+        const parts = [
+          `price_points apagados: ${j.price_points_deleted ?? 0}`,
+          `promotions desativadas: ${j.promotions_deactivated ?? 0}`,
+          `promocoes_supermercados desativadas: ${j.promocoes_supermercados_deactivated ?? 0}`,
+        ];
+        setClearPromoMsg(`Concluído. ${parts.join(' · ')}`);
+        setClearPromoConfirm(false);
+      } else {
+        setClearPromoMsg(j.error || 'Resposta inesperada');
+      }
+    } catch (e: unknown) {
+      setClearPromoMsg(e instanceof Error ? e.message : 'Erro de rede');
+    } finally {
+      setClearPromoBusy(false);
+    }
+  }
+
+  async function removeStoreFromMap() {
+    setRemovePinMsg('');
+    setRemovePinBusy(true);
+    try {
+      const scope = removePinScope === 'all' ? 'all_names' : 'address';
+      const body: Record<string, unknown> = {
+        store_name: removePinStoreName.trim(),
+        scope,
+        confirm: true,
+      };
+      if (scope === 'address') body.address = removePinAddress.trim();
+      if (scope === 'all_names') body.confirm_remove_all_stores_with_name = true;
+      if (removePinClearPromoPoints) body.clear_promotional_points = true;
+      if (removePinBlacklistCoords) {
+        body.blacklist_coordinates = true;
+        body.confirm_blacklist_coordinates = removePinConfirmBlacklist;
+      }
+      if (removePinCuratedOptOut) {
+        body.curated_pin_opt_out = true;
+        body.confirm_curated_pin_opt_out = removePinConfirmCuratedOptOut;
+      }
+
+      const res = await fetch('/api/admin/remove-store-from-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+      });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        matches?: { id: string; name: string; address?: string }[];
+        candidates?: { id: string; name: string; address?: string }[];
+        deactivated_count?: number;
+        promo_points_deleted?: number;
+        map_pin_suppressions_inserted?: number;
+        curated_pin_opt_out_upserted?: number;
+        note?: string;
+      };
+      if (res.status === 409 && j.matches?.length) {
+        setRemovePinMsg(
+          `${j.error || 'Ambíguo.'} ${j.matches.map((m) => `${m.name} — ${m.address || '(sem endereço)'}`).join(' | ')}`
+        );
+        return;
+      }
+      if (res.status === 404 && j.candidates?.length) {
+        setRemovePinMsg(
+          `${j.error || 'Sem match.'} Cadastro(s) com este nome: ${j.candidates.map((c) => c.address || '(vazio)').join(' · ')}`
+        );
+        return;
+      }
+      if (!res.ok) {
+        setRemovePinMsg(j.error || `HTTP ${res.status}`);
+        return;
+      }
+      if (j.ok) {
+        const extra: string[] = [];
+        if (typeof j.promo_points_deleted === 'number')
+          extra.push(`price_points promo apagados: ${j.promo_points_deleted}`);
+        if (typeof j.map_pin_suppressions_inserted === 'number')
+          extra.push(`bloqueios de coordenada: ${j.map_pin_suppressions_inserted}`);
+        if (typeof j.curated_pin_opt_out_upserted === 'number' && j.curated_pin_opt_out_upserted > 0)
+          extra.push(`opt-out curadoria: ${j.curated_pin_opt_out_upserted} loja(s)`);
+        setRemovePinMsg(
+          `Concluído. ${j.deactivated_count ?? 0} loja(s) desativada(s).${extra.length ? ` ${extra.join(' · ')}.` : ''} ${j.note || ''}`.trim()
+        );
+        setRemovePinConfirm(false);
+        setRemovePinConfirmAllNames(false);
+        setRemovePinConfirmBlacklist(false);
+        setRemovePinConfirmCuratedOptOut(false);
+      } else {
+        setRemovePinMsg(j.error || 'Resposta inesperada');
+      }
+    } catch (e: unknown) {
+      setRemovePinMsg(e instanceof Error ? e.message : 'Erro de rede');
+    } finally {
+      setRemovePinBusy(false);
+    }
+  }
+
+  async function submitCuratedOptOut(action: 'add' | 'remove') {
+    setCuratedOptMsg('');
+    setCuratedOptBusy(true);
+    try {
+      const res = await fetch('/api/admin/map-curated-opt-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          store_id: curatedOptStoreId.trim(),
+          confirm: curatedOptConfirm,
+          ...(action === 'add' && curatedOptNote.trim()
+            ? { note: curatedOptNote.trim().slice(0, 500) }
+            : {}),
+        }),
+        credentials: 'include',
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) {
+        setCuratedOptMsg(j.error || `HTTP ${res.status}`);
+        return;
+      }
+      setCuratedOptMsg(action === 'add' ? 'Opt-out gravado. Pin Pomar/Sacolão só com ofertas.' : 'Opt-out removido.');
+      setCuratedOptConfirm(false);
+    } catch (e: unknown) {
+      setCuratedOptMsg(e instanceof Error ? e.message : 'Erro de rede');
+    } finally {
+      setCuratedOptBusy(false);
+    }
+  }
+
   const statusIcon: Record<StepStatus, string> = {
     idle: '○',
     pending: '◌',
@@ -380,22 +599,31 @@ export default function QuickAdd() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 font-mono">
       <div className="max-w-2xl mx-auto">
-        <p className="mb-3 text-xs text-gray-500">
+        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
           <Link href="/admin" className="text-emerald-400/90 underline-offset-2 hover:underline">
             ← Painel operacional
+          </Link>
+          <Link href="/admin/map-thumbnail-rules" className="text-emerald-400/90 underline-offset-2 hover:underline">
+            Categorias de miniatura (base)
+          </Link>
+          <Link href="/admin/product-image-curator" className="text-emerald-400/90 underline-offset-2 hover:underline">
+            Curador de imagens (3 sugestões Google)
           </Link>
         </p>
         <h1 className="text-2xl font-bold text-white mb-1">⚡ Quick Add</h1>
         <p className="text-gray-500 text-sm mb-4">
-          Mapa de preços: lista manual grava preço + tenta miniatura (cache → Open Food Facts → Google CSE). Uma vez gravada a
+          Mapa de preços: lista manual grava preço + tenta miniatura (repositório/cache → categorias por palavra-chave → Open Food
+          Facts → Google CSE com loja + produto). Fast food evita OFF em itens de cardápio; repositório com nome de categoria (ex.
+          Arroz) cobre várias marcas. Uma vez gravada a
           foto do &quot;Filé mignon&quot; ou &quot;Manga Palmer&quot;, reutiliza em qualquer loja — sem reler o print.
         </p>
 
         <div className="mb-8 rounded-2xl border border-emerald-900/50 bg-emerald-950/15 p-4 space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-emerald-400/90">Repositório de miniaturas</h2>
           <p className="text-xs text-gray-400">
-            Cole o URL https da foto real (ex. do teu print hospedado). O nome deve bater com o que vais usar na lista (ex.{' '}
-            <span className="text-gray-300">Manga Palmer</span>).
+            Cole o URL https da foto real (ex. do teu print hospedado). O nome deve bater com o produto na lista ou com uma
+            categoria curada (ex. <span className="text-gray-300">Arroz</span>, <span className="text-gray-300">Milk shake</span>
+            ) para cobrir várias marcas com a mesma miniatura.
           </p>
           <input
             className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-600"
@@ -424,6 +652,323 @@ export default function QuickAdd() {
               className={`text-xs ${cacheMsg.startsWith('Gravado') ? 'text-emerald-400' : 'text-red-400'}`}
             >
               {cacheMsg}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-sky-900/50 bg-sky-950/15 p-4 space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-sky-400/90">Repositório de logos de loja</h2>
+          <p className="text-xs text-gray-400">
+            Cole o URL https da imagem do logo. Use o mesmo nome (ou trecho forte) que aparece em{' '}
+            <span className="text-gray-300">Nome da loja</span> no cadastro — ex.: &quot;Mercado XYZ&quot; casa com
+            &quot;Mercado XYZ - Filial Centro&quot;.
+          </p>
+          <input
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-600"
+            value={cacheLogoStoreName}
+            onChange={(e) => setCacheLogoStoreName(e.target.value)}
+            placeholder="Nome da loja / rede (ex. Pomar da Vila Madalena)"
+            disabled={cacheLogoBusy}
+          />
+          <input
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-600"
+            value={cacheLogoUrl}
+            onChange={(e) => setCacheLogoUrl(e.target.value)}
+            placeholder="https://… (logo jpg/png/webp)"
+            disabled={cacheLogoBusy}
+          />
+          <button
+            type="button"
+            onClick={saveStoreLogoToRepository}
+            disabled={cacheLogoBusy || !cacheLogoStoreName.trim() || !cacheLogoUrl.trim()}
+            className="w-full bg-sky-700 hover:bg-sky-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wide"
+          >
+            {cacheLogoBusy ? 'A gravar…' : 'Gravar logo no repositório'}
+          </button>
+          {cacheLogoMsg ? (
+            <p
+              className={`text-xs ${cacheLogoMsg.startsWith('Gravado') ? 'text-sky-300' : 'text-red-400'}`}
+            >
+              {cacheLogoMsg}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-rose-900/60 bg-rose-950/20 p-4 space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-rose-400/90">Limpar ofertas no mapa (por loja)</h2>
+          <p className="text-xs text-gray-400">
+            Apaga linhas <span className="text-gray-300">promocionais</span> em <code className="text-rose-200/80">price_points</code>,
+            desativa <code className="text-rose-200/80">promotions</code> (encarte) e <code className="text-rose-200/80">promocoes_supermercados</code>{' '}
+            quando o nome normalizado casa com o cadastro. Use o mesmo nome que em <span className="text-gray-300">Nome da loja</span>.
+          </p>
+          <input
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-rose-600"
+            value={clearPromoStoreName}
+            onChange={(e) => setClearPromoStoreName(e.target.value)}
+            placeholder="Nome exato da loja (ex. como em public.stores)"
+            disabled={clearPromoBusy}
+          />
+          <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-gray-600"
+              checked={clearPromoConfirm}
+              onChange={(e) => setClearPromoConfirm(e.target.checked)}
+              disabled={clearPromoBusy}
+            />
+            <span>Confirmo que quero remover as ofertas divulgadas desta loja no mapa (irreversível).</span>
+          </label>
+          <button
+            type="button"
+            onClick={clearStoreMapPromos}
+            disabled={clearPromoBusy || !clearPromoStoreName.trim() || !clearPromoConfirm}
+            className="w-full bg-rose-900 hover:bg-rose-800 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wide border border-rose-800/80"
+          >
+            {clearPromoBusy ? 'A processar…' : 'Remover ofertas desta loja'}
+          </button>
+          {clearPromoMsg ? (
+            <p
+              className={`text-xs whitespace-pre-wrap ${clearPromoMsg.startsWith('Concluído') ? 'text-rose-200' : 'text-red-400'}`}
+            >
+              {clearPromoMsg}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-amber-900/50 bg-amber-950/20 p-4 space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-amber-400/90">
+            Retirar loja do mapa (cadastro)
+          </h2>
+          <p className="text-xs text-gray-400">
+            Desativa o pin em <code className="text-amber-200/80">public.stores</code> (<span className="text-gray-300">active = false</span>
+            ). Para duplicata: use o <span className="text-gray-300">mesmo nome</span> e cole o{' '}
+            <span className="text-gray-300">endereço errado</span> da linha a remover; a loja correta permanece. Marque as opções
+            abaixo para também apagar ofertas em <code className="text-amber-200/80">price_points</code> e bloquear o pin no mesmo
+            local (evita reaparecer por importação/CNPJ após aplicar a migração <code className="text-gray-500">map_pin_location_suppressions</code>).
+          </p>
+          <input
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-600"
+            value={removePinStoreName}
+            onChange={(e) => setRemovePinStoreName(e.target.value)}
+            placeholder="Nome da loja (como no cadastro)"
+            disabled={removePinBusy}
+          />
+          <div className="flex flex-col gap-2 text-xs text-gray-300">
+            <label className="flex items-start gap-2 cursor-pointer select-none">
+              <input
+                type="radio"
+                name="removePinScope"
+                className="mt-0.5"
+                checked={removePinScope === 'address'}
+                onChange={() => setRemovePinScope('address')}
+                disabled={removePinBusy}
+              />
+              <span>
+                <strong className="text-amber-200/90">Só esta filial</strong> — exige o endereço da loja a desativar
+                (duplicatas).
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer select-none">
+              <input
+                type="radio"
+                name="removePinScope"
+                className="mt-0.5"
+                checked={removePinScope === 'all'}
+                onChange={() => setRemovePinScope('all')}
+                disabled={removePinBusy}
+              />
+              <span>
+                <strong className="text-amber-200/90">Todas as lojas ativas</strong> com este nome (vários pins de uma vez).
+              </span>
+            </label>
+          </div>
+          {removePinScope === 'address' ? (
+            <input
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-600"
+              value={removePinAddress}
+              onChange={(e) => setRemovePinAddress(e.target.value)}
+              placeholder="Endereço exatamente como no cadastro errado (rua, nº, bairro…)"
+              disabled={removePinBusy}
+            />
+          ) : null}
+          <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-gray-600"
+              checked={removePinClearPromoPoints}
+              onChange={(e) => setRemovePinClearPromoPoints(e.target.checked)}
+              disabled={removePinBusy}
+            />
+            <span>
+              Também apagar <strong className="text-amber-200/80">ofertas em price_points</strong> (categoria promocional) com o
+              nome exato desta(s) loja(s).
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-gray-600"
+              checked={removePinBlacklistCoords}
+              onChange={(e) => {
+                setRemovePinBlacklistCoords(e.target.checked);
+                if (!e.target.checked) setRemovePinConfirmBlacklist(false);
+              }}
+              disabled={removePinBusy}
+            />
+            <span>
+              <strong className="text-amber-200/80">Bloquear esta coordenada</strong> — o mapa deixa de mostrar o pin aqui e o{' '}
+              <code className="text-gray-500">find_or_create_store</code> não reativa/inserir neste sítio (mesmo nome
+              normalizado).
+            </span>
+          </label>
+          {removePinBlacklistCoords ? (
+            <label className="flex items-start gap-2 text-xs text-amber-200/90 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-amber-700"
+                checked={removePinConfirmBlacklist}
+                onChange={(e) => setRemovePinConfirmBlacklist(e.target.checked)}
+                disabled={removePinBusy}
+              />
+              <span>Confirmo gravar o bloqueio de coordenada (reversível apagando a linha em map_pin_location_suppressions).</span>
+            </label>
+          ) : null}
+          <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-gray-600"
+              checked={removePinCuratedOptOut}
+              onChange={(e) => {
+                setRemovePinCuratedOptOut(e.target.checked);
+                if (!e.target.checked) setRemovePinConfirmCuratedOptOut(false);
+              }}
+              disabled={removePinBusy}
+            />
+            <span>
+              <strong className="text-amber-200/80">Opt-out curadoria</strong> — gravar em{' '}
+              <code className="text-gray-500">map_curated_pin_opt_out</code>: esta loja deixa de usar o bypass Pomar/Sacolão
+              (só aparece no mapa com ofertas, útil se for reactivada mais tarde).
+            </span>
+          </label>
+          {removePinCuratedOptOut ? (
+            <label className="flex items-start gap-2 text-xs text-amber-200/90 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-amber-700"
+                checked={removePinConfirmCuratedOptOut}
+                onChange={(e) => setRemovePinConfirmCuratedOptOut(e.target.checked)}
+                disabled={removePinBusy}
+              />
+              <span>Confirmo gravar o opt-out de curadoria para o(s) store_id desativado(s).</span>
+            </label>
+          ) : null}
+          <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-gray-600"
+              checked={removePinConfirm}
+              onChange={(e) => setRemovePinConfirm(e.target.checked)}
+              disabled={removePinBusy}
+            />
+            <span>Confirmo desativar o(s) pin(s) desta(s) loja(s) no mapa.</span>
+          </label>
+          {removePinScope === 'all' ? (
+            <label className="flex items-start gap-2 text-xs text-amber-200/90 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-amber-700"
+                checked={removePinConfirmAllNames}
+                onChange={(e) => setRemovePinConfirmAllNames(e.target.checked)}
+                disabled={removePinBusy}
+              />
+              <span>Entendo que TODAS as lojas ativas com este nome serão desativadas.</span>
+            </label>
+          ) : null}
+          <button
+            type="button"
+            onClick={removeStoreFromMap}
+            disabled={
+              removePinBusy ||
+              !removePinStoreName.trim() ||
+              !removePinConfirm ||
+              (removePinScope === 'address' && !removePinAddress.trim()) ||
+              (removePinScope === 'all' && !removePinConfirmAllNames) ||
+              (removePinBlacklistCoords && !removePinConfirmBlacklist) ||
+              (removePinCuratedOptOut && !removePinConfirmCuratedOptOut)
+            }
+            className="w-full bg-amber-900 hover:bg-amber-800 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wide border border-amber-800/80"
+          >
+            {removePinBusy ? 'A processar…' : 'Desativar loja(s) no mapa'}
+          </button>
+          {removePinMsg ? (
+            <p
+              className={`text-xs whitespace-pre-wrap ${removePinMsg.startsWith('Concluído') ? 'text-amber-200' : 'text-red-400'}`}
+            >
+              {removePinMsg}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-teal-900/50 bg-teal-950/20 p-4 space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-teal-400/90">
+            Curadoria Pomar / Sacolão (loja ainda activa)
+          </h2>
+          <p className="text-xs text-gray-400">
+            Use o <code className="text-teal-200/80">id</code> da linha em <code className="text-teal-200/80">public.stores</code>{' '}
+            (Supabase). Com opt-out, o pin <strong className="text-gray-300">só</strong> entra no mapa se tiver ofertas — como
+            qualquer outro supermercado.
+          </p>
+          <input
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-600"
+            value={curatedOptStoreId}
+            onChange={(e) => setCuratedOptStoreId(e.target.value)}
+            placeholder="UUID da loja (stores.id)"
+            disabled={curatedOptBusy}
+          />
+          <input
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-600"
+            value={curatedOptNote}
+            onChange={(e) => setCuratedOptNote(e.target.value)}
+            placeholder="Nota opcional (só ao gravar opt-out)"
+            disabled={curatedOptBusy}
+          />
+          <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-gray-600"
+              checked={curatedOptConfirm}
+              onChange={(e) => setCuratedOptConfirm(e.target.checked)}
+              disabled={curatedOptBusy}
+            />
+            <span>Confirmo a alteração neste UUID.</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => submitCuratedOptOut('add')}
+              disabled={curatedOptBusy || !curatedOptStoreId.trim() || !curatedOptConfirm}
+              className="flex-1 min-w-[8rem] bg-teal-900 hover:bg-teal-800 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wide border border-teal-800/80"
+            >
+              {curatedOptBusy ? '…' : 'Gravar opt-out'}
+            </button>
+            <button
+              type="button"
+              onClick={() => submitCuratedOptOut('remove')}
+              disabled={curatedOptBusy || !curatedOptStoreId.trim() || !curatedOptConfirm}
+              className="flex-1 min-w-[8rem] bg-gray-800 hover:bg-gray-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-bold py-2 rounded uppercase tracking-wide border border-gray-600"
+            >
+              {curatedOptBusy ? '…' : 'Remover opt-out'}
+            </button>
+          </div>
+          {curatedOptMsg ? (
+            <p
+              className={`text-xs whitespace-pre-wrap ${
+                curatedOptMsg.includes('gravado') || curatedOptMsg.includes('removido')
+                  ? 'text-teal-200'
+                  : 'text-red-400'
+              }`}
+            >
+              {curatedOptMsg}
             </p>
           ) : null}
         </div>

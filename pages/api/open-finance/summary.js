@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
+import { createPluggyServerClient } from '../../../lib/pluggySyncTransactions';
 
 /** Mês civil em America/Sao_Paulo (YYYY-MM-DD início e fim). */
 function brazilCurrentMonthRange() {
@@ -19,6 +20,35 @@ function brazilCurrentMonthRange() {
   const start = `${y}-${m}-01`;
   const end = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
   return { start, end };
+}
+
+function cleanHexColor(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const normalized = raw.startsWith('#') ? raw : `#${raw}`;
+  if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(normalized)) return null;
+  return normalized.toUpperCase();
+}
+
+function pickConnectorMeta(item) {
+  const connector = item?.connector || item?.institution || null;
+  const id = connector?.id != null ? String(connector.id) : null;
+  const name =
+    connector?.name != null
+      ? String(connector.name).trim() || null
+      : connector?.institutionName != null
+        ? String(connector.institutionName).trim() || null
+        : null;
+  const imageUrl =
+    connector?.imageUrl != null
+      ? String(connector.imageUrl).trim() || null
+      : connector?.logoUrl != null
+        ? String(connector.logoUrl).trim() || null
+        : null;
+  const primaryColor = cleanHexColor(
+    connector?.primaryColor || connector?.color || connector?.brandColor || null
+  );
+  return { id, name, imageUrl, primaryColor };
 }
 
 /**
@@ -73,6 +103,66 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Falha ao ler contas.' });
   }
 
+  let accountsFiltered = accounts || [];
+  if (!cErr) {
+    const activeItemIds = new Set(
+      (connections || []).map((c) => c?.item_id).filter((id) => typeof id === 'string' && id.trim())
+    );
+    accountsFiltered = accountsFiltered.filter((a) => activeItemIds.has(a.item_id));
+  }
+
+  const nameCounts = accountsFiltered.reduce((acc, a) => {
+    const key = (a.name || 'Conta').trim() || 'Conta';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  accountsFiltered = accountsFiltered.map((a) => {
+    const base = (a.name || 'Conta').trim() || 'Conta';
+    const dup = (nameCounts[base] || 0) > 1;
+    const suffix =
+      dup && typeof a.item_id === 'string' && a.item_id.length >= 6
+        ? a.item_id.slice(-6)
+        : null;
+    return {
+      ...a,
+      display_name: suffix ? `${base} · …${suffix}` : base,
+    };
+  });
+
+  const itemIds = Array.from(
+    new Set(
+      accountsFiltered
+        .map((a) => (typeof a?.item_id === 'string' ? a.item_id.trim() : ''))
+        .filter(Boolean)
+    )
+  );
+  const connectorByItemId = {};
+  const pluggy = createPluggyServerClient();
+  if (pluggy && itemIds.length > 0) {
+    await Promise.all(
+      itemIds.map(async (itemId) => {
+        try {
+          const item = await pluggy.fetchItem(itemId);
+          const meta = pickConnectorMeta(item);
+          connectorByItemId[itemId] = meta;
+        } catch (err) {
+          console.warn('[open-finance/summary] fetchItem:', itemId, err?.message || err);
+        }
+      })
+    );
+  }
+
+  accountsFiltered = accountsFiltered.map((a) => {
+    const meta = connectorByItemId[a.item_id] || {};
+    return {
+      ...a,
+      connector_id: meta.id || null,
+      connector_name: meta.name || null,
+      connector_image_url: meta.imageUrl || null,
+      connector_primary_color: meta.primaryColor || null,
+    };
+  });
+
   let txQuery = supabase
     .from('bank_transactions')
     .select(
@@ -84,7 +174,7 @@ export default async function handler(req, res) {
     .limit(50);
 
   if (accountIdFilter) {
-    const allowed = (accounts || []).some((a) => a.id === accountIdFilter);
+    const allowed = accountsFiltered.some((a) => a.id === accountIdFilter);
     if (!allowed) {
       return res.status(400).json({ error: 'Conta inválida ou não pertence ao utilizador.' });
     }
@@ -104,12 +194,21 @@ export default async function handler(req, res) {
   let monthExpense = 0;
 
   if (monthStart && monthEnd) {
-    const { data: monthRows, error: mErr } = await supabase
+    let monthQ = supabase
       .from('bank_transactions')
       .select('type, amount')
       .eq('user_id', userId)
       .gte('date', monthStart)
       .lte('date', monthEnd);
+
+    if (accountIdFilter) {
+      const allowedMonth = accountsFiltered.some((a) => a.id === accountIdFilter);
+      if (allowedMonth) {
+        monthQ = monthQ.eq('bank_account_id', accountIdFilter);
+      }
+    }
+
+    const { data: monthRows, error: mErr } = await monthQ;
 
     if (!mErr && monthRows) {
       for (const row of monthRows) {
@@ -122,7 +221,9 @@ export default async function handler(req, res) {
     }
   }
 
-  const accountNameById = Object.fromEntries((accounts || []).map((a) => [a.id, a.name || 'Conta']));
+  const accountNameById = Object.fromEntries(
+    accountsFiltered.map((a) => [a.id, a.display_name || a.name || 'Conta'])
+  );
 
   const transactionsWithAccount = (recentTransactions || []).map((t) => ({
     ...t,
@@ -133,7 +234,7 @@ export default async function handler(req, res) {
     ok: true,
     syncing,
     connections: connections || [],
-    accounts: accounts || [],
+    accounts: accountsFiltered,
     recentTransactions: transactionsWithAccount,
     month: {
       start: monthStart,

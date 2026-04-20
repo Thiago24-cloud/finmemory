@@ -32,7 +32,7 @@ const STEPS = [
   {
     title: 'Menu inferior',
     body:
-      'Mapas, Gastos, Cartões e Perfil ficam sempre no rodapé para mudar de área rapidamente.',
+      'Mapas, Gastos e Perfil ficam sempre no rodapé para mudar de área rapidamente.',
   },
 ];
 

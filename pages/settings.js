@@ -3,7 +3,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone } from 'lucide-react';
+import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone, Instagram } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 import ProximityAlertsSettings from '../components/ProximityAlertsSettings';
 import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
@@ -22,6 +22,33 @@ export default function SettingsPage() {
   const [totpSecret, setTotpSecret] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [totpMsg, setTotpMsg] = useState('');
+  const [xpStats, setXpStats] = useState(null);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch('/api/map/gamification-me');
+        const data = await resp.json().catch(() => ({}));
+        if (cancelled) return;
+        if (resp.ok) {
+          setXpStats({
+            xp_points: Number(data.xp_points) || 0,
+            contributions_count: Number(data.contributions_count) || 0,
+            level: Number(data.level) || 1,
+          });
+        } else {
+          setXpStats({ xp_points: 0, contributions_count: 0, level: 1 });
+        }
+      } catch {
+        if (!cancelled) setXpStats({ xp_points: 0, contributions_count: 0, level: 1 });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/dashboard');
@@ -108,19 +135,75 @@ export default function SettingsPage() {
           <ProximityAlertsSettings userId={userId} />
         ) : null}
 
+        {status === 'authenticated' && xpStats ? (
+          <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-4 text-zinc-100 shadow-sm">
+            <p className="mb-1 text-xs text-zinc-500">Seu impacto na comunidade</p>
+            <p className="text-2xl font-bold text-zinc-100">
+              {xpStats.xp_points} <span className="text-orange-400">XP</span>
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Nível {xpStats.level} · {xpStats.contributions_count} confirmações no mapa
+            </p>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
+                style={{ width: `${xpStats.xp_points % 100}%` }}
+              />
+            </div>
+            <p className="mt-1 text-xs text-zinc-600">
+              Faltam {Math.max(0, 100 - (xpStats.xp_points % 100))} XP para o nível {xpStats.level + 1}
+            </p>
+            <a
+              href="https://instagram.com/finmemory"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 text-xs text-zinc-400 transition-colors hover:text-orange-400"
+            >
+              <Instagram className="h-3.5 w-3.5" />
+              Ver novidades no Instagram
+            </a>
+          </div>
+        ) : null}
+
         {status === 'authenticated' && session?.user ? (
           <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold text-gray-900">FinMemory Plus</h2>
-            <p className="mt-1 mb-3 text-sm text-gray-500">
-              Assinatura no Stripe — apoia o projeto e desbloqueia benefícios Plus.
+            <h2 className="text-base font-semibold text-gray-900">Planos FinMemory</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Assinatura no Stripe — Plus, Pro ou Família. Os preços vêm do Stripe Checkout.
             </p>
-            <UpgradePlus
-              userId={session.user.supabaseId}
-              userEmail={session.user.email}
-              className="w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white"
+            <button
+              type="button"
+              onClick={() => router.push('/planos')}
+              className="mt-4 w-full rounded-xl bg-[#2ECC49] py-3 px-4 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#25b340] hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100"
             >
-              Assinar FinMemory Plus
-            </UpgradePlus>
+              Ver planos disponíveis
+            </button>
+            <div className="mt-4 flex flex-col gap-2">
+              <UpgradePlus
+                plan="plus"
+                userId={session.user.supabaseId}
+                userEmail={session.user.email}
+                className="w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white"
+              >
+                Assinar Plus — R$ 9,90/mês
+              </UpgradePlus>
+              <UpgradePlus
+                plan="pro"
+                userId={session.user.supabaseId}
+                userEmail={session.user.email}
+                className="w-full rounded-lg border border-gray-900 bg-white py-2 text-sm font-semibold text-gray-900"
+              >
+                Assinar Pro — R$ 19,90/mês
+              </UpgradePlus>
+              <UpgradePlus
+                plan="familia"
+                userId={session.user.supabaseId}
+                userEmail={session.user.email}
+                className="w-full rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white"
+              >
+                Assinar Família — R$ 29,90/mês
+              </UpgradePlus>
+            </div>
           </div>
         ) : null}
 

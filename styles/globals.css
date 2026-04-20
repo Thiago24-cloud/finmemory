@@ -409,3 +409,80 @@ body.finmemory-native-barcode-scan-active .finmemory-barcode-scanner-ui {
     animation: none;
   }
 }
+
+/* Calculadora acoplada no dashboard — feedback ao enviar valor do histórico */
+@keyframes finmemory-calc-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.finmemory-calc-pulse {
+  animation: finmemory-calc-pulse 0.45s ease-out;
+}
+
+/* Splash / launch screen (AppSplashGate) — fundo branco, marca + pulso */
+@keyframes fm-splash-logo-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fm-splash-logo-in {
+  animation: fm-splash-logo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fm-splash-logo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.fm-splash-logo-pulse {
+  animation: fm-splash-logo-breathe 1.05s ease-in-out 2;
+  animation-delay: 0.5s;
+  animation-fill-mode: both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-splash-logo-in,
+  .fm-splash-logo-pulse {
+    animation: none;
+  }
+  .fm-splash-logo-in {
+    opacity: 1;
+  }
+}
+
+@keyframes fm-splash-exit {
+  to {
+    opacity: 0;
+  }
+}
+
+.fm-splash-exit {
+  animation: fm-splash-exit 0.42s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Evita “caixa” cinza do otimizador / wrapper na splash */
+.fm-splash-root .fm-splash-logo-pulse span,
+.fm-splash-root .fm-splash-logo-pulse img {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}

@@ -8,7 +8,8 @@ export const MAP_SHOP_SNAP = { closed: 100, peek: 65, expanded: 8 };
 
 const SNAP = MAP_SHOP_SNAP;
 
-const TRANSITION = 'transform 0.32s cubic-bezier(0.32,0.72,0,1)';
+/** Desaceleração suave (perto do Maps) — sem “snap” seco */
+const TRANSITION = 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)';
 
 function pctForSnap(s) {
   if (s === 'expanded') return SNAP.expanded;
@@ -46,6 +47,7 @@ function nearestSnap(pct) {
  * @param {string} p.shopErr
  * @param {number} p.promoCount — total para badge (ofertas + encartes)
  * @param {import('react').ReactNode} p.children — conteúdo rolável expandido (layout Google Maps)
+ * @param {(m: { translatePct: number; snap: string; isDragging: boolean; bottomInsetPx: number }) => void} [p.onVisualMetrics] — padding do mapa / detents
  */
 export default function MapShopSnapSheet({
   sheetSnap,
@@ -57,6 +59,7 @@ export default function MapShopSnapSheet({
   shopErr,
   promoCount,
   children,
+  onVisualMetrics,
 }) {
   const sheetRef = useRef(null);
   const gestureRef = useRef(null);
@@ -69,11 +72,39 @@ export default function MapShopSnapSheet({
   /** null = usar sheetSnap; número = translateY % durante arraste */
   const [dragTranslatePct, setDragTranslatePct] = useState(null);
 
+  const metricsRafRef = useRef(null);
+  const onVisualMetricsRef = useRef(onVisualMetrics);
+  onVisualMetricsRef.current = onVisualMetrics;
+  const draggingRef = useRef(false);
+
+  const reportVisualMetrics = useCallback(() => {
+    const fn = onVisualMetricsRef.current;
+    if (!fn) return;
+    const pct = dragPctLiveRef.current;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const bottomInsetPx = vh > 0 ? Math.max(0, ((100 - pct) / 100) * vh) : 0;
+    fn({
+      translatePct: pct,
+      snap: sheetSnapRef.current,
+      isDragging: draggingRef.current,
+      bottomInsetPx,
+    });
+  }, []);
+
+  const scheduleVisualMetrics = useCallback(() => {
+    if (!onVisualMetricsRef.current) return;
+    if (metricsRafRef.current != null) return;
+    metricsRafRef.current = requestAnimationFrame(() => {
+      metricsRafRef.current = null;
+      reportVisualMetrics();
+    });
+  }, [reportVisualMetrics]);
+
   useEffect(() => {
-    if (!isDragging) {
-      dragPctLiveRef.current = pctForSnap(sheetSnap);
-    }
-  }, [sheetSnap, isDragging]);
+    if (isDragging) return;
+    dragPctLiveRef.current = pctForSnap(sheetSnap);
+    reportVisualMetrics();
+  }, [sheetSnap, isDragging, reportVisualMetrics]);
 
   const resolveGestureEnd = useCallback(
     (startY, endY, startT, anchorPct, currentPct) => {
@@ -100,14 +131,18 @@ export default function MapShopSnapSheet({
 
       setIsDragging(false);
       setDragTranslatePct(null);
+      draggingRef.current = false;
 
       if (nextSnap === 'closed') {
+        dragPctLiveRef.current = SNAP.closed;
         onRequestClose();
       } else {
         onSheetSnapChange(nextSnap);
+        dragPctLiveRef.current = pctForSnap(nextSnap);
       }
+      requestAnimationFrame(() => reportVisualMetrics());
     },
-    [onRequestClose, onSheetSnapChange]
+    [onRequestClose, onSheetSnapChange, reportVisualMetrics]
   );
 
   useEffect(() => {
@@ -137,8 +172,10 @@ export default function MapShopSnapSheet({
       startT: Date.now(),
     };
     dragPctLiveRef.current = anchor;
+    draggingRef.current = true;
     setIsDragging(true);
     setDragTranslatePct(anchor);
+    scheduleVisualMetrics();
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch (_) {
@@ -154,6 +191,7 @@ export default function MapShopSnapSheet({
     const next = Math.min(100, Math.max(4, g.anchorPct + delta));
     dragPctLiveRef.current = next;
     setDragTranslatePct(next);
+    scheduleVisualMetrics();
   };
 
   const onPointerUp = (e) => {
@@ -183,8 +221,11 @@ export default function MapShopSnapSheet({
     } catch (_) {
       /* ignore */
     }
+    draggingRef.current = false;
     setIsDragging(false);
     setDragTranslatePct(null);
+    dragPctLiveRef.current = pctForSnap(sheetSnapRef.current);
+    requestAnimationFrame(() => reportVisualMetrics());
   };
 
   const translatePct = dragTranslatePct != null ? dragTranslatePct : pctForSnap(sheetSnap);
@@ -254,7 +295,7 @@ export default function MapShopSnapSheet({
           {handleBar}
 
           {sheetSnap === 'peek' && shopStore ? (
-            <div className="shrink-0 px-4 pb-4">
+            <div className="shrink-0 px-4 pb-4 transition-transform active:scale-[0.99] motion-reduce:active:scale-100">
               {shopLoading ? (
                 <div className="flex justify-center py-6">
                   <Loader2 className={`h-7 w-7 animate-spin ${wazeUi ? 'text-[#2ecc71]' : 'text-[#2ECC49]'}`} />

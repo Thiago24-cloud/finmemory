@@ -125,6 +125,13 @@ async function main() {
   console.log('\n--- Resumo ---');
   console.log('Criados:', created.length, skipped.length ? `| Ignorados (duplicado): ${skipped.length}` : '', failed.length ? `| Falhas: ${failed.length}` : '');
   if (created.length) console.log(JSON.stringify(created.map((c) => ({ event: c.event, id: c.id })), null, 2));
+  if (skipped.length && !created.length && webhookSecret) {
+    console.log(
+      '\nDica: os webhooks já existem na Pluggy mas podem ter sido criados sem header (401 no Cloud Run).\n' +
+        '  Correr: npm run pluggy:fix-webhook-secrets\n' +
+        '  (lista GET /webhooks, apaga os da URL …/api/pluggy/webhook com segredo errado e recria com X-Pluggy-Webhook-Secret.)'
+    );
+  }
   if (failed.length) {
     console.error(JSON.stringify(failed, null, 2));
     process.exit(1);

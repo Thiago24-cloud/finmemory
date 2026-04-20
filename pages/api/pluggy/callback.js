@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
+import { createPluggyServerClient } from '../../../lib/pluggySyncTransactions';
+import { refreshConnectorAndPruneDuplicates } from '../../../lib/pluggyPruneDuplicateItems';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,10 +39,27 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuração do servidor incompleta (Supabase).' });
   }
 
+  const nowIso = new Date().toISOString();
+  let pluggyConnectorId = null;
+  const pluggy = createPluggyServerClient();
+  if (pluggy) {
+    const { pluggyConnectorId: cid } = await refreshConnectorAndPruneDuplicates(
+      supabase,
+      pluggy,
+      userId,
+      itemId
+    );
+    pluggyConnectorId = cid;
+  }
+
   const { error } = await supabase.from('bank_connections').upsert(
     {
       user_id: userId,
       item_id: itemId,
+      pluggy_connector_id: pluggyConnectorId,
+      status: 'connected',
+      error_code: null,
+      updated_at: nowIso,
     },
     { onConflict: 'user_id,item_id' }
   );

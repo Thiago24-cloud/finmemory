@@ -1,48 +1,17 @@
 import Link from 'next/link';
-import {
-  BarChart3,
-  Tags,
-  MapPin,
-  Share2,
-  PenLine,
-  Users,
-  List,
-  CreditCard,
-  ScanBarcode,
-} from 'lucide-react';
+import { BarChart3, Tags, Users, List, ScanBarcode, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-/** Ícone estilo nota fiscal / cupom (SVG inline — evita asset externo). */
-function NotaFiscalIcon({ className }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M7 3h10a2 2 0 012 2v14l-2-1-2 1-2-1-2 1-2-1-2 1V5a2 2 0 012-2z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        fill="currentColor"
-        fillOpacity="0.08"
-      />
-      <path d="M9 7h6M9 10h6M9 13h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path
-        d="M8 16h8"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeDasharray="1.5 2"
-      />
-    </svg>
-  );
-}
-
 const SECONDARY_ACTIONS = [
+  {
+    href: '/simulador',
+    label: 'Simulador',
+    title: 'Simular saldo, rede de apoio e crédito',
+    Icon: Sparkles,
+    wrapClass:
+      'bg-gradient-to-br from-purple-950 to-zinc-900 text-purple-200 border border-purple-500/35 hover:from-purple-900 hover:to-zinc-900',
+    labelClass: 'text-purple-100',
+  },
   {
     href: '/scan-product',
     label: 'Código de barras',
@@ -52,28 +21,6 @@ const SECONDARY_ACTIONS = [
     wrapClass:
       'bg-red-50 text-red-600 border-2 border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.15)] hover:bg-red-100',
     labelClass: 'text-red-700',
-  },
-  {
-    href: '/share-price',
-    label: 'Preço',
-    Icon: Share2,
-    wrapClass: 'bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100',
-    labelClass: 'text-sky-800',
-  },
-  {
-    href: '/cartoes',
-    label: 'Cartões',
-    title: 'Cartões (manual)',
-    Icon: CreditCard,
-    wrapClass: 'bg-violet-50 text-violet-600 border border-violet-200 hover:bg-violet-100',
-    labelClass: 'text-violet-800',
-  },
-  {
-    href: '/manual-entry',
-    label: 'Gasto',
-    Icon: PenLine,
-    wrapClass: 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100',
-    labelClass: 'text-amber-900',
   },
   {
     href: '/partnership',
@@ -106,11 +53,9 @@ const SECONDARY_ACTIONS = [
 ];
 
 /**
- * Ações rápidas – destaque Escanear + Mapa; demais em grelha 4×2.
+ * Ações rápidas — grelha (escanear nota no card principal e na barra inferior).
  */
 export function QuickActions({ className }) {
-  const primaryBtn =
-    'flex flex-col items-center gap-2 min-w-[88px] hover:-translate-y-0.5 transition-transform duration-200';
   const secondaryBtn =
     'flex flex-col items-center gap-2 w-full max-w-[92px] mx-auto hover:-translate-y-0.5 transition-transform duration-200';
   const secondaryBtnWide =
@@ -118,25 +63,6 @@ export function QuickActions({ className }) {
 
   return (
     <div className={cn('max-w-lg mx-auto px-1', className)}>
-      <div className="flex flex-wrap gap-6 mb-6 justify-center px-1">
-        <Link
-          href="/add-receipt"
-          className={cn(primaryBtn, 'no-underline text-inherit')}
-          title="Foto da nota ou QR Code NFC-e"
-        >
-          <div className="w-[4.5rem] h-[4.5rem] rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-[#e8f5e9] to-[#c8e6c9] text-[#2e7d32] ring-1 ring-black/5 hover:from-[#c8e6c9] hover:to-[#a5d6a7] transition-colors">
-            <NotaFiscalIcon className="h-9 w-9" />
-          </div>
-          <span className="text-xs font-semibold text-neutral-800 whitespace-nowrap">Escanear</span>
-        </Link>
-        <Link href="/mapa" className={cn(primaryBtn, 'no-underline text-inherit')}>
-          <div className="w-[4.5rem] h-[4.5rem] rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-[#e3f2fd] to-[#bbdefb] text-[#0d47a1] ring-1 ring-black/5 hover:from-[#bbdefb] hover:to-[#90caf9] transition-colors">
-            <MapPin className="h-8 w-8" />
-          </div>
-          <span className="text-xs font-semibold text-neutral-800 whitespace-nowrap">Mapa</span>
-        </Link>
-      </div>
-
       <div
         className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-4 sm:gap-x-4 sm:gap-y-5 justify-items-stretch max-w-[280px] sm:max-w-[380px] mx-auto"
         role="navigation"

@@ -57,17 +57,25 @@ const SheetContent = React.forwardRef(
 );
 SheetContent.displayName = 'SheetContent';
 
-const SheetHeader = ({ className, ...props }) => (
-  <div className={cn('flex flex-col space-y-2 text-center sm:text-left', className)} {...props} />
-);
-const SheetFooter = ({ className, ...props }) => (
-  <div className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)} {...props} />
-);
+function SheetHeader({ className, ...props }) {
+  return <div className={cn('flex flex-col space-y-2 text-center sm:text-left', className)} {...props} />;
+}
+SheetHeader.displayName = 'SheetHeader';
+
+function SheetFooter({ className, ...props }) {
+  return (
+    <div className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)} {...props} />
+  );
+}
+SheetFooter.displayName = 'SheetFooter';
 const SheetTitle = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Title ref={ref} className={cn('text-lg font-semibold text-foreground', className)} {...props} />
 ));
+SheetTitle.displayName = 'SheetTitle';
+
 const SheetDescription = React.forwardRef(({ className, ...props }, ref) => (
   <SheetPrimitive.Description ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />
 ));
+SheetDescription.displayName = 'SheetDescription';
 
 export { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetOverlay, SheetPortal, SheetTitle, SheetTrigger };

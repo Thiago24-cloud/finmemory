@@ -1,14 +1,16 @@
 'use client';
 
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Clock, Globe, Loader2, MapPin, Navigation, Phone, ShoppingCart, X } from 'lucide-react';
+import { Clock, Globe, Loader2, MapPin, Navigation, Phone, Search, ShoppingCart, X } from 'lucide-react';
 import {
   openGoogleMapsDirectionsPreferCurrentLocation,
   openGoogleMapsSearchQuery,
   openWazeSearchByAddress,
 } from '../../lib/mapDirections';
 import { getMapProductImageSrcForImg } from '../../lib/mapImageProxy';
+import { displayPromoProductName, promoCategoryBadgeLabel } from '../../lib/mapOfferDisplay';
+import { getMapOfferSeenPresentation } from '../../lib/mapOfferSeenLabel';
 
 function storeTypeLabelForSheet(type) {
   if (!type) return 'Comércio';
@@ -43,33 +45,32 @@ function normalizeWebsiteUrl(w) {
   return `https://${s}`;
 }
 
-function offerShelfCategoryLabel(offer) {
-  const c = String(offer?.category || '').trim();
-  if (!c) return 'Promoção';
-  const parts = c
-    .split(/\s*-\s*/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (parts.length >= 2) return parts[parts.length - 1];
-  return c.length > 18 ? `${c.slice(0, 17)}…` : c;
-}
-
 const CARD_W = 160;
 const CARD_GAP = 10;
 
 const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
   offer,
+  storeNameHint,
   wazeUi,
   formatPriceLabel,
   selected,
   onToggle,
+  seenPresentation,
+  canConfirmPrice,
+  confirmBusy,
+  onConfirmPrice,
 }) {
   const url = offer.promo_image_url;
   const imgOk = url && isDisplayableImageUrl(url);
   const imgSrc = imgOk ? getMapProductImageSrcForImg(url) : '';
-  const name = String(offer.product_name || 'Produto').slice(0, 80);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [imgSrc, url]);
+  const hint = storeNameHint || offer.store_name || '';
+  const name = String(displayPromoProductName(offer.product_name, hint) || 'Produto').slice(0, 80);
   const priceNode = formatPriceLabel(offer);
-  const cat = offerShelfCategoryLabel(offer);
+  const cat = promoCategoryBadgeLabel(offer.category);
 
   return (
     <article
@@ -84,37 +85,84 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
         }`}
       >
         {imgOk ? (
-          <img src={imgSrc || url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+          <>
+            <div
+              className={`absolute inset-0 animate-pulse ${wazeUi ? 'bg-[#252a38]' : 'bg-gray-200'} ${
+                imgLoaded ? 'pointer-events-none opacity-0' : 'opacity-100'
+              } transition-opacity duration-200`}
+              aria-hidden
+            />
+            <img
+              src={imgSrc || url}
+              alt=""
+              className={`relative z-[1] h-full w-full object-cover transition-opacity duration-200 ${
+                imgLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgLoaded(true)}
+            />
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-emerald-600/90">
             <ShoppingCart className="h-10 w-10 text-white/90" aria-hidden />
           </div>
         )}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
-        <span
-          className={`inline-block max-w-full self-start rounded px-1.5 py-0.5 text-[10px] font-medium ${
-            wazeUi ? 'bg-[#2a2d3a] text-[#aaa]' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          {cat}
-        </span>
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 p-1.5">
+        {cat ? (
+          <span
+            className={`inline-block max-w-full self-start rounded px-1 py-0.5 text-[9px] font-medium ${
+              wazeUi ? 'bg-[#2a2d3a] text-[#aaa]' : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {cat}
+          </span>
+        ) : null}
         <p
-          className={`line-clamp-2 min-h-[2.5rem] text-xs font-medium leading-snug ${
+          className={`line-clamp-2 text-[11px] font-semibold leading-snug ${
             wazeUi ? 'text-[#e8e8e8]' : 'text-gray-900'
           }`}
         >
           {name}
         </p>
         <div
-          className={`text-sm font-bold tabular-nums ${wazeUi ? 'text-[#2ecc71]' : 'text-emerald-600'}`}
+          className={`text-[13px] font-bold tabular-nums leading-none ${wazeUi ? 'text-[#2ecc71]' : 'text-emerald-600'}`}
         >
           {priceNode}
         </div>
+        {seenPresentation?.text ? (
+          <div
+            className={`flex items-center gap-0.5 text-[9px] font-medium leading-tight ${seenPresentation.className}`}
+          >
+            <Clock className={`h-2.5 w-2.5 shrink-0 ${seenPresentation.iconClassName}`} aria-hidden />
+            <span>{seenPresentation.text}</span>
+          </div>
+        ) : null}
+        {canConfirmPrice && onConfirmPrice ? (
+          <button
+            type="button"
+            data-sheet-no-tap-expand
+            disabled={confirmBusy}
+            className={`mt-0.5 w-full rounded-md border py-1 text-[9px] font-semibold transition-colors disabled:opacity-50 ${
+              wazeUi
+                ? 'border-[#2a2d3a] bg-[#161922] text-[#9aa0a6] hover:border-[#2ecc71] hover:text-[#2ecc71]'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-400 hover:text-emerald-700'
+            }`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirmPrice(offer);
+            }}
+          >
+            {confirmBusy ? '…' : 'Preço ok na loja'}
+          </button>
+        ) : null}
         <button
           type="button"
           data-sheet-no-tap-expand
-          className={`mt-auto w-full rounded-lg py-2 text-xs font-semibold text-white ${
+          className={`mt-auto w-full rounded-lg py-1.5 text-[11px] font-semibold text-white ${
             wazeUi ? 'bg-[#2ecc71] text-[#0f1117]' : 'bg-[#2ECC49]'
           }`}
           onMouseDown={(e) => e.stopPropagation()}
@@ -149,10 +197,25 @@ export default function MapShopMobileGoogleSheetBody({
   encarteSection,
   sharePriceHref,
   hasEncartePromotions,
+  canConfirmPrice = false,
+  onOfferConfirmed,
+  confirmBusyOfferId = null,
 }) {
   const scrollerRef = useRef(null);
   const [carouselIdx, setCarouselIdx] = useState(0);
-  const nCarousel = carouselOffers.length;
+  const [sheetQuery, setSheetQuery] = useState('');
+
+  const filteredCarousel = useMemo(() => {
+    const t = sheetQuery.trim().toLowerCase();
+    if (!t) return carouselOffers;
+    return carouselOffers.filter((o) => {
+      const name = String(o.product_name || '').toLowerCase();
+      const cat = String(o.category || '').toLowerCase();
+      return name.includes(t) || cat.includes(t);
+    });
+  }, [carouselOffers, sheetQuery]);
+
+  const nCarousel = filteredCarousel.length;
 
   const heroSrc = useMemo(() => {
     const pu = shopStore?.photo_url;
@@ -193,6 +256,12 @@ export default function MapShopMobileGoogleSheetBody({
     setCarouselIdx(Math.min(Math.max(0, i), nCarousel - 1));
   }, [nCarousel]);
 
+  useEffect(() => {
+    setCarouselIdx(0);
+    const el = scrollerRef.current;
+    if (el) el.scrollLeft = 0;
+  }, [sheetQuery]);
+
   const pillBase =
     'inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[20px] border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-800 shadow-sm active:scale-[0.98]';
   const pillWaze = wazeUi
@@ -206,7 +275,7 @@ export default function MapShopMobileGoogleSheetBody({
 
   return (
     <div className={wazeUi ? 'text-[#e8e8e8]' : 'text-gray-900'}>
-      <div className="relative h-[220px] w-full shrink-0 overflow-hidden bg-emerald-600">
+      <div className="relative h-[200px] w-full shrink-0 overflow-hidden bg-emerald-600">
         {heroSrc ? (
           <img src={heroSrc} alt="" className="h-full w-full object-cover" />
         ) : (
@@ -240,6 +309,9 @@ export default function MapShopMobileGoogleSheetBody({
                 {shopStore?.name || 'Loja'}
               </h2>
               <p className="mt-0.5 text-[13px] text-white/70">{storeTypeLabelForSheet(shopStore?.type)}</p>
+              <p className="mt-1 max-w-[95%] text-[11px] font-medium leading-snug text-white/90 drop-shadow-sm line-clamp-2">
+                Nossa loja te espera — veja as ofertas e compare com calma.
+              </p>
               <span className="mt-2 inline-block rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
                 {promoCount} oferta{promoCount === 1 ? '' : 's'} ativa{promoCount === 1 ? '' : 's'}
               </span>
@@ -308,7 +380,56 @@ export default function MapShopMobileGoogleSheetBody({
         </div>
       ) : null}
 
-      {wazeCategoryChips}
+      {wazeCategoryChips || carouselOffers.length > 0 ? (
+        <div className="sticky top-0 z-[5]">
+          {wazeCategoryChips ? (
+            <div
+              className={`border-b ${
+                wazeUi
+                  ? 'border-[#1e2130] bg-[#13161f]/72 shadow-[0_6px_20px_rgba(0,0,0,0.22)] supports-[backdrop-filter]:bg-[#13161f]/48 backdrop-blur-xl backdrop-saturate-150'
+                  : 'border-gray-200/90 bg-white/72 shadow-[0_6px_18px_rgba(15,23,42,0.08)] supports-[backdrop-filter]:bg-white/48 backdrop-blur-xl backdrop-saturate-150'
+              }`}
+              data-sheet-no-drag
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              {wazeCategoryChips}
+            </div>
+          ) : null}
+          {carouselOffers.length > 0 ? (
+            <div
+              className={`border-b px-4 py-2 ${
+                wazeUi ? 'border-[#1e2130] bg-[#13161f]' : 'border-gray-100 bg-white'
+              }`}
+              data-sheet-no-drag
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              <label className="sr-only" htmlFor="finmemory-shop-sheet-search">
+                Pesquisar ofertas nesta loja
+              </label>
+              <div
+                className={`flex items-center gap-2 rounded-full border px-3 py-2 ${
+                  wazeUi ? 'border-[#2a2d3a] bg-[#1a1d27]' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <Search className={`h-4 w-4 shrink-0 ${wazeUi ? 'text-[#9aa0a6]' : 'text-gray-400'}`} aria-hidden />
+                <input
+                  id="finmemory-shop-sheet-search"
+                  type="search"
+                  enterKeyHint="search"
+                  value={sheetQuery}
+                  onChange={(e) => setSheetQuery(e.target.value)}
+                  placeholder={`Pesquisar em ${shopStore?.name || 'esta loja'}…`}
+                  className={`min-w-0 flex-1 border-0 bg-transparent text-[13px] outline-none focus:ring-0 ${
+                    wazeUi ? 'text-[#e8eaed] placeholder:text-[#6b7280]' : 'text-gray-900 placeholder:text-gray-400'
+                  }`}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {nCarousel > 0 ? (
         <div className="pt-1">
@@ -325,26 +446,38 @@ export default function MapShopMobileGoogleSheetBody({
             onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            {carouselOffers.map((offer) => (
+            {filteredCarousel.map((offer) => (
               <ShopOfferSnapCard
                 key={String(offer.id)}
                 offer={offer}
+                storeNameHint={shopStore?.name}
                 wazeUi={wazeUi}
                 formatPriceLabel={formatOfferPrice}
                 selected={cartOfferIdSet.has(String(offer.id))}
                 onToggle={toggleCartOffer}
+                seenPresentation={getMapOfferSeenPresentation(offer.observed_at)}
+                canConfirmPrice={canConfirmPrice}
+                confirmBusy={confirmBusyOfferId === String(offer.id)}
+                onConfirmPrice={onOfferConfirmed}
               />
             ))}
           </div>
-          <p className="px-4 pb-2 text-center text-[11px] text-gray-500">
-            {carouselIdx + 1} de {nCarousel} →
+          <p
+            className={`px-4 pb-2 text-center text-[11px] ${wazeUi ? 'text-[#666]' : 'text-gray-500'}`}
+          >
+            {carouselIdx + 1} de {nCarousel}
+            {sheetQuery.trim() ? ` · filtrado` : ''} →
           </p>
         </div>
+      ) : carouselOffers.length > 0 && sheetQuery.trim() ? (
+        <p className={`px-4 py-3 text-center text-sm ${wazeUi ? 'text-[#888]' : 'text-gray-600'}`}>
+          Nenhum produto corresponde a “{sheetQuery.trim()}”.
+        </p>
       ) : !shopLoading && !shopErr && !hasEncartePromotions ? (
         <p className={`px-4 py-4 text-center text-sm ${wazeUi ? 'text-[#888]' : 'text-gray-600'}`}>
           Nenhuma promoção encontrada para esta loja nesta região.
         </p>
-      ) : !shopLoading && !shopErr && hasEncartePromotions && nCarousel === 0 ? (
+      ) : !shopLoading && !shopErr && hasEncartePromotions && carouselOffers.length === 0 ? (
         <p className={`px-4 pb-2 text-center text-[11px] ${wazeUi ? 'text-[#666]' : 'text-gray-500'}`}>
           Sem ofertas de prateleira no mapa; veja os encartes abaixo.
         </p>

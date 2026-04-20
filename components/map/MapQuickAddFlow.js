@@ -45,6 +45,24 @@ export function MapQuickAddFlow({ wazeUi }) {
   const [summary, setSummary] = useState(null);
   const [fatalError, setFatalError] = useState('');
 
+  const [clearPromoStoreName, setClearPromoStoreName] = useState('');
+  const [clearPromoConfirm, setClearPromoConfirm] = useState(false);
+  const [clearPromoMsg, setClearPromoMsg] = useState('');
+  const [clearPromoBusy, setClearPromoBusy] = useState(false);
+
+  const [removePinScope, setRemovePinScope] = useState('address');
+  const [removePinStoreName, setRemovePinStoreName] = useState('');
+  const [removePinAddress, setRemovePinAddress] = useState('');
+  const [removePinConfirm, setRemovePinConfirm] = useState(false);
+  const [removePinConfirmAllNames, setRemovePinConfirmAllNames] = useState(false);
+  const [removePinClearPromoPoints, setRemovePinClearPromoPoints] = useState(false);
+  const [removePinBlacklistCoords, setRemovePinBlacklistCoords] = useState(false);
+  const [removePinConfirmBlacklist, setRemovePinConfirmBlacklist] = useState(false);
+  const [removePinCuratedOptOut, setRemovePinCuratedOptOut] = useState(false);
+  const [removePinConfirmCuratedOptOut, setRemovePinConfirmCuratedOptOut] = useState(false);
+  const [removePinMsg, setRemovePinMsg] = useState('');
+  const [removePinBusy, setRemovePinBusy] = useState(false);
+
   const cardClass = useMemo(
     () =>
       wazeUi
@@ -171,14 +189,137 @@ export function MapQuickAddFlow({ wazeUi }) {
     }
   }, [storeName, address, lat, lng, category, productsText, continueOnError, secret, appendStep]);
 
+  const clearStoreMapPromos = useCallback(async () => {
+    setClearPromoMsg('');
+    setClearPromoBusy(true);
+    const headers = { 'Content-Type': 'application/json' };
+    if (secret.trim()) headers['x-map-quick-add-secret'] = secret.trim();
+    try {
+      const res = await fetch('/api/admin/clear-store-map-promos', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          store_name: clearPromoStoreName.trim(),
+          confirm: true,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.status === 409 && Array.isArray(j.matches)) {
+        setClearPromoMsg(
+          `${j.error || 'Ambíguo.'} Lojas: ${j.matches.map((m) => m.name).join(' · ')}`
+        );
+        return;
+      }
+      if (!res.ok) {
+        setClearPromoMsg(j.error || `HTTP ${res.status}`);
+        return;
+      }
+      if (j.ok) {
+        setClearPromoMsg(
+          `Concluído. price_points: ${j.price_points_deleted ?? 0} · promotions: ${j.promotions_deactivated ?? 0} · agente: ${j.promocoes_supermercados_deactivated ?? 0}`
+        );
+        setClearPromoConfirm(false);
+      } else {
+        setClearPromoMsg(j.error || 'Resposta inesperada');
+      }
+    } catch (e) {
+      setClearPromoMsg(e?.message || 'Erro de rede');
+    } finally {
+      setClearPromoBusy(false);
+    }
+  }, [clearPromoStoreName, secret]);
+
+  const removeStoreFromMap = useCallback(async () => {
+    setRemovePinMsg('');
+    setRemovePinBusy(true);
+    const headers = { 'Content-Type': 'application/json' };
+    if (secret.trim()) headers['x-map-quick-add-secret'] = secret.trim();
+    const scope = removePinScope === 'all' ? 'all_names' : 'address';
+    const body = {
+      store_name: removePinStoreName.trim(),
+      scope,
+      confirm: true,
+    };
+    if (scope === 'address') body.address = removePinAddress.trim();
+    if (scope === 'all_names') body.confirm_remove_all_stores_with_name = true;
+    if (removePinClearPromoPoints) body.clear_promotional_points = true;
+    if (removePinBlacklistCoords) {
+      body.blacklist_coordinates = true;
+      body.confirm_blacklist_coordinates = removePinConfirmBlacklist;
+    }
+    if (removePinCuratedOptOut) {
+      body.curated_pin_opt_out = true;
+      body.confirm_curated_pin_opt_out = removePinConfirmCuratedOptOut;
+    }
+    try {
+      const res = await fetch('/api/admin/remove-store-from-map', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.status === 409 && Array.isArray(j.matches)) {
+        setRemovePinMsg(
+          `${j.error || 'Ambíguo.'} ${j.matches.map((m) => `${m.name} — ${m.address || ''}`).join(' | ')}`
+        );
+        return;
+      }
+      if (res.status === 404 && Array.isArray(j.candidates)) {
+        setRemovePinMsg(
+          `${j.error || 'Sem match.'} Endereços no cadastro: ${j.candidates.map((c) => c.address || '(vazio)').join(' · ')}`
+        );
+        return;
+      }
+      if (!res.ok) {
+        setRemovePinMsg(j.error || `HTTP ${res.status}`);
+        return;
+      }
+      if (j.ok) {
+        const extra = [];
+        if (typeof j.promo_points_deleted === 'number')
+          extra.push(`price_points promo: ${j.promo_points_deleted}`);
+        if (typeof j.map_pin_suppressions_inserted === 'number')
+          extra.push(`bloqueios: ${j.map_pin_suppressions_inserted}`);
+        if (typeof j.curated_pin_opt_out_upserted === 'number' && j.curated_pin_opt_out_upserted > 0)
+          extra.push(`opt-out curadoria: ${j.curated_pin_opt_out_upserted}`);
+        setRemovePinMsg(
+          `Concluído. ${j.deactivated_count ?? 0} loja(s) desativada(s).${extra.length ? ` ${extra.join(' · ')}.` : ''} ${j.note || ''}`.trim()
+        );
+        setRemovePinConfirm(false);
+        setRemovePinConfirmAllNames(false);
+        setRemovePinConfirmBlacklist(false);
+        setRemovePinConfirmCuratedOptOut(false);
+      } else {
+        setRemovePinMsg(j.error || 'Resposta inesperada');
+      }
+    } catch (e) {
+      setRemovePinMsg(e?.message || 'Erro de rede');
+    } finally {
+      setRemovePinBusy(false);
+    }
+  }, [
+    removePinScope,
+    removePinStoreName,
+    removePinAddress,
+    secret,
+    removePinClearPromoPoints,
+    removePinBlacklistCoords,
+    removePinConfirmBlacklist,
+    removePinCuratedOptOut,
+    removePinConfirmCuratedOptOut,
+  ]);
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 pb-24">
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h1 className={`text-xl font-bold ${wazeUi ? 'text-white' : 'text-gray-900'}`}>Curadoria rápida</h1>
           <p className={`mt-1 text-sm ${wazeUi ? 'text-[#9aa0a6]' : 'text-gray-600'}`}>
-            Loja + lista com progresso ao vivo; miniaturas: repositório em Supabase → Open Food Facts → Google CSE (se
-            configurado). Gravar URL em /admin/quick-add reutiliza em todas as lojas.
+            Loja + lista com progresso ao vivo; miniaturas: repositório/cache → categorias por palavra-chave → Open Food Facts →
+            Google CSE (loja + produto). Opcional no servidor: MAP_PRODUCT_IMAGE_VISION_VALIDATE=1. Gravar URL em
+            /admin/quick-add reutiliza em todas as lojas.
           </p>
         </div>
         <Link
@@ -285,6 +426,245 @@ export function MapQuickAddFlow({ wazeUi }) {
         >
           {running ? 'A processar…' : 'Enviar com progresso ao vivo'}
         </button>
+      </div>
+
+      <div
+        className={
+          wazeUi
+            ? 'mt-6 rounded-2xl border border-red-900/60 bg-[#2a1518]/80 p-4 space-y-3'
+            : 'mt-6 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 space-y-3'
+        }
+      >
+        <h2 className={`text-sm font-bold ${wazeUi ? 'text-[#f28b82]' : 'text-rose-900'}`}>
+          Limpar ofertas no mapa (por loja)
+        </h2>
+        <p className={`text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-600'}`}>
+          Remove ofertas promocionais divulgadas para o nome da loja (price_points com categoria promo, promotions e
+          promocoes_supermercados). Mesma permissão que o envio acima (login ou segredo).
+        </p>
+        <div>
+          <label className={labelClass}>Nome da loja a limpar</label>
+          <input
+            className={`mt-1 ${inputClass}`}
+            value={clearPromoStoreName}
+            onChange={(e) => setClearPromoStoreName(e.target.value)}
+            placeholder="Igual ao cadastro / campo Nome da loja acima"
+            disabled={clearPromoBusy || running}
+          />
+        </div>
+        <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-700'}`}>
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={clearPromoConfirm}
+            onChange={(e) => setClearPromoConfirm(e.target.checked)}
+            disabled={clearPromoBusy || running}
+          />
+          <span>Confirmo remoção das ofertas desta loja no mapa (irreversível).</span>
+        </label>
+        <button
+          type="button"
+          onClick={clearStoreMapPromos}
+          disabled={clearPromoBusy || running || !clearPromoStoreName.trim() || !clearPromoConfirm}
+          className={`w-full rounded-xl py-3 text-sm font-bold text-white transition-colors disabled:opacity-50 ${
+            wazeUi ? 'bg-[#8b1e2d] hover:bg-[#a5273a]' : 'bg-rose-800 hover:bg-rose-900'
+          }`}
+        >
+          {clearPromoBusy ? 'A processar…' : 'Remover ofertas desta loja'}
+        </button>
+        {clearPromoMsg ? (
+          <p
+            className={`text-xs whitespace-pre-wrap ${
+              clearPromoMsg.startsWith('Concluído')
+                ? wazeUi
+                  ? 'text-[#81c995]'
+                  : 'text-green-800'
+                : wazeUi
+                  ? 'text-[#f28b82]'
+                  : 'text-red-700'
+            }`}
+          >
+            {clearPromoMsg}
+          </p>
+        ) : null}
+      </div>
+
+      <div
+        className={
+          wazeUi
+            ? 'mt-6 rounded-2xl border border-amber-900/50 bg-[#2d2419]/90 p-4 space-y-3'
+            : 'mt-6 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 space-y-3'
+        }
+      >
+        <h2 className={`text-sm font-bold ${wazeUi ? 'text-[#fdd663]' : 'text-amber-900'}`}>
+          Retirar loja do mapa (cadastro)
+        </h2>
+        <p className={`text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-600'}`}>
+          Desativa o pin (<code className={wazeUi ? 'text-[#fdd663]' : 'text-amber-800'}>active = false</code>). Duplicata:
+          mesmo nome + endereço errado. &quot;Todas&quot; desativa todos os pins com esse nome.
+        </p>
+        <div>
+          <label className={labelClass}>Nome da loja</label>
+          <input
+            className={`mt-1 ${inputClass}`}
+            value={removePinStoreName}
+            onChange={(e) => setRemovePinStoreName(e.target.value)}
+            placeholder="Como no cadastro"
+            disabled={removePinBusy || running}
+          />
+        </div>
+        <div className={`space-y-2 text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-700'}`}>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="removePinScopeMq"
+              className="mt-0.5"
+              checked={removePinScope === 'address'}
+              onChange={() => setRemovePinScope('address')}
+              disabled={removePinBusy || running}
+            />
+            <span>Só esta filial (cole o endereço da linha errada)</span>
+          </label>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="removePinScopeMq"
+              className="mt-0.5"
+              checked={removePinScope === 'all'}
+              onChange={() => setRemovePinScope('all')}
+              disabled={removePinBusy || running}
+            />
+            <span>Todas as lojas ativas com este nome</span>
+          </label>
+        </div>
+        {removePinScope === 'address' ? (
+          <div>
+            <label className={labelClass}>Endereço a remover</label>
+            <input
+              className={`mt-1 ${inputClass}`}
+              value={removePinAddress}
+              onChange={(e) => setRemovePinAddress(e.target.value)}
+              placeholder="Rua, número, bairro…"
+              disabled={removePinBusy || running}
+            />
+          </div>
+        ) : null}
+        <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-700'}`}>
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={removePinClearPromoPoints}
+            onChange={(e) => setRemovePinClearPromoPoints(e.target.checked)}
+            disabled={removePinBusy || running}
+          />
+          <span>Também apagar ofertas em price_points (promo) com o nome exato desta(s) loja(s).</span>
+        </label>
+        <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-700'}`}>
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={removePinBlacklistCoords}
+            onChange={(e) => {
+              setRemovePinBlacklistCoords(e.target.checked);
+              if (!e.target.checked) setRemovePinConfirmBlacklist(false);
+            }}
+            disabled={removePinBusy || running}
+          />
+          <span>Bloquear esta coordenada (mapa + find_or_create_store).</span>
+        </label>
+        {removePinBlacklistCoords ? (
+          <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#fdd663]' : 'text-amber-900'}`}>
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={removePinConfirmBlacklist}
+              onChange={(e) => setRemovePinConfirmBlacklist(e.target.checked)}
+              disabled={removePinBusy || running}
+            />
+            <span>Confirmo gravar o bloqueio de coordenada.</span>
+          </label>
+        ) : null}
+        <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-700'}`}>
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={removePinCuratedOptOut}
+            onChange={(e) => {
+              setRemovePinCuratedOptOut(e.target.checked);
+              if (!e.target.checked) setRemovePinConfirmCuratedOptOut(false);
+            }}
+            disabled={removePinBusy || running}
+          />
+          <span>Gravar opt-out Pomar/Sacolão (só com ofertas se reactivar).</span>
+        </label>
+        {removePinCuratedOptOut ? (
+          <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#fdd663]' : 'text-amber-900'}`}>
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={removePinConfirmCuratedOptOut}
+              onChange={(e) => setRemovePinConfirmCuratedOptOut(e.target.checked)}
+              disabled={removePinBusy || running}
+            />
+            <span>Confirmo opt-out de curadoria.</span>
+          </label>
+        ) : null}
+        <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#bdc1c6]' : 'text-gray-700'}`}>
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={removePinConfirm}
+            onChange={(e) => setRemovePinConfirm(e.target.checked)}
+            disabled={removePinBusy || running}
+          />
+          <span>Confirmo desativar o(s) pin(s).</span>
+        </label>
+        {removePinScope === 'all' ? (
+          <label className={`flex items-start gap-2 text-xs ${wazeUi ? 'text-[#fdd663]' : 'text-amber-900'}`}>
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={removePinConfirmAllNames}
+              onChange={(e) => setRemovePinConfirmAllNames(e.target.checked)}
+              disabled={removePinBusy || running}
+            />
+            <span>Entendo que TODAS as lojas com este nome serão desativadas.</span>
+          </label>
+        ) : null}
+        <button
+          type="button"
+          onClick={removeStoreFromMap}
+          disabled={
+            removePinBusy ||
+            running ||
+            !removePinStoreName.trim() ||
+            !removePinConfirm ||
+            (removePinScope === 'address' && !removePinAddress.trim()) ||
+            (removePinScope === 'all' && !removePinConfirmAllNames) ||
+            (removePinBlacklistCoords && !removePinConfirmBlacklist) ||
+            (removePinCuratedOptOut && !removePinConfirmCuratedOptOut)
+          }
+          className={`w-full rounded-xl py-3 text-sm font-bold text-white transition-colors disabled:opacity-50 ${
+            wazeUi ? 'bg-[#b06000] hover:bg-[#c87510]' : 'bg-amber-800 hover:bg-amber-900'
+          }`}
+        >
+          {removePinBusy ? 'A processar…' : 'Desativar loja(s) no mapa'}
+        </button>
+        {removePinMsg ? (
+          <p
+            className={`text-xs whitespace-pre-wrap ${
+              removePinMsg.startsWith('Concluído')
+                ? wazeUi
+                  ? 'text-[#81c995]'
+                  : 'text-green-800'
+                : wazeUi
+                  ? 'text-[#f28b82]'
+                  : 'text-red-700'
+            }`}
+          >
+            {removePinMsg}
+          </p>
+        ) : null}
       </div>
 
       {fatalError ? (

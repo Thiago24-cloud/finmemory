@@ -43,7 +43,11 @@ export function TransactionRow({
     >
       {icon && <span className="text-[#2ECC49] flex-shrink-0">{icon}</span>}
       <div className="flex-1 min-w-0">
-        <Link href={`/transaction/${id}/edit`} className="font-medium text-[#333] hover:text-[#2ECC49] truncate block">
+        <Link
+          prefetch={false}
+          href={`/transaction/${id}/edit`}
+          className="font-medium text-[#333] hover:text-[#2ECC49] truncate block"
+        >
           {estabelecimento || 'Sem nome'}
         </Link>
         <span className="text-xs text-[#666]">{formattedDate}</span>

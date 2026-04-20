@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Loader2 } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import { ExpressionValueField } from '../components/ui/ExpressionValueField';
 
 const CATEGORIES = [
   'Supermercado', 'Farmácia', 'Posto', 'Bar/Restaurante', 'Padaria', 'Hortifruti', 'Eletrônicos', 'Outros',
@@ -156,18 +157,15 @@ export default function SharePricePage() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-[#333] mb-1">Preço (R$) *</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0,00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
-              required
-            />
-          </div>
+          <ExpressionValueField
+            label="Preço (R$)"
+            value={price}
+            onChange={setPrice}
+            mode="money"
+            placeholder="0,00"
+            required
+            hint="Toque para preço com teclado que permite somar (ex.: 3,99+2,5)."
+          />
           <div>
             <label className="block text-sm font-medium text-[#333] mb-1">Loja *</label>
             <input

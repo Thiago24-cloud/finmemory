@@ -16,7 +16,11 @@
     </style>
 
 
-    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+    <!-- Tela nativa inicial: fundo branco + marca central (evita máscara circular do ícone API 31+) -->
+    <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
     </style>
 </resources>

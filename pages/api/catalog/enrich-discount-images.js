@@ -1,9 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import {
-  fetchGoogleCseImageByName,
-  fetchOpenFoodFactsImageByName,
-  isValidResolvedImage,
-} from '../../../lib/externalProductImages';
+import { fetchExternalProductImageResolved, isValidResolvedImage } from '../../../lib/externalProductImages';
 import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
 
 function getSupabase() {
@@ -83,10 +79,12 @@ export default async function handler(req, res) {
       let imageUrl = await resolveFromCatalog(supabase, row.product_id);
 
       if (!imageUrl) {
-        imageUrl = await fetchOpenFoodFactsImageByName(row.nome_produto);
-      }
-      if (!imageUrl) {
-        imageUrl = await fetchGoogleCseImageByName(row.nome_produto, row.supermercado);
+        const resolved = await fetchExternalProductImageResolved(
+          row.nome_produto,
+          row.supermercado || '',
+          true
+        );
+        imageUrl = resolved.url;
       }
 
       if (!isValidResolvedImage(imageUrl)) {

@@ -18,6 +18,8 @@ function getStripe() {
 export default function UpgradeButton({
   className = '',
   children,
+  /** @type {'plus' | 'pro' | 'familia'} */
+  plan = 'plus',
   userId: _userId,
   userEmail: _userEmail,
 }) {
@@ -32,7 +34,7 @@ export default function UpgradeButton({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: '{}',
+        body: JSON.stringify({ plan }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
@@ -49,7 +51,7 @@ export default function UpgradeButton({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [plan]);
 
   if (!publishableKey) {
     return null;

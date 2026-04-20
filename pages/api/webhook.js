@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { getSupabaseAdmin } from '../../lib/supabaseAdmin';
+import { planFromStripePriceId } from '../../lib/stripePlanPrice';
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -16,11 +17,34 @@ export const config = {
   },
 };
 
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} email
+ * @param {Record<string, unknown>} fields
+ */
+async function syncProfilesStripeFields(supabase, email, fields) {
+  const em = String(email || '').trim();
+  if (!em) return;
+  const { data: rows, error: qErr } = await supabase.from('profiles').select('id').eq('email', em);
+  if (qErr) {
+    console.warn('[stripe/webhook] profiles lookup:', qErr.message);
+    return;
+  }
+  if (!rows?.length) return;
+  for (const row of rows) {
+    const { error } = await supabase.from('profiles').update(fields).eq('id', row.id);
+    if (error) console.warn('[stripe/webhook] profiles update:', error.message);
+  }
+}
+
 async function syncUserFromSubscription(supabase, stripe, subscription) {
   const sub =
     typeof subscription === 'string'
-      ? await stripe.subscriptions.retrieve(subscription)
+      ? await stripe.subscriptions.retrieve(subscription, {
+          expand: ['items.data.price'],
+        })
       : subscription;
+
   const userIdMeta = sub.metadata?.user_id;
   const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
   let userId = userIdMeta;
@@ -42,34 +66,63 @@ async function syncUserFromSubscription(supabase, stripe, subscription) {
   const status = sub.status;
   const active = status === 'active' || status === 'trialing';
 
+  const priceObj = sub.items?.data?.[0]?.price;
+  const priceId = typeof priceObj === 'string' ? priceObj : priceObj?.id;
+  const planFromPrice = planFromStripePriceId(priceId);
+  const planMeta = String(sub.metadata?.plan || '').toLowerCase();
+  let resolvedPlan = 'free';
+  if (active) {
+    if (planFromPrice) resolvedPlan = planFromPrice;
+    else if (planMeta === 'plus' || planMeta === 'pro' || planMeta === 'familia') resolvedPlan = planMeta;
+    else if (priceId) {
+      console.warn('[stripe/webhook] price id sem mapeamento nas env STRIPE_*_PRICE_ID:', priceId);
+      resolvedPlan = 'plus';
+    }
+  }
+
   const { data: cur } = await supabase
     .from('users')
-    .select('finmemory_plus_since')
+    .select('finmemory_plus_since, email')
     .eq('id', userId)
     .maybeSingle();
 
+  const nowIso = new Date().toISOString();
   const payload = {
     stripe_subscription_id: sub.id,
     stripe_subscription_status: status,
-    finmemory_plus_active: active,
+    finmemory_plus_active: active && resolvedPlan !== 'free',
+    plano: resolvedPlan,
+    plano_ativo: active && resolvedPlan !== 'free',
+    plano_atualizado_em: nowIso,
   };
   if (customerId) payload.stripe_customer_id = customerId;
 
-  if (active && !cur?.finmemory_plus_since) {
-    payload.finmemory_plus_since = new Date().toISOString();
+  if (active && !cur?.finmemory_plus_since && resolvedPlan !== 'free') {
+    payload.finmemory_plus_since = nowIso;
   }
 
   if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
     payload.finmemory_plus_active = false;
+    payload.plano = 'free';
+    payload.plano_ativo = false;
   }
 
   const { error } = await supabase.from('users').update(payload).eq('id', userId);
   if (error) console.error('[stripe/webhook] update users:', error.message);
+
+  const profileFields = {
+    stripe_customer_id: customerId || null,
+    stripe_subscription_id: sub.id,
+    plano: payload.plano,
+    plano_ativo: payload.plano_ativo,
+    plano_atualizado_em: nowIso,
+  };
+  if (cur?.email) await syncProfilesStripeFields(supabase, cur.email, profileFields);
 }
 
 /**
- * POST /api/webhook — eventos Stripe (assinatura FinMemory Plus).
- * Painel Stripe → Webhooks → URL: {NEXT_PUBLIC_APP_URL}/api/webhook
+ * POST /api/webhook — eventos Stripe (assinaturas Plus / Pro / Família).
+ * Stripe → Webhooks → URL: https://finmemory.com.br/api/webhook
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -117,13 +170,12 @@ export default async function handler(req, res) {
         const subId = session.subscription;
         const custId = session.customer;
         if (userId && subId) {
-          const sub = await stripe.subscriptions.retrieve(subId);
+          const sub = await stripe.subscriptions.retrieve(subId, {
+            expand: ['items.data.price'],
+          });
           await syncUserFromSubscription(supabase, stripe, sub);
         } else if (userId && custId && !subId) {
-          await supabase
-            .from('users')
-            .update({ stripe_customer_id: custId })
-            .eq('id', userId);
+          await supabase.from('users').update({ stripe_customer_id: custId }).eq('id', userId);
         }
         break;
       }

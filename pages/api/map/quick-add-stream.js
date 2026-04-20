@@ -7,7 +7,13 @@ import {
   parseProductsFromBody,
   resolveQuickAddAuth,
 } from '../../../lib/mapQuickAddCore';
-import { resolveThumbnailForQuickAddInsert } from '../../../lib/mapProductImageCache';
+import {
+  buildPricePointInsertRows,
+  getQuickAddInsertChunkSize,
+  getQuickAddThumbConcurrency,
+  insertPricePointsInChunks,
+  resolveQuickAddThumbnailsParallel,
+} from '../../../lib/quickAddPricePointsBulk';
 import { sseTryFlushRes } from '../../../lib/sseTryFlushRes';
 
 /**
@@ -174,64 +180,104 @@ export default async function handler(req, res) {
       },
     });
 
-    let inserted = 0;
-    const failures = [];
-    const thumbMemo = new Map();
+    send('step', {
+      id: 'thumbnails',
+      status: 'pending',
+      detail: { message: 'A resolver miniaturas em paralelo…' },
+    });
 
-    for (let i = 0; i < products.length; i += 1) {
-      const p = products[i];
-      send('product', { index: i + 1, total: products.length, status: 'start', name: p.product_name });
-      let imageUrl = null;
-      try {
-        imageUrl = await resolveThumbnailForQuickAddInsert(
-          supabase,
-          p.product_name,
-          storeNameForPoints,
-          thumbMemo
-        );
-      } catch (imgErr) {
-        console.warn('quick-add-stream image:', imgErr?.message || imgErr);
+    const thumbMemo = new Map();
+    const thumbConc = getQuickAddThumbConcurrency();
+    const chunkSize = getQuickAddInsertChunkSize();
+
+    const imageUrls = await resolveQuickAddThumbnailsParallel(
+      supabase,
+      products,
+      storeNameForPoints,
+      thumbMemo,
+      thumbConc,
+      (done, tot) => {
+        send('step', {
+          id: 'thumbnails',
+          status: 'pending',
+          detail: { message: `Miniaturas ${done}/${tot}`, done, total: tot },
+        });
       }
-      const { error: insErr } = await supabase.from('price_points').insert({
-        user_id: auth.userId,
-        product_name: p.product_name,
-        price: p.price,
-        store_name: storeNameForPoints,
-        lat,
-        lng,
-        category,
-        image_url: imageUrl || null,
-      });
-      if (insErr) {
-        failures.push({ index: i + 1, name: p.product_name, message: insErr.message });
+    );
+
+    send('step', { id: 'thumbnails', status: 'ok', detail: {} });
+
+    const rows = buildPricePointInsertRows(products, imageUrls, {
+      userId: auth.userId,
+      storeName: storeNameForPoints,
+      lat,
+      lng,
+      category,
+    });
+
+    send('step', {
+      id: 'insert_prices',
+      status: 'pending',
+      detail: { message: `A gravar ${rows.length} preço(s) em lotes…`, chunkSize },
+    });
+
+    const ins = await insertPricePointsInChunks(supabase, rows, {
+      chunkSize,
+      continueOnError,
+      onChunk: (upTo, totalRows) => {
+        send('step', {
+          id: 'insert_prices',
+          status: 'pending',
+          detail: { message: `Gravados ${upTo}/${totalRows}`, upTo, total: totalRows },
+        });
+      },
+    });
+
+    if (ins.fatal && !continueOnError) {
+      for (let i = 0; i < products.length; i += 1) {
+        if (ins.outcomes[i] !== 'inserted') continue;
         send('product', {
           index: i + 1,
           total: products.length,
-          status: 'error',
-          name: p.product_name,
-          message: insErr.message,
+          status: 'ok',
+          name: products[i].product_name,
         });
-        if (!continueOnError) {
-          send('error', { message: insErr.message, partial: { inserted, failures } });
-          res.end();
-          return;
-        }
-      } else {
-        inserted += 1;
+      }
+      send('error', {
+        message: ins.fatal.message || 'Insert em lote falhou',
+        partial: { inserted: ins.inserted, failures: ins.failures },
+      });
+      return;
+    }
+
+    for (let i = 0; i < products.length; i += 1) {
+      const p = products[i];
+      if (ins.outcomes[i] === 'inserted') {
         send('product', {
           index: i + 1,
           total: products.length,
           status: 'ok',
           name: p.product_name,
         });
+      } else if (ins.outcomes[i] === 'failed') {
+        const f = ins.failures.find((x) => x.index === i + 1);
+        send('product', {
+          index: i + 1,
+          total: products.length,
+          status: 'error',
+          name: p.product_name,
+          message: f?.message,
+        });
       }
     }
 
+    send('step', { id: 'insert_prices', status: 'ok', detail: {} });
+
     send('done', {
       ok: true,
-      inserted,
-      failed: failures.length,
-      failures,
+      inserted: ins.inserted,
+      failed: ins.failures.length,
+      failures: ins.failures,
       store_id: storeId,
       store_name: storeNameForPoints,
       lat,

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/Sheet';
+import { ExpressionValueField } from '../ui/ExpressionValueField';
 import { CalendarDays, CheckCircle2, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -349,25 +350,25 @@ export default function CobrancasDoMes({
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-sm font-medium text-[#333] mb-1">Valor (R$)</p>
-                <input
-                  className="w-full px-4 py-2 rounded-xl border border-[#e5e7eb] bg-white text-[#333] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/40"
-                  value={formValor}
-                  onChange={(e) => setFormValor(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="Ex: 39,90"
-                />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-[#333] mb-1">Dia (venc.)</p>
-                <input
-                  className="w-full px-4 py-2 rounded-xl border border-[#e5e7eb] bg-white text-[#333] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/40"
-                  value={formDia}
-                  onChange={(e) => setFormDia(e.target.value)}
-                  inputMode="numeric"
-                />
-              </div>
+              <ExpressionValueField
+                label="Valor (R$)"
+                value={formValor}
+                onChange={setFormValor}
+                mode="money"
+                placeholder="Ex: 39,90"
+                inputClassName="rounded-xl border-[#e5e7eb]"
+                hint="Teclado com + − × ÷."
+              />
+              <ExpressionValueField
+                label="Dia (venc.)"
+                value={formDia}
+                onChange={setFormDia}
+                mode="integer"
+                integerMin={1}
+                integerMax={31}
+                inputClassName="rounded-xl border-[#e5e7eb]"
+                hint="Dia 1–31."
+              />
             </div>
             <div>
               <p className="text-sm font-medium text-[#333] mb-1">Categoria</p>

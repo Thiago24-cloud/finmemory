@@ -1,5 +1,6 @@
 import React from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 
 export default function Termos() {
   return (
@@ -60,9 +61,9 @@ export default function Termos() {
           <h2 style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>6. Privacidade</h2>
           <p>
             O tratamento dos dados segue a{' '}
-            <a href="/privacidade" style={{ color: '#2ECC49' }}>
+            <Link href="/privacidade" style={{ color: '#2ECC49' }}>
               Política de Privacidade
-            </a>{' '}
+            </Link>{' '}
             do FinMemory, incluindo localização, notificações opcionais e Open Finance quando utilizar essas
             funcionalidades.
           </p>

@@ -51,7 +51,9 @@ export default async function handler(req, res) {
     health.checks.config = 'ok';
   }
 
-  // Diagnóstico de auth no Cloud Run (sem expor segredos — só true/false)
+  // Diagnóstico de auth no Cloud Run (sem expor segredos — só true/false).
+  // Não usar HTTP 503 aqui: o mapa e APIs públicas funcionam sem OAuth configurado;
+  // 503 só para variáveis sem as quais a app não consegue servir (Supabase público em falta).
   if (process.env.K_SERVICE) {
     const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
     health.checks.authEnv = {
@@ -64,14 +66,13 @@ export default async function handler(req, res) {
       health.checks.authEnv.nextauthSecret &&
       health.checks.authEnv.googleOAuth;
     if (!authOk) {
-      health.status = 'degraded';
+      if (health.status === 'ok') health.status = 'degraded';
       health.checks.authEnv.hint =
-        'Defina NEXTAUTH_SECRET, GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no serviço Cloud Run. Opcional: SUPABASE_SERVICE_ROLE_KEY para sessão em banco.';
+        'Login Google pode falhar: defina NEXTAUTH_SECRET, GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no Cloud Run. Opcional: SUPABASE_SERVICE_ROLE_KEY.';
     }
   }
 
-  // Status code baseado no health
-  const statusCode = health.status === 'ok' ? 200 : 503;
+  const statusCode = missingEnvVars.length > 0 ? 503 : 200;
 
   // Adicionar headers de cache
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');

@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { isExcludedFromPriceMapStoreName } from '../../../lib/mapExcludedMapStores';
+import { isExcludedFromPriceMapPoint } from '../../../lib/mapExcludedMapStores';
 import { geocodeAddress } from '../../../lib/geocode';
 import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
 import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
@@ -10,6 +10,8 @@ import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
 import { hydratePointsFromImageCache } from '../../../lib/mapProductImageCache';
 import { applyPeerPromoImageReuse } from '../../../lib/reuseMapProductImages';
 import { isLikelyNonProductScraperTitle } from '../../../lib/mapStoreChainMatch';
+import { displayPromoProductName } from '../../../lib/mapOfferDisplay';
+import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
 
 /**
  * GET /api/map/points - lista pontos do mapa.
@@ -267,7 +269,8 @@ export default async function handler(req, res) {
       ...(normalOtherRows || []),
     ]) {
       if (!row?.id) continue;
-      if (isExcludedFromPriceMapStoreName(row.store_name)) continue;
+      if (isExcludedFromPriceMapPoint({ store_name: row.store_name, lat: row.lat, lng: row.lng }))
+        continue;
       if (isLikelyNonProductScraperTitle(row.product_name)) continue;
       byId.set(row.id, row);
     }
@@ -332,6 +335,7 @@ export default async function handler(req, res) {
               : null;
           const slug = String(r.supermercado || '').toLowerCase();
           // DIA: mesmo nome que pins em public.stores → /api/map/stores marca tem_oferta_hoje por nome.
+          // Tabela promocoes_supermercados (schema agente): supermercado + nome_produto — sem coluna store_name.
           const storeName =
             slug === 'dia' ? 'Dia Supermercado' : `${label(r.supermercado)} · ofertas`;
           return {
@@ -350,7 +354,7 @@ export default async function handler(req, res) {
         });
         const byIdPromo = new Map(data.map((row) => [row.id, row]));
         for (const row of asPricePoints) {
-          if (isExcludedFromPriceMapStoreName(row.store_name)) continue;
+          if (isExcludedFromPriceMapPoint(row)) continue;
           if (!byIdPromo.has(row.id)) byIdPromo.set(row.id, row);
         }
         data = Array.from(byIdPromo.values()).sort((a, b) => {
@@ -406,7 +410,7 @@ export default async function handler(req, res) {
       // e impediam o enriquecimento por nome (Open Food Facts) abaixo.
       return {
         id: row.id,
-        product_name: row.product_name,
+        product_name: displayPromoProductName(row.product_name, row.store_name),
         price: row.price,
         store_name: row.store_name,
         lat: Number(row.lat),
@@ -448,6 +452,7 @@ export default async function handler(req, res) {
       }
     }
 
+    sanitizeMapPointsPromoImagesHttpsOnly(points);
     return res.status(200).json({ points });
   } catch (e) {
     console.error('Erro em /api/map/points:', e);

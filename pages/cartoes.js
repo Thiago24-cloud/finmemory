@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, CreditCard, Loader2, Plus, Trash2, Calculator } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import { ExpressionValueField } from '../components/ui/ExpressionValueField';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 
@@ -285,32 +286,36 @@ export default function CartoesPage() {
                 onChange={(e) => setNewLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 className="w-full mb-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="Limite total (opcional)"
-                value={newLimit}
-                onChange={(e) => setNewLimit(e.target.value)}
-                className="w-full mb-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  placeholder="Dia fechamento"
-                  value={newClosing}
-                  onChange={(e) => setNewClosing(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              <div className="mb-2">
+                <ExpressionValueField
+                  label="Limite total (opcional)"
+                  value={newLimit}
+                  onChange={setNewLimit}
+                  mode="money"
+                  placeholder="0,00"
+                  inputClassName="rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  placeholder="Dia vencimento"
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <ExpressionValueField
+                  label="Dia fechamento"
+                  value={newClosing}
+                  onChange={setNewClosing}
+                  mode="integer"
+                  integerMin={1}
+                  integerMax={31}
+                  placeholder="1–31"
+                  inputClassName="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+                <ExpressionValueField
+                  label="Dia vencimento"
                   value={newDue}
-                  onChange={(e) => setNewDue(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  onChange={setNewDue}
+                  mode="integer"
+                  integerMin={1}
+                  integerMax={31}
+                  placeholder="1–31"
+                  inputClassName="rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
               <button
@@ -381,18 +386,18 @@ export default function CartoesPage() {
                     <div className="mt-4 pt-3 border-t border-gray-100">
                       <p className="text-xs font-medium text-gray-700 mb-2">Lançar gasto neste cartão</p>
                       <div className="grid grid-cols-2 gap-2 mb-2">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="Valor"
+                        <ExpressionValueField
+                          label="Valor"
                           value={st.valor}
-                          onChange={(e) =>
+                          onChange={(v) =>
                             setExpenseByCard((prev) => ({
                               ...prev,
-                              [c.id]: { ...st, valor: e.target.value },
+                              [c.id]: { ...st, valor: v },
                             }))
                           }
-                          className="rounded-lg border border-gray-200 px-2 py-2 text-sm"
+                          mode="money"
+                          placeholder="0,00"
+                          inputClassName="rounded-lg border border-gray-200 px-2 py-2 text-sm"
                         />
                         <input
                           type="text"

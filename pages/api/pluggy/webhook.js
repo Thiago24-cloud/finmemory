@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { pluggyWebhookSecret } from '../../../lib/pluggyEnv';
 import { createPluggyServerClient, syncTransactionsForItem } from '../../../lib/pluggySyncTransactions';
 import { syncOpenFinanceForItem } from '../../../lib/pluggySyncOpenFinance';
+import { refreshConnectorAndPruneDuplicates } from '../../../lib/pluggyPruneDuplicateItems';
+import { autoLinkPluggyTransactionsForUser } from '../../../lib/autoLinkPluggyTransactions';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -94,11 +96,28 @@ async function runPluggyTransactionSync(supabase, itemId) {
   const pluggy = createPluggyServerClient();
   if (!pluggy) return;
   try {
+    const { pluggyConnectorId } = await refreshConnectorAndPruneDuplicates(
+      supabase,
+      pluggy,
+      bc.user_id,
+      itemId
+    );
+    if (pluggyConnectorId != null) {
+      await supabase
+        .from('bank_connections')
+        .update({ pluggy_connector_id: pluggyConnectorId, updated_at: new Date().toISOString() })
+        .eq('item_id', itemId);
+    }
     const [rTx, rOf] = await Promise.all([
       syncTransactionsForItem(supabase, pluggy, bc.user_id, itemId),
       syncOpenFinanceForItem(supabase, pluggy, bc.user_id, itemId),
     ]);
-    console.info('[pluggy/webhook] sync', itemId, { transacoes: rTx, openFinance: rOf });
+    const autoLink = await autoLinkPluggyTransactionsForUser(supabase, bc.user_id);
+    console.info('[pluggy/webhook] sync', itemId, {
+      transacoes: rTx,
+      openFinance: rOf,
+      autoLinkLinked: autoLink.ok ? autoLink.linked : 0,
+    });
   } catch (e) {
     console.warn('[pluggy/webhook] sync falhou', itemId, e?.message || e);
   }
@@ -167,10 +186,17 @@ async function processWebhookBody(supabase, body) {
           console.warn('[pluggy/webhook] utilizador não encontrado para clientUserId:', clientUserId);
           return;
         }
+        const pluggy = createPluggyServerClient();
+        let pluggyConnectorId = null;
+        if (pluggy) {
+          const r = await refreshConnectorAndPruneDuplicates(supabase, pluggy, userId, itemId);
+          pluggyConnectorId = r.pluggyConnectorId;
+        }
         const { error } = await supabase.from('bank_connections').upsert(
           {
             user_id: userId,
             item_id: itemId,
+            pluggy_connector_id: pluggyConnectorId,
             status: 'connected',
             error_code: null,
             updated_at: nowIso(),
@@ -216,7 +242,11 @@ export default async function handler(req, res) {
 
   const authResult = verifyWebhookSecret(req);
   if (!authResult.ok) {
-    console.warn('[pluggy/webhook] segredo inválido', authResult.debug);
+    console.warn(
+      '[pluggy/webhook] segredo inválido',
+      authResult.debug,
+      '→ Com PLUGGY_WEBHOOK_SECRET definido, o webhook Pluggy tem de enviar o mesmo valor num header (ex.: Authorization: Bearer … ou X-Pluggy-Webhook-Secret). Os headers só se configuram ao criar o webhook pela API Pluggy (docs: Webhook headers).'
+    );
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

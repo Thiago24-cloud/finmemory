@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import {
   Car,
   ShoppingBag,
@@ -14,10 +15,15 @@ import {
   Trash2,
   Search,
   MapPin,
+  Check,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getCategoryColor } from '../../lib/colors';
 import { buildReceiptShareText, whatsAppShareUrl } from '../../lib/buildReceiptShareText';
+import {
+  resolveMerchantDisplayName,
+  saveMerchantAlias,
+} from '../../lib/merchantDisplayAlias';
 
 const categoryIcons = {
   transporte: <Car className="h-5 w-5" />,
@@ -72,16 +78,51 @@ function canPublishToMap(transaction) {
   return diffDays >= 0 && diffDays <= 7;
 }
 
+/** Transação recente — borda suave para chamar atenção à edição do nome. */
+function isTransactionNew(transaction) {
+  if (transaction.created_at) {
+    const d = new Date(transaction.created_at);
+    if (!Number.isNaN(d.getTime())) {
+      const age = Date.now() - d.getTime();
+      return age >= 0 && age < 72 * 60 * 60 * 1000;
+    }
+  }
+  if (transaction.data) {
+    const s = String(transaction.data).trim().slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const d = new Date(`${s}T12:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        const age = Date.now() - d.getTime();
+        return age >= 0 && age < 96 * 60 * 60 * 1000;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Lista de transações – dados reais do Supabase (transacoes + produtos).
  * Editar: link para /transaction/[id]/edit. Deletar: botão com confirmação, chama onDeleted após sucesso.
  * emptyState: 'default' | 'search' – quando 'search', mostra mensagem de "nenhum resultado" em vez de "nenhuma transação ainda".
  */
-export function TransactionList({ transactions, userId, onDeleted, onPublishedToMap, className, emptyState = 'default' }) {
+export function TransactionList({
+  transactions,
+  userId,
+  onDeleted,
+  onRenamed,
+  onPublishedToMap,
+  className,
+  emptyState = 'default',
+}) {
+  const router = useRouter();
   const [deletingId, setDeletingId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const [publishingId, setPublishingId] = useState(null);
   const [publishedToMapIds, setPublishedToMapIds] = useState(new Set());
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [editInitialRaw, setEditInitialRaw] = useState('');
+  const [savingId, setSavingId] = useState(null);
 
   const handleDelete = async (id) => {
     if (!userId || !onDeleted) return;
@@ -90,7 +131,7 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
       const res = await fetch(`/api/transactions/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
+        body: JSON.stringify({ userId }),
       });
       const json = await res.json();
       if (json.success) {
@@ -125,7 +166,7 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
       const res = await fetch(`/api/transactions/${id}/publish-to-map`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(lat != null && lng != null ? { lat, lng } : {})
+        body: JSON.stringify(lat != null && lng != null ? { lat, lng } : {}),
       });
       const json = await res.json();
       if (json.success) {
@@ -150,6 +191,48 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
     }
     window.open(whatsAppShareUrl(text), '_blank', 'noopener,noreferrer');
   };
+
+  const startEdit = useCallback((transaction) => {
+    const raw = (transaction.estabelecimento && String(transaction.estabelecimento).trim()) || 'Local não informado';
+    setEditingId(transaction.id);
+    setEditInitialRaw(raw);
+    setEditValue(resolveMerchantDisplayName(userId, raw));
+  }, [userId]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingId(null);
+    setEditValue('');
+    setEditInitialRaw('');
+  }, []);
+
+  const saveTitle = useCallback(
+    async (transaction) => {
+      const trimmed = editValue.trim();
+      if (!trimmed || !userId) {
+        cancelEdit();
+        return;
+      }
+      setSavingId(transaction.id);
+      try {
+        const res = await fetch(`/api/transactions/${transaction.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, estabelecimento: trimmed }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          saveMerchantAlias(userId, editInitialRaw, trimmed);
+          cancelEdit();
+          if (typeof onRenamed === 'function') onRenamed();
+        }
+      } catch (e) {
+        console.error('Erro ao renomear:', e);
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [userId, editValue, editInitialRaw, cancelEdit, onRenamed]
+  );
 
   if (!transactions || transactions.length === 0) {
     if (emptyState === 'search') {
@@ -183,7 +266,8 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
         </span>
       </div>
       <p className="text-xs text-[#666] mb-4">
-        Toque em uma compra para ver <strong>preços e produtos</strong>. Use o ícone verde do WhatsApp para enviar o <strong>resumo</strong> por mensagem. Compras dos últimos 7 dias podem ser divulgadas no mapa (ícone Mapa). Ative a localização do site se pedir.
+        Toque na <strong>linha</strong> para abrir a compra. Toque no <strong>nome</strong> para renomear na hora (o app
+        reaplica o nome em compras futuras com o mesmo texto do banco). Use o WhatsApp para enviar o resumo.
       </p>
 
       <div className="card-lovable overflow-hidden divide-y divide-[#e5e7eb]">
@@ -191,18 +275,33 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
           const total = Number(transaction.total) || 0;
           const isIncome = total < 0;
           const displayValue = Math.abs(total);
-          const nomeLoja = (transaction.estabelecimento && String(transaction.estabelecimento).trim()) || 'Local não informado';
+          const rawName = (transaction.estabelecimento && String(transaction.estabelecimento).trim()) || 'Local não informado';
+          const nomeLoja = resolveMerchantDisplayName(userId, rawName);
           const produtos = transaction.produtos || [];
           const numItens = Array.isArray(produtos) ? produtos.length : 0;
 
           const showConfirm = confirmId === transaction.id;
           const isDeleting = deletingId === transaction.id;
+          const isEditing = editingId === transaction.id;
+          const isNew = isTransactionNew(transaction);
 
           return (
             <div key={transaction.id} className="bg-white">
-              <Link href={`/transaction/${transaction.id}`} className="block active:bg-[#f8f9fa]">
+              <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isEditing) router.push(`/transaction/${transaction.id}`);
+                }}
+                onClick={() => {
+                  if (!isEditing) router.push(`/transaction/${transaction.id}`);
+                }}
+                className={cn(
+                  'block cursor-pointer active:bg-[#f8f9fa]',
+                  isNew && !isEditing && 'shadow-[inset_0_0_0_2px_rgba(46,204,73,0.4)] rounded-xl'
+                )}
+              >
                 <div className="flex gap-3 p-4 sm:p-4">
-                  {/* Ícone por categoria */}
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white flex-shrink-0"
                     style={{ backgroundColor: getCategoryColor(transaction.categoria, transaction.estabelecimento).main }}
@@ -210,12 +309,46 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
                     {getCategoryIcon(transaction.categoria, transaction.estabelecimento)}
                   </div>
 
-                  {/* Nome da loja em destaque + valor na mesma linha */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-[#111] text-base sm:text-lg leading-snug line-clamp-2">
-                        {nomeLoja}
-                      </h3>
+                      {isEditing ? (
+                        <div className="flex flex-1 items-center gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="flex-1 min-w-0 font-bold text-[#111] text-base sm:text-lg leading-snug px-2 py-1 rounded-lg border-2 border-[#2ECC49] bg-white focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/40"
+                            autoFocus
+                            aria-label="Nome da compra"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveTitle(transaction);
+                              if (e.key === 'Escape') cancelEdit();
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => saveTitle(transaction)}
+                            disabled={savingId === transaction.id}
+                            className="shrink-0 p-2 rounded-xl bg-[#2ECC49] text-white hover:bg-[#22a83a] disabled:opacity-50"
+                            aria-label="Salvar nome"
+                          >
+                            <Check className="h-5 w-5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <h3
+                          className={cn(
+                            'font-semibold text-[#111] text-base sm:text-lg leading-snug line-clamp-2 flex-1 min-w-0 cursor-text',
+                            isNew && 'font-bold'
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (userId) startEdit(transaction);
+                          }}
+                        >
+                          {nomeLoja}
+                        </h3>
+                      )}
                       <span
                         className={cn(
                           'font-bold text-base shrink-0 whitespace-nowrap',
@@ -237,9 +370,8 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
 
-              {/* Ações: Divulgar no mapa (24h), Editar e Excluir */}
               {userId && (
                 <div className="flex items-center justify-end gap-1 px-4 pb-3 pt-0 flex-wrap">
                   <button
@@ -282,6 +414,7 @@ export function TransactionList({ transactions, userId, onDeleted, onPublishedTo
                     )
                   )}
                   <Link
+                    prefetch={false}
                     href={`/transaction/${transaction.id}/edit`}
                     className="p-2.5 rounded-xl text-[#666] hover:bg-[#e5e7eb] hover:text-[#333] transition-colors"
                     title="Editar"

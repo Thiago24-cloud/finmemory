@@ -1,26 +1,28 @@
 'use client';
 
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
-import { displayPromoProductName, promoShelfLabel } from '../lib/mapOfferDisplay';
+import { displayPromoProductName, promoCategoryBadgeLabel, promoShelfLabel } from '../lib/mapOfferDisplay';
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ShoppingCart, Loader2, Check, X, Navigation } from 'lucide-react';
+import { ShoppingCart, Loader2, Check, X, Navigation, Clock } from 'lucide-react';
+import { toast } from 'sonner';
 import { openGoogleMapsDirectionsPreferCurrentLocation, openWazeNavigation } from '../lib/mapDirections';
 import { getMapThemeById, getCategoryColor, getStorePinMainColor, MAP_THEMES } from '../lib/colors';
 import { SAO_PAULO_STATE_CENTER, SAO_PAULO_STATE_ZOOM } from '../lib/saoPauloStateMap';
 import { getSupabase } from '../lib/supabase';
 import { parsePriceToNumber } from '../lib/parseMapPrice';
+import { getMapOfferSeenPresentation } from '../lib/mapOfferSeenLabel';
 import { getMapProductImageSrcForImg } from '../lib/mapImageProxy';
 import { useMatchMedia } from '../lib/useMatchMedia';
+import { isClientUsablePinLogoRef } from '../lib/mapPinLogoUrl';
 import { getHomogeneousGroupLogoPinSrc, getStoreLogoPinSrc } from '../lib/storeLogos';
 import MapMobileBottomSheet from './map/MapMobileBottomSheet';
-import MapShopSnapSheet from './map/MapShopSnapSheet';
-import MapShopMobileGoogleSheetBody from './map/MapShopMobileGoogleSheetBody';
-import ShopOffersSnapCarousel from './map/ShopOffersSnapCarousel';
+import EstablishmentDetailSheet from './map/EstablishmentDetailSheet';
+import { MapBottomPaddingSync } from './map/MapBottomPaddingSync';
 import {
   getMapPinOpenAirLabelStyle,
   mixWithWhite,
@@ -87,6 +89,59 @@ function MapShopSheetDragLock({ locked }) {
       }
     };
   }, [map, locked]);
+  return null;
+}
+
+/**
+ * Mobile: pan suave para centrar o pin na área útil do mapa (acima do padding inferior do sheet).
+ */
+function MapUsefulAreaPan({ latLng, bottomPadPx, panTick }) {
+  const map = useMap();
+  const padRef = useRef(bottomPadPx);
+  padRef.current = bottomPadPx;
+  const panLat = latLng?.[0];
+  const panLng = latLng?.[1];
+
+  useEffect(() => {
+    if (!map || latLng == null || panTick == null || panTick < 1) return undefined;
+    const lat = panLat;
+    const lng = panLng;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+    let cancelled = false;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        if (cancelled || !map) return;
+        const pad = Math.max(0, Math.round(padRef.current || 0));
+        const ll = L.latLng(lat, lng);
+        let pt;
+        try {
+          pt = map.latLngToContainerPoint(ll);
+        } catch (_) {
+          return;
+        }
+        const size = map.getSize();
+        const vx = size.x / 2;
+        const vy = (size.y - pad) / 2;
+        const dx = vx - pt.x;
+        const dy = vy - pt.y;
+        if (Math.abs(dx) < 1.5 && Math.abs(dy) < 1.5) return;
+        try {
+          const reduce =
+            typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+          map.panBy(L.point(dx, dy), reduce ? { animate: false } : { animate: true, duration: 0.38 });
+        } catch (_) {
+          /* ignore */
+        }
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [map, latLng, panLat, panLng, panTick]);
+
   return null;
 }
 
@@ -392,7 +447,6 @@ function StoreMarkers({
 
   useEffect(() => {
     onVisibleStoresChange?.(visibleStores);
-    return () => onVisibleStoresChange?.([]);
   }, [visibleStores, onVisibleStoresChange]);
 
   /** Centrar no(s) pin(s) quando a busca coincide com nome de loja (estilo “encontrar no mapa”). */
@@ -452,7 +506,11 @@ function StoreMarkerItem({
   onMobileStorePinOpen,
   mapPriceBundleCount = 0,
 }) {
-  const logoUrl = useMemo(() => getStoreLogoPinSrc(store.name), [store.name]);
+  const logoUrl = useMemo(() => {
+    const pinned = String(store.pin_logo_url || '').trim();
+    if (pinned && isClientUsablePinLogoRef(pinned)) return pinned;
+    return getStoreLogoPinSrc(store.name);
+  }, [store.name, store.pin_logo_url]);
   const [logoLoadOk, setLogoLoadOk] = useState(false);
 
   useEffect(() => {
@@ -728,19 +786,34 @@ function formatPrecoExibicao(preco, categoria, id) {
     String(id || '').startsWith('promo-') ||
     String(categoria || '').toLowerCase().includes('promo');
   if (promoLike && n <= 0.01) return null;
-  return `R$ ${n.toFixed(2)}`;
+  return `R$ ${formatBRLPriceNum(n)}`;
 }
 
-/** Soma no carrinho / orçamento: ignora promo sem preço real. */
+/** Primeiro campo que parseia para valor > 0 (promo, clube, price, etc.). */
+function firstPositivePriceNumber(...values) {
+  for (const v of values) {
+    const n = parsePriceToNumber(v);
+    if (n != null && n > 0) return n;
+  }
+  return null;
+}
+
+/** Soma no carrinho / orçamento: ignora placeholder de centavo no agente (`promo-*`). */
 function numericPriceForSum(preco, categoria, id) {
   const n = parsePriceToNumber(preco);
   if (n == null) return null;
+  const idStr = String(id || '');
+  // Linhas do encarte (tabela promotions): não zerar por categoria "Promoção" nem conflito com regra do agente
+  if (idStr.startsWith('encarte-')) return n;
   const promoLike =
-    String(id || '').startsWith('promo-') ||
+    idStr.startsWith('promo-') ||
     String(categoria || '').toLowerCase().includes('promo');
   if (promoLike && n <= 0.01) return null;
   return n;
 }
+
+/** Pedidos GET idênticos em voo (ex.: mount + moveend) — uma só ida ao servidor. */
+const mapPointsInflight = new Map();
 
 /**
  * Busca pontos: modo produto (q) = global; modo mapa = bbox da área visível.
@@ -761,27 +834,84 @@ async function fetchMapPoints(map, searchIntent) {
       params.set('ne_lng', ne.lng.toFixed(5));
     }
     const qs = params.toString();
-    const res = await fetch(qs ? `/api/map/points?${qs}` : '/api/map/points');
-    if (!res.ok) return [];
-    const json = await res.json();
-    const points = json.points || [];
-    return points.map((p) => ({
-      id: p.id,
-      nome: p.store_name,
-      produto: p.product_name,
-      preco: p.price,
-      precoLabel: formatPrecoExibicao(p.price, p.category, p.id),
-      promo_image_url: p.promo_image_url || null,
-      lat: Number(p.lat),
-      lng: Number(p.lng),
-      categoria: p.category || '',
-      time_ago: p.time_ago,
-      user_label: p.user_label
-    }));
+    const inflightKey = qs || '__global__';
+    const existing = mapPointsInflight.get(inflightKey);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      try {
+        const res = await fetch(qs ? `/api/map/points?${qs}` : '/api/map/points');
+        if (!res.ok) return [];
+        const json = await res.json();
+        const points = json.points || [];
+        return points.map((p) => ({
+          id: p.id,
+          nome: p.store_name,
+          produto: displayPromoProductName(p.product_name, p.store_name),
+          preco: p.price,
+          precoLabel: formatPrecoExibicao(p.price, p.category, p.id),
+          promo_image_url: p.promo_image_url || null,
+          lat: Number(p.lat),
+          lng: Number(p.lng),
+          categoria: p.category || '',
+          time_ago: p.time_ago,
+          user_label: p.user_label,
+        }));
+      } catch (e) {
+        console.warn('Erro ao buscar pontos do mapa:', e);
+        return [];
+      } finally {
+        mapPointsInflight.delete(inflightKey);
+      }
+    })();
+
+    mapPointsInflight.set(inflightKey, promise);
+    return promise;
   } catch (e) {
     console.warn('Erro ao buscar pontos do mapa:', e);
     return [];
   }
+}
+
+const MAP_VIEWPORT_MERGE_MAX = 1600;
+
+/**
+ * Mantém pins já carregados na área visível (com margem) ao atualizar por bbox.
+ * Evita “sumir tudo” quando o viewport oscila, há limite na API ou corrida durante fitBounds/flyTo.
+ */
+function mergeViewportPricePoints(map, prev, incoming) {
+  if (!map || !Array.isArray(incoming)) return incoming || [];
+  let bounds;
+  try {
+    bounds = map.getBounds().pad(0.28);
+  } catch {
+    return incoming;
+  }
+  const byId = new Map();
+  for (const p of incoming) {
+    const lat = Number(p.lat);
+    const lng = Number(p.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    byId.set(p.id, p);
+  }
+  if (Array.isArray(prev)) {
+    for (const p of prev) {
+      if (byId.has(p.id)) continue;
+      const lat = Number(p.lat);
+      const lng = Number(p.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      try {
+        if (!bounds.contains(L.latLng(lat, lng))) continue;
+      } catch {
+        continue;
+      }
+      byId.set(p.id, p);
+    }
+  }
+  const out = Array.from(byId.values());
+  if (out.length <= MAP_VIEWPORT_MERGE_MAX) return out;
+  out.sort((a, b) => String(b.id || '').localeCompare(String(a.id || '')));
+  return out.slice(0, MAP_VIEWPORT_MERGE_MAX);
 }
 
 /**
@@ -834,6 +964,10 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
   const debounceRef = useRef(null);
   /** Evita que uma resposta lenta (viewport antigo) substitua pins de um movimento mais recente. */
   const loadGenerationRef = useRef(0);
+  /** Último conjunto aplicado — merge no viewport sem depender de `locais` no closure do load. */
+  const locaisSnapshotRef = useRef([]);
+  /** Após busca global por produto, o primeiro fetch por bbox deve substituir (não misturar com o global). */
+  const afterProductViewportRef = useRef(false);
   const productMode = searchIntent.type === 'product';
 
   const load = useCallback(async () => {
@@ -844,7 +978,30 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
     try {
       const points = await fetchMapPoints(map, searchIntent);
       if (gen !== loadGenerationRef.current) return;
-      setLocais(points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng)));
+      const raw = points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
+      const wasProduct = searchIntent.type === 'product';
+
+      if (wasProduct) {
+        afterProductViewportRef.current = true;
+        locaisSnapshotRef.current = raw;
+        setLocais(raw);
+        return;
+      }
+
+      /* Resposta vazia com mapa já povoado: não substituir (evita apagar pins por corrida/animacao ou falha transitória). */
+      if (raw.length === 0 && locaisSnapshotRef.current.length > 12) {
+        return;
+      }
+
+      let next;
+      if (afterProductViewportRef.current) {
+        afterProductViewportRef.current = false;
+        next = raw;
+      } else {
+        next = mergeViewportPricePoints(map, locaisSnapshotRef.current, raw);
+      }
+      locaisSnapshotRef.current = next;
+      setLocais(next);
     } catch (error) {
       console.error('Erro ao buscar locais:', error);
     } finally {
@@ -1053,10 +1210,13 @@ function isEncarteOrNonImageUrl(url) {
   return /\/encarte\/|encarte\.|tablo[ií]de|folheto|ofertas\/pdf|\/folheto\//i.test(u);
 }
 
+/** Miniaturas no mapa: só https:// (nunca data: — memória e payloads). */
 function isDisplayableImageUrl(url) {
   if (!url || typeof url !== 'string') return false;
   const trimmed = url.trim();
   if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return false;
+  if (/^data:/i.test(trimmed)) return false;
+  if (!/^https:\/\//i.test(trimmed)) return false;
   if (isEncarteOrNonImageUrl(url)) return false;
   const u = trimmed.toLowerCase();
   if (/\.(webp|jpg|jpeg|png|gif|avif|svg)(\?|#|$|&)/i.test(u)) return true;
@@ -1067,7 +1227,7 @@ function isDisplayableImageUrl(url) {
   ) {
     return true;
   }
-  return /^https?:\/\//i.test(u) && !/\.(pdf|zip)(\?|$)/i.test(u);
+  return !/\.(pdf|zip)(\?|$)/i.test(u);
 }
 
 function uniqueDisplayableImageUrls(points) {
@@ -1084,6 +1244,36 @@ function uniqueDisplayableImageUrls(points) {
   return out;
 }
 
+/** Fachada / imagem da loja (`stores.photo_url`) — contexto antes das fotos de produto. */
+function StoreBelongingBanner({ store }) {
+  const u = store?.photo_url;
+  if (!u || !isDisplayableImageUrl(u)) return null;
+  const raw = String(u).trim();
+  const src = getMapProductImageSrcForImg(raw) || raw;
+  return (
+    <div className="relative h-[88px] w-full shrink-0 overflow-hidden bg-slate-200">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className="finmemory-offer-photo absolute inset-0 h-full w-full object-cover"
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/78 via-black/25 to-transparent"
+        aria-hidden
+      />
+      <p className="absolute bottom-1.5 left-2 right-3 text-[10px] font-medium leading-snug text-white drop-shadow-md line-clamp-2">
+        <span className="font-bold">{store.name}</span>
+        {' · '}
+        Nossa loja te espera — ofertas na vitrine.
+      </p>
+    </div>
+  );
+}
+
 /** Dados enriquecidos de `/api/map/stores` → hero + cards no popup da loja. */
 function useStoreOfferPreview(store) {
   const preview = Array.isArray(store?.offer_preview) ? store.offer_preview : [];
@@ -1096,7 +1286,8 @@ function useStoreOfferPreview(store) {
     if (preview.length === 0) return '#2ECC49';
     return getCategoryColor(preview[0]?.category || 'Supermercado - Promoção', store.name).main;
   }, [preview, store.name]);
-  return { preview, heroSources, accentHex };
+  const heroCategory = preview.length ? preview[0]?.category || '' : '';
+  return { preview, heroSources, accentHex, heroCategory };
 }
 
 /** Corpo do card de loja (popup desktop ou bottom sheet mobile) — dados de `offer_preview` no pin. */
@@ -1115,7 +1306,7 @@ function StoreMarkerOfferPanelBody({
     () => getStorePinMainColor(store.type, store.id),
     [store.type, store.id]
   );
-  const { preview, heroSources, accentHex } = useStoreOfferPreview(store);
+  const { preview, heroSources, accentHex, heroCategory } = useStoreOfferPreview(store);
   const hasCardOffers = store.tem_oferta_hoje && preview.length > 0;
   const offerTotalForUi = Math.max(Number(store.offer_count) || 0, preview.length);
   const offerPreviewTruncated = offerTotalForUi > preview.length;
@@ -1175,10 +1366,13 @@ function StoreMarkerOfferPanelBody({
 
       {!peekOnly && hasCardOffers ? (
         <div className="overflow-hidden">
+          <StoreBelongingBanner store={store} />
           <HeroOfferCarousel
             sources={heroSources}
             storeTitle={store.name}
             count={store.offer_count || preview.length}
+            category={heroCategory}
+            dense
           />
         </div>
       ) : null}
@@ -1193,13 +1387,13 @@ function StoreMarkerOfferPanelBody({
       ) : null}
 
       {!peekOnly && hasCardOffers ? (
-        <div className="px-2 pb-1 pt-2">
-          <p className="text-xs font-semibold text-amber-800">
-            Ofertas ativas: {store.offer_count || 0}
-          </p>
-          <div className="mt-1 flex flex-col gap-0.5">
+        <div className="px-2 pb-1 pt-1.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <p className="text-[11px] font-semibold text-amber-800 m-0">
+              Ofertas ativas: {store.offer_count || 0}
+            </p>
             <span
-              className="inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm"
+              className="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm"
               style={{ backgroundColor: accentHex }}
             >
               {offerPreviewTruncated
@@ -1207,11 +1401,11 @@ function StoreMarkerOfferPanelBody({
                 : `${preview.length} ${preview.length === 1 ? 'item' : 'itens'}`}
             </span>
             {offerPreviewTruncated ? (
-              <span className="text-[10px] text-amber-900/90">Abra «Ver promoções / Montar cesta» para ver todos.</span>
+              <span className="text-[9px] text-amber-900/85 leading-tight">Lista completa em «Ver promoções».</span>
             ) : null}
           </div>
           <div
-            className="mt-2 grid grid-cols-2 gap-2 max-h-[min(280px,42vh)] overflow-y-auto pr-0.5 -mr-0.5"
+            className="mt-1.5 grid grid-cols-2 gap-1.5 max-h-[min(300px,46vh)] overflow-y-auto pr-0.5 -mr-0.5"
             style={{ touchAction: 'pan-y', scrollbarGutter: 'stable' }}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -1219,7 +1413,6 @@ function StoreMarkerOfferPanelBody({
             onWheel={(e) => e.stopPropagation()}
           >
             {preview.map((o, i) => {
-              const loc = o.display_store_name || store.name;
               const label = formatPrecoExibicao(o.price, o.category, o.id);
               const priceSlot =
                 label != null ? (
@@ -1240,8 +1433,8 @@ function StoreMarkerOfferPanelBody({
                 );
               const point = {
                 id: o.id,
-                nome: loc,
-                produto: `${loc} — ${o.product_name}`,
+                nome: store.name,
+                produto: displayPromoProductName(o.product_name, store.name),
                 preco: o.price,
                 categoria: o.category || '',
                 promo_image_url: o.promo_image_url,
@@ -1252,6 +1445,7 @@ function StoreMarkerOfferPanelBody({
                   point={point}
                   accentHex={accentHex}
                   priceSlot={priceSlot}
+                  compact
                   interactive={Boolean(onStoreOfferCartToggle)}
                   selected={cartOfferIdSet?.has(String(o.id))}
                   onActivate={() => onStoreOfferCartToggle?.(point)}
@@ -1411,15 +1605,16 @@ function EncarteValidityBadge({ row, wazeUi }) {
 /** Linhas de `public.promotions` (store_id + active) no painel ao abrir pin da loja. */
 function PromotionEncarteCard({ row, wazeUi, accentHex, selected, onToggle }) {
   const glyph = categoryFallbackGlyph(row.category);
-  const pctComputed = promotionEncarteDiscountPct(row.original_price, row.promo_price);
+  const orig = parsePriceToNumber(row.original_price);
+  const promoRaw = parsePriceToNumber(row.promo_price);
+  const club = parsePriceToNumber(row.club_price);
+  const promoEffective = firstPositivePriceNumber(row.promo_price, row.club_price, row.price);
+  const pctComputed = promotionEncarteDiscountPct(row.original_price, promoEffective);
   const pct =
     row.discount_pct != null && Number.isFinite(Number(row.discount_pct))
       ? Math.round(Number(row.discount_pct))
       : pctComputed;
-  const orig = parsePriceToNumber(row.original_price);
-  const promo = parsePriceToNumber(row.promo_price);
-  const club = parsePriceToNumber(row.club_price);
-  const showOrig = orig != null && promo != null && orig > promo;
+  const showOrig = orig != null && promoEffective != null && orig > promoEffective;
   const imgUrl = row.product_image_url || row.flyer_image_url;
   const imgSrc = imgUrl ? getMapProductImageSrcForImg(imgUrl) : '';
   const showImg = Boolean(imgSrc && isDisplayableImageUrl(imgUrl));
@@ -1503,13 +1698,20 @@ function PromotionEncarteCard({ row, wazeUi, accentHex, selected, onToggle }) {
             R$ {formatBRLPriceNum(orig)}
           </p>
         ) : null}
-        {club != null && promo != null && club !== promo ? (
+        {club != null &&
+        promoRaw != null &&
+        club !== promoRaw &&
+        promoEffective === promoRaw ? (
           <p className={`mt-0.5 text-[10px] tabular-nums ${wazeUi ? 'text-[#8ab4f8]' : 'text-blue-600'}`}>
             Clube: R$ {formatBRLPriceNum(club)}
           </p>
         ) : null}
         <p className="mt-auto pt-1 text-[13px] font-bold tabular-nums" style={{ color: accentHex }}>
-          {promo != null ? `R$ ${formatBRLPriceNum(promo)}` : <span className="text-[11px] font-normal opacity-80">Preço no encarte</span>}
+          {promoEffective != null ? (
+            `R$ ${formatBRLPriceNum(promoEffective)}`
+          ) : (
+            <span className="text-[11px] font-normal opacity-80">Preço no encarte</span>
+          )}
           {row.unit ? (
             <span className={`ml-1 text-[10px] font-normal ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}>
               / {row.unit}
@@ -1533,7 +1735,7 @@ function PromotionEncarteCard({ row, wazeUi, accentHex, selected, onToggle }) {
 }
 
 /** Card de oferta no painel escuro “Waze dos Preços” (dados reais da API). */
-function WazeOfferCard({ offer, selected, onToggle, accentHex }) {
+function WazeOfferCard({ offer, selected, onToggle, accentHex, canConfirmPrice, confirmBusy, onConfirmOffer }) {
   const [imgBroken, setImgBroken] = useState(false);
   const url = offer.promo_image_url;
   const imgSrc = useMemo(() => (url ? getMapProductImageSrcForImg(url) : ''), [url]);
@@ -1542,12 +1744,12 @@ function WazeOfferCard({ offer, selected, onToggle, accentHex }) {
     setImgBroken(false);
   }, [url]);
 
-  const shelf =
-    promoShelfLabel(offer.category) || offerShelfCategory(offer);
+  const shelf = promoCategoryBadgeLabel(offer.category);
   const glyph = categoryFallbackGlyph(offer.category);
-  const displayName = displayPromoProductName(offer.product_name);
+  const displayName = displayPromoProductName(offer.product_name, offer.store_name);
   const priceNum = numericPriceForSum(offer.price, offer.category, offer.id);
   const showImg = url && isDisplayableImageUrl(url) && !isEncarteOrNonImageUrl(url) && !imgBroken && Boolean(imgSrc || url);
+  const seen = getMapOfferSeenPresentation(offer.observed_at);
 
   return (
     <div
@@ -1606,7 +1808,7 @@ function WazeOfferCard({ offer, selected, onToggle, accentHex }) {
       >
         {displayName}
       </p>
-      <p className="mb-1.5 text-left text-[11px] text-[#888]">{shelf}</p>
+      {shelf ? <p className="mb-1.5 text-left text-[11px] text-[#888]">{shelf}</p> : null}
       {priceNum != null && priceNum > 0 ? (
         <p className="text-base font-bold tabular-nums" style={{ color: accentHex }}>
           R$ {formatBRLPriceNum(priceNum)}
@@ -1614,14 +1816,34 @@ function WazeOfferCard({ offer, selected, onToggle, accentHex }) {
       ) : (
         <p className="text-left text-xs text-[#888]">Preço no encarte / loja</p>
       )}
+      {seen.text ? (
+        <div className={`mt-1.5 flex items-center gap-0.5 text-[9px] font-medium ${seen.className}`}>
+          <Clock className={`h-2.5 w-2.5 shrink-0 ${seen.iconClassName}`} aria-hidden />
+          <span>{seen.text}</span>
+        </div>
+      ) : null}
+      {canConfirmPrice && onConfirmOffer ? (
+        <button
+          type="button"
+          disabled={confirmBusy}
+          className="mt-1.5 w-full rounded-md border border-[#2a2d3a] bg-[#161922] py-1 text-[9px] font-semibold text-[#9aa0a6] transition-colors hover:border-[#2ecc71] hover:text-[#2ecc71] disabled:opacity-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            onConfirmOffer(offer);
+          }}
+        >
+          {confirmBusy ? '…' : 'Preço ok na loja'}
+        </button>
+      ) : null}
     </div>
   );
 }
 
 /** Hero com carrossel quando há várias fotos; autoplay leve + pontos e setas. */
-function HeroOfferCarousel({ sources, storeTitle, count }) {
+function HeroOfferCarousel({ sources, storeTitle, count, category = '', dense = false }) {
   const [idx, setIdx] = useState(0);
   const [brokenByUrl, setBrokenByUrl] = useState(() => ({}));
+  const categoryGlyph = categoryFallbackGlyph(category);
 
   const n = sources.length;
   const safeIdx = n ? idx % n : 0;
@@ -1660,12 +1882,17 @@ function HeroOfferCarousel({ sources, storeTitle, count }) {
     setIdx((i) => (i + delta + n * 10) % n);
   };
 
+  const heroH = dense ? 'h-[118px]' : 'h-[152px]';
+  const dotsBottom = dense ? 'bottom-[40px]' : 'bottom-[52px]';
+
   return (
-    <div className="relative h-[152px] w-full overflow-hidden bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200">
+    <div
+      className={`relative w-full overflow-hidden bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200 ${heroH}`}
+    >
       {n === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-300/90 to-slate-400/80">
           <span className="text-5xl drop-shadow-sm" aria-hidden>
-            🛒
+            {categoryGlyph}
           </span>
         </div>
       )}
@@ -1685,7 +1912,7 @@ function HeroOfferCarousel({ sources, storeTitle, count }) {
       {n > 0 && !showSlide && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-300/90 to-slate-400/80">
           <span className="text-5xl drop-shadow-sm" aria-hidden>
-            🛒
+            {categoryGlyph}
           </span>
           <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-white/90">Foto indisponível</span>
         </div>
@@ -1712,7 +1939,7 @@ function HeroOfferCarousel({ sources, storeTitle, count }) {
             ›
           </button>
           <div
-            className="absolute bottom-[52px] left-0 right-0 z-[2] flex justify-center gap-1.5 px-8"
+            className={`absolute left-0 right-0 z-[2] flex justify-center gap-1.5 px-8 ${dotsBottom}`}
             onMouseDown={(e) => e.stopPropagation()}
           >
             {sources.map((u, i) => (
@@ -1732,9 +1959,19 @@ function HeroOfferCarousel({ sources, storeTitle, count }) {
         </>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-black/70 via-black/30 to-transparent pt-20 pb-3 px-3">
-        <p className="text-[15px] font-bold text-white leading-tight drop-shadow-md line-clamp-2">{storeTitle}</p>
-        <p className="text-[11px] font-medium text-white/90 mt-0.5">
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-black/70 via-black/30 to-transparent px-3 pb-3 ${
+          dense ? 'pt-12' : 'pt-20'
+        }`}
+      >
+        <p
+          className={`font-bold text-white leading-tight drop-shadow-md line-clamp-2 ${
+            dense ? 'text-[13px]' : 'text-[15px]'
+          }`}
+        >
+          {storeTitle}
+        </p>
+        <p className={`font-medium text-white/90 mt-0.5 ${dense ? 'text-[10px]' : 'text-[11px]'}`}>
           {count} {count === 1 ? 'oferta' : 'ofertas'} em destaque
           {n > 1 ? ` · ${safeIdx + 1}/${n} fotos` : ''}
         </p>
@@ -1744,7 +1981,18 @@ function HeroOfferCarousel({ sources, storeTitle, count }) {
 }
 
 /** Miniatura do produto — imagem real ou placeholder (estilo vitrine). */
-function ProductOfferThumb({ point, accentHex, priceSlot, selected, interactive, onActivate }) {
+function ProductOfferThumb({
+  point,
+  accentHex,
+  priceSlot,
+  selected,
+  interactive,
+  onActivate,
+  compact = false,
+  canConfirmPrice,
+  confirmBusy,
+  onConfirmOffer,
+}) {
   const [broken, setBroken] = useState(false);
   const url = point.promo_image_url;
   const imgSrc = useMemo(() => (url ? getMapProductImageSrcForImg(url) : ''), [url]);
@@ -1756,8 +2004,9 @@ function ProductOfferThumb({ point, accentHex, priceSlot, selected, interactive,
   const encarteOnly = url && isEncarteOrNonImageUrl(url);
   const tryImage = url && isDisplayableImageUrl(url) && !encarteOnly;
   const fallbackGlyph = categoryFallbackGlyph(point.categoria);
-  const displayName = displayPromoProductName(point.produto);
-  const shelf = promoShelfLabel(point.categoria);
+  const displayName = displayPromoProductName(point.produto, point.nome);
+  const shelf = promoCategoryBadgeLabel(point.categoria);
+  const seen = getMapOfferSeenPresentation(point.observed_at);
 
   const Wrapper = 'div';
   const wrapProps = interactive
@@ -1778,28 +2027,35 @@ function ProductOfferThumb({ point, accentHex, priceSlot, selected, interactive,
       }
     : {};
 
+  const cardRound = compact ? 'rounded-lg' : 'rounded-xl';
+  const ringSel = compact
+    ? 'ring-2 ring-[#2ECC49] ring-offset-1 ring-offset-white shadow-md'
+    : 'ring-[3px] ring-[#2ECC49] ring-offset-2 ring-offset-white shadow-md';
+
   return (
     <Wrapper
       {...wrapProps}
-      className={`rounded-xl border border-gray-100/90 bg-white shadow-sm overflow-hidden flex flex-col text-left w-full relative transition-[box-shadow] ${
+      className={`${cardRound} border border-gray-100/90 bg-white shadow-sm overflow-hidden flex flex-col text-left w-full relative transition-[box-shadow] ${
         interactive ? 'cursor-pointer hover:opacity-95' : ''
-      } ${
-        selected
-          ? 'ring-[3px] ring-[#2ECC49] ring-offset-2 ring-offset-white shadow-md'
-          : ''
-      }`}
+      } ${selected ? ringSel : ''}`}
     >
       {selected && (
         <span
-          className="absolute top-1.5 right-1.5 z-[2] flex h-6 w-6 items-center justify-center rounded-full bg-[#2ECC49] text-white shadow-md"
+          className={`absolute z-[2] flex items-center justify-center rounded-full bg-[#2ECC49] text-white shadow-md ${
+            compact ? 'top-1 right-1 h-5 w-5' : 'top-1.5 right-1.5 h-6 w-6'
+          }`}
           aria-hidden
         >
-          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+          <Check className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} strokeWidth={3} />
         </span>
       )}
       <div
-        className="relative aspect-[4/3] w-full bg-gradient-to-br from-gray-100 to-gray-200"
-        style={{ minHeight: '88px' }}
+        className={
+          compact
+            ? 'relative h-[72px] w-full shrink-0 bg-gradient-to-br from-gray-100 to-gray-200'
+            : 'relative aspect-[4/3] w-full bg-gradient-to-br from-gray-100 to-gray-200'
+        }
+        style={compact ? undefined : { minHeight: '88px' }}
       >
         {encarteOnly && (
           <a
@@ -1838,26 +2094,61 @@ function ProductOfferThumb({ point, accentHex, priceSlot, selected, interactive,
             }}
             aria-hidden
           >
-            <span className="text-3xl opacity-95 drop-shadow-sm">{fallbackGlyph}</span>
+            <span className={compact ? 'text-2xl opacity-95 drop-shadow-sm' : 'text-3xl opacity-95 drop-shadow-sm'}>
+              {fallbackGlyph}
+            </span>
           </div>
         )}
       </div>
-      <div className="p-2 flex flex-col flex-1 min-h-0">
-        <p className="text-[11px] font-semibold text-gray-900 leading-snug line-clamp-3 min-h-[2.75rem]" title={point.produto}>
+      <div className={`flex flex-col flex-1 min-h-0 ${compact ? 'p-1.5' : 'p-2'}`}>
+        <p
+          className={`font-semibold text-gray-900 leading-snug ${
+            compact ? 'text-[10px] line-clamp-2' : 'text-[11px] line-clamp-3 min-h-[2.75rem]'
+          }`}
+          title={point.produto}
+        >
           {displayName}
         </p>
-        {shelf ? (
+        {shelf && !compact ? (
           <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 truncate">
             {shelf}
           </p>
         ) : null}
-        <div className="mt-auto pt-1.5 text-[12px] font-bold leading-tight" style={{ color: accentHex }}>
+        <div
+          className={`font-bold leading-tight ${compact ? 'mt-1 text-[12px]' : 'mt-auto pt-1.5 text-[12px]'}`}
+          style={{ color: accentHex }}
+        >
           {priceSlot}
         </div>
+        {seen.text ? (
+          <div
+            className={`mt-1 flex items-center gap-0.5 text-[8px] font-medium leading-tight ${seen.className}`}
+          >
+            <Clock className={`h-2.5 w-2.5 shrink-0 ${seen.iconClassName}`} aria-hidden />
+            <span>{seen.text}</span>
+          </div>
+        ) : null}
+        {canConfirmPrice && onConfirmOffer && point.id != null ? (
+          <button
+            type="button"
+            disabled={confirmBusy}
+            className={`w-full rounded-md border border-gray-200 bg-white font-semibold text-gray-600 transition-colors hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50 ${
+              compact ? 'mt-1 py-0.5 text-[8px]' : 'mt-1 py-1 text-[9px]'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirmOffer();
+            }}
+          >
+            {confirmBusy ? '…' : 'Preço ok'}
+          </button>
+        ) : null}
         {interactive && onActivate ? (
           <button
             type="button"
-            className={`mt-2 w-full rounded-lg py-1.5 text-[11px] font-bold transition-colors ${
+            className={`w-full font-bold transition-colors ${
+              compact ? 'mt-1.5 rounded-md py-1 text-[10px]' : 'mt-2 rounded-lg py-1.5 text-[11px]'
+            } ${
               selected
                 ? 'bg-[#2ECC49] text-white hover:bg-[#22a83a]'
                 : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
@@ -1867,7 +2158,7 @@ function ProductOfferThumb({ point, accentHex, priceSlot, selected, interactive,
               onActivate();
             }}
           >
-            {selected ? '✓ Na cesta — toque para remover' : '+ Cesta'}
+            {selected ? (compact ? '✓ Remover' : '✓ Na cesta — toque para remover') : '+ Cesta'}
           </button>
         ) : null}
       </div>
@@ -2003,7 +2294,13 @@ function MapsStyleOfferPopup({ group, accentHex, cartOfferIdSet, onMapPointCartT
       onClick={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
     >
-      <HeroOfferCarousel sources={heroSources} storeTitle={storeTitle} count={count} />
+      <HeroOfferCarousel
+        sources={heroSources}
+        storeTitle={storeTitle}
+        count={count}
+        category={first?.categoria || ''}
+        dense
+      />
 
       {hasDirections ? (
         <div className="px-3 pt-3 pb-1">
@@ -2021,19 +2318,18 @@ function MapsStyleOfferPopup({ group, accentHex, cartOfferIdSet, onMapPointCartT
             style={{ backgroundColor: accentHex }}
           >
             {count === 1
-              ? promoShelfLabel(first?.categoria) ||
-                (String(first?.categoria || '').toLowerCase().includes('promo') ? 'Promoção' : '') ||
-                first?.categoria ||
-                'Oferta'
+              ? promoCategoryBadgeLabel(first?.categoria) || 'Oferta'
               : `${count} itens`}
           </span>
           {showTotal && (
-            <span className="text-[12px] font-semibold text-gray-600 tabular-nums">Total R$ {total.toFixed(2)}</span>
+            <span className="text-[12px] font-semibold text-gray-600 tabular-nums">
+              Total R$ {formatBRLPriceNum(total)}
+            </span>
           )}
         </div>
 
         <div
-          className="grid grid-cols-2 gap-2 max-h-[min(320px,45vh)] overflow-y-auto pr-0.5 -mr-0.5"
+          className="grid grid-cols-2 gap-1.5 max-h-[min(320px,45vh)] overflow-y-auto pr-0.5 -mr-0.5"
           style={{ touchAction: 'pan-y', scrollbarGutter: 'stable' }}
           onMouseDown={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
@@ -2063,6 +2359,7 @@ function MapsStyleOfferPopup({ group, accentHex, cartOfferIdSet, onMapPointCartT
                 point={p}
                 accentHex={accentHex}
                 priceSlot={priceSlot}
+                compact
                 interactive={Boolean(onMapPointCartToggle)}
                 selected={cartOfferIdSet?.has(String(p.id))}
                 onActivate={() => onMapPointCartToggle?.(p)}
@@ -2072,7 +2369,7 @@ function MapsStyleOfferPopup({ group, accentHex, cartOfferIdSet, onMapPointCartT
         </div>
 
         {onMapPointCartToggle ? (
-          <p className="text-[10px] text-emerald-700 font-medium mt-2 px-0.5 leading-snug">
+          <p className="text-[10px] text-emerald-700 font-medium mt-1.5 px-0.5 leading-snug">
             Toque no card ou em <strong>+ Cesta</strong> para adicionar ao carrinho (abre à direita). Encarte em PDF: use o botão no card.
           </p>
         ) : null}
@@ -2274,7 +2571,15 @@ export default function MapaPrecosLeaflet({
   const mapPadTop = headerOffsetPx;
   const chromeTop = overlayTopPx != null && overlayTopPx !== undefined ? overlayTopPx : headerOffsetPx;
   const [shopSheetSnap, setShopSheetSnap] = useState('closed');
+  /** Padding inferior do Leaflet (área útil) quando a folha da loja cobre o mapa no mobile. */
+  const [mobileShopSheetMapBottomPadPx, setMobileShopSheetMapBottomPadPx] = useState(0);
+  /** Preview do pin (folha pequena antes de abrir a loja). */
+  const [previewSheetMapBottomPadPx, setPreviewSheetMapBottomPadPx] = useState(0);
+  /** Incrementa para disparar pan suave na janela útil (folha + padding). */
+  const [mapUsefulPanTick, setMapUsefulPanTick] = useState(0);
   const [previewSheetSnap, setPreviewSheetSnap] = useState('peek');
+  /** Desktop: reserva inferior quando o painel da loja está aberto (padding no Leaflet). */
+  const [desktopShopBottomPadPx, setDesktopShopBottomPadPx] = useState(0);
 
   useLayoutEffect(() => {
     if (shopOpen) setShopSheetSnap('peek');
@@ -2288,6 +2593,64 @@ export default function MapaPrecosLeaflet({
   const handleShopSheetSnapChange = useCallback((next) => {
     setShopSheetSnap(next);
   }, []);
+
+  const handleShopSheetVisualMetrics = useCallback((m) => {
+    setMobileShopSheetMapBottomPadPx(Math.max(0, Math.round(Number(m?.bottomInsetPx) || 0)));
+  }, []);
+
+  useEffect(() => {
+    if (!shopOpen || !isMobileMapSheet) setMobileShopSheetMapBottomPadPx(0);
+  }, [shopOpen, isMobileMapSheet]);
+
+  const handlePreviewSheetVisualMetrics = useCallback((m) => {
+    setPreviewSheetMapBottomPadPx(Math.max(0, Math.round(Number(m?.bottomInsetPx) || 0)));
+  }, []);
+
+  useEffect(() => {
+    if (!mobileStorePreview || !isMobileMapSheet) setPreviewSheetMapBottomPadPx(0);
+  }, [mobileStorePreview, isMobileMapSheet]);
+
+  /** Desktop: painel fixo inferior (~42vh, cap 560px) — mesmo “respiro” do mapa que no mobile. */
+  useEffect(() => {
+    if (!shopOpen || isMobileMapSheet) {
+      setDesktopShopBottomPadPx(0);
+      return undefined;
+    }
+    const ro = () => {
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+      if (vh <= 0) return;
+      setDesktopShopBottomPadPx(Math.min(560, Math.round(vh * 0.42)));
+    };
+    ro();
+    window.addEventListener('resize', ro);
+    return () => window.removeEventListener('resize', ro);
+  }, [shopOpen, isMobileMapSheet]);
+
+  /** Pan na janela útil só ao abrir a folha da loja (evita mover o mapa ao mexer na lista). */
+  useEffect(() => {
+    if (!shopOpen || !shopStore?.id) return undefined;
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      if (!cancelled) setMapUsefulPanTick((n) => n + 1);
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [shopOpen, shopStore?.id]);
+
+  /** Pan só ao abrir o preview do pin (não a cada resize / mudança de snap). */
+  useEffect(() => {
+    if (!isMobileMapSheet || shopOpen || !mobileStorePreview?.id) return undefined;
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      if (!cancelled) setMapUsefulPanTick((n) => n + 1);
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [isMobileMapSheet, shopOpen, mobileStorePreview?.id]);
 
   const onPreviewSheetSnapChange = useCallback((next) => {
     if (next === 'closed') setMobileStorePreview(null);
@@ -2411,6 +2774,46 @@ export default function MapaPrecosLeaflet({
       .finally(() => setShopLoading(false));
   }, []);
 
+  const [confirmOfferBusyId, setConfirmOfferBusyId] = useState(null);
+
+  const handleOfferConfirmed = useCallback(
+    async (offer) => {
+      if (!shopStore?.id || !offer?.id) return;
+      if (!session?.user?.email) {
+        toast.error('Faça login para confirmar o preço na loja.');
+        return;
+      }
+      setConfirmOfferBusyId(String(offer.id));
+      try {
+        const res = await fetch('/api/map/confirm-offer-seen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ offerId: offer.id, storeId: shopStore.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Não foi possível confirmar');
+        const iso = data.observed_at || new Date().toISOString();
+        setShopOffers((prev) =>
+          prev.map((o) =>
+            String(o.id) === String(offer.id) ? { ...o, observed_at: iso, time_ago: 'Agora' } : o
+          )
+        );
+        if (data.awarded && data.xp_awarded) {
+          toast.success(`+${data.xp_awarded} XP — Obrigado por colaborar!`);
+        } else if (data.reason === 'already_today') {
+          toast.message('Você já confirmou esta oferta hoje. Valeu!');
+        } else {
+          toast.success('Obrigado! A data do preço foi atualizada para todos.');
+        }
+      } catch (e) {
+        toast.error(e?.message || 'Erro ao confirmar');
+      } finally {
+        setConfirmOfferBusyId(null);
+      }
+    },
+    [session?.user?.email, shopStore?.id]
+  );
+
   const toggleSelectedPromotionItem = useCallback(
     (rowOrId) => {
       const row =
@@ -2425,15 +2828,20 @@ export default function MapaPrecosLeaflet({
         setPromoCart((prevCart) => {
           if (wasOn) return prevCart.filter((x) => x.offerId !== cartId);
           if (prevCart.some((x) => x.offerId === cartId)) return prevCart;
-          const rawPrice = row.promo_price;
           const cat = row.category || 'Supermercado - Promoção';
-          const priceNum = numericPriceForSum(rawPrice, cat, cartId);
+          const resolved = firstPositivePriceNumber(row.promo_price, row.club_price, row.price);
+          const priceNum = numericPriceForSum(resolved, cat, cartId);
+          const precoLabel =
+            priceNum != null
+              ? `R$ ${formatBRLPriceNum(priceNum)}`
+              : formatPrecoExibicao(row.promo_price, cat, cartId) ||
+                formatPrecoExibicao(row.club_price, cat, cartId);
           return prevCart.concat({
             offerId: cartId,
             productName: row.product_name,
             storeLabel: shopStore?.name || 'Loja',
             priceNum,
-            precoLabel: formatPrecoExibicao(rawPrice, cat, cartId),
+            precoLabel,
           });
         });
         if (wasOn) return prevSel.filter((x) => x !== sid);
@@ -2449,6 +2857,35 @@ export default function MapaPrecosLeaflet({
     return main;
   }, [shopStore]);
 
+  const mapOverlayBottomPadPx = useMemo(() => {
+    if (shopOpen) {
+      return isMobileMapSheet ? mobileShopSheetMapBottomPadPx : desktopShopBottomPadPx;
+    }
+    if (mobileStorePreview && isMobileMapSheet) return previewSheetMapBottomPadPx;
+    return 0;
+  }, [
+    isMobileMapSheet,
+    shopOpen,
+    mobileStorePreview,
+    mobileShopSheetMapBottomPadPx,
+    previewSheetMapBottomPadPx,
+    desktopShopBottomPadPx,
+  ]);
+
+  const mapUsefulPanLatLng = useMemo(() => {
+    if (shopOpen && shopStore) {
+      const la = Number(shopStore.lat);
+      const ln = Number(shopStore.lng);
+      if (Number.isFinite(la) && Number.isFinite(ln)) return [la, ln];
+    }
+    if (mobileStorePreview && !shopOpen && isMobileMapSheet) {
+      const la = Number(mobileStorePreview.lat);
+      const ln = Number(mobileStorePreview.lng);
+      if (Number.isFinite(la) && Number.isFinite(ln)) return [la, ln];
+    }
+    return null;
+  }, [isMobileMapSheet, shopOpen, shopStore, mobileStorePreview]);
+
   const toggleCartOffer = useCallback(
     (offer, storeLabelOverride) => {
       const id = String(offer.id);
@@ -2456,19 +2893,26 @@ export default function MapaPrecosLeaflet({
       setPromoCart((prev) => {
         const ix = prev.findIndex((x) => x.offerId === id);
         if (ix >= 0) return prev.filter((_, i) => i !== ix);
-        const rawPrice =
-          offer?.price != null && offer?.price !== ''
-            ? offer.price
-            : offer?.promo_price != null && offer?.promo_price !== ''
-              ? offer.promo_price
-              : null;
-        const priceNum = numericPriceForSum(rawPrice, offer.category, offer.id);
+        const resolved = firstPositivePriceNumber(offer?.price, offer?.promo_price, offer?.club_price);
+        const rawForFormat =
+          resolved != null
+            ? resolved
+            : offer?.price != null && offer?.price !== ''
+              ? offer.price
+              : offer?.promo_price != null && offer?.promo_price !== ''
+                ? offer.promo_price
+                : offer?.club_price;
+        const priceNum = numericPriceForSum(resolved, offer.category, offer.id);
+        const precoLabel =
+          priceNum != null
+            ? `R$ ${formatBRLPriceNum(priceNum)}`
+            : formatPrecoExibicao(rawForFormat, offer.category, offer.id);
         return prev.concat({
           offerId: id,
           productName: offer.product_name,
           storeLabel,
           priceNum,
-          precoLabel: formatPrecoExibicao(rawPrice, offer.category, offer.id),
+          precoLabel,
         });
       });
     },
@@ -2517,8 +2961,8 @@ export default function MapaPrecosLeaflet({
   const selectedEncarteTotal = useMemo(
     () =>
       selectedPromotionRowsOrdered.reduce((s, r) => {
-        const n = parsePriceToNumber(r.promo_price);
-        return s + (n != null ? n : 0);
+        const n = firstPositivePriceNumber(r.promo_price, r.club_price, r.price);
+        return s + (typeof n === 'number' ? n : 0);
       }, 0),
     [selectedPromotionRowsOrdered]
   );
@@ -2716,6 +3160,7 @@ export default function MapaPrecosLeaflet({
       <MapContainer
         center={DEFAULT_MAP_CENTER}
         zoom={DEFAULT_MAP_ZOOM}
+        zoomControl={false}
         style={mapContainerStyle}
         className={`z-0 finmemory-map-tiles finmemory-map-theme-${theme.id}`}
       >
@@ -2764,6 +3209,12 @@ export default function MapaPrecosLeaflet({
         />
         <MapShopSheetDragLock
           locked={isMobileMapSheet && shopOpen && shopSheetSnap === 'expanded'}
+        />
+        <MapBottomPaddingSync paddingPx={mapOverlayBottomPadPx} />
+        <MapUsefulAreaPan
+          latLng={mapUsefulPanLatLng}
+          bottomPadPx={mapOverlayBottomPadPx}
+          panTick={mapUsefulPanTick}
         />
       </MapContainer>
 
@@ -2837,7 +3288,7 @@ export default function MapaPrecosLeaflet({
                   }`}
                 >
                   {line.priceNum != null
-                    ? `R$ ${line.priceNum.toFixed(2)}`
+                    ? `R$ ${formatBRLPriceNum(line.priceNum)}`
                     : line.precoLabel || '—'}
                 </span>
                 <button
@@ -2875,7 +3326,7 @@ export default function MapaPrecosLeaflet({
                 className="tabular-nums"
                 style={wazeUi ? { color: cartTotalNumeric > 50 ? '#e74c3c' : '#2ecc71' } : undefined}
               >
-                R$ {cartTotalNumeric.toFixed(2)}
+                R$ {formatBRLPriceNum(cartTotalNumeric)}
               </span>
             </div>
             <div className="space-y-1">
@@ -2977,7 +3428,9 @@ export default function MapaPrecosLeaflet({
               wazeUi ? '' : ''
             }`}
           >
-            {selectedPromotionRowsOrdered.map((row) => (
+            {selectedPromotionRowsOrdered.map((row) => {
+              const selEff = firstPositivePriceNumber(row.promo_price, row.club_price, row.price);
+              return (
               <div
                 key={row.id}
                 className={`flex items-start gap-2 rounded-lg px-2 py-2 text-xs ${
@@ -2995,9 +3448,7 @@ export default function MapaPrecosLeaflet({
                     wazeUi ? 'text-[#2ecc71]' : 'text-emerald-700'
                   }`}
                 >
-                  {parsePriceToNumber(row.promo_price) != null
-                    ? `R$ ${formatBRLPriceNum(row.promo_price)}`
-                    : '—'}
+                  {selEff != null ? `R$ ${formatBRLPriceNum(selEff)}` : '—'}
                 </span>
                 <button
                   type="button"
@@ -3010,7 +3461,8 @@ export default function MapaPrecosLeaflet({
                   <X className="h-4 w-4" strokeWidth={2.5} />
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div
             className={`flex flex-shrink-0 flex-col gap-2 border-t p-3 ${
@@ -3024,7 +3476,7 @@ export default function MapaPrecosLeaflet({
             >
               <span>Total</span>
               <span className="tabular-nums" style={{ color: encarteBudgetBarColor }}>
-                R$ {selectedEncarteTotal.toFixed(2)}
+                R$ {formatBRLPriceNum(selectedEncarteTotal)}
               </span>
             </div>
             <div className={`h-2 overflow-hidden rounded-full ${wazeUi ? 'bg-[#1e2130]' : 'bg-gray-200'}`}>
@@ -3055,6 +3507,7 @@ export default function MapaPrecosLeaflet({
         <MapMobileBottomSheet
           snap={previewSheetSnap}
           onSnapChange={onPreviewSheetSnapChange}
+          onVisualMetrics={handlePreviewSheetVisualMetrics}
           wazeUi={wazeUi}
           peekDvh={35}
           expandedDvh={92}
@@ -3134,7 +3587,7 @@ export default function MapaPrecosLeaflet({
                 ) : null}
                 {latestOfferObservedLabel ? (
                   <p className={`mt-0.5 text-[11px] ${wazeUi ? 'text-amber-300' : 'text-amber-700'}`}>
-                    Ultima verificacao no mapa: {latestOfferObservedLabel}
+                    Última atualização no mapa: {latestOfferObservedLabel}
                   </p>
                 ) : null}
               </div>
@@ -3170,34 +3623,37 @@ export default function MapaPrecosLeaflet({
               </div>
             ) : null}
 
-            {(shopOffers.length > 0 || shopPromotions.length > 0) && shopShelfCategories.length > 1 ? (
-              <div
-                className={`finmemory-waze-scroll flex flex-shrink-0 gap-1.5 overflow-x-auto px-4 py-2.5 ${
-                  wazeUi ? '' : 'border-b border-gray-100'
-                }`}
-              >
-                {shopShelfCategories.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setShopFilterCat(c)}
-                    className={`shrink-0 flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      shopFilterCat === c
-                        ? wazeUi
-                          ? 'border-[#2ecc71] bg-[#2ecc71] text-[#0f1117]'
-                          : 'border-[#2ECC49] bg-[#2ECC49] text-white'
-                        : wazeUi
-                          ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#888] hover:border-[#2ecc71] hover:text-[#2ecc71]'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    {c === 'Todos' ? 'Todos' : `${ENCARTE_CATEGORY_ICONS[c] ? `${ENCARTE_CATEGORY_ICONS[c]} ` : ''}${c}`}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
             <div className={`min-h-0 flex-1 overflow-y-auto px-3 pb-8 ${wazeUi ? 'finmemory-waze-scroll' : ''}`}>
+              {(shopOffers.length > 0 || shopPromotions.length > 0) && shopShelfCategories.length > 1 ? (
+                <div
+                  className={`sticky top-0 z-[6] -mx-3 mb-1 border-b px-3 py-2 ${
+                    wazeUi
+                      ? 'border-[#1e2130] bg-[#13161f]/72 shadow-[0_6px_16px_rgba(0,0,0,0.18)] supports-[backdrop-filter]:bg-[#13161f]/48 backdrop-blur-xl backdrop-saturate-150'
+                      : 'border-gray-200/90 bg-white/72 shadow-[0_4px_14px_rgba(15,23,42,0.06)] supports-[backdrop-filter]:bg-white/48 backdrop-blur-xl backdrop-saturate-150'
+                  }`}
+                >
+                  <div className="finmemory-waze-scroll flex flex-shrink-0 gap-1.5 overflow-x-auto px-0.5">
+                    {shopShelfCategories.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setShopFilterCat(c)}
+                        className={`shrink-0 flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          shopFilterCat === c
+                            ? wazeUi
+                              ? 'border-[#2ecc71] bg-[#2ecc71] text-[#0f1117]'
+                              : 'border-[#2ECC49] bg-[#2ECC49] text-white'
+                            : wazeUi
+                              ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#888] hover:border-[#2ecc71] hover:text-[#2ecc71]'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                      >
+                        {c === 'Todos' ? 'Todos' : `${ENCARTE_CATEGORY_ICONS[c] ? `${ENCARTE_CATEGORY_ICONS[c]} ` : ''}${c}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div
                 className={`mb-2 mt-2 flex items-center justify-between rounded-lg px-2.5 py-2 text-[11px] ${
                   wazeUi
@@ -3280,7 +3736,8 @@ export default function MapaPrecosLeaflet({
               ) : null}
               {!shopLoading && filteredShopOffers.length > 0 ? (
                 <>
-                  <div className={`mb-3 overflow-hidden rounded-xl ${wazeUi ? 'border border-[#2a2d3a]' : ''}`}>
+                  <div className={`mb-2 overflow-hidden rounded-xl ${wazeUi ? 'border border-[#2a2d3a]' : ''}`}>
+                    <StoreBelongingBanner store={shopStore} />
                     <HeroOfferCarousel
                       sources={uniqueDisplayableImageUrls(
                         filteredShopOffers.map((o) => ({
@@ -3292,6 +3749,8 @@ export default function MapaPrecosLeaflet({
                       )}
                       storeTitle={shopStore?.name || ''}
                       count={filteredShopOffers.length}
+                      category={filteredShopOffers[0]?.category || ''}
+                      dense
                     />
                   </div>
                   {wazeUi ? (
@@ -3303,17 +3762,22 @@ export default function MapaPrecosLeaflet({
                           selected={cartOfferIdSet.has(String(offer.id))}
                           onToggle={() => toggleCartOffer(offer)}
                           accentHex="#2ecc71"
+                          canConfirmPrice={Boolean(session?.user?.email)}
+                          confirmBusy={confirmOfferBusyId === String(offer.id)}
+                          onConfirmOffer={() => handleOfferConfirmed(offer)}
                         />
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-2 pb-4">
+                    <div className="grid grid-cols-2 gap-1.5 pb-4">
                       {filteredShopOffers.map((offer, i) => {
                         const pt = {
                           id: offer.id,
+                          nome: shopStore?.name || offer.store_name || '',
                           produto: offer.product_name,
                           categoria: offer.category || '',
                           promo_image_url: offer.promo_image_url,
+                          observed_at: offer.observed_at,
                         };
                         const label = formatPrecoExibicao(offer.price, offer.category, offer.id);
                         const priceSlot =
@@ -3339,9 +3803,13 @@ export default function MapaPrecosLeaflet({
                             point={pt}
                             accentHex={shopAccent}
                             priceSlot={priceSlot}
+                            compact
                             selected={cartOfferIdSet.has(String(offer.id))}
                             interactive
                             onActivate={() => toggleCartOffer(offer)}
+                            canConfirmPrice={Boolean(session?.user?.email)}
+                            confirmBusy={confirmOfferBusyId === String(offer.id)}
+                            onConfirmOffer={() => handleOfferConfirmed(offer)}
                           />
                         );
                       })}
@@ -3355,134 +3823,25 @@ export default function MapaPrecosLeaflet({
       ) : null}
 
       {shopOpen && isMobileMapSheet ? (
-        <MapShopSnapSheet
-          sheetSnap={shopSheetSnap}
-          onSheetSnapChange={handleShopSheetSnapChange}
-          onRequestClose={() => setShopOpen(false)}
-          wazeUi={wazeUi}
-          shopStore={shopStore}
-          shopLoading={shopLoading}
-          shopErr={shopErr}
-          promoCount={shopOffers.length + shopPromotions.length}
-        >
-          <MapShopMobileGoogleSheetBody
-            shopStore={shopStore}
-            shopLoading={shopLoading}
-            shopErr={shopErr}
-            wazeUi={wazeUi}
-            userOrigin={userMapPosition}
-            carouselOffers={filteredShopOffers}
-            promoCount={shopOffers.length + shopPromotions.length}
-            cartOfferIdSet={cartOfferIdSet}
-            toggleCartOffer={toggleCartOffer}
-            formatOfferPrice={(offer) => {
-              const label = formatPrecoExibicao(offer.price, offer.category, offer.id);
-              if (label != null) return label;
-              if (offer.promo_image_url) {
-                return (
-                  <a
-                    href={offer.promo_image_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`text-[11px] font-semibold underline ${
-                      wazeUi ? 'text-[#2ecc71]' : 'text-emerald-700'
-                    }`}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Ver encarte
-                  </a>
-                );
-              }
-              return (
-                <span className={`text-[11px] ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}>
-                  Promoção
-                </span>
-              );
-            }}
-            onRequestClose={() => setShopOpen(false)}
-            wazeCategoryChips={
-              (shopOffers.length > 0 || shopPromotions.length > 0) && shopShelfCategories.length > 1 ? (
-                <div
-                  data-sheet-no-drag
-                  className="finmemory-waze-scroll flex flex-shrink-0 gap-1.5 overflow-x-auto px-4 py-2"
-                  style={{ touchAction: 'pan-x' }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                >
-                  {shopShelfCategories.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setShopFilterCat(c)}
-                      className={`shrink-0 flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                        shopFilterCat === c
-                          ? wazeUi
-                            ? 'border-[#2ecc71] bg-[#2ecc71] text-[#0f1117]'
-                            : 'border-[#2ECC49] bg-[#2ECC49] text-white'
-                          : wazeUi
-                            ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#888] hover:border-[#2ecc71] hover:text-[#2ecc71]'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      {c === 'Todos' ? 'Todos' : `${ENCARTE_CATEGORY_ICONS[c] ? `${ENCARTE_CATEGORY_ICONS[c]} ` : ''}${c}`}
-                    </button>
-                  ))}
-                </div>
-              ) : null
-            }
-            encarteSection={
-              !shopLoading && shopPromotions.length > 0 ? (
-                <div className="px-4 pb-3">
-                  <p
-                    className={`mb-2 text-xs font-semibold ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}
-                  >
-                    Promoções (encarte)
-                  </p>
-                  <div className={`mb-2 flex flex-wrap gap-1.5 ${wazeUi ? 'text-[#888]' : 'text-gray-600'}`}>
-                    {[
-                      { id: 'validade', label: 'Por validade' },
-                      { id: 'preco', label: 'Por preço' },
-                      { id: 'nome', label: 'Por produto' },
-                      { id: 'imagem', label: 'Com imagem' },
-                    ].map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setEncarteSortBy(opt.id)}
-                        className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
-                          encarteSortBy === opt.id
-                            ? wazeUi
-                              ? 'border-[#2ecc71] bg-[#2ecc71] text-[#0f1117]'
-                              : 'border-[#2ECC49] bg-emerald-50 text-emerald-900'
-                            : wazeUi
-                              ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#888] hover:border-[#2ecc71]'
-                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className={`grid grid-cols-2 gap-2 ${wazeUi ? 'gap-2.5' : ''}`}>
-                    {filteredShopPromotions.map((row) => (
-                      <PromotionEncarteCard
-                        key={row.id}
-                        row={row}
-                        wazeUi={wazeUi}
-                        accentHex={shopAccent}
-                        selected={selectedItems.includes(String(row.id))}
-                        onToggle={() => toggleSelectedPromotionItem(row)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null
-            }
-            sharePriceHref={`/share-price?store=${encodeURIComponent(shopStore?.name || '')}&category=${encodeURIComponent('Supermercado - Promoção')}`}
-            hasEncartePromotions={shopPromotions.length > 0}
-          />
-        </MapShopSnapSheet>
+        <EstablishmentDetailSheet
+          open={shopOpen}
+          store={shopStore}
+          offers={shopOffers}
+          promotions={shopPromotions}
+          loading={shopLoading}
+          error={shopErr}
+          onClose={() => setShopOpen(false)}
+          onVisualMetrics={handleShopSheetVisualMetrics}
+          canConfirmPrice={Boolean(session?.user?.email)}
+          appUserId={session?.user?.supabaseId}
+          onOfferSeenUpdated={(offerId, observedAt) => {
+            setShopOffers((prev) =>
+              prev.map((o) =>
+                String(o.id) === String(offerId) ? { ...o, observed_at: observedAt, time_ago: 'Agora' } : o
+              )
+            );
+          }}
+        />
       ) : null}
     </div>
   );

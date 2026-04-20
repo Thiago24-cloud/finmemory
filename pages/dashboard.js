@@ -2,14 +2,17 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
-import { Loader2, Mail, Camera, MapPin, X, Trash2, RotateCcw, Search, Calculator } from 'lucide-react';
+import { Loader2, Mail, X, Trash2, RotateCcw, Search, Calculator } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BottomNav } from '../components/BottomNav';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
 import { QuickActions } from '../components/dashboard/QuickActions';
-import { TransactionList } from '../components/dashboard/TransactionList';
+import { UnifiedHistoryList } from '../components/dashboard/UnifiedHistoryList';
+import { OpenFinanceBankCarousel } from '../components/dashboard/OpenFinanceBankCarousel';
+import { FeaturedScanReceiptCTA } from '../components/dashboard/FeaturedScanReceiptCTA';
+import { CalculatorDockProvider, useCalculatorDock } from '../components/dashboard/CalculatorDockContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
@@ -20,7 +23,6 @@ import {
   setDashboardOnboardingDoneLocal,
 } from '../lib/dashboardOnboardingStorage';
 import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
-import OpenFinanceTransactionList from '../components/OpenFinance/TransactionList';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
 let supabaseInstance = null;
@@ -88,9 +90,28 @@ export async function getServerSideProps(ctx) {
   }
 }
 
+function DashboardCalculadoraLayout({ children }) {
+  const { desktopOpen } = useCalculatorDock();
+  return (
+    <div
+      className={
+        desktopOpen
+          ? 'w-full transition-[padding] duration-300 ease-out lg:pr-[min(300px,28vw)]'
+          : 'w-full transition-[padding] duration-300 ease-out'
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data: session, status } = useSession();
-  const openFinance = useOpenFinanceSummary({ enabled: status === 'authenticated' });
+  const [openFinanceAccountId, setOpenFinanceAccountId] = useState(null);
+  const openFinance = useOpenFinanceSummary({
+    enabled: status === 'authenticated',
+    accountId: openFinanceAccountId,
+  });
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -193,6 +214,20 @@ export default function Dashboard() {
       fetchUserId().catch((err) => console.warn('fetchUserId:', err?.message || err));
     }
   }, [session]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      setOpenFinanceAccountId(null);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    const list = openFinance.data?.accounts;
+    if (!openFinanceAccountId || !Array.isArray(list)) return;
+    if (!list.some((a) => a.id === openFinanceAccountId)) {
+      setOpenFinanceAccountId(null);
+    }
+  }, [openFinance.data?.accounts, openFinanceAccountId]);
 
   useEffect(() => {
     if (status !== 'authenticated' || !userId) return undefined;
@@ -530,6 +565,9 @@ export default function Dashboard() {
         // Recarrega as transações após um pequeno delay para garantir que foram salvas
         setTimeout(async () => {
           setSyncLogs(prev => [...prev, { type: 'info', message: '🔄 Recarregando transações...', timestamp: new Date() }]);
+          try {
+            await fetch('/api/transactions/auto-link-pluggy', { method: 'POST' });
+          } catch (_) {}
           await loadTransactions(userId);
           setSyncLogs(prev => [...prev, { type: 'success', message: '✅ Transações recarregadas!', timestamp: new Date() }]);
         }, 1000);
@@ -582,6 +620,25 @@ export default function Dashboard() {
       loadTransactions(userId);
     }
   }, [userId, loadTransactions]);
+
+  // Pareamento após o resumo Open Finance terminar de carregar (inclui mudança de conta / refresh implícito do hook)
+  useEffect(() => {
+    if (!userId || status !== 'authenticated' || openFinance.loading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/transactions/auto-link-pluggy', { method: 'POST' });
+        const j = await r.json().catch(() => ({}));
+        if (cancelled || !j?.ok) return;
+        if (Number(j.linked) > 0) await loadTransactions(userId);
+      } catch (e) {
+        console.warn('[dashboard] auto-link-pluggy (pós Open Finance):', e?.message || e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, status, openFinance.loading, loadTransactions]);
 
   // Onboarding: mostrar dicas uma vez (localStorage)
   useEffect(() => {
@@ -760,6 +817,26 @@ export default function Dashboard() {
     });
   }, [filteredTransactions, searchQuery]);
 
+  const openFinanceTransactionsForMonth = useMemo(() => {
+    const list = openFinance.data?.recentTransactions || [];
+    if (!selectedMonth) return list;
+    return list.filter((t) => getYearMonthKey(t.date) === selectedMonth);
+  }, [openFinance.data?.recentTransactions, selectedMonth]);
+
+  const searchFilteredOpenFinance = useMemo(() => {
+    if (!searchQuery.trim()) return openFinanceTransactionsForMonth;
+    const q = searchQuery.trim().toLowerCase();
+    return (openFinanceTransactionsForMonth || []).filter((t) => {
+      if ((t.description || '').toLowerCase().includes(q)) return true;
+      if ((t.category || '').toLowerCase().includes(q)) return true;
+      if ((t.account_name || '').toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }, [openFinanceTransactionsForMonth, searchQuery]);
+
+  const showHistorySearch =
+    (filteredTransactions || []).length > 0 || openFinanceTransactionsForMonth.length > 0;
+
   const totalBalance = useMemo(() => {
     return (filteredTransactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
   }, [filteredTransactions]);
@@ -769,45 +846,29 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-md mx-auto px-5 pb-24 pt-5">
-        <h1 className="sr-only">FinMemory - Dashboard</h1>
-        <BottomNav />
-
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
-            <p className="text-[#666]">Carregando sessão...</p>
-          </div>
-        ) : !isAuthenticated ? (
-          <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6 text-center px-4">
-            <Image src="/logo.png" alt="FinMemory" width={80} height={80} className="object-contain" />
-            <div className="w-20 h-20 rounded-full bg-[#e8f5e9] flex items-center justify-center">
-              <Mail className="h-10 w-10 text-[#28a745]" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold mb-2 text-[#333]">FinMemory</h1>
-              <p className="text-[#666]">Entre com email e senha para acessar seu painel.</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleConnectGmail}
-              className="px-6 py-3 bg-gradient-google text-white hover:opacity-90 rounded-xl font-semibold inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28a745] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa]"
-              aria-label="Entrar com email e senha"
-            >
-              <Mail className="h-5 w-5" aria-hidden />
-              Entrar
-            </button>
-          </div>
-        ) : (
-          <>
+      <h1 className="sr-only">FinMemory - Dashboard</h1>
+      {isAuthenticated ? (
+        <CalculatorDockProvider>
+          <DashboardCalculadoraLayout>
+            <div className="max-w-md mx-auto px-5 pt-5 pb-[calc(10.5rem+env(safe-area-inset-bottom))] lg:pb-32">
+              <BottomNav />
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                  <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
+                  <p className="text-[#666]">Carregando sessão...</p>
+                </div>
+              ) : (
+                <>
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
-            {/* Nível (gamificação leve) */}
             {transactionCount >= 0 && (
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs text-[#666]">
                   {transactionCount} transação{transactionCount !== 1 ? 'ões' : ''}
                 </span>
-                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#2ECC49]/15 text-[#2ECC49]" title="Quanto mais você sincroniza, mais sobe de nível">
+                <span
+                  className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#2ECC49]/15 text-[#2ECC49]"
+                  title="Quanto mais você sincroniza, mais sobe de nível"
+                >
                   Nível {userLevel}
                 </span>
               </div>
@@ -841,6 +902,14 @@ export default function Dashboard() {
               />
             </div>
 
+            <OpenFinanceBankCarousel
+              accounts={openFinance.data?.accounts}
+              loading={openFinance.loading}
+              selectedAccountId={openFinanceAccountId}
+              onSelectAccount={setOpenFinanceAccountId}
+            />
+            <FeaturedScanReceiptCTA />
+
             <section
               className="mb-6 rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
               aria-label="Open Finance"
@@ -850,12 +919,22 @@ export default function Dashboard() {
                   <h2 className="text-sm font-semibold text-[#333] m-0">Open Finance</h2>
                   <p className="text-xs text-[#666] mt-0.5 m-0">Contas e movimentos do banco (Pluggy).</p>
                 </div>
-                <Link
-                  href="/settings"
-                  className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap shrink-0 hover:underline"
-                >
-                  Configurar
-                </Link>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openFinance.refresh()}
+                    disabled={openFinance.loading}
+                    className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    Atualizar extrato
+                  </button>
+                  <Link
+                    href="/settings"
+                    className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline"
+                  >
+                    Configurar
+                  </Link>
+                </div>
               </div>
               {openFinance.error && (
                 <p className="text-xs text-red-600 mb-3">
@@ -867,27 +946,13 @@ export default function Dashboard() {
                   A sincronizar dados com a instituição… os valores podem atualizar em instantes.
                 </p>
               )}
-              {!openFinance.loading && (openFinance.data?.accounts || []).length > 0 && (
-                <ul className="space-y-2 mb-4">
-                  {(openFinance.data.accounts || []).map((a) => {
-                    const bal =
-                      a.balance != null && Number.isFinite(Number(a.balance))
-                        ? new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: a.currency_code || 'BRL',
-                          }).format(Number(a.balance))
-                        : '—';
-                    return (
-                      <li
-                        key={a.id}
-                        className="flex items-center justify-between gap-2 text-sm py-2 border-b border-[#f0f0f0] last:border-0"
-                      >
-                        <span className="text-[#333] font-medium truncate">{a.name || 'Conta'}</span>
-                        <span className="text-[#333] tabular-nums shrink-0">{bal}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
+              {openFinanceAccountId && (openFinance.data?.accounts || []).length > 0 && (
+                <p className="text-xs font-medium text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl px-3 py-2 mb-3 m-0">
+                  A mostrar só:{' '}
+                  {(openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.display_name ||
+                    (openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.name ||
+                    'esta conta'}
+                </p>
               )}
               {!openFinance.loading && openFinance.data?.month && (
                 <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
@@ -909,18 +974,18 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
-              <OpenFinanceTransactionList
-                transactions={openFinance.data?.recentTransactions}
-                loading={openFinance.loading}
-              />
+              <p className="text-xs text-[#666] m-0">
+                Movimentos do banco e das notas aparecem juntos em <strong className="text-[#333]">Histórico</strong>{' '}
+                abaixo; linhas duplicadas somem quando a nota corresponde ao extrato.
+              </p>
             </section>
 
             <Link
               href="/calculadora"
-              className="flex items-center justify-center gap-2 w-full py-3 mb-4 rounded-2xl border border-[#28a745]/40 bg-[#0b1220] text-white font-semibold text-sm shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:bg-[#0f172a] transition-colors"
+              className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] text-[#334155] font-medium text-xs hover:bg-[#f1f5f9] transition-colors"
             >
-              <Calculator className="h-5 w-5 text-[#28a745]" aria-hidden />
-              Calculadora de economia
+              <Calculator className="h-4 w-4 text-[#2ECC49]" aria-hidden />
+              Calculadora de economia (tela completa)
             </Link>
 
             {/* Cobranças do mês */}
@@ -988,44 +1053,37 @@ export default function Dashboard() {
               </div>
             )}
 
-            {loading ? (
-              <div className="space-y-4" aria-live="polite" aria-busy="true">
-                <div className="card-lovable p-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-4 py-4">
-                      <div className="h-10 w-10 rounded-full bg-[#e5e7eb] animate-pulse shrink-0" />
-                      <div className="flex-1 space-y-2 min-w-0">
-                        <div className="h-4 max-w-[75%] bg-[#e5e7eb] rounded animate-pulse" />
-                        <div className="h-3 max-w-[50%] bg-[#e5e7eb] rounded animate-pulse" />
-                      </div>
-                      <div className="h-4 w-20 bg-[#e5e7eb] rounded animate-pulse shrink-0" />
-                    </div>
-                  ))}
+            <>
+              {showHistorySearch && (
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#999] pointer-events-none" aria-hidden />
+                  <input
+                    type="search"
+                    placeholder="Buscar no histórico (nota, banco, categoria, produto)..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] placeholder:text-[#999] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/50 focus:border-[#2ECC49]"
+                    aria-label="Buscar no histórico unificado"
+                  />
                 </div>
-              </div>
-            ) : (
-              <>
-                {filteredTransactions.length > 0 && (
-                  <div className="relative mb-4">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#999] pointer-events-none" aria-hidden />
-                    <input
-                      type="search"
-                      placeholder="Buscar por estabelecimento, categoria ou produto..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] placeholder:text-[#999] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/50 focus:border-[#2ECC49]"
-                      aria-label="Buscar transações por estabelecimento, categoria ou produto"
-                    />
-                  </div>
-                )}
-                <TransactionList
-                  transactions={searchFilteredTransactions}
-                  userId={userId}
-                  onDeleted={() => loadTransactions(userId)}
-                  emptyState={searchQuery.trim() && searchFilteredTransactions.length === 0 ? 'search' : 'default'}
-                />
-              </>
-            )}
+              )}
+              <UnifiedHistoryList
+                openFinanceTransactions={searchFilteredOpenFinance}
+                finMemoryTransactions={searchFilteredTransactions}
+                openFinanceLoading={openFinance.loading}
+                finMemoryLoading={loading}
+                userId={userId}
+                onDeleted={() => loadTransactions(userId)}
+                onRenamed={() => loadTransactions(userId)}
+                emptyState={
+                  searchQuery.trim() &&
+                  searchFilteredTransactions.length === 0 &&
+                  searchFilteredOpenFinance.length === 0
+                    ? 'search'
+                    : 'default'
+                }
+              />
+            </>
 
             {/* Sheet: Lixeira – listar excluídas e restaurar */}
             <Sheet open={showTrashSheet} onOpenChange={setShowTrashSheet}>
@@ -1095,11 +1153,7 @@ export default function Dashboard() {
             >
               🔍 Debug
             </button>
-          </>
-        )}
 
-        {isAuthenticated && (
-          <>
         {/* Debug Info Panel */}
         {debugInfo && (
           <div className="card-lovable mb-6">
@@ -1242,19 +1296,41 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-          </>
-        )}
-      </div>
-
-      {/* FAB – Lovable: círculo 60px, gradiente roxo, canto inferior direito */}
-      {isAuthenticated && !isLoading && (
-        <a
-          href="/add-receipt"
-          className="fixed bottom-6 right-5 w-16 h-16 rounded-full flex items-center justify-center shadow-fab hover:scale-110 active:scale-95 transition-transform z-10 bg-gradient-primary text-white"
-          title="Escanear Nota Fiscal"
-        >
-          <Camera className="h-7 w-7" />
-        </a>
+            </>
+              )}
+            </div>
+          </DashboardCalculadoraLayout>
+        </CalculatorDockProvider>
+      ) : (
+        <div className="max-w-md mx-auto px-5 pt-5 pb-32">
+          <BottomNav />
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
+              <p className="text-[#666]">Carregando sessão...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6 text-center px-4">
+              <Image src="/logo.png" alt="FinMemory" width={80} height={80} className="object-contain" />
+              <div className="w-20 h-20 rounded-full bg-[#e8f5e9] flex items-center justify-center">
+                <Mail className="h-10 w-10 text-[#28a745]" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold mb-2 text-[#333]">FinMemory</h1>
+                <p className="text-[#666]">Entre com email e senha para acessar seu painel.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleConnectGmail}
+                className="px-6 py-3 bg-gradient-google text-white hover:opacity-90 rounded-xl font-semibold inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28a745] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa]"
+                aria-label="Entrar com email e senha"
+              >
+                <Mail className="h-5 w-5" aria-hidden />
+                Entrar
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {onboardingTourOpen && (
