@@ -2658,9 +2658,8 @@ export default function MapaPrecosLeaflet({
   }, []);
 
   const handleMobileStorePinOpen = useCallback((store) => {
-    setShopOpen(false);
-    setMobileStorePreview(store);
-  }, []);
+    handleRequestStoreShop(store);
+  }, [handleRequestStoreShop]);
 
   /**
    * none = área visível; product = busca global por texto de produto/loja;
