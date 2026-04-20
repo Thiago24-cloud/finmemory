@@ -2657,9 +2657,6 @@ export default function MapaPrecosLeaflet({
     else setPreviewSheetSnap(next);
   }, []);
 
-  const handleMobileStorePinOpen = useCallback((store) => {
-    handleRequestStoreShop(store);
-  }, [handleRequestStoreShop]);
 
   /**
    * none = área visível; product = busca global por texto de produto/loja;
@@ -2772,6 +2769,10 @@ export default function MapaPrecosLeaflet({
       .catch((e) => setShopErr(e.message || 'Erro ao carregar ofertas'))
       .finally(() => setShopLoading(false));
   }, []);
+
+  const handleMobileStorePinOpen = useCallback((store) => {
+    handleRequestStoreShop(store);
+  }, [handleRequestStoreShop]);
 
   const [confirmOfferBusyId, setConfirmOfferBusyId] = useState(null);
 
