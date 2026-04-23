@@ -1,28 +1,42 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion, useMotionValue, animate } from 'framer-motion';
 
-const DRAG_THRESHOLD = 44;
-const TAP_MAX_DY = 14;
-/** A partir deste arrasto (px) em full com lista no topo, fecha direto para half → closed em sequência rápida não: um gesto grande vai para half; segundo gesto… simplificamos: > BIG fecha. */
-const DRAG_TO_CLOSE_FROM_FULL = 110;
-const PULL_RUBBER = 0.55;
-const PULL_MAX = 220;
+/** px — arrasto mínimo para considerar mudança de detent */
+const COMMIT_DRAG_PX = 56;
+/** Toque curto no handle / chrome sem arrasto */
+const TAP_MAX_PX = 14;
+/** Resistência ao arrastar para baixo (colapsar) */
+const PULL_DOWN_RUBBER = 0.62;
+const PULL_DOWN_MAX_PX = 200;
+/** Resistência ao “puxar para cima” além do full (Nubank-style) */
+const PULL_UP_RUBBER = 0.28;
+const PULL_UP_MAX_PX = 48;
+/**
+ * z-index: overlay 1003, folha 1004 — acima dos pins Leaflet (~600)
+ * e da barra de busca do mapa (z-[1001]); abaixo de sidebars fixas (1005+).
+ */
+const Z_OVERLAY = 1003;
+const Z_SHEET = 1004;
 
 /**
- * Bottom sheet estilo Google Maps (mobile): detents closed | half | full,
- * scroll aninhado (lista no scrollTop 0 + arrastar para baixo move o painel)
- * e física com spring (framer-motion).
+ * Bottom sheet do mapa de preços (mobile): detents half (~35% dvh) | full (~95% dvh).
+ * closed = painel desmontado pelo pai (onSnapChange('closed')).
+ *
+ * Gestos:
+ * - Arrasto a partir de [data-sheet-handle] ou [data-sheet-sticky] (fora de inputs) move a folha.
+ * - Na área rolável [data-sheet-scroll]: se scrollTop === 0 e o gesto é para baixo, move a folha
+ *   em vez de rolar a lista (nested scroll corrigido).
  *
  * @param {object} p
  * @param {'closed'|'half'|'full'} p.snap
  * @param {(next: 'closed'|'half'|'full') => void} p.onSnapChange
- * @param {boolean} p.wazeUi
- * @param {React.ReactNode} p.children
- * @param {number} [p.halfDvh] ~35
- * @param {number} [p.fullDvh] ~95
- * @param {React.ReactNode} [p.stickyChrome] — fixo abaixo do handle (ex.: pills + título)
+ * @param {boolean} p.wazeUi — ajusta cores de texto no chrome (mantém fundo premium #0f0f0f)
+ * @param {React.ReactNode} p.children — corpo (só a grelha / conteúdo rolável)
+ * @param {number} [p.halfDvh]
+ * @param {number} [p.fullDvh]
+ * @param {React.ReactNode} [p.stickyChrome] — fixo sob o handle (nome + busca etc.)
  * @param {(m: { snap: string; bottomInsetPx: number }) => void} [p.onVisualMetrics]
  */
 export default function MapMobileBottomSheet({
@@ -37,17 +51,24 @@ export default function MapMobileBottomSheet({
 }) {
   const reduceMotion = useReducedMotion();
   const [vh, setVh] = useState(640);
+
   const scrollRef = useRef(null);
-  const pullRef = useRef({ active: false, startY: 0, startScrollTop: 0, mode: null });
-  const [pullOffset, setPullOffset] = useState(0);
-  const pullOffsetRef = useRef(0);
-  pullOffsetRef.current = pullOffset;
+  const suppressChromeClickUntil = useRef(0);
 
   const snapRef = useRef(snap);
   snapRef.current = snap;
 
-  const suppressChromeClickUntil = useRef(0);
-  const dragY0 = useRef(null);
+  /** Arrasto ativo: 'handle' | 'scroll_pull' | null */
+  const dragKindRef = useRef(null);
+  const dragStartYRef = useRef(0);
+  const dragStartScrollTopRef = useRef(0);
+  const activePointerIdRef = useRef(null);
+
+  /** Offset visual em px: positivo = folha desce (colapsa); negativo = folha “estica” além do full */
+  const dragOffsetMv = useMotionValue(0);
+
+  const onVisualMetricsRef = useRef(onVisualMetrics);
+  onVisualMetricsRef.current = onVisualMetrics;
 
   useEffect(() => {
     const upd = () => setVh(window.innerHeight || 640);
@@ -65,28 +86,36 @@ export default function MapMobileBottomSheet({
     () =>
       reduceMotion
         ? { duration: 0.2 }
-        : { type: 'spring', stiffness: 520, damping: 42, mass: 0.85 },
+        : { type: 'spring', stiffness: 480, damping: 40, mass: 0.88 },
     [reduceMotion]
   );
 
-  const onVisualMetricsRef = useRef(onVisualMetrics);
-  onVisualMetricsRef.current = onVisualMetrics;
+  const pullOffsetRef = useRef(0);
+  pullOffsetRef.current = dragOffsetMv.get();
+
+  useEffect(() => {
+    const unsub = dragOffsetMv.on('change', (v) => {
+      pullOffsetRef.current = v;
+    });
+    return () => unsub();
+  }, [dragOffsetMv]);
 
   const reportMetrics = useCallback(() => {
     const fn = onVisualMetricsRef.current;
     if (!fn) return;
     const base = snapRef.current === 'full' ? hFullPx : hHalfPx;
-    const bottomInsetPx = Math.max(0, Math.round(base - pullOffsetRef.current));
+    const extra = pullOffsetRef.current;
+    const bottomInsetPx = Math.max(0, Math.round(base - Math.max(0, extra)));
     fn({ snap: snapRef.current, bottomInsetPx });
   }, [hFullPx, hHalfPx]);
 
   useEffect(() => {
-    setPullOffset(0);
-  }, [snap]);
+    dragOffsetMv.set(0);
+  }, [snap, dragOffsetMv]);
 
   useEffect(() => {
     reportMetrics();
-  }, [snap, hFullPx, hHalfPx, pullOffset, reportMetrics]);
+  }, [snap, hFullPx, hHalfPx, reportMetrics]);
 
   useEffect(() => {
     if (!onVisualMetricsRef.current) return undefined;
@@ -95,180 +124,201 @@ export default function MapMobileBottomSheet({
     return () => window.removeEventListener('resize', onResize);
   }, [reportMetrics]);
 
-  const endPull = useCallback(() => {
-    const off = pullOffsetRef.current;
-    setPullOffset(0);
-    pullRef.current = { active: false, startY: 0, startScrollTop: 0, mode: null };
+  const settleDragOffset = useCallback(() => {
+    if (reduceMotion) {
+      dragOffsetMv.set(0);
+    } else {
+      animate(dragOffsetMv, 0, { type: 'spring', stiffness: 520, damping: 42, mass: 0.85 });
+    }
+  }, [dragOffsetMv, reduceMotion]);
+
+  const resolveEndFromDragOffset = useCallback(() => {
+    const off = Math.max(0, pullOffsetRef.current);
     const s = snapRef.current;
     if (off < 24) return;
     if (s === 'full') {
-      if (off > DRAG_TO_CLOSE_FROM_FULL) onSnapChange('closed');
-      else if (off > DRAG_THRESHOLD) onSnapChange('half');
+      if (off > 120) onSnapChange('closed');
+      else if (off > COMMIT_DRAG_PX) onSnapChange('half');
       return;
     }
-    if (s === 'half' && off > DRAG_THRESHOLD) {
+    if (s === 'half' && off > COMMIT_DRAG_PX) {
       onSnapChange('closed');
     }
   }, [onSnapChange]);
 
-  const applySnapFromDrag = useCallback(
-    (dy) => {
-      const s = snapRef.current;
-      if (dy > DRAG_THRESHOLD) {
-        if (s === 'full') onSnapChange('half');
-        else onSnapChange('closed');
-        return;
-      }
-      if (dy < -DRAG_THRESHOLD) {
-        if (s === 'half') onSnapChange('full');
-      }
-    },
-    [onSnapChange]
-  );
+  const applyTapToggle = useCallback(() => {
+    const s = snapRef.current;
+    if (s === 'half') onSnapChange('full');
+    else onSnapChange('half');
+  }, [onSnapChange]);
 
-  const onChromeClick = useCallback(
+  const onChromeTapOrToggle = useCallback(
     (e) => {
       if (Date.now() < suppressChromeClickUntil.current) return;
       const el = e.target;
       if (!(el instanceof Element)) return;
       if (el.closest('button, a, input, textarea, select, [data-sheet-no-tap-expand]')) return;
-      const s = snapRef.current;
-      if (s === 'half') onSnapChange('full');
-      else onSnapChange('half');
+      applyTapToggle();
     },
-    [onSnapChange]
+    [applyTapToggle]
   );
 
-  const onTouchStart = useCallback((e) => {
-    dragY0.current = e.touches[0].clientY;
+  const isInteractiveTarget = useCallback((target) => {
+    if (!(target instanceof Element)) return true;
+    return Boolean(
+      target.closest(
+        'button, a, input, textarea, select, [data-sheet-no-tap-expand], [data-sheet-pan-x]'
+      )
+    );
   }, []);
 
-  const onTouchMove = useCallback((e) => {
-    if (dragY0.current == null) return;
-    if (e.cancelable) e.preventDefault();
-  }, []);
-
-  const onTouchEnd = useCallback(
+  /** ----- Handle / sticky: pointer (arrasto sempre move folha) ----- */
+  const onHandlePointerDown = useCallback(
     (e) => {
-      if (dragY0.current == null) return;
-      const y0 = dragY0.current;
-      dragY0.current = null;
-      const dy = e.changedTouches[0].clientY - y0;
+      if (e.button !== 0) return;
+      if (isInteractiveTarget(e.target)) return;
+      dragKindRef.current = 'handle';
+      dragOffsetMv.set(0);
+      dragStartYRef.current = e.clientY;
+      activePointerIdRef.current = e.pointerId;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* noop */
+      }
+    },
+    [dragOffsetMv, isInteractiveTarget]
+  );
+
+  const onHandlePointerMove = useCallback(
+    (e) => {
+      if (dragKindRef.current !== 'handle') return;
+      if (e.pointerId !== activePointerIdRef.current) return;
+      const dy = e.clientY - dragStartYRef.current;
       const s = snapRef.current;
 
-      if (Math.abs(dy) < TAP_MAX_DY) {
-        suppressChromeClickUntil.current = Date.now() + 450;
-        if (s === 'half') onSnapChange('full');
-        else onSnapChange('half');
+      if (dy > 0) {
+        const rubber = Math.min(PULL_DOWN_MAX_PX, dy * PULL_DOWN_RUBBER);
+        dragOffsetMv.set(rubber);
+      } else if (s === 'full' && dy < 0) {
+        const up = Math.max(-PULL_UP_MAX_PX, dy * PULL_UP_RUBBER);
+        dragOffsetMv.set(up);
+      } else if (s === 'half' && dy < 0) {
+        const up = Math.max(-PULL_UP_MAX_PX, dy * PULL_UP_RUBBER);
+        dragOffsetMv.set(up);
+      } else {
+        dragOffsetMv.set(0);
+      }
+      reportMetrics();
+    },
+    [dragOffsetMv, reportMetrics]
+  );
+
+  const endHandleDrag = useCallback(
+    (e) => {
+      if (dragKindRef.current !== 'handle') return;
+      if (e.pointerId !== activePointerIdRef.current) return;
+      dragKindRef.current = null;
+      activePointerIdRef.current = null;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* noop */
+      }
+
+      const dy = e.clientY - dragStartYRef.current;
+      if (Math.abs(dy) < TAP_MAX_PX) {
+        suppressChromeClickUntil.current = Date.now() + 400;
+        applyTapToggle();
+        settleDragOffset();
         return;
       }
-      applySnapFromDrag(dy);
-    },
-    [applySnapFromDrag, onSnapChange]
-  );
 
-  const pointerDownY = useRef(null);
-  const onPointerDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    pointerDownY.current = e.clientY;
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      /* noop */
-    }
-  }, []);
-
-  const onPointerUp = useCallback(
-    (e) => {
-      if (pointerDownY.current == null) return;
-      const y0 = pointerDownY.current;
-      pointerDownY.current = null;
-      const dy = e.clientY - y0;
-      const s = snapRef.current;
-      if (Math.abs(dy) < TAP_MAX_DY) {
-        suppressChromeClickUntil.current = Date.now() + 450;
-        if (s === 'half') onSnapChange('full');
-        else onSnapChange('half');
-        return;
+      if (dy > COMMIT_DRAG_PX) {
+        const s = snapRef.current;
+        if (s === 'full') {
+          if (pullOffsetRef.current > 110) onSnapChange('closed');
+          else onSnapChange('half');
+        } else if (s === 'half') {
+          onSnapChange('closed');
+        }
+      } else if (dy < -COMMIT_DRAG_PX && snapRef.current === 'half') {
+        onSnapChange('full');
+      } else {
+        resolveEndFromDragOffset();
       }
-      applySnapFromDrag(dy);
+      settleDragOffset();
     },
-    [applySnapFromDrag, onSnapChange]
+    [applyTapToggle, onSnapChange, resolveEndFromDragOffset, settleDragOffset]
   );
 
-  /** Pull-to-collapse no corpo quando scrollTop === 0 */
+  /** ----- Lista: quando scrollTop === 0, arrastar para baixo move a folha ----- */
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return undefined;
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return undefined;
 
-    const isChromeTarget = (target) => {
-      if (!(target instanceof Element)) return true;
-      return Boolean(
-        target.closest(
-          'button, a, input, textarea, select, [data-sheet-no-tap-expand], [data-sheet-pan-x]'
-        )
-      );
-    };
+    const touchPull = { active: false, startY: 0, startScrollTop: 0 };
 
-    const onTouchStartBody = (e) => {
+    const onTouchStart = (e) => {
       if (snapRef.current === 'closed') return;
-      if (isChromeTarget(e.target)) return;
-      pullRef.current = {
-        active: true,
-        startY: e.touches[0].clientY,
-        startScrollTop: el.scrollTop,
-        mode: null,
-      };
+      if (isInteractiveTarget(e.target)) return;
+      touchPull.active = true;
+      touchPull.startY = e.touches[0].clientY;
+      touchPull.startScrollTop = scrollEl.scrollTop;
     };
 
-    const onTouchMoveBody = (e) => {
-      const pr = pullRef.current;
-      if (!pr.active) return;
+    const onTouchMove = (e) => {
+      if (!touchPull.active) return;
       const y = e.touches[0].clientY;
-      const dy = y - pr.startY;
-      if (pr.startScrollTop > 0 || el.scrollTop > 0) {
-        if (dy < 0) pr.mode = 'scroll';
-        if (el.scrollTop > 0) {
-          pr.startScrollTop = el.scrollTop;
-          pr.startY = y;
-          setPullOffset(0);
+      const dy = y - touchPull.startY;
+      const st = scrollEl.scrollTop;
+
+      if (touchPull.startScrollTop > 0 || st > 0) {
+        if (st > 0) {
+          touchPull.startScrollTop = st;
+          touchPull.startY = y;
+          dragOffsetMv.set(0);
         }
         return;
       }
+
       if (dy <= 0) return;
+
       if (e.cancelable) e.preventDefault();
-      pr.mode = 'pull';
-      const rubber = Math.min(PULL_MAX, dy * PULL_RUBBER);
-      setPullOffset(rubber);
+      const rubber = Math.min(PULL_DOWN_MAX_PX, dy * PULL_DOWN_RUBBER);
+      dragOffsetMv.set(rubber);
+      reportMetrics();
     };
 
-    const onTouchEndBody = () => {
-      if (!pullRef.current.active) return;
-      pullRef.current.active = false;
-      if (pullRef.current.mode === 'pull' || pullOffsetRef.current > 8) {
-        endPull();
-      } else {
-        setPullOffset(0);
+    const onTouchEnd = () => {
+      if (!touchPull.active) return;
+      touchPull.active = false;
+      if (pullOffsetRef.current > 8) {
+        resolveEndFromDragOffset();
       }
+      settleDragOffset();
     };
 
-    el.addEventListener('touchstart', onTouchStartBody, { passive: true });
-    el.addEventListener('touchmove', onTouchMoveBody, { passive: false });
-    el.addEventListener('touchend', onTouchEndBody);
-    el.addEventListener('touchcancel', onTouchEndBody);
+    scrollEl.addEventListener('touchstart', onTouchStart, { passive: true });
+    scrollEl.addEventListener('touchmove', onTouchMove, { passive: false });
+    scrollEl.addEventListener('touchend', onTouchEnd);
+    scrollEl.addEventListener('touchcancel', onTouchEnd);
     return () => {
-      el.removeEventListener('touchstart', onTouchStartBody);
-      el.removeEventListener('touchmove', onTouchMoveBody);
-      el.removeEventListener('touchend', onTouchEndBody);
-      el.removeEventListener('touchcancel', onTouchEndBody);
+      scrollEl.removeEventListener('touchstart', onTouchStart);
+      scrollEl.removeEventListener('touchmove', onTouchMove);
+      scrollEl.removeEventListener('touchend', onTouchEnd);
+      scrollEl.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [endPull, snap]);
+  }, [dragOffsetMv, isInteractiveTarget, reportMetrics, resolveEndFromDragOffset, settleDragOffset, snap]);
 
-  const overlayOpacity = snap === 'full' ? (wazeUi ? 0.52 : 0.38) : wazeUi ? 0.22 : 0.16;
+  /** Overlay: escurece mais no full + um pouco durante arrasto para baixo */
+  const overlayBaseHalf = wazeUi ? 0.2 : 0.14;
+  const overlayBaseFull = wazeUi ? 0.52 : 0.48;
+  const overlayOpacityTarget =
+    snap === 'full' ? overlayBaseFull : snap === 'half' ? overlayBaseHalf : 0;
 
-  const sheetBg = wazeUi
-    ? 'rounded-t-[24px] border-t border-[#2a2d3a] bg-[#0f0f0f] shadow-[0_-12px_36px_rgba(0,0,0,0.45)]'
-    : 'rounded-t-[24px] border-t border-gray-200 bg-white shadow-[0_-12px_36px_rgba(0,0,0,0.14)]';
+  const sheetSurface =
+    'rounded-t-[24px] border-t border-white/[0.08] bg-[#0f0f0f] shadow-[0_-16px_48px_rgba(0,0,0,0.55)]';
 
   return (
     <>
@@ -278,10 +328,11 @@ export default function MapMobileBottomSheet({
             key="sheet-overlay"
             type="button"
             initial={{ opacity: 0 }}
-            animate={{ opacity: overlayOpacity }}
+            animate={{ opacity: overlayOpacityTarget }}
             exit={{ opacity: 0 }}
             transition={{ duration: reduceMotion ? 0.12 : 0.22 }}
-            className="fixed inset-0 z-[1003] border-0 bg-black p-0"
+            className="fixed inset-0 border-0 bg-black p-0"
+            style={{ zIndex: Z_OVERLAY }}
             aria-label={snap === 'full' ? 'Recolher painel' : 'Fechar painel'}
             onClick={() => {
               if (snap === 'full') onSnapChange('half');
@@ -292,56 +343,49 @@ export default function MapMobileBottomSheet({
       </AnimatePresence>
 
       <motion.div
-        className={`fixed inset-x-0 bottom-0 z-[1004] flex min-h-0 max-h-none flex-col overflow-hidden pb-[max(0px,env(safe-area-inset-bottom))] ${sheetBg}`}
+        className={`fixed inset-x-0 bottom-0 flex min-h-0 max-h-none flex-col overflow-hidden pb-[max(0px,env(safe-area-inset-bottom))] ${sheetSurface}`}
+        style={{
+          zIndex: Z_SHEET,
+          y: dragOffsetMv,
+        }}
         initial={false}
         animate={{
           height: targetHeightPx,
-          y: pullOffset,
         }}
         transition={{
           height: springTransition,
-          y: { duration: reduceMotion ? 0 : 0 },
         }}
       >
         <div
-          role="button"
-          tabIndex={0}
-          className="flex shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 px-4 pb-2 pt-3 touch-none select-none"
+          data-sheet-handle
+          role="presentation"
+          className="flex shrink-0 cursor-grab active:cursor-grabbing flex-col items-center justify-center gap-2 px-4 pb-2 pt-3.5 select-none touch-none"
           style={{ touchAction: 'none' }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onPointerDown={onPointerDown}
-          onPointerUp={onPointerUp}
-          onPointerCancel={() => {
-            pointerDownY.current = null;
-            dragY0.current = null;
-          }}
-          onClick={onChromeClick}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onChromeClick(e);
-            }
-          }}
-          aria-label={snap === 'half' ? 'Expandir painel' : 'Recolher painel'}
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={endHandleDrag}
+          onPointerCancel={endHandleDrag}
         >
-          <div
-            className={`h-1 w-12 rounded-full ${wazeUi ? 'bg-[#4b5563]' : 'bg-gray-300'}`}
-            aria-hidden
-          />
-          <span
-            className={`text-[11px] font-medium ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-500'}`}
-          >
+          <div className="h-1 w-11 shrink-0 rounded-full bg-[#5c5c5c]" aria-hidden />
+          <span className="text-center text-[10px] font-medium leading-tight text-[#737373]">
             {snap === 'half'
-              ? 'Toque ou arraste para cima · promoções'
-              : 'Arraste para baixo com a lista no topo ou use a alça'}
+              ? 'Arraste para cima para ver ofertas · para baixo para fechar'
+              : 'Com a lista no topo, arraste para baixo para recolher'}
           </span>
         </div>
 
         {stickyChrome ? (
           <div
-            className={`shrink-0 border-b ${wazeUi ? 'border-[#1e2130] bg-[#0f0f0f]' : 'border-gray-100 bg-white'}`}
+            data-sheet-sticky
+            className="shrink-0 border-b border-white/[0.06] bg-[#0f0f0f]"
+            onPointerDown={(e) => {
+              if (isInteractiveTarget(e.target)) return;
+              onHandlePointerDown(e);
+            }}
+            onPointerMove={onHandlePointerMove}
+            onPointerUp={endHandleDrag}
+            onPointerCancel={endHandleDrag}
+            onClick={onChromeTapOrToggle}
           >
             {stickyChrome}
           </div>
@@ -349,10 +393,12 @@ export default function MapMobileBottomSheet({
 
         <div
           ref={scrollRef}
-          className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain ${
-            wazeUi ? 'finmemory-waze-scroll' : ''
-          }`}
-          style={{ touchAction: 'pan-y' }}
+          data-sheet-scroll
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain"
+          style={{
+            touchAction: 'pan-y',
+            WebkitOverflowScrolling: 'touch',
+          }}
         >
           {children}
         </div>

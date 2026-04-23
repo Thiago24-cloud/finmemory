@@ -1318,12 +1318,21 @@ function StoreMarkerOfferPanelBody({
   disableInnerProductScroll = false,
   /** Permite que toques verticais subam para o sheet (pull quando scrollTop=0) */
   allowRootTouchPropagation = false,
+  /** Filtro local por nome de produto (ex.: busca no sticky do bottom sheet) */
+  offerNameFilter = '',
 }) {
   const pinColor = useMemo(
     () => getStorePinMainColor(store.type, store.id),
     [store.type, store.id]
   );
   const { preview, heroSources, accentHex, heroCategory } = useStoreOfferPreview(store);
+  const previewFiltered = useMemo(() => {
+    const q = String(offerNameFilter || '').trim().toLowerCase();
+    if (!q) return preview;
+    return preview.filter((o) =>
+      displayPromoProductName(o.product_name, store.name).toLowerCase().includes(q)
+    );
+  }, [preview, offerNameFilter, store.name]);
   const hasCardOffers = store.tem_oferta_hoje && preview.length > 0;
   const offerTotalForUi = Math.max(Number(store.offer_count) || 0, preview.length);
   const offerPreviewTruncated = offerTotalForUi > preview.length;
@@ -1439,7 +1448,12 @@ function StoreMarkerOfferPanelBody({
             onTouchStart={disableInnerProductScroll ? undefined : (e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
           >
-            {preview.map((o, i) => {
+            {previewFiltered.length === 0 && preview.length > 0 ? (
+              <p className="col-span-2 py-3 text-center text-[12px] text-gray-500">
+                Nenhuma oferta corresponde à busca.
+              </p>
+            ) : null}
+            {previewFiltered.map((o, i) => {
               const label = formatPrecoExibicao(o.price, o.category, o.id);
               const priceSlot =
                 label != null ? (
@@ -2292,41 +2306,56 @@ function MapShopMobileActionPills({ shopStore, userOrigin, wazeUi }) {
   );
 }
 
-/** Cabeçalho fixo do bottom sheet mobile (pills + tipo + nome + fechar) — evita duplicar lógica de cor do pin. */
-function MobilePreviewSheetStickyChrome({ store, userOrigin, wazeUi, onClose }) {
+/** Cabeçalho fixo do bottom sheet mobile (pills + tipo + nome + busca + fechar) — fundo #0f0f0f (Nubank-style). */
+function MobilePreviewSheetStickyChrome({
+  store,
+  userOrigin,
+  wazeUi,
+  onClose,
+  offerFilter = '',
+  onOfferFilterChange,
+}) {
   const pinColor = useMemo(() => getStorePinMainColor(store.type, store.id), [store.type, store.id]);
+  const typeChipWaze = wazeUi ? 'border-[#2ECC49]/50 text-[#a7f3d0]' : 'border-emerald-500/40 text-emerald-200';
+  const typeChipStyle = wazeUi
+    ? undefined
+    : { color: pinColor, borderColor: `${pinColor}80` };
   return (
     <div className="px-3 pt-1 pb-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <MapShopMobileActionPills shopStore={store} userOrigin={userOrigin} wazeUi={wazeUi} />
           <p
-            className={`mt-1.5 inline-block text-[11px] font-bold border-b-2 pb-0.5 ${
-              wazeUi ? 'border-[#2ECC49]/50 text-[#a7f3d0]' : ''
-            }`}
-            style={
-              wazeUi
-                ? undefined
-                : {
-                    color: readableAccentOnLightChip(pinColor),
-                    borderColor: `${pinColor}99`,
-                  }
-            }
+            className={`mt-1.5 inline-block text-[11px] font-bold border-b-2 pb-0.5 ${typeChipWaze}`}
+            style={wazeUi ? undefined : typeChipStyle}
           >
             {storeTypeLabel(store.type)}
           </p>
-          <h3 className={`mt-0.5 truncate text-sm font-bold ${wazeUi ? 'text-[#fafafa]' : 'text-gray-900'}`}>
-            {store.name}
-          </h3>
+          <h3 className="mt-0.5 truncate text-sm font-bold text-[#fafafa]">{store.name}</h3>
           {store.address ? (
-            <p className={`mt-0.5 truncate text-[11px] ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-600'}`}>{store.address}</p>
+            <p className="mt-0.5 truncate text-[11px] text-[#9ca3af]">{store.address}</p>
           ) : null}
+          <div className="mt-2" data-sheet-no-tap-expand>
+            <label className="sr-only" htmlFor="map-preview-offer-filter">
+              Filtrar ofertas por nome
+            </label>
+            <input
+              id="map-preview-offer-filter"
+              type="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              placeholder="Buscar nesta loja…"
+              value={offerFilter}
+              onChange={(e) => onOfferFilterChange?.(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="w-full rounded-xl border border-white/[0.1] bg-white/[0.06] px-3 py-2 text-[13px] text-[#fafafa] outline-none ring-0 placeholder:text-[#6b6b6b] focus:border-emerald-500/50 focus:bg-white/[0.09]"
+            />
+          </div>
         </div>
         <button
           type="button"
-          className={`shrink-0 rounded-full p-1.5 ${
-            wazeUi ? 'text-[#e5e5e5] hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'
-          }`}
+          className="shrink-0 rounded-full p-1.5 text-[#e5e5e5] hover:bg-white/10"
           aria-label="Fechar"
           data-sheet-no-tap-expand
           onClick={onClose}
@@ -2656,6 +2685,8 @@ export default function MapaPrecosLeaflet({
   /** Incrementa para disparar pan suave na janela útil (folha + padding). */
   const [mapUsefulPanTick, setMapUsefulPanTick] = useState(0);
   const [previewSheetSnap, setPreviewSheetSnap] = useState('half');
+  /** Filtro de ofertas no bottom sheet mobile (nome do produto). */
+  const [previewOfferFilter, setPreviewOfferFilter] = useState('');
   /** Desktop: largura da sidebar à esquerda (padding no Leaflet) — estilo Google Maps. */
   const [desktopSidebarHoverPulse, setDesktopSidebarHoverPulse] = useState(false);
 
@@ -2667,6 +2698,10 @@ export default function MapaPrecosLeaflet({
   useEffect(() => {
     if (mobileStorePreview) setPreviewSheetSnap('half');
   }, [mobileStorePreview]);
+
+  useEffect(() => {
+    setPreviewOfferFilter('');
+  }, [mobileStorePreview?.id]);
 
   const handleShopSheetSnapChange = useCallback((next) => {
     setShopSheetSnap(next);
@@ -3597,6 +3632,8 @@ export default function MapaPrecosLeaflet({
               userOrigin={userMapPosition}
               wazeUi={wazeUi}
               onClose={() => setMobileStorePreview(null)}
+              offerFilter={previewOfferFilter}
+              onOfferFilterChange={setPreviewOfferFilter}
             />
           }
         >
@@ -3611,7 +3648,8 @@ export default function MapaPrecosLeaflet({
                 hideDirections
                 peekOnly={previewSheetSnap === 'half'}
                 suppressBuiltInHeader
-                disableInnerProductScroll={previewSheetSnap === 'full'}
+                disableInnerProductScroll
+                offerNameFilter={previewOfferFilter}
                 allowRootTouchPropagation
                 rootClassName="finmemory-popup-store-offers w-full max-w-full overflow-hidden rounded-lg"
               />
