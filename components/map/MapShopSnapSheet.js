@@ -69,8 +69,6 @@ export default function MapShopSnapSheet({
   const dragPctLiveRef = useRef(pctForSnap(sheetSnap));
 
   const [isDragging, setIsDragging] = useState(false);
-  /** null = usar sheetSnap; número = translateY % durante arraste */
-  const [dragTranslatePct, setDragTranslatePct] = useState(null);
 
   const metricsRafRef = useRef(null);
   const onVisualMetricsRef = useRef(onVisualMetrics);
@@ -130,8 +128,9 @@ export default function MapShopSnapSheet({
       }
 
       setIsDragging(false);
-      setDragTranslatePct(null);
       draggingRef.current = false;
+      // Restaura transform via CSS para que a transição de snap seja controlada pelo estilo declarativo.
+      if (sheetRef.current) sheetRef.current.style.transform = '';
 
       if (nextSnap === 'closed') {
         dragPctLiveRef.current = SNAP.closed;
@@ -160,8 +159,18 @@ export default function MapShopSnapSheet({
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const t = e.target;
     if (t && typeof t.closest === 'function' && t.closest('[data-sheet-no-drag]')) {
-      gestureRef.current = null;
-      return;
+      // Nested scroll: quando a lista está no topo e o painel está expandido,
+      // um swipe para baixo deve fechar o painel em vez de "quicar" no overscroll.
+      const scrollEl = t.closest('[data-sheet-no-drag]');
+      const atTop = !scrollEl || scrollEl.scrollTop <= 0;
+      const isExpanded = sheetSnapRef.current === 'expanded';
+      if (!atTop || !isExpanded) {
+        // Lista com scroll > 0, ou painel não expandido: delega ao scroll nativo.
+        gestureRef.current = null;
+        return;
+      }
+      // scrollTop === 0 + expanded: deixa o gesto cair no handler abaixo
+      // para que swipe-down feche o painel (comportamento Google Maps).
     }
     const y = e.clientY;
     const anchor = pctForSnap(sheetSnapRef.current);
@@ -174,7 +183,6 @@ export default function MapShopSnapSheet({
     dragPctLiveRef.current = anchor;
     draggingRef.current = true;
     setIsDragging(true);
-    setDragTranslatePct(anchor);
     scheduleVisualMetrics();
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -190,7 +198,10 @@ export default function MapShopSnapSheet({
     const delta = ((e.clientY - g.startY) / vh) * 100;
     const next = Math.min(100, Math.max(4, g.anchorPct + delta));
     dragPctLiveRef.current = next;
-    setDragTranslatePct(next);
+    // Aplica direto ao DOM — zero re-render por frame durante o arraste.
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = `translateY(${next}%)`;
+    }
     scheduleVisualMetrics();
   };
 
@@ -224,13 +235,18 @@ export default function MapShopSnapSheet({
     draggingRef.current = false;
     setIsDragging(false);
     setDragTranslatePct(null);
+    draggingRef.current = false;
     dragPctLiveRef.current = pctForSnap(sheetSnapRef.current);
+    if (sheetRef.current) sheetRef.current.style.transform = '';
     requestAnimationFrame(() => reportVisualMetrics());
   };
 
-  const translatePct = dragTranslatePct != null ? dragTranslatePct : pctForSnap(sheetSnap);
+  const translatePct = pctForSnap(sheetSnap);
 
-  const showBackdrop = sheetSnap !== 'closed';
+  // expanded: backdrop escuro (bloqueia mapa intencionalmente, foco no painel).
+  // peek: botão transparente apenas para capturar clique-fora, sem bloquear pins.
+  const showDarkBackdrop = sheetSnap === 'expanded';
+  const showClearBackdrop = sheetSnap === 'peek';
 
   const handleBar = (
     <div
@@ -248,11 +264,19 @@ export default function MapShopSnapSheet({
 
   return (
     <>
-      {showBackdrop ? (
+      {showDarkBackdrop ? (
         <button
           type="button"
           aria-label="Fechar painel"
           className={`fixed inset-0 z-[998] border-0 p-0 ${wazeUi ? 'bg-black/70' : 'bg-black/50'}`}
+          onClick={onRequestClose}
+        />
+      ) : showClearBackdrop ? (
+        // Transparente: captura clique-fora sem escurecer o mapa nem bloquear os pins.
+        <button
+          type="button"
+          aria-label="Fechar painel"
+          className="fixed inset-0 z-[998] border-0 bg-transparent p-0"
           onClick={onRequestClose}
         />
       ) : null}
@@ -272,7 +296,9 @@ export default function MapShopSnapSheet({
           transform: `translateY(${translatePct}%)`,
           transition: isDragging ? 'none' : TRANSITION,
           willChange: 'transform',
-          touchAction: 'none',
+          // 'none' apenas durante drag ativo iniciado no handle/fora da zona scrollável.
+          // Fora do drag, 'pan-y' permite que a lista interna role normalmente (nested scroll).
+          touchAction: isDragging ? 'none' : 'pan-y',
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

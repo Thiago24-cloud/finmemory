@@ -1,4 +1,4 @@
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -20,6 +20,10 @@ export default function HomePage() {
   const router = useRouter();
   const { msg } = router.query;
   const isNotRegistered = msg === 'nao-cadastrado';
+  const isSemAcessoAdmin = msg === 'sem-acesso-admin';
+  /** Mensagens em que a home não deve mandar utilizador autenticado para o mapa (evita “sumir” o aviso). */
+  const skipMapaRedirect =
+    msg === 'nao-cadastrado' || msg === 'sem-acesso-admin';
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
   // Evita ficar preso em "Carregando..." se /api/auth/session demorar ou falhar (ex.: adapter DB)
@@ -32,13 +36,13 @@ export default function HomePage() {
     if (status !== 'loading') setLoadingTimedOut(false);
   }, [status]);
 
-  // Só redireciona para o mapa se estiver autenticado e NÃO veio de "acesso negado"
-  // (evita loop: mapa redireciona para /?msg=nao-cadastrado -> index redireciona para mapa -> repetir)
+  // Só redireciona para o mapa se estiver autenticado e NÃO veio de mensagem que deve ficar na home
+  // (evita loop: mapa -> /?msg=nao-cadastrado -> index -> mapa; e /admin -> sem-acesso-admin -> não empurrar para mapa)
   useEffect(() => {
-    if (status === 'authenticated' && router.query.msg !== 'nao-cadastrado') {
+    if (status === 'authenticated' && !skipMapaRedirect) {
       router.push('/mapa');
     }
-  }, [status, router, router.query.msg]);
+  }, [status, router, router.query.msg, skipMapaRedirect]);
 
   const showLoading = status === 'loading' && !loadingTimedOut;
 
@@ -122,6 +126,24 @@ export default function HomePage() {
           {isNotRegistered && (
             <div className="w-full mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm text-center">
               Acesso restrito. Use uma conta cadastrada ou entre em contato para solicitar acesso.
+            </div>
+          )}
+
+          {isSemAcessoAdmin && (
+            <div className="w-full mb-6 space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-left text-sm text-rose-900">
+              <p className="font-semibold">Painel /admin — acesso negado para esta conta.</p>
+              <p className="text-rose-800/90">
+                O e-mail com que está logado não está autorizado no painel operacional (ou falhou a verificação no
+                servidor). Saia e entre com a conta de administrador, ou peça para incluírem o seu e-mail em{' '}
+                <code className="rounded bg-white/80 px-1 py-0.5 text-xs">FINMEMORY_ADMIN_EMAILS</code> no Cloud Run.
+              </p>
+              <button
+                type="button"
+                className="w-full rounded-lg bg-[#1f2937] py-2.5 font-semibold text-white hover:bg-black/90"
+                onClick={() => signOut({ callbackUrl: '/login?callbackUrl=/admin' })}
+              >
+                Sair e abrir login para o /admin
+              </button>
             </div>
           )}
 

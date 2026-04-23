@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
 import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
 import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
@@ -187,6 +186,7 @@ export default async function handler(req, res) {
       )
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+      .in('source', ['bot_fila_aprovado', 'admin_manual'])
       .gte('created_at', cutoffIso)
       .gte('lat', latMin)
       .lte('lat', latMax)
@@ -194,23 +194,8 @@ export default async function handler(req, res) {
       .lte('lng', lngMax)
       .limit(2000);
 
-    const agentPromoQuery = supabase
-      .from('promocoes_supermercados')
-      .select(
-        'id, lat, lng, supermercado, nome_produto, expira_em, atualizado_em, categoria, preco, imagem_url, product_id'
-      )
-      .eq('ativo', true)
-      .gt('expira_em', new Date().toISOString())
-      .not('lat', 'is', null)
-      .not('lng', 'is', null)
-      .gte('lat', latMin)
-      .lte('lat', latMax)
-      .gte('lng', lngMin)
-      .lte('lng', lngMax)
-      .limit(2000);
-
-    const [{ data, error }, { data: promoPoints, error: promoErr }, { data: agentPromos, error: agentPromoErr }] =
-      await Promise.all([storesQuery, promoPointsQuery, agentPromoQuery]);
+    const [{ data, error }, { data: promoPoints, error: promoErr }] =
+      await Promise.all([storesQuery, promoPointsQuery]);
 
     if (error) {
       console.error('Erro ao buscar stores:', error);
@@ -220,10 +205,6 @@ export default async function handler(req, res) {
     if (promoErr) {
       console.warn('Aviso: erro ao buscar promo points para tem_oferta_hoje:', promoErr.message);
     }
-    if (agentPromoErr) {
-      console.warn('Aviso: promocoes_supermercados indisponível:', agentPromoErr.message);
-    }
-
     let pinSuppressions = [];
     try {
       pinSuppressions = await fetchActiveMapPinSuppressions(supabase);
@@ -242,26 +223,6 @@ export default async function handler(req, res) {
       .filter((s) => !isPharmacyStoreType(s.type))
       .filter((s) => !isExcludedFromPriceMapPoint({ store_name: s.name, lat: s.lat, lng: s.lng }))
       .filter((s) => !isStoreRowSuppressedByPinRules(s, pinSuppressions));
-
-    let promoAgentRows = [];
-    if (agentPromos?.length) {
-      promoAgentRows = agentPromos.filter((r) => !isLikelyNonProductScraperTitle(r.nome_produto)).map((r) => ({
-        id: `promo-${r.id}`,
-        lat: r.lat,
-        lng: r.lng,
-        category: formatAgentPromoMapCategory(r.categoria),
-        store_name: String(r.supermercado || ''),
-        agent_supermercado_slug: String(r.supermercado || '')
-          .toLowerCase()
-          .trim() || null,
-        product_name: r.nome_produto,
-        created_at: r.atualizado_em || r.expira_em || new Date().toISOString(),
-        price: r.preco,
-        product_id: r.product_id ?? null,
-        imagem_url: r.imagem_url || null,
-        image_url: null,
-      }));
-    }
 
     const storesBase = storesRows;
     const storeById = new Map(storesBase.map((s) => [s.id, s]));
@@ -371,7 +332,6 @@ export default async function handler(req, res) {
         if (sn && storeByExactName.has(sn)) return true;
         return isPromoCategory(p.category);
       }),
-      ...promoAgentRows.filter((p) => !isExcludedFromPriceMapPoint(p)),
       ...promoFromTableRows.filter((p) => !isExcludedFromPriceMapPoint(p)),
     ];
     for (const p of points) {
@@ -459,7 +419,6 @@ export default async function handler(req, res) {
         ...new Set([
           ...allPreview.map((r) => r.product_id).filter(Boolean),
           ...(promoPoints || []).map((p) => p.product_id).filter(Boolean),
-          ...(agentPromos || []).map((r) => r.product_id).filter(Boolean),
         ]),
       ];
       if (productIds.length > 0) {
@@ -477,9 +436,6 @@ export default async function handler(req, res) {
         }
       }
       const reusePairs = [];
-      for (const r of agentPromos || []) {
-        reusePairs.push({ product_name: r.nome_produto, url: r.imagem_url || null });
-      }
       for (const row of promoPoints || []) {
         let url = row.image_url || null;
         const pid = row.product_id;

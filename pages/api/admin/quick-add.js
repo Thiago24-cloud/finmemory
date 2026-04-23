@@ -240,6 +240,7 @@ export default async function handler(req, res) {
       lat,
       lng,
       category,
+      source: 'admin_manual',
     });
 
     send({

@@ -13,3 +13,15 @@ node_modules/
 .next/
 *.log
 .DS_Store
+
+# Artefatos pesados locais (não necessários para build Cloud Run)
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+ios/App/build/
+ios/DerivedData/
+
+# Outros caches locais
+.cursor/
+www/

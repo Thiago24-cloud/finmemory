@@ -94,11 +94,14 @@ function MapShopSheetDragLock({ locked }) {
 
 /**
  * Mobile: pan suave para centrar o pin na área útil do mapa (acima do padding inferior do sheet).
+ * Desktop: com sidebar à esquerda, centra na faixa visível à direita do padding esquerdo.
  */
-function MapUsefulAreaPan({ latLng, bottomPadPx, panTick }) {
+function MapUsefulAreaPan({ latLng, bottomPadPx, leftPadPx = 0, panTick }) {
   const map = useMap();
   const padRef = useRef(bottomPadPx);
   padRef.current = bottomPadPx;
+  const leftPadRef = useRef(leftPadPx);
+  leftPadRef.current = leftPadPx;
   const panLat = latLng?.[0];
   const panLng = latLng?.[1];
 
@@ -113,6 +116,7 @@ function MapUsefulAreaPan({ latLng, bottomPadPx, panTick }) {
       raf2 = requestAnimationFrame(() => {
         if (cancelled || !map) return;
         const pad = Math.max(0, Math.round(padRef.current || 0));
+        const leftPad = Math.max(0, Math.round(leftPadRef.current || 0));
         const ll = L.latLng(lat, lng);
         let pt;
         try {
@@ -121,7 +125,7 @@ function MapUsefulAreaPan({ latLng, bottomPadPx, panTick }) {
           return;
         }
         const size = map.getSize();
-        const vx = size.x / 2;
+        const vx = (size.x + leftPad) / 2;
         const vy = (size.y - pad) / 2;
         const dx = vx - pt.x;
         const dy = vy - pt.y;
@@ -394,6 +398,8 @@ function StoreMarkers({
   onMobileStorePinOpen,
   onVisibleStoresChange,
   mapPriceCountByStoreId = null,
+  /** Desktop sidebar: pin da loja aberta pulsa ao hover nas promoções na lista */
+  pulseStoreId = null,
 }) {
   const { map, zoom } = useMapAndZoom();
   const searchActive = searchQuery.trim().length >= 2;
@@ -486,6 +492,9 @@ function StoreMarkers({
           isMobileMapSheet={isMobileMapSheet}
           onMobileStorePinOpen={onMobileStorePinOpen}
           mapPriceBundleCount={Number(mapPriceCountByStoreId?.[String(store.id)]) || 0}
+          pulseHighlight={
+            pulseStoreId != null && String(pulseStoreId) === String(store.id)
+          }
         />
       ))}
     </>
@@ -505,6 +514,7 @@ function StoreMarkerItem({
   isMobileMapSheet = false,
   onMobileStorePinOpen,
   mapPriceBundleCount = 0,
+  pulseHighlight = false,
 }) {
   const logoUrl = useMemo(() => {
     const pinned = String(store.pin_logo_url || '').trim();
@@ -576,21 +586,33 @@ function StoreMarkerItem({
   const labelOpenAirStyle = useMemo(() => getMapPinOpenAirLabelStyle(pinColor), [pinColor]);
 
   const markerEventHandlers = useMemo(
-    () =>
-      isMobileMapSheet && typeof onMobileStorePinOpen === 'function'
-        ? {
-            click: (e) => {
-              L.DomEvent.stop(e);
-              onMobileStorePinOpen(store);
-            },
-          }
-        : undefined,
-    [isMobileMapSheet, onMobileStorePinOpen, store]
+    () => ({
+      click: (e) => {
+        L.DomEvent.stop(e);
+        if (isMobileMapSheet && typeof onMobileStorePinOpen === 'function') {
+          onMobileStorePinOpen(store);
+        } else if (!isMobileMapSheet && typeof onRequestStoreShop === 'function') {
+          onRequestStoreShop(store);
+        }
+      },
+    }),
+    [isMobileMapSheet, onMobileStorePinOpen, onRequestStoreShop, store]
   );
+
+  const markerRef = useRef(null);
+  useEffect(() => {
+    const inst = markerRef.current;
+    const el =
+      inst && typeof inst.getElement === 'function' ? inst.getElement() : null;
+    if (!el) return;
+    if (pulseHighlight) el.classList.add('finmemory-store-pin--hover-pulse');
+    else el.classList.remove('finmemory-store-pin--hover-pulse');
+  }, [pulseHighlight, icon]);
 
   return (
     /** Acima dos círculos de preço/promo (2500); senão milhares de ofertas DIA tapam os pins de loja. */
     <Marker
+      ref={markerRef}
       position={[Number(store.lat), Number(store.lng)]}
       icon={icon}
       zIndexOffset={3500}
@@ -625,17 +647,6 @@ function StoreMarkerItem({
           </span>
         </Tooltip>
       )}
-      {!isMobileMapSheet ? (
-        <Popup autoPan={false}>
-          <StoreMarkerOfferPanelBody
-            store={store}
-            userOrigin={userOrigin}
-            cartOfferIdSet={cartOfferIdSet}
-            onStoreOfferCartToggle={onStoreOfferCartToggle}
-            onRequestStoreShop={onRequestStoreShop}
-          />
-        </Popup>
-      ) : null}
     </Marker>
   );
 }
@@ -1301,6 +1312,12 @@ function StoreMarkerOfferPanelBody({
   peekOnly = false,
   rootClassName,
   trailingHeaderAction = null,
+  /** Cabeçalho (tipo, nome, endereço) renderizado fora do scroll no bottom sheet mobile */
+  suppressBuiltInHeader = false,
+  /** Grelha/lista de ofertas usa o scroll do sheet (evita conflito com pull-to-recolher) */
+  disableInnerProductScroll = false,
+  /** Permite que toques verticais subam para o sheet (pull quando scrollTop=0) */
+  allowRootTouchPropagation = false,
 }) {
   const pinColor = useMemo(
     () => getStorePinMainColor(store.type, store.id),
@@ -1314,34 +1331,40 @@ function StoreMarkerOfferPanelBody({
     ? 'finmemory-popup-store-offers min-w-0 w-[min(100vw-2rem,300px)] max-w-[300px] overflow-hidden rounded-lg'
     : 'finmemory-popup-store-offers min-w-[180px] overflow-hidden rounded-lg';
 
+  const rootTouchProps = allowRootTouchPropagation
+    ? {}
+    : { onTouchStart: (e) => e.stopPropagation() };
+
   return (
     <div
       className={rootClassName ?? defaultRoot}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
+      {...rootTouchProps}
     >
-      <div className="p-2 pb-1 relative">
-        {trailingHeaderAction ? (
-          <div className="absolute right-0 top-0 z-[1]">{trailingHeaderAction}</div>
-        ) : null}
-        <span
-          className="inline-block text-[11px] font-bold mb-1 border-b-2 pb-0.5"
-          style={{
-            color: readableAccentOnLightChip(pinColor),
-            borderColor: `${pinColor}99`,
-          }}
-        >
-          {storeTypeLabel(store.type)}
-        </span>
-        <h3
-          className={`font-bold text-gray-900 text-sm mt-1 ${trailingHeaderAction ? 'pr-10' : ''}`}
-        >
-          {store.name}
-        </h3>
-        {store.address && <p className="text-xs text-gray-600 mt-0.5">{store.address}</p>}
-        {store.neighborhood && <p className="text-xs text-gray-500">{store.neighborhood}</p>}
-      </div>
+      {!suppressBuiltInHeader ? (
+        <div className="p-2 pb-1 relative">
+          {trailingHeaderAction ? (
+            <div className="absolute right-0 top-0 z-[1]">{trailingHeaderAction}</div>
+          ) : null}
+          <span
+            className="inline-block text-[11px] font-bold mb-1 border-b-2 pb-0.5"
+            style={{
+              color: readableAccentOnLightChip(pinColor),
+              borderColor: `${pinColor}99`,
+            }}
+          >
+            {storeTypeLabel(store.type)}
+          </span>
+          <h3
+            className={`font-bold text-gray-900 text-sm mt-1 ${trailingHeaderAction ? 'pr-10' : ''}`}
+          >
+            {store.name}
+          </h3>
+          {store.address && <p className="text-xs text-gray-600 mt-0.5">{store.address}</p>}
+          {store.neighborhood && <p className="text-xs text-gray-500">{store.neighborhood}</p>}
+        </div>
+      ) : null}
 
       {peekOnly && hasCardOffers ? (
         <div className="px-2 pb-1 pt-0">
@@ -1405,11 +1428,15 @@ function StoreMarkerOfferPanelBody({
             ) : null}
           </div>
           <div
-            className="mt-1.5 grid grid-cols-2 gap-1.5 max-h-[min(300px,46vh)] overflow-y-auto pr-0.5 -mr-0.5"
+            className={
+              disableInnerProductScroll
+                ? 'mt-1.5 grid grid-cols-2 gap-1.5 pr-0.5 -mr-0.5'
+                : 'mt-1.5 grid grid-cols-2 gap-1.5 max-h-[min(300px,46vh)] overflow-y-auto pr-0.5 -mr-0.5'
+            }
             style={{ touchAction: 'pan-y', scrollbarGutter: 'stable' }}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
+            onTouchStart={disableInnerProductScroll ? undefined : (e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
           >
             {preview.map((o, i) => {
@@ -1469,11 +1496,15 @@ function StoreMarkerOfferPanelBody({
         <div className="px-2 pb-1">
           <p className="text-xs font-semibold text-amber-700">Ofertas ativas: {store.offer_count || 0}</p>
           <ul
-            className="mt-1 max-h-[220px] overflow-y-auto space-y-1 text-xs text-gray-700 pl-4 list-disc pr-1"
+            className={
+              disableInnerProductScroll
+                ? 'mt-1 space-y-1 text-xs text-gray-700 pl-4 list-disc pr-1'
+                : 'mt-1 max-h-[220px] overflow-y-auto space-y-1 text-xs text-gray-700 pl-4 list-disc pr-1'
+            }
             style={{ touchAction: 'pan-y', scrollbarGutter: 'stable' }}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
+            onTouchStart={disableInnerProductScroll ? undefined : (e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
           >
             {store.offer_products.map((prod, i) => (
@@ -2217,6 +2248,7 @@ function MapShopMobileActionPills({ shopStore, userOrigin, wazeUi }) {
     : `${basePill} border border-gray-200 bg-white text-gray-800`;
   return (
     <div
+      data-sheet-pan-x
       className="flex gap-2 overflow-x-auto px-4 pb-2 pt-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}
       onMouseDown={(e) => e.stopPropagation()}
@@ -2256,6 +2288,52 @@ function MapShopMobileActionPills({ shopStore, userOrigin, wazeUi }) {
       <Link href="/shopping-list" className={secondaryCls} onMouseDown={(e) => e.stopPropagation()}>
         Lista
       </Link>
+    </div>
+  );
+}
+
+/** Cabeçalho fixo do bottom sheet mobile (pills + tipo + nome + fechar) — evita duplicar lógica de cor do pin. */
+function MobilePreviewSheetStickyChrome({ store, userOrigin, wazeUi, onClose }) {
+  const pinColor = useMemo(() => getStorePinMainColor(store.type, store.id), [store.type, store.id]);
+  return (
+    <div className="px-3 pt-1 pb-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <MapShopMobileActionPills shopStore={store} userOrigin={userOrigin} wazeUi={wazeUi} />
+          <p
+            className={`mt-1.5 inline-block text-[11px] font-bold border-b-2 pb-0.5 ${
+              wazeUi ? 'border-[#2ECC49]/50 text-[#a7f3d0]' : ''
+            }`}
+            style={
+              wazeUi
+                ? undefined
+                : {
+                    color: readableAccentOnLightChip(pinColor),
+                    borderColor: `${pinColor}99`,
+                  }
+            }
+          >
+            {storeTypeLabel(store.type)}
+          </p>
+          <h3 className={`mt-0.5 truncate text-sm font-bold ${wazeUi ? 'text-[#fafafa]' : 'text-gray-900'}`}>
+            {store.name}
+          </h3>
+          {store.address ? (
+            <p className={`mt-0.5 truncate text-[11px] ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-600'}`}>{store.address}</p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className={`shrink-0 rounded-full p-1.5 ${
+            wazeUi ? 'text-[#e5e5e5] hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+          aria-label="Fechar"
+          data-sheet-no-tap-expand
+          onClick={onClose}
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -2566,7 +2644,7 @@ export default function MapaPrecosLeaflet({
   /** Ordenação das linhas `promotions` (encarte) no painel da loja. */
   const [encarteSortBy, setEncarteSortBy] = useState('validade');
 
-  /** Mobile sheet: max-width 767px — painel inferior estilo Google Maps (peek 35% / expandido 92%). */
+  /** Mobile sheet: max-width 767px — bottom sheet com detents half (~35%) / full (~95%). */
   const isMobileMapSheet = useMatchMedia('(max-width: 767px)', false);
   const mapPadTop = headerOffsetPx;
   const chromeTop = overlayTopPx != null && overlayTopPx !== undefined ? overlayTopPx : headerOffsetPx;
@@ -2577,9 +2655,9 @@ export default function MapaPrecosLeaflet({
   const [previewSheetMapBottomPadPx, setPreviewSheetMapBottomPadPx] = useState(0);
   /** Incrementa para disparar pan suave na janela útil (folha + padding). */
   const [mapUsefulPanTick, setMapUsefulPanTick] = useState(0);
-  const [previewSheetSnap, setPreviewSheetSnap] = useState('peek');
-  /** Desktop: reserva inferior quando o painel da loja está aberto (padding no Leaflet). */
-  const [desktopShopBottomPadPx, setDesktopShopBottomPadPx] = useState(0);
+  const [previewSheetSnap, setPreviewSheetSnap] = useState('half');
+  /** Desktop: largura da sidebar à esquerda (padding no Leaflet) — estilo Google Maps. */
+  const [desktopSidebarHoverPulse, setDesktopSidebarHoverPulse] = useState(false);
 
   useLayoutEffect(() => {
     if (shopOpen) setShopSheetSnap('peek');
@@ -2587,7 +2665,7 @@ export default function MapaPrecosLeaflet({
   }, [shopOpen]);
 
   useEffect(() => {
-    if (mobileStorePreview) setPreviewSheetSnap('peek');
+    if (mobileStorePreview) setPreviewSheetSnap('half');
   }, [mobileStorePreview]);
 
   const handleShopSheetSnapChange = useCallback((next) => {
@@ -2610,20 +2688,8 @@ export default function MapaPrecosLeaflet({
     if (!mobileStorePreview || !isMobileMapSheet) setPreviewSheetMapBottomPadPx(0);
   }, [mobileStorePreview, isMobileMapSheet]);
 
-  /** Desktop: painel fixo inferior (~42vh, cap 560px) — mesmo “respiro” do mapa que no mobile. */
   useEffect(() => {
-    if (!shopOpen || isMobileMapSheet) {
-      setDesktopShopBottomPadPx(0);
-      return undefined;
-    }
-    const ro = () => {
-      const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
-      if (vh <= 0) return;
-      setDesktopShopBottomPadPx(Math.min(560, Math.round(vh * 0.42)));
-    };
-    ro();
-    window.addEventListener('resize', ro);
-    return () => window.removeEventListener('resize', ro);
+    if (!shopOpen || isMobileMapSheet) setDesktopSidebarHoverPulse(false);
   }, [shopOpen, isMobileMapSheet]);
 
   /** Pan na janela útil só ao abrir a folha da loja (evita mover o mapa ao mexer na lista). */
@@ -2857,9 +2923,14 @@ export default function MapaPrecosLeaflet({
     return main;
   }, [shopStore]);
 
+  const desktopShopSidebarWidthPx = useMemo(() => {
+    if (shopOpen && !isMobileMapSheet) return 400;
+    return 0;
+  }, [shopOpen, isMobileMapSheet]);
+
   const mapOverlayBottomPadPx = useMemo(() => {
     if (shopOpen) {
-      return isMobileMapSheet ? mobileShopSheetMapBottomPadPx : desktopShopBottomPadPx;
+      return isMobileMapSheet ? mobileShopSheetMapBottomPadPx : 0;
     }
     if (mobileStorePreview && isMobileMapSheet) return previewSheetMapBottomPadPx;
     return 0;
@@ -2869,8 +2940,15 @@ export default function MapaPrecosLeaflet({
     mobileStorePreview,
     mobileShopSheetMapBottomPadPx,
     previewSheetMapBottomPadPx,
-    desktopShopBottomPadPx,
   ]);
+
+  const desktopSidebarPulseStoreId = useMemo(() => {
+    if (!shopOpen || isMobileMapSheet || !desktopSidebarHoverPulse || !shopStore?.id) return null;
+    return shopStore.id;
+  }, [shopOpen, isMobileMapSheet, desktopSidebarHoverPulse, shopStore?.id]);
+
+  const onDesktopPromoHoverEnter = useCallback(() => setDesktopSidebarHoverPulse(true), []);
+  const onDesktopPromoHoverLeave = useCallback(() => setDesktopSidebarHoverPulse(false), []);
 
   const mapUsefulPanLatLng = useMemo(() => {
     if (shopOpen && shopStore) {
@@ -3206,14 +3284,16 @@ export default function MapaPrecosLeaflet({
           onMobileStorePinOpen={handleMobileStorePinOpen}
           onVisibleStoresChange={setStoresVisibleOnMap}
           mapPriceCountByStoreId={mapPriceCountByStoreId}
+          pulseStoreId={desktopSidebarPulseStoreId}
         />
         <MapShopSheetDragLock
           locked={isMobileMapSheet && shopOpen && shopSheetSnap === 'expanded'}
         />
-        <MapBottomPaddingSync paddingPx={mapOverlayBottomPadPx} />
+        <MapBottomPaddingSync paddingPx={mapOverlayBottomPadPx} paddingLeftPx={desktopShopSidebarWidthPx} />
         <MapUsefulAreaPan
           latLng={mapUsefulPanLatLng}
           bottomPadPx={mapOverlayBottomPadPx}
+          leftPadPx={desktopShopSidebarWidthPx}
           panTick={mapUsefulPanTick}
         />
       </MapContainer>
@@ -3509,14 +3589,17 @@ export default function MapaPrecosLeaflet({
           onSnapChange={onPreviewSheetSnapChange}
           onVisualMetrics={handlePreviewSheetVisualMetrics}
           wazeUi={wazeUi}
-          peekDvh={35}
-          expandedDvh={92}
+          halfDvh={35}
+          fullDvh={95}
+          stickyChrome={
+            <MobilePreviewSheetStickyChrome
+              store={mobileStorePreview}
+              userOrigin={userMapPosition}
+              wazeUi={wazeUi}
+              onClose={() => setMobileStorePreview(null)}
+            />
+          }
         >
-          <MapShopMobileActionPills
-            shopStore={mobileStorePreview}
-            userOrigin={userMapPosition}
-            wazeUi={wazeUi}
-          />
           <div className={wazeUi ? 'p-3 pt-0' : 'px-2 pb-2 pt-0'}>
             <div className={wazeUi ? 'rounded-xl bg-white p-2 shadow-sm' : 'contents'}>
               <StoreMarkerOfferPanelBody
@@ -3526,19 +3609,11 @@ export default function MapaPrecosLeaflet({
                 onStoreOfferCartToggle={toggleCartFromMapPoint}
                 onRequestStoreShop={handleRequestStoreShop}
                 hideDirections
-                peekOnly={previewSheetSnap === 'peek'}
+                peekOnly={previewSheetSnap === 'half'}
+                suppressBuiltInHeader
+                disableInnerProductScroll={previewSheetSnap === 'full'}
+                allowRootTouchPropagation
                 rootClassName="finmemory-popup-store-offers w-full max-w-full overflow-hidden rounded-lg"
-                trailingHeaderAction={
-                  <button
-                    type="button"
-                    className="rounded-full p-1.5 text-gray-600 hover:bg-gray-100"
-                    aria-label="Fechar"
-                    data-sheet-no-tap-expand
-                    onClick={() => setMobileStorePreview(null)}
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                }
               />
             </div>
           </div>
@@ -3546,38 +3621,25 @@ export default function MapaPrecosLeaflet({
       )}
 
       {shopOpen && !isMobileMapSheet ? (
-        <>
-          <button
-            type="button"
-            className={`fixed inset-0 z-[1003] cursor-default border-0 p-0 ${wazeUi ? 'bg-black/70' : 'bg-black/50'}`}
-            aria-label="Fechar painel"
-            onClick={() => setShopOpen(false)}
-          />
-          <div
-            className={`fixed inset-x-0 bottom-0 z-[1004] flex max-h-none flex-col shadow-[0_-8px_40px_rgba(0,0,0,0.35)] ${
-              wazeUi
-                ? `max-h-[min(62vh,720px)] rounded-t-2xl border-t border-[#2a2d3a] bg-[#13161f] sm:max-h-[min(88vh,760px)] ${
-                    promoCart.length > 0 || selectedItems.length > 0
-                      ? 'sm:mr-[min(300px,calc(100vw-0.5rem))]'
-                      : ''
-                  }`
-                : `max-h-[min(88vh,640px)] rounded-t-3xl border-t border-gray-200 bg-white shadow-[0_-8px_32px_rgba(0,0,0,0.12)] ${
-                    promoCart.length > 0 || selectedItems.length > 0
-                      ? 'sm:mr-[min(300px,calc(100vw-0.5rem))]'
-                      : ''
-                  }`
-            }`}
-          >
+        <aside
+          className={`fixed left-0 z-[1004] flex w-[min(400px,92vw)] max-w-full flex-col overflow-hidden rounded-r-2xl border border-l-0 shadow-[4px_0_40px_rgba(0,0,0,0.28)] sm:rounded-r-3xl ${
+            wazeUi
+              ? 'border-[#2a2d3a] bg-[#13161f]'
+              : 'border-gray-200/90 bg-[#0f1117] text-[#e8e8e8] shadow-[4px_0_40px_rgba(0,0,0,0.45)]'
+          }`}
+          style={{ top: chromeTop, height: `calc(100dvh - ${chromeTop}px)` }}
+          aria-label="Detalhes do estabelecimento"
+        >
             <div
               className={`flex flex-shrink-0 items-center justify-between px-4 pb-2 pt-3 ${
-                wazeUi ? 'border-b border-[#1e2130]' : 'border-b border-gray-100'
+                wazeUi ? 'border-b border-[#1e2130]' : 'border-b border-white/10'
               }`}
             >
               <div className="min-w-0 pr-2">
-                <p className={`text-xs font-semibold ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}>
+                <p className={`text-xs font-semibold ${wazeUi ? 'text-[#888]' : 'text-[#a1a1aa]'}`}>
                   {wazeUi ? 'Waze dos Preços · compra em tempo real' : 'Compra em tempo real'}
                 </p>
-                <h2 className={`truncate text-lg font-bold ${wazeUi ? 'text-[#f0f0f0]' : 'text-gray-900'}`}>
+                <h2 className={`truncate text-lg font-bold ${wazeUi ? 'text-[#f0f0f0]' : 'text-[#fafafa]'}`}>
                   {shopStore?.name}
                 </h2>
                 {wazeUi && shopStore?.address ? (
@@ -3586,7 +3648,7 @@ export default function MapaPrecosLeaflet({
                   </p>
                 ) : null}
                 {latestOfferObservedLabel ? (
-                  <p className={`mt-0.5 text-[11px] ${wazeUi ? 'text-amber-300' : 'text-amber-700'}`}>
+                  <p className={`mt-0.5 text-[11px] ${wazeUi ? 'text-amber-300' : 'text-amber-400/80'}`}>
                     Última atualização no mapa: {latestOfferObservedLabel}
                   </p>
                 ) : null}
@@ -3594,7 +3656,7 @@ export default function MapaPrecosLeaflet({
               <button
                 type="button"
                 className={`shrink-0 rounded-full p-2 ${
-                  wazeUi ? 'text-[#888] hover:bg-[#1e2130]' : 'text-gray-600 hover:bg-gray-100'
+                  wazeUi ? 'text-[#888] hover:bg-[#1e2130]' : 'text-[#a1a1aa] hover:bg-white/10'
                 }`}
                 aria-label="Fechar"
                 onClick={() => setShopOpen(false)}
@@ -3605,17 +3667,17 @@ export default function MapaPrecosLeaflet({
 
             {shopStore && Number.isFinite(Number(shopStore.lat)) && Number.isFinite(Number(shopStore.lng)) ? (
               <div
-                className={`flex-shrink-0 px-4 pb-3 ${wazeUi ? 'border-b border-[#1e2130]' : 'border-b border-gray-100'}`}
+                className={`flex-shrink-0 px-4 pb-3 ${wazeUi ? 'border-b border-[#1e2130]' : 'border-b border-white/10'}`}
               >
                 <MapDirectionsRow
                   lat={shopStore.lat}
                   lng={shopStore.lng}
                   userOrigin={userMapPosition}
-                  variant={wazeUi ? 'dark' : 'light'}
+                  variant="dark"
                 />
                 <p
                   className={`mt-1.5 text-center text-[10px] leading-snug ${
-                    wazeUi ? 'text-[#888]' : 'text-gray-500'
+                    wazeUi ? 'text-[#888]' : 'text-[#888]'
                   }`}
                 >
                   Trajeto a partir da sua posição no Finmemory Maps (se usou Minha localização).
@@ -3629,7 +3691,7 @@ export default function MapaPrecosLeaflet({
                   className={`sticky top-0 z-[6] -mx-3 mb-1 border-b px-3 py-2 ${
                     wazeUi
                       ? 'border-[#1e2130] bg-[#13161f]/72 shadow-[0_6px_16px_rgba(0,0,0,0.18)] supports-[backdrop-filter]:bg-[#13161f]/48 backdrop-blur-xl backdrop-saturate-150'
-                      : 'border-gray-200/90 bg-white/72 shadow-[0_4px_14px_rgba(15,23,42,0.06)] supports-[backdrop-filter]:bg-white/48 backdrop-blur-xl backdrop-saturate-150'
+                      : 'border-white/10 bg-[#0f1117]/90 shadow-[0_6px_16px_rgba(0,0,0,0.35)] supports-[backdrop-filter]:bg-[#0f1117]/60 backdrop-blur-xl backdrop-saturate-150'
                   }`}
                 >
                   <div className="finmemory-waze-scroll flex flex-shrink-0 gap-1.5 overflow-x-auto px-0.5">
@@ -3645,7 +3707,7 @@ export default function MapaPrecosLeaflet({
                               : 'border-[#2ECC49] bg-[#2ECC49] text-white'
                             : wazeUi
                               ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#888] hover:border-[#2ecc71] hover:text-[#2ecc71]'
-                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                              : 'border-white/15 bg-[#1a1d24] text-[#ccc] hover:border-[#2ECC49]/50 hover:text-[#2ECC49]'
                         }`}
                       >
                         {c === 'Todos' ? 'Todos' : `${ENCARTE_CATEGORY_ICONS[c] ? `${ENCARTE_CATEGORY_ICONS[c]} ` : ''}${c}`}
@@ -3682,7 +3744,7 @@ export default function MapaPrecosLeaflet({
                 <p className={`py-4 text-sm ${wazeUi ? 'text-red-400' : 'text-red-600'}`}>{shopErr}</p>
               ) : null}
               {!shopLoading && !shopErr && shopOffers.length === 0 && shopPromotions.length === 0 ? (
-                <p className={`py-6 text-center text-sm ${wazeUi ? 'text-[#888]' : 'text-gray-600'}`}>
+                <p className={`py-6 text-center text-sm ${wazeUi ? 'text-[#888]' : 'text-[#a1a1aa]'}`}>
                   Nenhuma promoção encontrada para esta loja nesta região.
                 </p>
               ) : null}
@@ -3713,7 +3775,7 @@ export default function MapaPrecosLeaflet({
                               : 'border-[#2ECC49] bg-emerald-50 text-emerald-900'
                             : wazeUi
                               ? 'border-[#2a2d3a] bg-[#1a1d27] text-[#888] hover:border-[#2ecc71]'
-                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                              : 'border-white/15 bg-[#1a1d24] text-[#bbb] hover:border-[#2ECC49]/45'
                         }`}
                       >
                         {opt.label}
@@ -3722,21 +3784,30 @@ export default function MapaPrecosLeaflet({
                   </div>
                   <div className={`grid grid-cols-2 gap-2 pb-3 ${wazeUi ? 'gap-2.5 sm:grid-cols-3' : ''}`}>
                     {filteredShopPromotions.map((row) => (
-                      <PromotionEncarteCard
+                      <div
                         key={row.id}
-                        row={row}
-                        wazeUi={wazeUi}
-                        accentHex={shopAccent}
-                        selected={selectedItems.includes(String(row.id))}
-                        onToggle={() => toggleSelectedPromotionItem(row)}
-                      />
+                        onMouseEnter={onDesktopPromoHoverEnter}
+                        onMouseLeave={onDesktopPromoHoverLeave}
+                      >
+                        <PromotionEncarteCard
+                          row={row}
+                          wazeUi={wazeUi}
+                          accentHex={shopAccent}
+                          selected={selectedItems.includes(String(row.id))}
+                          onToggle={() => toggleSelectedPromotionItem(row)}
+                        />
+                      </div>
                     ))}
                   </div>
                 </>
               ) : null}
               {!shopLoading && filteredShopOffers.length > 0 ? (
                 <>
-                  <div className={`mb-2 overflow-hidden rounded-xl ${wazeUi ? 'border border-[#2a2d3a]' : ''}`}>
+                  <div
+                    className={`mb-2 overflow-hidden rounded-xl ${wazeUi ? 'border border-[#2a2d3a]' : 'border border-white/10'}`}
+                    onMouseEnter={onDesktopPromoHoverEnter}
+                    onMouseLeave={onDesktopPromoHoverLeave}
+                  >
                     <StoreBelongingBanner store={shopStore} />
                     <HeroOfferCarousel
                       sources={uniqueDisplayableImageUrls(
@@ -3756,16 +3827,21 @@ export default function MapaPrecosLeaflet({
                   {wazeUi ? (
                     <div className="grid grid-cols-2 gap-2.5 pb-4 sm:grid-cols-3">
                       {filteredShopOffers.map((offer) => (
-                        <WazeOfferCard
+                        <div
                           key={offer.id}
-                          offer={offer}
-                          selected={cartOfferIdSet.has(String(offer.id))}
-                          onToggle={() => toggleCartOffer(offer)}
-                          accentHex="#2ecc71"
-                          canConfirmPrice={Boolean(session?.user?.email)}
-                          confirmBusy={confirmOfferBusyId === String(offer.id)}
-                          onConfirmOffer={() => handleOfferConfirmed(offer)}
-                        />
+                          onMouseEnter={onDesktopPromoHoverEnter}
+                          onMouseLeave={onDesktopPromoHoverLeave}
+                        >
+                          <WazeOfferCard
+                            offer={offer}
+                            selected={cartOfferIdSet.has(String(offer.id))}
+                            onToggle={() => toggleCartOffer(offer)}
+                            accentHex="#2ecc71"
+                            canConfirmPrice={Boolean(session?.user?.email)}
+                            confirmBusy={confirmOfferBusyId === String(offer.id)}
+                            onConfirmOffer={() => handleOfferConfirmed(offer)}
+                          />
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -3798,19 +3874,24 @@ export default function MapaPrecosLeaflet({
                             <span className="text-[11px] text-gray-500">Preço no encarte</span>
                           );
                         return (
-                          <ProductOfferThumb
+                          <div
                             key={offer.id || i}
-                            point={pt}
-                            accentHex={shopAccent}
-                            priceSlot={priceSlot}
-                            compact
-                            selected={cartOfferIdSet.has(String(offer.id))}
-                            interactive
-                            onActivate={() => toggleCartOffer(offer)}
-                            canConfirmPrice={Boolean(session?.user?.email)}
-                            confirmBusy={confirmOfferBusyId === String(offer.id)}
-                            onConfirmOffer={() => handleOfferConfirmed(offer)}
-                          />
+                            onMouseEnter={onDesktopPromoHoverEnter}
+                            onMouseLeave={onDesktopPromoHoverLeave}
+                          >
+                            <ProductOfferThumb
+                              point={pt}
+                              accentHex={shopAccent}
+                              priceSlot={priceSlot}
+                              compact
+                              selected={cartOfferIdSet.has(String(offer.id))}
+                              interactive
+                              onActivate={() => toggleCartOffer(offer)}
+                              canConfirmPrice={Boolean(session?.user?.email)}
+                              confirmBusy={confirmOfferBusyId === String(offer.id)}
+                              onConfirmOffer={() => handleOfferConfirmed(offer)}
+                            />
+                          </div>
                         );
                       })}
                     </div>
@@ -3818,8 +3899,7 @@ export default function MapaPrecosLeaflet({
                 </>
               ) : null}
             </div>
-          </div>
-        </>
+        </aside>
       ) : null}
 
       {shopOpen && isMobileMapSheet ? (

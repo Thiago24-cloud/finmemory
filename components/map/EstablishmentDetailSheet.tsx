@@ -372,18 +372,18 @@ export default function EstablishmentDetailSheet({
 
   const promoCount = normalized.length;
 
-  const onPanStart = () => {
+  const onPanStart = useCallback(() => {
     draggingRef.current = true;
     dragBase.current = y.get();
-  };
+  }, [y]);
 
-  const onPan = (_: unknown, info: { offset: { y: number } }) => {
+  const onPan = useCallback((_: unknown, info: { offset: { y: number } }) => {
     const next = Math.min(collapsedY, Math.max(fullY, dragBase.current + info.offset.y));
     y.set(next);
     scheduleMetricsFromY();
-  };
+  }, [collapsedY, fullY, y, scheduleMetricsFromY]);
 
-  const onPanEnd = () => {
+  const onPanEnd = useCallback(() => {
     draggingRef.current = false;
     const cur = y.get();
     const snaps = [
@@ -403,7 +403,7 @@ export default function EstablishmentDetailSheet({
         reportMetrics(y.get(), false);
       },
     });
-  };
+  }, [fullY, midY, collapsedY, y, reportMetrics]);
 
   const handleConfirm = async (p: NormalizedProduct) => {
     if (!store?.id || !canConfirmPrice) {

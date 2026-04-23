@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
-import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
 import { hydratePointsFromImageCache } from '../../../lib/mapProductImageCache';
 import {
@@ -16,7 +15,6 @@ import {
 } from '../../../lib/mapOfferDisplay';
 import {
   inferChainSlugFromPromoStoreName,
-  inferChainSlugFromStoreDisplayName,
   isLikelyNonProductScraperTitle,
   normalizeMapChainText,
   promoStoreNamesLooselyAlign,
@@ -117,26 +115,6 @@ function formatTimeAgo(dateStr) {
   return d.toLocaleDateString('pt-BR');
 }
 
-function agentLabel(slug) {
-  const s = String(slug || '').toLowerCase();
-  const map = {
-    dia: 'Dia',
-    assai: 'Assaí',
-    carrefour: 'Carrefour',
-    paodeacucar: 'Pão de Açúcar',
-    hirota: 'Hirota',
-    lopes: 'Lopes',
-    sonda: 'Sonda',
-    saojorge: 'Sacolão São Jorge',
-    mambo: 'Mambo',
-    agape: 'Ágape',
-    armazemdocampo: 'Armazém do Campo',
-    pomardavilavilamadalena: 'Pomar da Vila',
-    padraosuper: 'Supermercado Padrão',
-  };
-  return map[s] || String(slug || 'Rede');
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -225,8 +203,6 @@ export default async function handler(req, res) {
     const latMax = sLat + delta;
     const lngMin = sLng - delta;
     const lngMax = sLng + delta;
-    /** Rede do pin (se reconhecida): filtra `promocoes_supermercados` por slug para não perder ofertas por `limit` global na bbox. */
-    const storeChainSlug = inferChainSlugFromStoreDisplayName(store.name);
     /** Raio oferta↔pin (km). 1.25 absorve pequeno desvio GPS / cadastro vs fan-out do agente. */
     const promoThresholdKm = Number(process.env.MAP_STORE_OFFERS_RADIUS_KM) || 1.25;
     /** Curadoria/agente podem usar coords de referência ~1–2 km do pin OSM/Google do `stores`. */
@@ -248,6 +224,7 @@ export default async function handler(req, res) {
       .select(baseSelect)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+      .in('source', ['bot_fila_aprovado', 'admin_manual'])
       .ilike('category', '%promo%')
       .gte('created_at', promoCutoffIso)
       .gte('lat', latMin)
@@ -262,6 +239,7 @@ export default async function handler(req, res) {
       .select('product_name, product_id, created_at')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+      .in('source', ['bot_fila_aprovado', 'admin_manual'])
       .gte('created_at', promoCutoffIso)
       .gte('lat', latMin)
       .lte('lat', latMax)
@@ -285,66 +263,7 @@ export default async function handler(req, res) {
 
     let merged = [...(promoRows || [])].map((r) => ({ ...r, source: 'price_points' }));
 
-    try {
-      let agentQ = supabase
-        .from('promocoes_supermercados')
-        .select(
-          'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url, product_id, categoria'
-        )
-        .eq('ativo', true)
-        .gt('expira_em', new Date().toISOString())
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .gte('lat', latMin)
-        .lte('lat', latMax)
-        .gte('lng', lngMin)
-        .lte('lng', lngMax)
-        .order('atualizado_em', { ascending: false });
-      if (storeChainSlug) {
-        agentQ = agentQ.eq('supermercado', storeChainSlug).limit(4000);
-      } else {
-        agentQ = agentQ.limit(1000);
-      }
-      const { data: promoFromAgent, error: agentErr } = await agentQ;
-
-      if (agentErr) {
-        console.warn('store-offers agent:', agentErr.message);
-      } else if (promoFromAgent?.length) {
-        const asPricePoints = promoFromAgent.map((r) => {
-          const raw = r.preco;
-          const priceNum = parsePriceToNumber(raw);
-          const slug = String(r.supermercado || '').toLowerCase().trim();
-          const storeName = slug === 'dia' ? 'Dia Supermercado' : `${agentLabel(r.supermercado)} · ofertas`;
-          const nome =
-            r.nome_produto != null && String(r.nome_produto).trim() !== ''
-              ? String(r.nome_produto).trim()
-              : 'Oferta';
-          const rowId =
-            r.id != null && r.id !== ''
-              ? `promo-${r.id}`
-              : `promo-noid-${normalizeMapChainText(String(r.nome_produto || ''))}-${String(r.lat)}-${String(r.lng)}`;
-          return {
-            // Prefixo explícito para nunca colidir com id de price_points no Map de dedupe
-            id: rowId,
-            product_name: nome,
-            price: priceNum,
-            store_name: storeName,
-            agent_supermercado_slug: slug || null,
-            lat: r.lat,
-            lng: r.lng,
-            category: formatAgentPromoMapCategory(r.categoria),
-            created_at: r.atualizado_em,
-            user_id: null,
-            product_id: r.product_id ?? null,
-            imagem_url: r.imagem_url || null,
-            source: 'agent_promotions',
-          };
-        });
-        merged = merged.concat(asPricePoints);
-      }
-    } catch (e) {
-      console.warn('store-offers promocoes_supermercados:', e.message);
-    }
+    // Bloqueio global: não incluir `promocoes_supermercados` em offers de loja.
 
     console.log('[store-offers] total merged:', merged.length);
     console.log('[store-offers] store:', store.name, store.lat, store.lng);

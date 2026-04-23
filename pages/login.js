@@ -21,6 +21,7 @@ export default function LoginPage() {
   const resetToken = typeof router.query?.resetToken === 'string' ? router.query.resetToken : '';
   const resetEmail = typeof router.query?.email === 'string' ? router.query.email : '';
   const verified = router.query?.verified === '1';
+  const resetOk = router.query?.resetOk === '1';
 
   const doLogin = async () => {
     setBusy(true);
@@ -114,8 +115,8 @@ export default function LoginPage() {
       setMsg(data.error || 'Falha ao redefinir senha.');
       return;
     }
-    setMsg('Senha redefinida. Faça login normalmente.');
-    router.replace('/login');
+    setPassword('');
+    await router.replace({ pathname: '/login', query: { resetOk: '1' } });
   };
 
   const onSubmit = async (e) => {
@@ -145,6 +146,7 @@ export default function LoginPage() {
         <form onSubmit={onSubmit} className="bg-white rounded-[20px] p-8 w-full max-w-md shadow-card-lovable">
           <h1 className="text-2xl font-bold text-[#333] text-center mb-4">FinMemory</h1>
           {verified ? <p className="text-sm text-green-700 mb-3">Email confirmado com sucesso. Agora é só entrar.</p> : null}
+          {resetOk ? <p className="text-sm text-green-700 mb-3">Senha redefinida. Faça login com a nova senha.</p> : null}
           {resetToken && resetEmail ? (
             <div className="mb-4 rounded-lg border border-gray-200 p-3 bg-gray-50">
               <p className="text-sm font-semibold mb-2">Redefinir senha</p>
@@ -256,7 +258,7 @@ export default function LoginPage() {
               )}
             </div>
           ) : null}
-          {msg ? <p className="text-sm text-red-600 mb-3">{msg}</p> : null}
+          {msg ? <p className="text-sm text-red-600 mb-3 whitespace-pre-wrap">{msg}</p> : null}
           <button
             type="submit"
             disabled={busy}

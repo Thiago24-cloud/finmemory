@@ -16,10 +16,24 @@ export default async function handler(req, res) {
   const email = normalizeEmail(req.body?.email);
   if (!email) return res.status(200).json({ ok: true });
 
+  const { data: authRow, error: lookupErr } = await supabase
+    .from('auth_local_users')
+    .select('email')
+    .eq('email', email)
+    .maybeSingle();
+  if (lookupErr) {
+    console.error('[auth][password_reset] lookup error:', lookupErr.message);
+    return res.status(200).json({ ok: true });
+  }
+  if (!authRow) {
+    console.info('[auth][password_reset] no_local_auth_row (resposta generica ao cliente)');
+    return res.status(200).json({ ok: true });
+  }
+
   const token = generateOpaqueToken();
   const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-  await supabase
+  const { error: updErr } = await supabase
     .from('auth_local_users')
     .update({
       password_reset_token_hash: token.hash,
@@ -28,6 +42,10 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     })
     .eq('email', email);
+  if (updErr) {
+    console.error('[auth][password_reset] update error:', updErr.message);
+    return res.status(200).json({ ok: true });
+  }
 
   const appUrl = process.env.NEXTAUTH_URL || process.env.APP_BASE_URL || 'https://finmemory.com.br';
   const resetUrl = `${appUrl}/login?resetToken=${token.raw}&email=${encodeURIComponent(email)}`;

@@ -213,6 +213,7 @@ export default async function handler(req, res) {
       lat,
       lng,
       category,
+      source: auth.via === 'session' ? 'community_manual' : 'admin_manual',
     });
 
     send('step', {

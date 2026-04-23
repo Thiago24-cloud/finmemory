@@ -59,10 +59,11 @@ export default function AdminHomePage() {
       ready: true,
     },
     {
-      href: '#',
-      title: 'Fila encarte / revisão',
-      desc: 'Em breve: encarte_queue, needs_review.',
-      ready: false,
+      href: '/admin/bot-fila',
+      title: 'Fila do Bot',
+      desc: 'Promoções enviadas pelo scraper aguardando aprovação antes de publicar no mapa.',
+      ready: true,
+      badge: 'Novo',
     },
   ];
 

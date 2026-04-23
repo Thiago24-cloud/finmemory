@@ -7,6 +7,13 @@ import { curatorCandidateImageSrc } from '../../lib/curatorImagePreviewHost';
 
 type CatalogRow = { product_id: string; name: string; gtin: string | null };
 type MapNameRow = { product_name: string; norm_key: string };
+type BotQueueMissingImageRow = {
+  bot_queue_item_id: string;
+  store_name: string;
+  product_name: string;
+  norm_key: string;
+  received_at: string | null;
+};
 
 type Candidate = { url: string };
 
@@ -35,6 +42,7 @@ function CuratorProductHeading({ fullName }: { fullName: string }) {
 export default function ProductImageCuratorPanel() {
   const [catalog, setCatalog] = useState<CatalogRow[]>([]);
   const [mapNames, setMapNames] = useState<MapNameRow[]>([]);
+  const [botQueueMissing, setBotQueueMissing] = useState<BotQueueMissingImageRow[]>([]);
   const [cseOk, setCseOk] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -53,6 +61,7 @@ export default function ProductImageCuratorPanel() {
       if (!r.ok) throw new Error(j.error || r.statusText);
       setCatalog(Array.isArray(j.catalog_missing) ? j.catalog_missing : []);
       setMapNames(Array.isArray(j.map_names_missing) ? j.map_names_missing : []);
+      setBotQueueMissing(Array.isArray(j.bot_queue_missing_images) ? j.bot_queue_missing_images : []);
       setCseOk(Boolean(j.google_cse_configured));
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Erro ao carregar');
@@ -109,7 +118,7 @@ export default function ProductImageCuratorPanel() {
   async function selectImage(
     key: string,
     imageUrl: string,
-    opts: { product_id?: string | null; product_name?: string | null }
+    opts: { product_id?: string | null; product_name?: string | null; bot_queue_item_id?: string | null }
   ) {
     setSavingKey(`${key}:${imageUrl.slice(0, 40)}`);
     setErr('');
@@ -123,6 +132,7 @@ export default function ProductImageCuratorPanel() {
           image_url: imageUrl,
           product_id: opts.product_id || undefined,
           product_name: opts.product_name || undefined,
+          bot_queue_item_id: opts.bot_queue_item_id || undefined,
         }),
       });
       const j = await r.json();
@@ -319,6 +329,89 @@ export default function ProductImageCuratorPanel() {
                               type="button"
                               disabled={Boolean(savingKey)}
                               onClick={() => selectImage(key, c.url, { product_name: row.product_name })}
+                              className="rounded bg-emerald-600 py-1 text-[11px] font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+                            >
+                              Selecionar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <h2 className="text-sm font-semibold text-emerald-300">Fila do bot — itens sem imagem</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Esta é a fila de imagem separada da fila de ingestão do bot. Ao selecionar uma imagem aqui, o item continua
+            no <code className="text-gray-600">/admin/bot-fila</code> para aprovação final.
+          </p>
+          {loading ? null : botQueueMissing.length === 0 ? (
+            <p className="mt-3 text-sm text-gray-500">Nenhum item pendente de imagem vindo da fila do bot.</p>
+          ) : (
+            <ul className="mt-3 space-y-4">
+              {botQueueMissing.map((row, idx) => {
+                const key = `b:${row.bot_queue_item_id}:${row.norm_key}:${idx}`;
+                const cand = candidatesByKey[key] || [];
+                const rowMeta = searchMetaByKey[key];
+                const busy = loadingKey === key;
+                return (
+                  <li key={key} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <CuratorProductHeading fullName={row.product_name} />
+                        <p className="mt-1 text-xs text-gray-500">
+                          loja <span className="text-gray-400">{row.store_name || '—'}</span> · fila{' '}
+                          <code className="text-gray-600">{row.bot_queue_item_id}</code>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!cseOk || busy}
+                        onClick={() => fetchCandidates(key, row.product_name, null)}
+                        className="shrink-0 rounded-lg border border-emerald-500/50 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-900/60 disabled:opacity-50"
+                      >
+                        {busy ? 'A buscar…' : 'Buscar 3 sugestões'}
+                      </button>
+                    </div>
+                    {rowMeta?.empty ? (
+                      <p className="mt-2 text-xs text-amber-100/90">
+                        {rowMeta.google_error?.message
+                          ? `Google: ${rowMeta.google_error.message}${
+                              rowMeta.google_error.httpStatus != null
+                                ? ` (HTTP ${rowMeta.google_error.httpStatus})`
+                                : ''
+                            }`
+                          : 'Nenhuma imagem HTTPS válida encontrada para este item da fila do bot.'}
+                      </p>
+                    ) : null}
+                    {cand.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-3">
+                        {cand.map((c) => (
+                          <div
+                            key={c.url}
+                            className="flex w-[140px] flex-col gap-2 rounded-lg border border-white/10 bg-black/30 p-2"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={curatorCandidateImageSrc(c.url)}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              className="h-24 w-full rounded object-contain bg-white/5"
+                            />
+                            <button
+                              type="button"
+                              disabled={Boolean(savingKey)}
+                              onClick={() =>
+                                selectImage(key, c.url, {
+                                  product_name: row.product_name,
+                                  bot_queue_item_id: row.bot_queue_item_id,
+                                })
+                              }
                               className="rounded bg-emerald-600 py-1 text-[11px] font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
                             >
                               Selecionar

@@ -5,7 +5,7 @@ import { geocodeAddress } from '../../../lib/geocode';
 import {
   INGEST_SOURCE_DIA_STORE_PAGE,
   buildDiaGptPromoRun,
-  writePricePointsPromoRun,
+  enqueuePromocoes,
 } from '../../../lib/ingest';
 
 const { buildDiaOffersExtractionPrompt } = require('../../../lib/diaOffersGptPrompt.js');
@@ -67,7 +67,6 @@ export default async function handler(req, res) {
   }
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const botUserId = process.env.DIA_BOT_USER_ID || '00000000-0000-0000-0000-000000000000';
   const categoryBase = 'Supermercado - Promoção';
   const runId = randomUUID();
 
@@ -132,35 +131,44 @@ export default async function handler(req, res) {
       return res.status(422).json({ error: built.error });
     }
 
-    const written = await writePricePointsPromoRun(supabase, built, {
-      botUserId,
-      replaceWindowHours: 24,
-    });
-    if (!written.ok) {
-      return res.status(500).json({ error: written.error });
-    }
-
-    if (written.inserted === 0) {
+    if (!built.pricePoints || built.pricePoints.length === 0) {
       return res.status(200).json({
         success: true,
-        ingestSource: INGEST_SOURCE_DIA_STORE_PAGE,
+        queued: false,
         runId,
         storeName: built.storeDisplayName,
-        inserted: 0,
         note: 'Nenhuma oferta válida extraída',
         offersExtracted: offers.length,
-        categoryBase,
       });
+    }
+
+    const produtos = built.pricePoints.map((p) => ({
+      nome: p.product_name || p.name || '',
+      preco: p.price ?? null,
+      imagem_url: p.image_url || null,
+    }));
+
+    const queued = await enqueuePromocoes(supabase, {
+      storeName: built.storeDisplayName,
+      storeAddress: built.storeAddress || null,
+      storeLat: lat,
+      storeLng: lng,
+      produtos,
+      origem: INGEST_SOURCE_DIA_STORE_PAGE,
+    });
+
+    if (!queued.ok) {
+      return res.status(500).json({ error: `Erro ao enfileirar: ${queued.error}` });
     }
 
     return res.status(200).json({
       success: true,
-      ingestSource: INGEST_SOURCE_DIA_STORE_PAGE,
+      queued: true,
       runId,
       storeName: built.storeDisplayName,
       offersExtracted: offers.length,
-      inserted: written.inserted,
-      categoryBase,
+      produtosEnfileirados: produtos.length,
+      note: 'Enviado para fila de aprovação em /admin/bot-fila',
     });
   } catch (e) {
     console.error('import-dia-offers error:', e);

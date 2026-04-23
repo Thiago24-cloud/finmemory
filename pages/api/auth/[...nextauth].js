@@ -1,6 +1,6 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { verifyPassword } from '../../../lib/passwordAuth';
+import { verifyPassword, isScryptPasswordHash } from '../../../lib/passwordAuth';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { verifyTotpCode } from '../../../lib/tokens';
 import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
@@ -67,6 +67,13 @@ export const authOptions = {
           .maybeSingle();
         if (authErr || !localAuth?.password_hash) return null;
 
+        if (!isScryptPasswordHash(localAuth.password_hash)) {
+          console.error(
+            '[auth][login] password_hash_format_invalid — esperado scrypt$N$r$p$salt$hash (use hashPassword() ou fluxo de reset).'
+          );
+          return null;
+        }
+
         const lockoutUntilTs = localAuth.lockout_until ? Date.parse(localAuth.lockout_until) : 0;
         if (lockoutUntilTs && lockoutUntilTs > Date.now()) return null;
 
@@ -114,7 +121,10 @@ export const authOptions = {
           .select('id,email,name,created_at')
           .eq('id', localAuth.user_id)
           .maybeSingle();
-        if (!userRow?.id) return null;
+        if (!userRow?.id) {
+          console.error('[auth][login] missing_users_row_for_user_id', { email, user_id: localAuth.user_id });
+          return null;
+        }
 
         return {
           id: userRow.id,

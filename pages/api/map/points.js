@@ -5,7 +5,6 @@ import { isExcludedFromPriceMapPoint } from '../../../lib/mapExcludedMapStores';
 import { geocodeAddress } from '../../../lib/geocode';
 import { bboxIsStateOrMacroRegion } from '../../../lib/saoPauloStateMap';
 import { getPublicProductImageUrl } from '../../../lib/productImageUrl';
-import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { enrichMapPointsImageUrls } from '../../../lib/enrichMapPointImages';
 import { hydratePointsFromImageCache } from '../../../lib/mapProductImageCache';
 import { applyPeerPromoImageReuse } from '../../../lib/reuseMapProductImages';
@@ -124,7 +123,8 @@ export default async function handler(req, res) {
         store_name: storeNameStr,
         lat: latNum,
         lng: lngNum,
-        category: category && String(category).trim() ? String(category).trim() : null
+        category: category && String(category).trim() ? String(category).trim() : null,
+        source: 'community_manual',
       });
       if (insertErr) {
         console.error('Erro ao inserir price_point:', insertErr);
@@ -205,6 +205,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
+          .in('source', ['bot_fila_aprovado', 'admin_manual'])
           .ilike('category', '%promo%')
           .gte('created_at', promoCutoffIso),
         bbox
@@ -221,6 +222,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
+          .in('source', ['bot_fila_aprovado', 'admin_manual'])
           .is('category', null)
           .gte('created_at', normalCutoffIso),
         bbox
@@ -235,6 +237,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
+          .in('source', ['bot_fila_aprovado', 'admin_manual'])
           .not('category', 'ilike', '%promo%')
           .gte('created_at', normalCutoffIso),
         bbox
@@ -289,85 +292,9 @@ export default async function handler(req, res) {
     });
     let data = merged.slice(0, outCap);
 
-    // Promoções do agente (tabloides / import) — mesma forma que price_points para o mapa
-    try {
-      let promoAgentQ = applyLatLngBbox(
-        supabase
-          .from('promocoes_supermercados')
-          .select(
-            'id, nome_produto, preco, supermercado, lat, lng, atualizado_em, expira_em, imagem_url, product_id, categoria'
-          )
-          .eq('ativo', true)
-          .gt('expira_em', new Date().toISOString())
-          .not('lat', 'is', null)
-          .not('lng', 'is', null),
-        bbox
-      )
-        .order('atualizado_em', { ascending: false })
-        .limit(bbox ? Math.min(stateScale ? 1400 : 200, rowLimit) : 300);
-      const { data: promoFromAgent, error: promoTableErr } = await promoAgentQ;
-
-      if (promoTableErr) {
-        console.warn('promocoes_supermercados (mapa):', promoTableErr.message);
-      } else if (promoFromAgent && promoFromAgent.length) {
-        const label = (s) =>
-          ({
-            dia: 'Dia',
-            assai: 'Assaí',
-            carrefour: 'Carrefour',
-            paodeacucar: 'Pão de Açúcar',
-            hirota: 'Hirota',
-            lopes: 'Lopes',
-            sonda: 'Sonda',
-            saojorge: 'Sacolão São Jorge',
-            mambo: 'Mambo',
-            agape: 'Ágape',
-            armazemdocampo: 'Armazém do Campo',
-            padraosuper: 'Supermercado Padrão',
-          }[String(s || '').toLowerCase()] || String(s || 'Rede'));
-        const asPricePoints = promoFromAgent
-          .filter((r) => !isLikelyNonProductScraperTitle(r.nome_produto))
-          .map((r) => {
-          const raw = r.preco;
-          const priceNum =
-            raw != null && raw !== '' && !Number.isNaN(Number(raw))
-              ? Number(raw)
-              : null;
-          const slug = String(r.supermercado || '').toLowerCase();
-          // DIA: mesmo nome que pins em public.stores → /api/map/stores marca tem_oferta_hoje por nome.
-          // Tabela promocoes_supermercados (schema agente): supermercado + nome_produto — sem coluna store_name.
-          const storeName =
-            slug === 'dia' ? 'Dia Supermercado' : `${label(r.supermercado)} · ofertas`;
-          return {
-            id: `promo-${r.id}`,
-            product_name: r.nome_produto,
-            price: priceNum,
-            store_name: storeName,
-            lat: r.lat,
-            lng: r.lng,
-            category: formatAgentPromoMapCategory(r.categoria),
-            created_at: r.atualizado_em,
-            user_id: null,
-            product_id: r.product_id ?? null,
-            imagem_url: r.imagem_url || null,
-          };
-        });
-        const byIdPromo = new Map(data.map((row) => [row.id, row]));
-        for (const row of asPricePoints) {
-          if (isExcludedFromPriceMapPoint(row)) continue;
-          if (!byIdPromo.has(row.id)) byIdPromo.set(row.id, row);
-        }
-        data = Array.from(byIdPromo.values()).sort((a, b) => {
-          const pa = isPromoRow(a) ? 1 : 0;
-          const pb = isPromoRow(b) ? 1 : 0;
-          if (pa !== pb) return pb - pa;
-          return new Date(b.created_at) - new Date(a.created_at);
-        });
-        data = data.slice(0, outCap);
-      }
-    } catch (e) {
-      console.warn('promocoes_supermercados merge:', e.message);
-    }
+    // Bloqueio global do pipeline bruto:
+    // `promocoes_supermercados` não entra no mapa. Fluxo obrigatório:
+    // bot -> bot_promocoes_fila (aprovado) -> price_points.source='bot_fila_aprovado'.
 
     /**
      * Fallback de imagem no mapa:
