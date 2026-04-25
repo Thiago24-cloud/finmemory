@@ -8,7 +8,6 @@ import { normalizeEmail } from '../../../lib/securityPolicy';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 
 // Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.
-// Para verificação do Google, mantenha alinhado com o domínio principal.
 const DEFAULT_NEXTAUTH_URL = 'https://finmemory.com.br';
 if (typeof process !== 'undefined') {
   const url = process.env.NEXTAUTH_URL || '';
@@ -17,24 +16,29 @@ if (typeof process !== 'undefined') {
   }
 }
 
+// Cookies seguros (secure:true) só funcionam em HTTPS.
+// Em localhost (http) devem ser false para o browser armazenar CSRF + sessão.
+const _isHttps = (process.env.NEXTAUTH_URL || '').startsWith('https://');
+
 export const authOptions = {
   // Necessário atrás de proxy (Firebase Hosting → Cloud Run): NextAuth confia no host do proxy
   trustHost: true,
   // Credentials Provider funciona de forma estável com estratégia JWT.
   adapter: undefined,
   // Cookies: sem domain para link do Cloud Run; nomes sem __Host- para evitar CSRF falhar atrás de proxy.
-  useSecureCookies: true,
+  // secure ativo só em HTTPS — em http://localhost o browser recusa cookies secure e o CSRF quebra.
+  useSecureCookies: _isHttps,
   cookies: {
     sessionToken: {
       name: 'next-auth.session-token',
-      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true }
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: _isHttps }
     },
-    callbackUrl: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true } },
+    callbackUrl: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: _isHttps } },
     csrfToken: {
       name: 'next-auth.csrf-token',
-      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true }
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: _isHttps }
     },
-    state: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: true, maxAge: 900 } }
+    state: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: _isHttps, maxAge: 900 } }
   },
   providers: [
     CredentialsProvider({
@@ -47,25 +51,56 @@ export const authOptions = {
       async authorize(credentials, req) {
         const ip = getRequestIp(req);
         const ipRate = checkRateLimit({ bucket: 'login-ip', key: ip, limit: 20, windowMs: 15 * 60 * 1000 });
-        if (!ipRate.allowed) return null;
+        if (!ipRate.allowed) {
+          console.warn('[auth][login] reject', { code: 'rate_limit_ip', ip });
+          return null;
+        }
 
         const email = normalizeEmail(credentials?.email);
         const password = String(credentials?.password || '');
         const otp = String(credentials?.otp || '').trim();
-        if (!email || !password) return null;
+        if (!email || !password) {
+          console.warn('[auth][login] reject', { code: 'missing_email_or_password', ip });
+          return null;
+        }
 
         const emailRate = checkRateLimit({ bucket: 'login-email', key: email, limit: 12, windowMs: 15 * 60 * 1000 });
-        if (!emailRate.allowed) return null;
+        if (!emailRate.allowed) {
+          console.warn('[auth][login] reject', { code: 'rate_limit_email', email, ip });
+          return null;
+        }
 
         const supabase = getSupabaseAdmin();
-        if (!supabase) return null;
+        if (!supabase) {
+          console.warn('[auth][login] reject', { code: 'supabase_admin_missing', ip });
+          return null;
+        }
 
         const { data: localAuth, error: authErr } = await supabase
           .from('auth_local_users')
           .select('user_id,email,password_hash,email_verified_at,failed_login_attempts,lockout_until,totp_secret,totp_enabled_at')
           .eq('email', email)
           .maybeSingle();
-        if (authErr || !localAuth?.password_hash) return null;
+        if (authErr) {
+          console.warn('[auth][login] reject', {
+            code: 'auth_local_users_query_error',
+            email,
+            ip,
+            message: authErr.message,
+            details: authErr.details,
+            hint: authErr.hint,
+            code_db: authErr.code,
+          });
+          return null;
+        }
+        if (!localAuth) {
+          console.warn('[auth][login] reject', { code: 'no_auth_local_user_row', email, ip });
+          return null;
+        }
+        if (!localAuth.password_hash) {
+          console.warn('[auth][login] reject', { code: 'no_password_hash', email, ip });
+          return null;
+        }
 
         if (!isScryptPasswordHash(localAuth.password_hash)) {
           console.error(
@@ -75,7 +110,10 @@ export const authOptions = {
         }
 
         const lockoutUntilTs = localAuth.lockout_until ? Date.parse(localAuth.lockout_until) : 0;
-        if (lockoutUntilTs && lockoutUntilTs > Date.now()) return null;
+        if (lockoutUntilTs && lockoutUntilTs > Date.now()) {
+          console.warn('[auth][login] reject', { code: 'account_locked', email, ip, lockout_until: localAuth.lockout_until });
+          return null;
+        }
 
         if (!verifyPassword(password, localAuth.password_hash)) {
           const attempts = Number(localAuth.failed_login_attempts || 0) + 1;
@@ -156,14 +194,30 @@ export const authOptions = {
       const supabase = getSupabaseAdmin();
       if (email && supabase) {
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('users')
-            .select('id, created_at')
+            .select('id, created_at, plano, plano_ativo')
             .eq('email', email)
             .maybeSingle();
           if (data?.id) {
             token.supabaseId = data.id;
             token.created_at = data.created_at;
+            token.plano = data.plano || 'free';
+            token.plano_ativo = Boolean(data.plano_ativo);
+          } else if (error) {
+            // plano/plano_ativo columns may not exist yet — fallback to basic query
+            console.warn('jwt callback: extended query failed, trying fallback:', error?.message);
+            const { data: basic } = await supabase
+              .from('users')
+              .select('id, created_at')
+              .eq('email', email)
+              .maybeSingle();
+            if (basic?.id) {
+              token.supabaseId = basic.id;
+              token.created_at = basic.created_at;
+              token.plano = 'free';
+              token.plano_ativo = false;
+            }
           }
         } catch (e) {
           console.error('jwt callback users lookup:', e?.message || e);
@@ -193,19 +247,36 @@ export const authOptions = {
         if (token.supabaseId) session.user.supabaseId = token.supabaseId;
         if (token.created_at) session.user.created_at = token.created_at;
         if (token.sub && !session.user.id) session.user.id = token.sub;
+        session.user.plano = token.plano || 'free';
+        session.user.plano_ativo = Boolean(token.plano_ativo);
       }
       if (session?.user?.email && !session.user.supabaseId) {
         try {
           const supabase = getSupabaseAdmin();
           if (supabase) {
-            const { data } = await supabase
+            const { data, error } = await supabase
               .from('users')
-              .select('id, created_at')
+              .select('id, created_at, plano, plano_ativo')
               .eq('email', session.user.email)
               .maybeSingle();
             if (data) {
               session.user.supabaseId = data.id;
               session.user.created_at = data.created_at;
+              session.user.plano = data.plano || 'free';
+              session.user.plano_ativo = Boolean(data.plano_ativo);
+            } else if (error) {
+              console.warn('session callback: extended query failed, trying fallback:', error?.message);
+              const { data: basic } = await supabase
+                .from('users')
+                .select('id, created_at')
+                .eq('email', session.user.email)
+                .maybeSingle();
+              if (basic) {
+                session.user.supabaseId = basic.id;
+                session.user.created_at = basic.created_at;
+                session.user.plano = 'free';
+                session.user.plano_ativo = false;
+              }
             }
           }
         } catch (error) {

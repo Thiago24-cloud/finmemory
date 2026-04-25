@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, BarChart3, Loader2 } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
+import PlanGuard from '../components/PlanGuard';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
@@ -141,6 +142,13 @@ export default function ReportsPage() {
           </div>
         </div>
 
+        <PlanGuard
+          feature="relatorios"
+          title="Relatórios Avançados — Plano Pro"
+          body="Visualize gráficos, categorias e tendências dos seus gastos. Disponível no plano Pro."
+          className="min-h-[300px]"
+        >
+
         {availableMonths.length > 0 && (
           <div className="mb-4">
             <label htmlFor="reports-month-filter" className="block text-sm font-medium text-foreground mb-2">
@@ -194,6 +202,8 @@ export default function ReportsPage() {
             </div>
           )}
         </div>
+
+        </PlanGuard>
       </div>
     </div>
   );

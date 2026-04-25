@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
 import { Loader2, Mail, X, Trash2, RotateCcw, Search, Calculator } from 'lucide-react';
@@ -106,7 +107,9 @@ function DashboardCalculadoraLayout({ children }) {
 }
 
 export default function Dashboard() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
+  const router = useRouter();
+  const [stripeSuccessBanner, setStripeSuccessBanner] = useState(false);
   const [openFinanceAccountId, setOpenFinanceAccountId] = useState(null);
   const openFinance = useOpenFinanceSummary({
     enabled: status === 'authenticated',
@@ -129,6 +132,16 @@ export default function Dashboard() {
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
+
+  // Após retorno do Stripe Checkout: atualiza sessão para refletir novo plano sem re-login
+  useEffect(() => {
+    if (router.query.stripe !== 'success') return;
+    setStripeSuccessBanner(true);
+    update(); // re-executa JWT callback → lê plano atualizado do DB
+    const url = new URL(window.location.href);
+    url.searchParams.delete('stripe');
+    window.history.replaceState({}, '', url.toString());
+  }, [router.query.stripe, update]);
 
   // Debug: Log quando transactions mudar
   useEffect(() => {
@@ -859,6 +872,19 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
+            {stripeSuccessBanner && (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <span>Assinatura ativada! Seu plano foi atualizado.</span>
+                <button
+                  type="button"
+                  onClick={() => setStripeSuccessBanner(false)}
+                  className="shrink-0 rounded p-0.5 hover:bg-emerald-100"
+                  aria-label="Fechar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
             {transactionCount >= 0 && (
               <div className="flex items-center justify-between mb-3">

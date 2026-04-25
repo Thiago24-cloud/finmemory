@@ -3,9 +3,10 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone, Instagram } from 'lucide-react';
+import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone, Instagram, Trash2 } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 import ProximityAlertsSettings from '../components/ProximityAlertsSettings';
+import PlanGuard from '../components/PlanGuard';
 import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
 
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
@@ -23,6 +24,9 @@ export default function SettingsPage() {
   const [totpCode, setTotpCode] = useState('');
   const [totpMsg, setTotpMsg] = useState('');
   const [xpStats, setXpStats] = useState(null);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
+  const [deleteAccountErr, setDeleteAccountErr] = useState('');
 
   useEffect(() => {
     if (status !== 'authenticated') return undefined;
@@ -114,6 +118,26 @@ export default function SettingsPage() {
     setTotpMsg('Falha ao desativar 2FA.');
   };
 
+  const handleConfirmDeleteAccount = async () => {
+    setDeleteAccountErr('');
+    setDeleteAccountBusy(true);
+    try {
+      const r = await fetch('/api/account/delete', { method: 'DELETE', credentials: 'same-origin' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setDeleteAccountErr(data.error || 'Não foi possível excluir a conta.');
+        return;
+      }
+      setShowDeleteAccountModal(false);
+      if (typeof window !== 'undefined') localStorage.removeItem('user_id');
+      await signOut({ callbackUrl: '/', redirect: true });
+    } catch (e) {
+      setDeleteAccountErr(e?.message || 'Erro de rede.');
+    } finally {
+      setDeleteAccountBusy(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <div className="max-w-md mx-auto px-5 py-6 pb-24">
@@ -132,7 +156,14 @@ export default function SettingsPage() {
         </div>
 
         {status === 'authenticated' && userId ? (
-          <ProximityAlertsSettings userId={userId} />
+          <PlanGuard
+            feature="radar"
+            title="Radar de Ofertas — Plano Plus"
+            body="Receba alertas quando estiver perto de lojas com promoções da sua lista. Disponível no plano Plus."
+            className="mb-4"
+          >
+            <ProximityAlertsSettings userId={userId} />
+          </PlanGuard>
         ) : null}
 
         {status === 'authenticated' && xpStats ? (
@@ -223,6 +254,26 @@ export default function SettingsPage() {
           </div>
         ) : null}
 
+        {status === 'authenticated' && session?.user ? (
+          <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="text-base font-semibold text-gray-900">Conta</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Excluir a conta remove os seus dados do FinMemory, conforme a Política de Privacidade.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteAccountErr('');
+                setShowDeleteAccountModal(true);
+              }}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+            >
+              <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+              Excluir conta
+            </button>
+          </div>
+        ) : null}
+
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <Link href="/privacidade" className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-200 text-gray-900">
             <Shield className="h-5 w-5 text-gray-500" />
@@ -289,21 +340,78 @@ export default function SettingsPage() {
           </div>
           <div className="p-4">
             {status === 'authenticated' ? (
-              <ConnectBank
-                onSuccess={() => {
-                  router.push('/dashboard');
-                }}
-                onError={(e) => {
-                  const msg = e?.message || 'Falha ao conectar banco.';
-                  if (typeof window !== 'undefined') alert(msg);
-                }}
-              />
+              <PlanGuard
+                feature="open_finance"
+                title="Open Finance — Plano Pro"
+                body="Conecte seus bancos e importe movimentações automaticamente. Disponível no plano Pro."
+              >
+                <ConnectBank
+                  onSuccess={() => {
+                    router.push('/dashboard');
+                  }}
+                  onError={(e) => {
+                    const msg = e?.message || 'Falha ao conectar banco.';
+                    if (typeof window !== 'undefined') alert(msg);
+                  }}
+                />
+              </PlanGuard>
             ) : (
               <p className="text-sm text-gray-500">Faça login para conectar seu banco.</p>
             )}
           </div>
         </div>
       </div>
+
+      {showDeleteAccountModal ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deleteAccountBusy) {
+              setShowDeleteAccountModal(false);
+              setDeleteAccountErr('');
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-xl">
+            <h2 id="delete-account-title" className="text-lg font-semibold text-gray-900">
+              Excluir conta
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-gray-600">
+              Tem certeza? Esta ação é irreversível. Todos os seus dados serão excluídos em até 30 dias.
+            </p>
+            {deleteAccountErr ? (
+              <p className="mt-3 text-sm text-red-600" role="alert">
+                {deleteAccountErr}
+              </p>
+            ) : null}
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
+              <button
+                type="button"
+                disabled={deleteAccountBusy}
+                onClick={handleConfirmDeleteAccount}
+                className="w-full rounded-xl bg-red-600 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 sm:w-auto sm:min-w-[11rem]"
+              >
+                {deleteAccountBusy ? 'A excluir…' : 'Excluir permanentemente'}
+              </button>
+              <button
+                type="button"
+                disabled={deleteAccountBusy}
+                onClick={() => {
+                  setShowDeleteAccountModal(false);
+                  setDeleteAccountErr('');
+                }}
+                className="w-full rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50 disabled:opacity-60 sm:w-auto sm:min-w-[7rem]"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <BottomNav />
     </div>
   );

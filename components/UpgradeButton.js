@@ -37,9 +37,27 @@ export default function UpgradeButton({
         body: JSON.stringify({ plan }),
       });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
+      if (!r.ok) {
+        if (r.status === 401) {
+          if (typeof window !== 'undefined') {
+            const cb = encodeURIComponent('/planos');
+            window.location.href = `/login?callbackUrl=${cb}`;
+            return;
+          }
+        }
+        throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
+      }
       if (data.url) {
-        window.location.href = data.url;
+        // Alguns browsers/webviews são sensíveis ao fluxo assíncrono;
+        // forçamos navegação no mesmo separador com fallback.
+        window.location.assign(data.url);
+        setTimeout(() => {
+          try {
+            window.open(data.url, '_self');
+          } catch (_) {
+            // noop
+          }
+        }, 150);
         return;
       }
       const stripe = await getStripe();
@@ -47,6 +65,8 @@ export default function UpgradeButton({
       const { error } = await stripe.redirectToCheckout({ sessionId: data.sessionId });
       if (error) throw error;
     } catch (e) {
+      // Deixa rastro para inspeção no browser em casos de "clique sem ação".
+      console.error('[stripe/upgrade-button]', e);
       setErr(e?.message || 'Erro');
     } finally {
       setLoading(false);

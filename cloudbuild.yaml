@@ -11,6 +11,8 @@ steps:
       - 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${_MAPBOX_ACCESS_TOKEN}'
       - '--build-arg'
       - 'NEXT_PUBLIC_BUILD_ID=${_COMMIT_SHA}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}'
       - '-t'
       - 'gcr.io/$PROJECT_ID/finmemory:$_COMMIT_SHA'
       - '-t'
@@ -59,3 +61,4 @@ substitutions:
   _NEXT_PUBLIC_SUPABASE_URL: ''
   _NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
   _MAPBOX_ACCESS_TOKEN: ''
+  _NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ''

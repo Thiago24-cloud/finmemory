@@ -6,6 +6,7 @@ import { checkoutPlanOrDefault, stripePriceIdsFromEnv } from '../../lib/stripePl
 
 function baseUrl() {
   return (
+    process.env.STRIPE_APP_BASE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.APP_BASE_URL ||
     process.env.NEXTAUTH_URL ||
