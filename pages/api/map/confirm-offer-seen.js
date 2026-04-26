@@ -14,6 +14,15 @@ function getSupabase() {
   return supabaseInstance;
 }
 
+function fallbackExpiryDateForBotFila() {
+  const promoTtlHours = Math.max(
+    24,
+    Number.parseInt(process.env.MAP_PROMO_TTL_HOURS || '168', 10) || 168
+  );
+  const dt = new Date(Date.now() + promoTtlHours * 60 * 60 * 1000);
+  return dt.toISOString().slice(0, 10);
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -140,7 +149,22 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, observed_at: nowIso, ...gamification });
       }
 
-      const { error } = await supabase.from('price_points').update({ atualizado_em: nowIso }).eq('id', idStr);
+      // Algumas linhas antigas (source=bot_fila_aprovado) podem ter expires_at nulo
+      // e quebram no UPDATE por causa da constraint de validade obrigatória.
+      const { data: pointRow, error: pointErr } = await supabase
+        .from('price_points')
+        .select('id, source, expires_at')
+        .eq('id', idStr)
+        .maybeSingle();
+      if (pointErr) return res.status(400).json({ error: pointErr.message });
+      if (!pointRow?.id) return res.status(404).json({ error: 'Oferta não encontrada' });
+
+      const updatePayload = { atualizado_em: nowIso };
+      if (pointRow.source === 'bot_fila_aprovado' && !pointRow.expires_at) {
+        updatePayload.expires_at = fallbackExpiryDateForBotFila();
+      }
+
+      const { error } = await supabase.from('price_points').update(updatePayload).eq('id', idStr);
       if (error) return res.status(400).json({ error: error.message });
       if (appUserId) {
         gamification = await tryAwardGamification(supabase, appUserId, storeId, 'price_points', idStr);
