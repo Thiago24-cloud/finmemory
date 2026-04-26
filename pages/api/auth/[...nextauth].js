@@ -7,6 +7,11 @@ import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { normalizeEmail } from '../../../lib/securityPolicy';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 
+const GOOGLE_PLAY_REVIEWER_EMAIL = 'thiagochimezie44@gmail.com';
+function isGooglePlayReviewerEmail(email) {
+  return normalizeEmail(email) === GOOGLE_PLAY_REVIEWER_EMAIL;
+}
+
 // Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.
 const DEFAULT_NEXTAUTH_URL = 'https://finmemory.com.br';
 if (typeof process !== 'undefined') {
@@ -57,6 +62,7 @@ export const authOptions = {
         }
 
         const email = normalizeEmail(credentials?.email);
+        const isReviewer = isGooglePlayReviewerEmail(email);
         const password = String(credentials?.password || '');
         const otp = String(credentials?.otp || '').trim();
         if (!email || !password) {
@@ -130,12 +136,12 @@ export const authOptions = {
           return null;
         }
 
-        if (!localAuth.email_verified_at) {
+        if (!localAuth.email_verified_at && !isReviewer) {
           console.warn('[auth][login] email_not_verified', { email, ip });
           return null;
         }
 
-        if (localAuth.totp_enabled_at && localAuth.totp_secret) {
+        if (!isReviewer && localAuth.totp_enabled_at && localAuth.totp_secret) {
           const validOtp = verifyTotpCode({ secret: localAuth.totp_secret, code: otp, window: 1 });
           if (!validOtp) {
             console.warn('[auth][login] invalid_otp', { email, ip });
@@ -228,6 +234,9 @@ export const authOptions = {
 
     async signIn({ user }) {
       try {
+        if (isGooglePlayReviewerEmail(user?.email)) {
+          return true;
+        }
         const allowlist = getPrivateBetaAllowlistFromEnv();
         if (!isEmailAllowedInPrivateBeta(user?.email, allowlist)) {
           console.warn('[auth] signIn bloqueado (lista de acesso):', user?.email);
