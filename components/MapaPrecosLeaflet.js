@@ -24,6 +24,7 @@ import MapMobileBottomSheet from './map/MapMobileBottomSheet';
 import EstablishmentDetailSheet from './map/EstablishmentDetailSheet';
 import FloatingCartBar from './map/FloatingCartBar';
 import { useMapCart } from './map/MapCartContext';
+import { useBagBackgroundMonitoring } from './map/useBagBackgroundMonitoring';
 import { MapBottomPaddingSync } from './map/MapBottomPaddingSync';
 import {
   getMapPinOpenAirLabelStyle,
@@ -2654,8 +2655,19 @@ export default function MapaPrecosLeaflet({
   const [previewOfferFilter, setPreviewOfferFilter] = useState('');
   /** Desktop: largura da sidebar à esquerda (padding no Leaflet) — estilo Google Maps. */
   const [desktopSidebarHoverPulse, setDesktopSidebarHoverPulse] = useState(false);
-  const { selectedProducts, setSelectedProducts, removeSelectedProduct, toggleSelectedProduct } = useMapCart();
-  const promoCart = selectedProducts;
+  const {
+    shoppingBag,
+    shoppingBagTotals,
+    groupedByStore,
+    setSelectedProducts,
+    removeSelectedProduct,
+    toggleSelectedProduct,
+  } = useMapCart();
+  const promoCart = shoppingBag;
+  const [bagSheetOpen, setBagSheetOpen] = useState(false);
+  const [nearbyBagAlert, setNearbyBagAlert] = useState(null);
+  const bagAlertCooldownRef = useRef(new Map());
+  useBagBackgroundMonitoring(promoCart);
 
   useLayoutEffect(() => {
     if (shopOpen) setShopSheetSnap('peek');
@@ -2665,6 +2677,10 @@ export default function MapaPrecosLeaflet({
   useEffect(() => {
     if (mobileStorePreview) setPreviewSheetSnap('half');
   }, [mobileStorePreview]);
+
+  useEffect(() => {
+    if (promoCart.length === 0) setBagSheetOpen(false);
+  }, [promoCart.length]);
 
   const isDetailOpen = shopOpen || Boolean(mobileStorePreview);
   useEffect(() => {
@@ -2936,6 +2952,12 @@ export default function MapaPrecosLeaflet({
             name: row.product_name,
             productName: row.product_name,
             price: priceNum,
+            placeId: shopStore?.place_id || null,
+            storeId: shopStore?.id || null,
+            storeGeo:
+              Number.isFinite(Number(shopStore?.lat)) && Number.isFinite(Number(shopStore?.lng))
+                ? { lat: Number(shopStore.lat), lng: Number(shopStore.lng) }
+                : null,
             storeLabel: shopStore?.name || 'Loja',
             storeName: shopStore?.name || 'Loja',
             priceNum,
@@ -3021,6 +3043,14 @@ export default function MapaPrecosLeaflet({
         name: offer.product_name,
         productName: offer.product_name,
         price: priceNum,
+        placeId: shopStore?.place_id || offer?.place_id || null,
+        storeId: shopStore?.id || offer?.store_id || null,
+        storeGeo:
+          Number.isFinite(Number(shopStore?.lat)) && Number.isFinite(Number(shopStore?.lng))
+            ? { lat: Number(shopStore.lat), lng: Number(shopStore.lng) }
+            : Number.isFinite(Number(offer?.store_lat)) && Number.isFinite(Number(offer?.store_lng))
+              ? { lat: Number(offer.store_lat), lng: Number(offer.store_lng) }
+              : null,
         storeLabel,
         storeName: storeLabel,
         priceNum,
@@ -3039,6 +3069,10 @@ export default function MapaPrecosLeaflet({
           product_name: p.produto,
           category: p.categoria,
           price: p.preco,
+          store_id: p.store_id || null,
+          place_id: p.place_id || null,
+          store_lat: p.lat,
+          store_lng: p.lng,
         },
         p.nome
       );
@@ -3064,6 +3098,48 @@ export default function MapaPrecosLeaflet({
   }, [cartTotalNumeric, budgetCap]);
 
   const cartOfferIdSet = useMemo(() => new Set(promoCart.map((x) => x.offerId || x.id)), [promoCart]);
+
+  useEffect(() => {
+    if (!userMapPosition || promoCart.length === 0) {
+      setNearbyBagAlert(null);
+      return;
+    }
+    const radiusMeters = 220;
+    const now = Date.now();
+    let best = null;
+    for (const item of promoCart) {
+      const storeGeo = item?.storeGeo;
+      if (!storeGeo || !Number.isFinite(storeGeo.lat) || !Number.isFinite(storeGeo.lng)) continue;
+      const distance = haversineMeters(
+        Number(userMapPosition.lat),
+        Number(userMapPosition.lng),
+        Number(storeGeo.lat),
+        Number(storeGeo.lng)
+      );
+      if (distance > radiusMeters) continue;
+      if (!best || distance < best.distance) {
+        best = { item, distance };
+      }
+    }
+    if (!best) {
+      setNearbyBagAlert(null);
+      return;
+    }
+
+    const alertKey = `${best.item.id}:${best.item.storeName || best.item.storeLabel}`;
+    const lastTs = bagAlertCooldownRef.current.get(alertKey) || 0;
+    if (now - lastTs > 120000) {
+      bagAlertCooldownRef.current.set(alertKey, now);
+      const priceLabel =
+        typeof best.item.priceNum === 'number'
+          ? `R$ ${formatBRLPriceNum(best.item.priceNum)}`
+          : best.item.precoLabel || 'preço atualizado';
+      toast.message(
+        `Você está perto de ${best.item.storeName || best.item.storeLabel}. ${best.item.productName || best.item.name} por ${priceLabel}.`
+      );
+    }
+    setNearbyBagAlert(best);
+  }, [promoCart, userMapPosition]);
 
   const selectedPromotionRowsOrdered = useMemo(() => {
     const byId = new Map(shopPromotions.map((r) => [String(r.id), r]));
@@ -3391,6 +3467,19 @@ export default function MapaPrecosLeaflet({
         </div>
       )}
 
+      {nearbyBagAlert ? (
+        <div className="pointer-events-none absolute bottom-[9.25rem] left-3 right-3 z-[1102] sm:left-4 sm:right-auto sm:max-w-[360px]">
+          <div className="rounded-xl border border-emerald-400/40 bg-[#0f1117]/95 px-3 py-2 text-xs text-emerald-50 shadow-[0_10px_28px_rgba(16,185,129,0.25)] backdrop-blur-md">
+            Você está perto de <span className="font-semibold text-emerald-300">{nearbyBagAlert.item.storeName || nearbyBagAlert.item.storeLabel}</span>.{' '}
+            <span className="font-medium">{nearbyBagAlert.item.productName || nearbyBagAlert.item.name}</span>{' '}
+            {typeof nearbyBagAlert.item.priceNum === 'number'
+              ? `por R$ ${formatBRLPriceNum(nearbyBagAlert.item.priceNum)}`
+              : 'está disponível aqui'}
+            .
+          </div>
+        </div>
+      ) : null}
+
       {promoCart.length > 0 && !isMobileMapSheet && (
         <div
           style={{ top: chromeTop }}
@@ -3548,10 +3637,59 @@ export default function MapaPrecosLeaflet({
       {isMobileMapSheet && promoCart.length > 0 ? (
         <FloatingCartBar
           itemsCount={promoCart.length}
+          totalPrice={shoppingBagTotals.totalPrice}
+          onOpenBag={() => setBagSheetOpen(true)}
           onOpenList={() => {
             /* Link no próprio componente */
           }}
         />
+      ) : null}
+
+      {isMobileMapSheet && bagSheetOpen && promoCart.length > 0 ? (
+        <div className="fixed inset-0 z-[1103] bg-black/45 px-3 pb-6 pt-16" onClick={() => setBagSheetOpen(false)}>
+          <div
+            className="mx-auto flex h-full max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-emerald-400/40 bg-[#0f1117] text-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div>
+                <p className="text-sm font-bold">Sacola de compras</p>
+                <p className="text-xs text-emerald-200">
+                  {shoppingBagTotals.itemsCount} itens • R$ {formatBRLPriceNum(shoppingBagTotals.totalPrice)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBagSheetOpen(false)}
+                className="rounded-lg border border-white/15 px-2 py-1 text-xs text-zinc-200"
+              >
+                Fechar
+              </button>
+            </div>
+            <div className="finmemory-waze-scroll min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              {Object.entries(groupedByStore).map(([storeName, items]) => (
+                <section key={storeName} className="mb-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 last:mb-0">
+                  <p className="mb-2 text-xs font-semibold text-emerald-300">{storeName}</p>
+                  <div className="space-y-1.5">
+                    {items.map((item) => (
+                      <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
+                        <span className="line-clamp-2 flex-1 text-zinc-200">{item.productName || item.name}</span>
+                        <span className="shrink-0 font-medium text-emerald-200">
+                          {typeof item.priceNum === 'number' ? `R$ ${formatBRLPriceNum(item.priceNum)}` : item.precoLabel || '—'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+            <div className="border-t border-white/10 px-4 py-3">
+              <Link href="/shopping-list" className="block rounded-xl bg-emerald-500 px-3 py-2 text-center text-sm font-bold text-[#0f1117] no-underline">
+                Ir para lista completa
+              </Link>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {selectedItems.length > 0 && (

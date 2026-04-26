@@ -4,7 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ShoppingCart } from 'lucide-react';
 
-export default function FloatingCartBar({ itemsCount = 0, onOpenList, className = '' }) {
+function formatCurrency(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+export default function FloatingCartBar({
+  itemsCount = 0,
+  totalPrice = 0,
+  onOpenList,
+  onOpenBag,
+  className = ''
+}) {
   const prevCountRef = useRef(itemsCount);
   const [pulse, setPulse] = useState(false);
 
@@ -28,15 +39,27 @@ export default function FloatingCartBar({ itemsCount = 0, onOpenList, className 
           <div className={`rounded-full bg-emerald-500/20 p-2 ${pulse ? 'scale-110 opacity-90' : 'scale-100 opacity-100'} transition-all duration-200`}>
             <ShoppingCart className="h-4 w-4 text-emerald-300" />
           </div>
-          <p className="text-sm font-semibold">{itemsCount} item(ns) no carrinho</p>
+          <div>
+            <p className="text-sm font-semibold">{itemsCount} item(ns) na sacola</p>
+            <p className="text-[11px] text-emerald-200">{formatCurrency(totalPrice)}</p>
+          </div>
         </div>
-        <Link
-          href="/shopping-list"
-          onClick={onOpenList}
-          className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-[#0f1117] no-underline hover:bg-emerald-400"
-        >
-          Ver lista
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenBag}
+            className="rounded-xl border border-emerald-400/50 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-400/10"
+          >
+            Ver sacola
+          </button>
+          <Link
+            href="/shopping-list"
+            onClick={onOpenList}
+            className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-[#0f1117] no-underline hover:bg-emerald-400"
+          >
+            Lista
+          </Link>
+        </div>
       </div>
     </div>
   );
