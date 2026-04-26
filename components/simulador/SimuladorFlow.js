@@ -29,6 +29,7 @@ const defaultState = () => ({
   reliefPct: 40,
   startingBalance: 1200,
   dailyBurn: 65,
+  dailyBurnAuto: true,
   salaryDay: 5,
   salaryAmount: 3200,
   heavyBillDay: 10,
@@ -180,6 +181,39 @@ export function SimuladorFlow() {
     return () => clearTimeout(t);
   }, [state, remoteReady, status]);
 
+  useEffect(() => {
+    if (status !== 'authenticated') return undefined;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchHints();
+    };
+    window.addEventListener('focus', fetchHints);
+    document.addEventListener('visibilitychange', onVisible);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') fetchHints();
+    }, 60000);
+    return () => {
+      window.removeEventListener('focus', fetchHints);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(id);
+    };
+  }, [status, fetchHints]);
+
+  useEffect(() => {
+    if (!hints) return;
+    setState((s) => {
+      if (!s.dailyBurnAuto) return s;
+      const suggested =
+        hints.dailyBurnReal28d > 0
+          ? hints.dailyBurnReal28d
+          : hints.dailyBurnHint > 0
+            ? hints.dailyBurnHint
+            : 0;
+      if (!(suggested > 0)) return s;
+      if (Math.abs((Number(s.dailyBurn) || 0) - suggested) < 0.01) return s;
+      return { ...s, dailyBurn: suggested };
+    });
+  }, [hints]);
+
   const set = useCallback((patch) => {
     setState((s) => ({ ...s, ...patch }));
   }, []);
@@ -200,7 +234,12 @@ export function SimuladorFlow() {
           ? hints.salaryDayHint
           : s.salaryDay,
       dailyBurn:
-        hints.dailyBurnHint > 0 ? hints.dailyBurnHint : s.dailyBurn,
+        hints.dailyBurnReal28d > 0
+          ? hints.dailyBurnReal28d
+          : hints.dailyBurnHint > 0
+            ? hints.dailyBurnHint
+            : s.dailyBurn,
+      dailyBurnAuto: true,
       creditDueDay:
         typeof card?.due_day === 'number' && card.due_day >= 1 && card.due_day <= 31 ? card.due_day : s.creditDueDay,
       bestPurchaseDay:
@@ -211,6 +250,15 @@ export function SimuladorFlow() {
   }, [hints]);
 
   const dim = useMemo(() => daysInCurrentMonth(), []);
+  const todayDay = useMemo(() => new Date().getDate(), []);
+  const committedExtraValue = useMemo(
+    () => (state.extraEnabled && state.extraCommitted ? Math.max(0, Number(state.extraAmount) || 0) : 0),
+    [state.extraEnabled, state.extraCommitted, state.extraAmount]
+  );
+  const adjustedStartingBalance = useMemo(
+    () => Math.max(0, (Number(state.startingBalance) || 0) - committedExtraValue),
+    [state.startingBalance, committedExtraValue]
+  );
 
   const projection = useMemo(() => {
     const supportInflows = state.hasSupport
@@ -245,7 +293,7 @@ export function SimuladorFlow() {
     });
 
     return projectSimuladorMonth({
-      startingBalance: Number(state.startingBalance) || 0,
+      startingBalance: adjustedStartingBalance,
       dailyBurn: Number(state.dailyBurn) || 0,
       salaryDay: Number(state.salaryDay) > 0 ? Number(state.salaryDay) : null,
       salaryAmount: Number(state.salaryAmount) || 0,
@@ -254,7 +302,46 @@ export function SimuladorFlow() {
       scheduledOutflows,
       stressMode: state.stressMode,
     });
-  }, [state, dim]);
+  }, [state, dim, adjustedStartingBalance]);
+
+  const salaryProjection = useMemo(() => {
+    const salaryDay = Math.min(31, Math.max(1, Number(state.salaryDay) || 1));
+    const currentDay = Math.min(31, Math.max(1, todayDay || 1));
+    const daysRemaining = salaryDay >= currentDay ? salaryDay - currentDay : 31 - currentDay + salaryDay;
+    const burn = Math.max(0, Number(state.dailyBurn) || 0);
+    const projectionOut = daysRemaining * burn;
+    const salary = Math.max(0, Number(state.salaryAmount) || 0);
+    const saldoFinalEsperado = adjustedStartingBalance - projectionOut + salary;
+    return {
+      daysRemaining,
+      burn,
+      projectionOut,
+      saldoFinalEsperado: Math.round(saldoFinalEsperado * 100) / 100,
+      salaryDay,
+    };
+  }, [state.salaryDay, state.salaryAmount, state.dailyBurn, adjustedStartingBalance, todayDay]);
+
+  const entradasConfirmadas = useMemo(() => {
+    const salary = Math.max(0, Number(state.salaryAmount) || 0);
+    const support = state.hasSupport
+      ? state.contacts.reduce((acc, c) => {
+          const rel = Number(c.reliability) || 0;
+          const amount = Math.max(0, Number(c.amount) || 0);
+          if (rel < 0.85 || amount <= 0) return acc;
+          return acc + amount * rel;
+        }, 0)
+      : 0;
+    const extra =
+      state.extraEnabled && !state.extraCommitted && Number(state.extraAmount) > 0 && Number(state.extraReliabilityPct) >= 85
+        ? Number(state.extraAmount) * (Number(state.extraReliabilityPct) / 100)
+        : 0;
+    return Math.round((salary + support + extra) * 100) / 100;
+  }, [state]);
+
+  const metaDiariaSugerida = useMemo(() => {
+    const dias = Math.max(1, salaryProjection.daysRemaining);
+    return Math.round(((adjustedStartingBalance + entradasConfirmadas) / dias) * 100) / 100;
+  }, [salaryProjection.daysRemaining, adjustedStartingBalance, entradasConfirmadas]);
 
   const deferredToCardDisplay = useMemo(() => {
     const heavy = Number(state.heavyBillAmount) || 0;
@@ -328,8 +415,33 @@ export function SimuladorFlow() {
             min={0}
             className={fieldClass}
             value={state.dailyBurn}
-            onChange={(e) => set({ dailyBurn: Number(e.target.value) })}
+            onChange={(e) => set({ dailyBurn: Number(e.target.value), dailyBurnAuto: false })}
           />
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-[10px] text-zinc-500">
+              Base real (28d):{' '}
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                hints?.dailyBurnReal28d || 0
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                set({
+                  dailyBurn:
+                    hints?.dailyBurnReal28d > 0
+                      ? hints.dailyBurnReal28d
+                      : hints?.dailyBurnHint > 0
+                        ? hints.dailyBurnHint
+                        : state.dailyBurn,
+                  dailyBurnAuto: true,
+                })
+              }
+              className="text-[10px] font-medium text-purple-300 underline underline-offset-2"
+            >
+              usar cálculo real
+            </button>
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 mt-3">
@@ -354,6 +466,37 @@ export function SimuladorFlow() {
             onChange={(e) => set({ salaryAmount: Number(e.target.value) })}
           />
         </div>
+      </div>
+      <div className="mt-3 rounded-xl border border-purple-500/20 bg-purple-950/20 px-3 py-2.5">
+        <p className="text-xs text-zinc-300">
+          Com seu gasto atual de{' '}
+          <strong className="text-purple-300">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              salaryProjection.burn
+            )}
+            /dia
+          </strong>
+          , você chegará ao dia do salário com{' '}
+          <strong className={salaryProjection.saldoFinalEsperado < 0 ? 'text-red-300' : 'text-emerald-300'}>
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              salaryProjection.saldoFinalEsperado
+            )}
+          </strong>
+          .
+        </p>
+        <p className="mt-1 text-[11px] text-zinc-500">
+          Meta diária sugerida para sobreviver sem entrar no vermelho:{' '}
+          <strong className="text-zinc-200">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(metaDiariaSugerida)}
+            /dia
+          </strong>{' '}
+          (entradas confirmadas: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entradasConfirmadas)}).
+        </p>
+        {committedExtraValue > 0 ? (
+          <p className="mt-1 text-[11px] text-amber-300">
+            Ajuste aplicado: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(committedExtraValue)} retirados do saldo por estar comprometido.
+          </p>
+        ) : null}
       </div>
     </>
   );
@@ -417,8 +560,28 @@ export function SimuladorFlow() {
                     hints.accountBalanceTotal || 0
                   )}
                 </strong>
-                . Sugestões: mês atual (fuso Brasil) e cartões manuais.
+                . Burn rate real (28d):{' '}
+                <strong className="text-zinc-200">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    hints.dailyBurnReal28d || hints.dailyBurnHint || 0
+                  )}
+                  /dia
+                </strong>
+                .
               </p>
+              {hints?.burnRateBreakdown ? (
+                <p className="text-[10px] text-zinc-600">
+                  28 dias · Open Finance{' '}
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    hints.burnRateBreakdown.openFinanceDebits || 0
+                  )}{' '}
+                  + OCR/Manual{' '}
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    hints.burnRateBreakdown.ocrManualDebits || 0
+                  )}
+                  .
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"

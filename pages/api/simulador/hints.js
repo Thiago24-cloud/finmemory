@@ -32,6 +32,11 @@ function isoDateDaysAgo(days) {
   return d.toISOString().slice(0, 10);
 }
 
+function safeAbsNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.abs(n) : 0;
+}
+
 /**
  * GET /api/simulador/hints
  * Sugestões a partir de Open Finance (contas, mês atual, crédito manual) e histórico de créditos.
@@ -162,6 +167,52 @@ export default async function handler(req, res) {
   const dailyBurnHint =
     daysInMonth > 0 ? Math.max(0, Math.round((monthExpense / daysInMonth) * 100) / 100) : 0;
 
+  const since28 = isoDateDaysAgo(28);
+  let openFinanceDebits28d = 0;
+  let ocrManualDebits28d = 0;
+
+  const { data: bankTx28d, error: bankTxErr } = await supabase
+    .from('bank_transactions')
+    .select('amount, type, date')
+    .eq('user_id', userId)
+    .gte('date', since28)
+    .order('date', { ascending: false })
+    .limit(1200);
+
+  if (bankTxErr) {
+    console.warn('[simulador/hints] bank_transactions 28d:', bankTxErr.message);
+  } else if (Array.isArray(bankTx28d)) {
+    for (const row of bankTx28d) {
+      const type = String(row?.type || '').toUpperCase();
+      const amount = Number(row?.amount || 0);
+      const isDebitByType = type === 'DEBIT' || type === 'EXPENSE';
+      const isDebitBySignal = !Number.isNaN(amount) && amount < 0;
+      if (isDebitByType || isDebitBySignal) {
+        openFinanceDebits28d += safeAbsNumber(amount);
+      }
+    }
+  }
+
+  const { data: localTx28d, error: localTxErr } = await supabase
+    .from('transacoes')
+    .select('total, source, data, created_at')
+    .eq('user_id', userId)
+    .in('source', ['receipt_ocr', 'manual'])
+    .gte('data', since28)
+    .order('data', { ascending: false })
+    .limit(1200);
+
+  if (localTxErr) {
+    console.warn('[simulador/hints] transacoes 28d:', localTxErr.message);
+  } else if (Array.isArray(localTx28d)) {
+    for (const row of localTx28d) {
+      ocrManualDebits28d += safeAbsNumber(row?.total);
+    }
+  }
+
+  const totalDebits28d = openFinanceDebits28d + ocrManualDebits28d;
+  const dailyBurnReal28d = Math.round((totalDebits28d / 28) * 100) / 100;
+
   const { data: cards, error: cardErr } = await supabase
     .from('manual_credit_cards')
     .select('id, label, due_day, closing_day, credit_limit')
@@ -193,6 +244,13 @@ export default async function handler(req, res) {
     },
     salaryDayHint,
     dailyBurnHint,
+    dailyBurnReal28d,
+    burnRateBreakdown: {
+      windowDays: 28,
+      totalDebits: Math.round(totalDebits28d * 100) / 100,
+      openFinanceDebits: Math.round(openFinanceDebits28d * 100) / 100,
+      ocrManualDebits: Math.round(ocrManualDebits28d * 100) / 100,
+    },
     manualCards,
     hasOpenFinance: accountsOut.length > 0,
   });
