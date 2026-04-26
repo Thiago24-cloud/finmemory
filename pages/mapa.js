@@ -52,6 +52,7 @@ export default function MapaPage() {
   const [promoOnly, setPromoOnly] = useState(false);
   const [mapChipSelection, setMapChipSelection] = useState('todos');
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
   const [chipsShouldHide, setChipsShouldHide] = useState(false);
   const searchInputRef = useRef(null);
   const narrowScreen = useMatchMedia('(max-width: 767px)');
@@ -101,6 +102,9 @@ export default function MapaPage() {
   const handleDetailOpenChange = useCallback((open) => {
     setIsDetailOpen(Boolean(open));
   }, []);
+  const handleDetailExpandedChange = useCallback((expanded) => {
+    setIsDetailExpanded(Boolean(expanded));
+  }, []);
 
   useEffect(() => {
     let t;
@@ -130,6 +134,7 @@ export default function MapaPage() {
             headerOffsetPx={mapPaddingTopPx}
             overlayTopPx={mapOverlayTopPx}
             onDetailOpenChange={handleDetailOpenChange}
+            onDetailExpandedChange={handleDetailExpandedChange}
           />
         </div>
 
@@ -147,7 +152,12 @@ export default function MapaPage() {
             className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch pt-[max(8px,env(safe-area-inset-top))] px-3"
             aria-label="Controles do mapa"
           >
-            <div className="pointer-events-auto flex w-full max-w-full flex-col gap-2 md:flex-row md:items-center md:gap-2">
+            <div
+              className={`flex w-full max-w-full flex-col gap-2 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex-row md:items-center md:gap-2 ${
+                isDetailExpanded ? 'pointer-events-none -translate-y-2 opacity-0' : 'pointer-events-auto translate-y-0 opacity-100'
+              }`}
+              aria-hidden={isDetailExpanded}
+            >
               <button
                 type="button"
                 onClick={() => setShowMenuSheet(true)}

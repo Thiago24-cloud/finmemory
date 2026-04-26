@@ -2576,6 +2576,7 @@ export default function MapaPrecosLeaflet({
   headerOffsetPx = 56,
   overlayTopPx,
   onDetailOpenChange,
+  onDetailExpandedChange,
 }) {
   const theme = getMapThemeById(mapThemeId);
   const mapboxToken =
@@ -2671,6 +2672,18 @@ export default function MapaPrecosLeaflet({
       if (typeof onDetailOpenChange === 'function') onDetailOpenChange(false);
     };
   }, [isDetailOpen, onDetailOpenChange]);
+
+  const isDetailExpanded =
+    (isMobileMapSheet && shopOpen && shopSheetSnap === 'full') ||
+    (isMobileMapSheet && !shopOpen && Boolean(mobileStorePreview) && previewSheetSnap === 'full');
+  useEffect(() => {
+    if (typeof onDetailExpandedChange === 'function') {
+      onDetailExpandedChange(Boolean(isDetailExpanded));
+    }
+    return () => {
+      if (typeof onDetailExpandedChange === 'function') onDetailExpandedChange(false);
+    };
+  }, [isDetailExpanded, onDetailExpandedChange]);
 
   useEffect(() => {
     setPreviewOfferFilter('');

@@ -469,7 +469,7 @@ export default function EstablishmentDetailSheet({
         <button
           type="button"
           aria-label="Fechar"
-          className="fixed inset-0 z-[1003] border-0 bg-black/60 p-0"
+          className="fixed inset-0 z-[1099] border-0 bg-black/60 p-0"
           onClick={() => setSnap('mid')}
         />
       ) : null}
@@ -477,7 +477,7 @@ export default function EstablishmentDetailSheet({
       <motion.div
         role="dialog"
         aria-modal={snap === 'full'}
-        className="fixed inset-x-0 bottom-0 z-[1004] flex max-h-none flex-col rounded-t-2xl border border-zinc-800/50 bg-zinc-950/95 shadow-[0_-12px_48px_rgba(0,0,0,0.45)] supports-[backdrop-filter]:backdrop-blur-xl"
+        className="fixed inset-x-0 bottom-0 z-[1100] flex max-h-none flex-col rounded-t-2xl border border-zinc-800/50 bg-zinc-950/95 shadow-[0_-12px_48px_rgba(0,0,0,0.45)] supports-[backdrop-filter]:backdrop-blur-xl"
         style={{
           height: '100dvh',
           maxHeight: '100dvh',
@@ -531,8 +531,12 @@ export default function EstablishmentDetailSheet({
           </div>
         </motion.div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3">
-          <div className="sticky top-0 z-10 -mx-1 shrink-0 bg-zinc-950/95 px-1 pb-2 pt-1 supports-[backdrop-filter]:backdrop-blur-md">
+        <div
+          className="finmemory-waze-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-6"
+          data-sheet-no-drag
+          style={{ touchAction: 'pan-y' }}
+        >
+          <div className="sticky top-0 z-10 -mx-1 bg-zinc-950/95 px-1 pb-2 pt-1 supports-[backdrop-filter]:backdrop-blur-md">
             <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2">
               <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
               <input
@@ -543,17 +547,16 @@ export default function EstablishmentDetailSheet({
                 data-sheet-no-drag
               />
             </div>
+            <FilterChips
+              chips={filterChipItems}
+              activeChipId={cat}
+              onChange={setCat}
+              className="finmemory-waze-scroll mt-2"
+              ariaLabel="Filtros por categoria"
+            />
           </div>
 
-          <FilterChips
-            chips={filterChipItems}
-            activeChipId={cat}
-            onChange={setCat}
-            className="finmemory-waze-scroll shrink-0"
-            ariaLabel="Filtros por categoria"
-          />
-
-          <div className="min-h-0 flex-1 overflow-y-auto pb-6" data-sheet-no-drag style={{ touchAction: 'pan-y' }}>
+          <div className="pt-1">
             {loading ? (
               <div className="flex justify-center py-10">
                 <Loader2 className="h-8 w-8 animate-spin text-orange-400" />

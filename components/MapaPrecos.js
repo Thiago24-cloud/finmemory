@@ -14,6 +14,7 @@ export default function MapaPrecos({
   /** Quando o mapa vai até ao topo (padding 0), posição dos painéis / botão GPS — ver pages/mapa.js */
   overlayTopPx,
   onDetailOpenChange,
+  onDetailExpandedChange,
 }) {
   return (
     <div className="fixed inset-0 z-0 h-full w-full">
@@ -25,6 +26,7 @@ export default function MapaPrecos({
         headerOffsetPx={headerOffsetPx}
         overlayTopPx={overlayTopPx}
         onDetailOpenChange={onDetailOpenChange}
+        onDetailExpandedChange={onDetailExpandedChange}
       />
     </div>
   );
