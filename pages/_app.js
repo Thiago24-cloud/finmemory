@@ -9,6 +9,7 @@ import { AppSplashGate } from '../components/splash/AppSplashGate';
 import { DeployRecovery } from '../components/DeployRecovery';
 import PWAInstallProvider from '../components/PWAInstallProvider';
 import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
+import { MapCartProvider } from '../components/map/MapCartContext';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import '../styles/globals.css';
 
@@ -46,7 +47,9 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             <ServiceWorkerRegister />
             <DeployRecovery />
             <AnalyticsProvider>
-              <Component {...pageProps} />
+              <MapCartProvider>
+                <Component {...pageProps} />
+              </MapCartProvider>
               <Toaster richColors position="top-center" />
             </AnalyticsProvider>
           </PWAInstallProvider>

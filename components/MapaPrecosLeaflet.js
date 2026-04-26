@@ -22,6 +22,8 @@ import { isClientUsablePinLogoRef } from '../lib/mapPinLogoUrl';
 import { getHomogeneousGroupLogoPinSrc, getStoreLogoPinSrc } from '../lib/storeLogos';
 import MapMobileBottomSheet from './map/MapMobileBottomSheet';
 import EstablishmentDetailSheet from './map/EstablishmentDetailSheet';
+import FloatingCartBar from './map/FloatingCartBar';
+import { useMapCart } from './map/MapCartContext';
 import { MapBottomPaddingSync } from './map/MapBottomPaddingSync';
 import {
   getMapPinOpenAirLabelStyle,
@@ -2629,7 +2631,6 @@ export default function MapaPrecosLeaflet({
   const [selectedItems, setSelectedItems] = useState([]);
   const [shopLoading, setShopLoading] = useState(false);
   const [shopErr, setShopErr] = useState('');
-  const [promoCart, setPromoCart] = useState([]);
   const [budgetCap, setBudgetCap] = useState(50);
   const [savingList, setSavingList] = useState(false);
   const [saveBanner, setSaveBanner] = useState('');
@@ -2653,6 +2654,8 @@ export default function MapaPrecosLeaflet({
   const [previewOfferFilter, setPreviewOfferFilter] = useState('');
   /** Desktop: largura da sidebar à esquerda (padding no Leaflet) — estilo Google Maps. */
   const [desktopSidebarHoverPulse, setDesktopSidebarHoverPulse] = useState(false);
+  const { selectedProducts, setSelectedProducts, removeSelectedProduct, toggleSelectedProduct } = useMapCart();
+  const promoCart = selectedProducts;
 
   useLayoutEffect(() => {
     if (shopOpen) setShopSheetSnap('peek');
@@ -2844,7 +2847,7 @@ export default function MapaPrecosLeaflet({
     setShopOffers([]);
     setShopPromotions([]);
     setSelectedItems([]);
-    setPromoCart((prev) => prev.filter((x) => !String(x.offerId).startsWith('encarte-')));
+    setSelectedProducts((prev) => prev.filter((x) => !String(x.offerId || x.id).startsWith('encarte-')));
     fetch(`/api/map/store-offers?store_id=${encodeURIComponent(store.id)}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
@@ -2916,9 +2919,9 @@ export default function MapaPrecosLeaflet({
       const cartId = `encarte-${sid}`;
       setSelectedItems((prevSel) => {
         const wasOn = prevSel.includes(sid);
-        setPromoCart((prevCart) => {
-          if (wasOn) return prevCart.filter((x) => x.offerId !== cartId);
-          if (prevCart.some((x) => x.offerId === cartId)) return prevCart;
+        setSelectedProducts((prevCart) => {
+          if (wasOn) return prevCart.filter((x) => (x.offerId || x.id) !== cartId);
+          if (prevCart.some((x) => (x.offerId || x.id) === cartId)) return prevCart;
           const cat = row.category || 'Supermercado - Promoção';
           const resolved = firstPositivePriceNumber(row.promo_price, row.club_price, row.price);
           const priceNum = numericPriceForSum(resolved, cat, cartId);
@@ -2928,18 +2931,23 @@ export default function MapaPrecosLeaflet({
               : formatPrecoExibicao(row.promo_price, cat, cartId) ||
                 formatPrecoExibicao(row.club_price, cat, cartId);
           return prevCart.concat({
+            id: cartId,
             offerId: cartId,
+            name: row.product_name,
             productName: row.product_name,
+            price: priceNum,
             storeLabel: shopStore?.name || 'Loja',
+            storeName: shopStore?.name || 'Loja',
             priceNum,
             precoLabel,
+            imageUrl: row.product_image_url || row.flyer_image_url || null,
           });
         });
         if (wasOn) return prevSel.filter((x) => x !== sid);
         return [...prevSel, sid];
       });
     },
-    [shopPromotions, shopStore]
+    [shopPromotions, shopStore, setSelectedProducts]
   );
 
   const shopAccent = useMemo(() => {
@@ -2993,33 +3001,34 @@ export default function MapaPrecosLeaflet({
     (offer, storeLabelOverride) => {
       const id = String(offer.id);
       const storeLabel = storeLabelOverride || shopStore?.name || 'Loja';
-      setPromoCart((prev) => {
-        const ix = prev.findIndex((x) => x.offerId === id);
-        if (ix >= 0) return prev.filter((_, i) => i !== ix);
-        const resolved = firstPositivePriceNumber(offer?.price, offer?.promo_price, offer?.club_price);
-        const rawForFormat =
-          resolved != null
-            ? resolved
-            : offer?.price != null && offer?.price !== ''
-              ? offer.price
-              : offer?.promo_price != null && offer?.promo_price !== ''
-                ? offer.promo_price
-                : offer?.club_price;
-        const priceNum = numericPriceForSum(resolved, offer.category, offer.id);
-        const precoLabel =
-          priceNum != null
-            ? `R$ ${formatBRLPriceNum(priceNum)}`
-            : formatPrecoExibicao(rawForFormat, offer.category, offer.id);
-        return prev.concat({
-          offerId: id,
-          productName: offer.product_name,
-          storeLabel,
-          priceNum,
-          precoLabel,
-        });
+      const resolved = firstPositivePriceNumber(offer?.price, offer?.promo_price, offer?.club_price);
+      const rawForFormat =
+        resolved != null
+          ? resolved
+          : offer?.price != null && offer?.price !== ''
+            ? offer.price
+            : offer?.promo_price != null && offer?.promo_price !== ''
+              ? offer.promo_price
+              : offer?.club_price;
+      const priceNum = numericPriceForSum(resolved, offer.category, offer.id);
+      const precoLabel =
+        priceNum != null
+          ? `R$ ${formatBRLPriceNum(priceNum)}`
+          : formatPrecoExibicao(rawForFormat, offer.category, offer.id);
+      toggleSelectedProduct({
+        id,
+        offerId: id,
+        name: offer.product_name,
+        productName: offer.product_name,
+        price: priceNum,
+        storeLabel,
+        storeName: storeLabel,
+        priceNum,
+        precoLabel,
+        imageUrl: offer?.promo_image_url || offer?.image_url || null,
       });
     },
-    [shopStore]
+    [shopStore, toggleSelectedProduct]
   );
 
   const toggleCartFromMapPoint = useCallback(
@@ -3054,7 +3063,7 @@ export default function MapaPrecosLeaflet({
     return Math.min(100, (cartTotalNumeric / cap) * 100);
   }, [cartTotalNumeric, budgetCap]);
 
-  const cartOfferIdSet = useMemo(() => new Set(promoCart.map((x) => x.offerId)), [promoCart]);
+  const cartOfferIdSet = useMemo(() => new Set(promoCart.map((x) => x.offerId || x.id)), [promoCart]);
 
   const selectedPromotionRowsOrdered = useMemo(() => {
     const byId = new Map(shopPromotions.map((r) => [String(r.id), r]));
@@ -3232,14 +3241,14 @@ export default function MapaPrecosLeaflet({
           throw itemsErr;
         }
       }
-      setPromoCart([]);
+      setSelectedProducts([]);
       router.push('/shopping-list');
     } catch (e) {
       setSaveBanner(e.message || 'Não foi possível salvar.');
     } finally {
       setSavingList(false);
     }
-  }, [session, promoCart, router]);
+  }, [session, promoCart, router, setSelectedProducts]);
 
   /** Atualização periódica só com aba visível (mapa mais “vivo” sem custo em background). */
   useEffect(() => {
@@ -3382,7 +3391,7 @@ export default function MapaPrecosLeaflet({
         </div>
       )}
 
-      {promoCart.length > 0 && (
+      {promoCart.length > 0 && !isMobileMapSheet && (
         <div
           style={{ top: chromeTop }}
           className={`absolute z-[1006] flex w-[min(100vw-1rem,280px)] max-h-[min(70vh,440px)] flex-col rounded-xl shadow-xl backdrop-blur-md ${
@@ -3439,7 +3448,7 @@ export default function MapaPrecosLeaflet({
                       const sid = oid.slice('encarte-'.length);
                       setSelectedItems((s) => s.filter((x) => x !== sid));
                     }
-                    setPromoCart((prev) => prev.filter((x) => x.offerId !== line.offerId));
+                    removeSelectedProduct(line.offerId || line.id);
                   }}
                 >
                   ×
@@ -3535,6 +3544,15 @@ export default function MapaPrecosLeaflet({
           </div>
         </div>
       )}
+
+      {isMobileMapSheet && promoCart.length > 0 ? (
+        <FloatingCartBar
+          itemsCount={promoCart.length}
+          onOpenList={() => {
+            /* Link no próprio componente */
+          }}
+        />
+      ) : null}
 
       {selectedItems.length > 0 && (
         <aside
