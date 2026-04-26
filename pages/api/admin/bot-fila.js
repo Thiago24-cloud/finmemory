@@ -65,6 +65,7 @@ function computeProdutoDiscount(produto) {
 
 function summarizeQueueItem(item) {
   const produtos = Array.isArray(item?.produtos) ? item.produtos : [];
+  const split = splitProdutosByPublishReadiness(produtos);
   let maxDiscount = null;
   let nearestExpiry = null;
   let inferredScope = null;
@@ -98,6 +99,13 @@ function summarizeQueueItem(item) {
     extraction_strategy: dominantStrategy,
     max_discount_percent: maxDiscount,
     nearest_expiry_at: nearestExpiry ? nearestExpiry.toISOString() : null,
+    queue_meta: {
+      total: produtos.length,
+      ready: split.ready.length,
+      invalid_price: split.invalid.length,
+      pending_image: split.pendingImage.length,
+      only_problem: split.ready.length === 0 && (split.invalid.length > 0 || split.pendingImage.length > 0),
+    },
   };
 }
 
@@ -121,6 +129,42 @@ function buildExtractionHealth(items, maxOffers = 100) {
     strategyCount,
     jsonPercent: total > 0 ? Math.round((jsonCount / total) * 100) : 0,
     htmlPercent: total > 0 ? Math.round((htmlCount / total) * 100) : 0,
+  };
+}
+
+function buildPendingDiagnostics(items) {
+  let entries = 0;
+  let totalProducts = 0;
+  let readyProducts = 0;
+  let invalidPriceProducts = 0;
+  let pendingImageProducts = 0;
+  let entriesOnlyInvalid = 0;
+  let entriesReadyToPublish = 0;
+
+  for (const item of items || []) {
+    const produtos = Array.isArray(item?.produtos) ? item.produtos : [];
+    const split = splitProdutosByPublishReadiness(produtos);
+    const hasReady = split.ready.length > 0;
+    const hasInvalid = split.invalid.length > 0;
+    const hasPendingImage = split.pendingImage.length > 0;
+
+    entries += 1;
+    totalProducts += produtos.length;
+    readyProducts += split.ready.length;
+    invalidPriceProducts += split.invalid.length;
+    pendingImageProducts += split.pendingImage.length;
+    if (hasReady) entriesReadyToPublish += 1;
+    if (!hasReady && (hasInvalid || hasPendingImage)) entriesOnlyInvalid += 1;
+  }
+
+  return {
+    entries,
+    totalProducts,
+    readyProducts,
+    invalidPriceProducts,
+    pendingImageProducts,
+    entriesReadyToPublish,
+    entriesOnlyInvalid,
   };
 }
 
@@ -221,17 +265,40 @@ export default async function handler(req, res) {
     });
 
     const legacyGroups = Array.from(byStore.values()).sort((a, b) => b.count - a.count);
+    const pendingDiagnostics = buildPendingDiagnostics(enriched);
+    const { data: rejectedRows, error: rejectedErr } = await supabase
+      .from('bot_promocoes_fila')
+      .select('id, store_name, reviewed_at, reviewed_by, artifacts')
+      .eq('status', 'rejeitado')
+      .order('reviewed_at', { ascending: false })
+      .limit(30);
+    if (rejectedErr) return res.status(500).json({ error: rejectedErr.message });
+    const rejectionHistory = (rejectedRows || []).map((row) => {
+      const moderation =
+        row?.artifacts?.moderation && typeof row.artifacts.moderation === 'object'
+          ? row.artifacts.moderation
+          : {};
+      return {
+        id: row.id,
+        store_name: row.store_name,
+        reviewed_at: row.reviewed_at || moderation.rejected_at || null,
+        reviewed_by: row.reviewed_by || moderation.rejected_by || null,
+        rejection_reason: moderation.rejection_reason || null,
+      };
+    });
     return res.status(200).json({
       items: enriched,
       legacyGroups,
       ingestRejections: getLatestIngestRejections(5),
       extractionHealth,
+      pendingDiagnostics,
+      rejectionHistory,
     });
   }
 
   // POST — aprovar ou rejeitar
   if (req.method === 'POST') {
-    const { id, action, store_name: legacyStoreName } = req.body || {};
+    const { id, action, store_name: legacyStoreName, rejection_reason: rejectionReasonRaw } = req.body || {};
     if (!['aprovar', 'rejeitar', 'reprocessar_legado'].includes(action)) {
       return res.status(400).json({ error: 'action inválida. Use aprovar|rejeitar|reprocessar_legado' });
     }
@@ -282,12 +349,37 @@ export default async function handler(req, res) {
     }
 
     if (action === 'rejeitar') {
+      const { data: currentRow, error: currentErr } = await supabase
+        .from('bot_promocoes_fila')
+        .select('artifacts')
+        .eq('id', id)
+        .single();
+      if (currentErr) return res.status(500).json({ error: currentErr.message });
+      const reason = String(rejectionReasonRaw || '').trim();
+      const currentArtifacts =
+        currentRow?.artifacts && typeof currentRow.artifacts === 'object' ? currentRow.artifacts : {};
+      const artifacts = {
+        ...currentArtifacts,
+        moderation: {
+          ...(currentArtifacts.moderation && typeof currentArtifacts.moderation === 'object'
+            ? currentArtifacts.moderation
+            : {}),
+          rejection_reason: reason || null,
+          rejected_at: new Date().toISOString(),
+          rejected_by: session.user.email,
+        },
+      };
       const { error } = await supabase
         .from('bot_promocoes_fila')
-        .update({ status: 'rejeitado', reviewed_at: new Date().toISOString(), reviewed_by: session.user.email })
+        .update({
+          status: 'rejeitado',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: session.user.email,
+          artifacts,
+        })
         .eq('id', id);
       if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, rejection_reason: reason || null });
     }
 
     // action === 'aprovar': busca o item e publica no mapa com guard-rails

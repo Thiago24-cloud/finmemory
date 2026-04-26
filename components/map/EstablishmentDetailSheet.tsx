@@ -8,6 +8,7 @@ import { differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { getMapProductImageSrcForImg } from '../../lib/mapImageProxy';
 import { displayPromoProductName } from '../../lib/mapOfferDisplay';
+import FilterChips from './FilterChips';
 
 export type EstablishmentSheetOffer = {
   id: string | number;
@@ -369,6 +370,15 @@ export default function EstablishmentDetailSheet({
       return p.name.toLowerCase().includes(q) || p.categoryRaw.toLowerCase().includes(q);
     });
   }, [normalized, search, cat]);
+  const filterChipItems = useMemo(
+    () =>
+      CATEGORIES.map((c) => ({
+        id: c.id,
+        label: c.label,
+        icon: c.emoji,
+      })),
+    []
+  );
 
   const promoCount = normalized.length;
 
@@ -535,26 +545,13 @@ export default function EstablishmentDetailSheet({
             </div>
           </div>
 
-          <div
-            className="finmemory-waze-scroll shrink-0 overflow-x-auto pb-2"
-            data-sheet-no-drag
-            style={{ touchAction: 'pan-x' }}
-          >
-            <div className="flex w-max gap-2 px-0.5">
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCat(c.id)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                    cat === c.id ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-300'
-                  }`}
-                >
-                  {c.emoji} {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <FilterChips
+            chips={filterChipItems}
+            activeChipId={cat}
+            onChange={setCat}
+            className="finmemory-waze-scroll shrink-0"
+            ariaLabel="Filtros por categoria"
+          />
 
           <div className="min-h-0 flex-1 overflow-y-auto pb-6" data-sheet-no-drag style={{ touchAction: 'pan-y' }}>
             {loading ? (

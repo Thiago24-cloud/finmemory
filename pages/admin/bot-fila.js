@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../api/auth/[...nextauth]';
 import { canAccessAdminRoutes } from '../../lib/adminAccess';
@@ -111,15 +111,35 @@ function OrigemBadge({ origem }) {
   );
 }
 
+const REJECTION_REASON_PRESETS = [
+  'Duplicado',
+  'Preço inválido',
+  'Imagem ruim',
+  'Loja errada',
+  'Produto fora de contexto',
+  'Sem dados mínimos',
+];
+
 export default function BotFilaPage() {
   const [items, setItems] = useState([]);
+  const [qualityFilter, setQualityFilter] = useState('todos');
   const [sortBy, setSortBy] = useState('desconto');
   const [scopeFilter, setScopeFilter] = useState('todos');
   const [cityView, setCityView] = useState('all');
   const [cityFilter, setCityFilter] = useState('all');
   const [legacyGroups, setLegacyGroups] = useState([]);
   const [ingestRejections, setIngestRejections] = useState([]);
+  const [rejectionHistory, setRejectionHistory] = useState([]);
   const [extractionHealth, setExtractionHealth] = useState({ total: 0, jsonPercent: 0, htmlPercent: 0 });
+  const [pendingDiagnostics, setPendingDiagnostics] = useState({
+    entries: 0,
+    totalProducts: 0,
+    readyProducts: 0,
+    invalidPriceProducts: 0,
+    pendingImageProducts: 0,
+    entriesReadyToPublish: 0,
+    entriesOnlyInvalid: 0,
+  });
   const [showIngestLog, setShowIngestLog] = useState(false);
   const [legacyFilter, setLegacyFilter] = useState('todos');
   const [loading, setLoading] = useState(true);
@@ -130,6 +150,10 @@ export default function BotFilaPage() {
   const [migratePreview, setMigratePreview] = useState(null);
   const [migrateBusy, setMigrateBusy] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [rejectModal, setRejectModal] = useState({ open: false, id: null });
+  const [rejectReasonMode, setRejectReasonMode] = useState('preset');
+  const [rejectReasonPreset, setRejectReasonPreset] = useState(REJECTION_REASON_PRESETS[0]);
+  const [rejectReasonCustom, setRejectReasonCustom] = useState('');
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
@@ -152,6 +176,18 @@ export default function BotFilaPage() {
       setLegacyGroups(json.legacyGroups || []);
       setIngestRejections(json.ingestRejections || []);
       setExtractionHealth(json.extractionHealth || { total: 0, jsonPercent: 0, htmlPercent: 0 });
+      setRejectionHistory(Array.isArray(json.rejectionHistory) ? json.rejectionHistory : []);
+      setPendingDiagnostics(
+        json.pendingDiagnostics || {
+          entries: 0,
+          totalProducts: 0,
+          readyProducts: 0,
+          invalidPriceProducts: 0,
+          pendingImageProducts: 0,
+          entriesReadyToPublish: 0,
+          entriesOnlyInvalid: 0,
+        }
+      );
     } catch {
       showToast('Erro ao carregar fila', false);
     } finally {
@@ -159,15 +195,25 @@ export default function BotFilaPage() {
     }
   }, [scopeFilter, sortBy, cityView, cityFilter]);
 
+  const visibleItems = useMemo(() => {
+    if (qualityFilter === 'publicaveis') {
+      return items.filter((it) => Number(it?.queue_meta?.ready || 0) > 0);
+    }
+    if (qualityFilter === 'problema') {
+      return items.filter((it) => Boolean(it?.queue_meta?.only_problem));
+    }
+    return items;
+  }, [items, qualityFilter]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     setSelectedIndex((prev) => {
-      if (items.length === 0) return 0;
+      if (visibleItems.length === 0) return 0;
       if (prev < 0) return 0;
-      if (prev >= items.length) return items.length - 1;
+      if (prev >= visibleItems.length) return visibleItems.length - 1;
       return prev;
     });
-  }, [items.length]);
+  }, [visibleItems.length]);
 
   useEffect(() => {
     const handler = (event) => {
@@ -176,22 +222,22 @@ export default function BotFilaPage() {
       if (isTyping) return;
       if (event.key === 'j' || event.key === 'J') {
         event.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, Math.max(0, items.length - 1)));
+        setSelectedIndex((prev) => Math.min(prev + 1, Math.max(0, visibleItems.length - 1)));
       } else if (event.key === 'k' || event.key === 'K') {
         event.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      } else if ((event.key === 'v' || event.key === 'V') && items[selectedIndex]) {
+      } else if ((event.key === 'v' || event.key === 'V') && visibleItems[selectedIndex]) {
         event.preventDefault();
-        setExpandedId((prev) => (prev === items[selectedIndex].id ? null : items[selectedIndex].id));
-      } else if ((event.key === 'a' || event.key === 'A') && items[selectedIndex]) {
+        setExpandedId((prev) => (prev === visibleItems[selectedIndex].id ? null : visibleItems[selectedIndex].id));
+      } else if ((event.key === 'a' || event.key === 'A') && visibleItems[selectedIndex]) {
         event.preventDefault();
-        act(items[selectedIndex].id, 'aprovar');
-      } else if ((event.key === 'r' || event.key === 'R') && items[selectedIndex]) {
+        act(visibleItems[selectedIndex].id, 'aprovar');
+      } else if ((event.key === 'r' || event.key === 'R') && visibleItems[selectedIndex]) {
         event.preventDefault();
-        act(items[selectedIndex].id, 'rejeitar');
-      } else if (event.key === 'Backspace' && items[selectedIndex]) {
+        act(visibleItems[selectedIndex].id, 'rejeitar');
+      } else if (event.key === 'Backspace' && visibleItems[selectedIndex]) {
         event.preventDefault();
-        act(items[selectedIndex].id, 'rejeitar');
+        act(visibleItems[selectedIndex].id, 'rejeitar');
       } else if (event.key === '1') {
         event.preventDefault();
         setCityView('all');
@@ -208,7 +254,7 @@ export default function BotFilaPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [items, selectedIndex]);
+  }, [visibleItems, selectedIndex]);
 
   const openMigrateModal = async () => {
     setMigrateModal(true);
@@ -246,13 +292,13 @@ export default function BotFilaPage() {
     }
   };
 
-  const act = async (id, action) => {
+  const act = async (id, action, rejectionReason = '') => {
     setBusy(id + action);
     try {
       const res = await fetch('/api/admin/bot-fila', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify({ id, action, rejection_reason: rejectionReason }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Erro');
@@ -267,7 +313,7 @@ export default function BotFilaPage() {
           showToast(`✅ Aprovado — ${json.inserted} produto(s) publicados no mapa`);
         }
       } else {
-        showToast('❌ Rejeitado');
+        showToast(rejectionReason ? `❌ Rejeitado — motivo: ${rejectionReason}` : '❌ Rejeitado');
       }
       if (keepInQueue) {
         await load();
@@ -279,6 +325,24 @@ export default function BotFilaPage() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const rejectWithReason = (id) => {
+    setRejectReasonMode('preset');
+    setRejectReasonPreset(REJECTION_REASON_PRESETS[0]);
+    setRejectReasonCustom('');
+    setRejectModal({ open: true, id });
+  };
+
+  const confirmRejectWithReason = async () => {
+    if (!rejectModal.id) return;
+    const reason =
+      rejectReasonMode === 'custom'
+        ? String(rejectReasonCustom || '').trim()
+        : String(rejectReasonPreset || '').trim();
+    const id = rejectModal.id;
+    setRejectModal({ open: false, id: null });
+    await act(id, 'rejeitar', reason);
   };
 
   const reprocessLegacy = async (storeName) => {
@@ -331,7 +395,7 @@ export default function BotFilaPage() {
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#2ECC49]/30 bg-[#101820] p-3">
             <p className="text-sm text-gray-300">
-              {loading ? 'Carregando…' : `${items.length} entrada(s) pendente(s)`}
+              {loading ? 'Carregando…' : `${visibleItems.length} entrada(s) pendente(s)`}
             </p>
             <div className="flex flex-wrap gap-2">
               <select
@@ -387,10 +451,87 @@ export default function BotFilaPage() {
               </button>
             </div>
           </div>
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            {[
+              { key: 'todos', label: `Todos (${items.length})` },
+              {
+                key: 'publicaveis',
+                label: `Publicáveis (${items.filter((it) => Number(it?.queue_meta?.ready || 0) > 0).length})`,
+              },
+              {
+                key: 'problema',
+                label: `Só com problema (${items.filter((it) => Boolean(it?.queue_meta?.only_problem)).length})`,
+              },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setQualityFilter(f.key)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  qualityFilter === f.key
+                    ? 'bg-[#2ECC49] text-[#08210f]'
+                    : 'border border-[#2ECC49]/40 bg-[#0b1118] text-[#d7ffe0] hover:bg-[#112219]'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           <p className="mb-4 text-xs text-gray-400">
             Atalhos: <span className="text-[#2ECC49]">J/K</span> navegar · <span className="text-[#2ECC49]">V</span> expandir · <span className="text-[#2ECC49]">A</span> aprovar · <span className="text-[#2ECC49]">R</span> rejeitar
             {' '}· <span className="text-[#2ECC49]">Backspace</span> descartar · <span className="text-[#2ECC49]">1/2/3</span> Estado/Capital/Interior · <span className="text-[#2ECC49]">L</span> log de rejeições
           </p>
+
+          {!loading && (
+            <section className="mb-4 grid gap-2 rounded-xl border border-[#2ECC49]/30 bg-[#0f1720] p-3 text-xs text-gray-200 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+                <p className="text-gray-400">Entradas na fila</p>
+                <p className="text-sm font-semibold text-[#8bf9a3]">{pendingDiagnostics.entries}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+                <p className="text-gray-400">Produtos aptos</p>
+                <p className="text-sm font-semibold text-emerald-300">{pendingDiagnostics.readyProducts}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+                <p className="text-gray-400">Produtos c/ preço inválido</p>
+                <p className="text-sm font-semibold text-red-300">{pendingDiagnostics.invalidPriceProducts}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/20 p-2">
+                <p className="text-gray-400">Entradas só com problema</p>
+                <p className="text-sm font-semibold text-amber-300">{pendingDiagnostics.entriesOnlyInvalid}</p>
+              </div>
+            </section>
+          )}
+
+          {!loading && (
+            <section className="mb-5 rounded-xl border border-violet-400/30 bg-violet-500/10 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-violet-100">Histórico de rejeições</h3>
+                <span className="text-[11px] text-violet-200/85">últimas {rejectionHistory.length}</span>
+              </div>
+              {rejectionHistory.length === 0 ? (
+                <p className="text-xs text-violet-100/80">Nenhuma rejeição registrada ainda.</p>
+              ) : (
+                <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
+                  {rejectionHistory.map((row) => (
+                    <li
+                      key={row.id}
+                      className="rounded-lg border border-violet-300/25 bg-black/20 px-2.5 py-2 text-xs text-violet-100"
+                    >
+                      <p className="font-semibold">
+                        {row.store_name || 'Loja sem nome'}
+                        {row.rejection_reason ? (
+                          <span className="ml-1 font-normal text-violet-200/95">· {row.rejection_reason}</span>
+                        ) : null}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-violet-200/80">
+                        {formatDate(row.reviewed_at)} · {row.reviewed_by || 'revisor não informado'}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
           {showIngestLog && (
             <section className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -545,14 +686,89 @@ export default function BotFilaPage() {
             </div>
           )}
 
-          {!loading && items.length === 0 && (
+          {/* Modal de motivo de rejeição */}
+          {rejectModal.open && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                <h2 className="text-lg font-bold text-[#111]">Rejeitar entrada</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Escolha um motivo para registrar no histórico.
+                </p>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => setRejectReasonMode('preset')}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      rejectReasonMode === 'preset'
+                        ? 'bg-[#2ECC49] text-[#08210f]'
+                        : 'border border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    Motivo padrão
+                  </button>
+                  <button
+                    onClick={() => setRejectReasonMode('custom')}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      rejectReasonMode === 'custom'
+                        ? 'bg-[#2ECC49] text-[#08210f]'
+                        : 'border border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    Motivo personalizado
+                  </button>
+                </div>
+
+                {rejectReasonMode === 'preset' ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {REJECTION_REASON_PRESETS.map((reason) => (
+                      <button
+                        key={reason}
+                        onClick={() => setRejectReasonPreset(reason)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          rejectReasonPreset === reason
+                            ? 'bg-rose-600 text-white'
+                            : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                        }`}
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <textarea
+                    value={rejectReasonCustom}
+                    onChange={(e) => setRejectReasonCustom(e.target.value)}
+                    placeholder="Descreva o motivo (opcional)"
+                    className="mt-3 min-h-24 w-full rounded-xl border border-gray-300 p-3 text-sm text-gray-800 outline-none focus:border-[#2ECC49]"
+                  />
+                )}
+
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    onClick={() => setRejectModal({ open: false, id: null })}
+                    className="rounded-lg border border-black/10 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmRejectWithReason}
+                    className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                  >
+                    Confirmar rejeição
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!loading && visibleItems.length === 0 && (
             <div className="rounded-2xl border border-dashed border-black/15 bg-white/60 p-10 text-center text-gray-500">
               Nenhuma promoção aguardando revisão.
             </div>
           )}
 
           <ul className="space-y-3">
-            {items.map((item, index) => {
+            {visibleItems.map((item, index) => {
               const produtos = Array.isArray(item.produtos) ? item.produtos : [];
               const artifactUrls = collectArtifactUrls(item);
               const isExpanded = expandedId === item.id;
@@ -593,6 +809,14 @@ export default function BotFilaPage() {
                         {item.max_discount_percent != null ? ` · desconto máx ${item.max_discount_percent}%` : ''}
                         {item.nearest_expiry_at ? ` · expira ${formatDate(item.nearest_expiry_at)}` : ''}
                       </p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
+                          aptos: {item?.queue_meta?.ready || 0}
+                        </span>
+                        <span className="rounded-full border border-red-400/35 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-200">
+                          preço inválido: {item?.queue_meta?.invalid_price || 0}
+                        </span>
+                      </div>
                       {artifactUrls.length > 0 ? (
                         <div className="mt-2 flex flex-wrap gap-2">
                           <a
@@ -621,7 +845,7 @@ export default function BotFilaPage() {
                         {isExpanded ? 'Ocultar' : 'Ver produtos'}
                       </button>
                       <button
-                        onClick={() => act(item.id, 'rejeitar')}
+                        onClick={() => rejectWithReason(item.id)}
                         disabled={isBusy}
                         className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
                       >

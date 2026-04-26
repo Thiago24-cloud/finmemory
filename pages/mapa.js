@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -51,6 +51,8 @@ export default function MapaPage() {
   /** Padrão "Todos" (como referência DIA) — mapa mostra todas as ofertas/pontos até filtrar. */
   const [promoOnly, setPromoOnly] = useState(false);
   const [mapChipSelection, setMapChipSelection] = useState('todos');
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [chipsShouldHide, setChipsShouldHide] = useState(false);
   const searchInputRef = useRef(null);
   const narrowScreen = useMatchMedia('(max-width: 767px)');
 
@@ -96,6 +98,23 @@ export default function MapaPage() {
     setShowMenuSheet(false);
   };
 
+  const handleDetailOpenChange = useCallback((open) => {
+    setIsDetailOpen(Boolean(open));
+  }, []);
+
+  useEffect(() => {
+    let t;
+    if (isDetailOpen) {
+      // Aguarda 1 frame para a abertura do sheet começar e só então oculta os chips.
+      t = window.setTimeout(() => setChipsShouldHide(true), 40);
+    } else {
+      setChipsShouldHide(false);
+    }
+    return () => {
+      if (t) window.clearTimeout(t);
+    };
+  }, [isDetailOpen]);
+
   return (
     <>
       <Head>
@@ -110,6 +129,7 @@ export default function MapaPage() {
             wazeUi={wazeUi}
             headerOffsetPx={mapPaddingTopPx}
             overlayTopPx={mapOverlayTopPx}
+            onDetailOpenChange={handleDetailOpenChange}
           />
         </div>
 
@@ -212,7 +232,14 @@ export default function MapaPage() {
                 </div>
               </div>
 
-              <div className="min-w-0 w-full md:flex-1">
+              <div
+                className={`min-w-0 w-full md:flex-1 transition-all ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  chipsShouldHide
+                    ? 'pointer-events-none max-h-0 -translate-y-1 overflow-hidden opacity-0'
+                    : 'max-h-24 translate-y-0 opacity-100'
+                } ${narrowScreen ? 'duration-200' : 'duration-300'}`}
+                aria-hidden={chipsShouldHide}
+              >
                 <MapOverlayCategoryChips
                   wazeUi={wazeUi}
                   mapsMobileLayout={!wazeUi && narrowScreen}

@@ -2575,6 +2575,7 @@ export default function MapaPrecosLeaflet({
   wazeUi = false,
   headerOffsetPx = 56,
   overlayTopPx,
+  onDetailOpenChange,
 }) {
   const theme = getMapThemeById(mapThemeId);
   const mapboxToken =
@@ -2660,6 +2661,16 @@ export default function MapaPrecosLeaflet({
   useEffect(() => {
     if (mobileStorePreview) setPreviewSheetSnap('half');
   }, [mobileStorePreview]);
+
+  const isDetailOpen = shopOpen || Boolean(mobileStorePreview);
+  useEffect(() => {
+    if (typeof onDetailOpenChange === 'function') {
+      onDetailOpenChange(isDetailOpen);
+    }
+    return () => {
+      if (typeof onDetailOpenChange === 'function') onDetailOpenChange(false);
+    };
+  }, [isDetailOpen, onDetailOpenChange]);
 
   useEffect(() => {
     setPreviewOfferFilter('');

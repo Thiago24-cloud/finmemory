@@ -209,12 +209,23 @@ export default async function handler(req, res) {
     const chainSlugRadiusKm =
       Number.parseFloat(process.env.MAP_STORE_OFFERS_CHAIN_SLUG_RADIUS_KM || '') || 2.5;
 
+    const defaultTtlHours = Math.max(
+      1,
+      Number.parseInt(process.env.MAP_DEFAULT_TTL_HOURS || '24', 10) || 24
+    );
     const promoTtlHours = Math.max(
+      defaultTtlHours,
+      Number.parseInt(process.env.MAP_PROMO_TTL_HOURS || '168', 10) || 168
+    );
+    const storePromoTtlHours = Math.max(
       1,
       Number.parseInt(process.env.MAP_STORE_OFFERS_PROMO_TTL_HOURS || '24', 10) || 24
     );
     /** Só para `price_points` (divulgação/import categoria promo). O agente usa `expira_em` (ex.: 72h). */
-    const promoCutoffIso = new Date(Date.now() - promoTtlHours * 60 * 60 * 1000).toISOString();
+    const promoCutoffIso = new Date(
+      Date.now() - Math.max(storePromoTtlHours, promoTtlHours) * 60 * 60 * 1000
+    ).toISOString();
+    const normalCutoffIso = new Date(Date.now() - defaultTtlHours * 60 * 60 * 1000).toISOString();
 
     const baseSelect =
       'id, product_name, price, store_name, lat, lng, category, created_at, atualizado_em, user_id, product_id';
@@ -224,9 +235,24 @@ export default async function handler(req, res) {
       .select(baseSelect)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .in('source', ['bot_fila_aprovado', 'admin_manual'])
+      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual'])
       .ilike('category', '%promo%')
       .gte('created_at', promoCutoffIso)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .order('created_at', { ascending: false })
+      .limit(2000);
+
+    const normalQ = supabase
+      .from('price_points')
+      .select(baseSelect)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual'])
+      .not('category', 'ilike', '%promo%')
+      .gte('created_at', normalCutoffIso)
       .gte('lat', latMin)
       .lte('lat', latMax)
       .gte('lng', lngMin)
@@ -239,8 +265,8 @@ export default async function handler(req, res) {
       .select('product_name, product_id, created_at')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .in('source', ['bot_fila_aprovado', 'admin_manual'])
-      .gte('created_at', promoCutoffIso)
+      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual'])
+      .gte('created_at', normalCutoffIso)
       .gte('lat', latMin)
       .lte('lat', latMax)
       .gte('lng', lngMin)
@@ -248,8 +274,13 @@ export default async function handler(req, res) {
       .order('created_at', { ascending: false })
       .limit(2000);
 
-    const [{ data: promoRows, error: promoErr }, { data: reusePts, error: reuseErr }] = await Promise.all([
+    const [
+      { data: promoRows, error: promoErr },
+      { data: normalRows, error: normalErr },
+      { data: reusePts, error: reuseErr },
+    ] = await Promise.all([
       promoQ,
+      normalQ,
       reuseQ,
     ]);
 
@@ -257,11 +288,15 @@ export default async function handler(req, res) {
       console.error('store-offers price_points:', promoErr);
       return res.status(500).json({ error: promoErr.message });
     }
+    if (normalErr) {
+      console.error('store-offers price_points normal:', normalErr);
+      return res.status(500).json({ error: normalErr.message });
+    }
     if (reuseErr) {
       console.warn('store-offers reuse price_points:', reuseErr.message);
     }
 
-    let merged = [...(promoRows || [])].map((r) => ({ ...r, source: 'price_points' }));
+    let merged = [...(promoRows || []), ...(normalRows || [])].map((r) => ({ ...r, source: 'price_points' }));
 
     // Bloqueio global: não incluir `promocoes_supermercados` em offers de loja.
 
@@ -279,6 +314,13 @@ export default async function handler(req, res) {
       const pStoreName = (row.store_name || '').toLowerCase();
       const normalizedPointStoreName = normalizeMapChainText(row.store_name);
       if (pStoreName && pStoreName === storeNameLower) return true;
+
+      const categoryText = String(row.category || '').toLowerCase();
+      const rowIsPromo = categoryText.includes('promo');
+      if (!rowIsPromo) {
+        // Alinha com /api/map/stores: itens não-promo só entram quando o nome da loja casa exatamente.
+        return false;
+      }
 
       const slug =
         row.agent_supermercado_slug ||
