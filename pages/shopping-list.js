@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, Plus, Trash2, Check, Filter, MapPin, StickyNote } f
 import { BottomNav } from '../components/BottomNav';
 import ProximityAlertsSettings from '../components/ProximityAlertsSettings';
 import { getSupabase } from '../lib/supabase';
+import { useMapCart } from '../components/map/MapCartContext';
 
 const FILTER_STATUS = [
   { value: 'all', label: 'Todos' },
@@ -55,6 +56,9 @@ export default function ShoppingListPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPeriod, setFilterPeriod] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [savingMapBag, setSavingMapBag] = useState(false);
+  const [mapBagBanner, setMapBagBanner] = useState('');
+  const { shoppingBag, shoppingBagTotals, clearSelectedProducts } = useMapCart();
 
   const userId = session?.user?.supabaseId || (typeof window !== 'undefined' && localStorage.getItem('user_id'));
 
@@ -246,6 +250,90 @@ export default function ShoppingListPage() {
     fetchPartnershipAndItems();
   };
 
+  const handleSaveMapBag = async () => {
+    setMapBagBanner('');
+    if (!userId) {
+      setMapBagBanner('Faça login para salvar os produtos do mapa.');
+      return;
+    }
+    if (!shoppingBag?.length) return;
+    const supabase = getSupabase();
+    if (!supabase) {
+      setMapBagBanner('Não foi possível conectar.');
+      return;
+    }
+    setSavingMapBag(true);
+    try {
+      let partnershipId = null;
+      const { data: memberRow, error: e1 } = await supabase
+        .from('partnership_members')
+        .select('partnership_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (!e1 && memberRow) {
+        const { data: p, error: e2 } = await supabase
+          .from('partnerships')
+          .select('id')
+          .eq('id', memberRow.partnership_id)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (!e2 && p) partnershipId = p.id;
+      }
+
+      const itemsPayload = shoppingBag.map(({ offerId, id, productName, name, storeLabel, priceNum, precoLabel }) => ({
+        offerId: String(offerId || id),
+        productName: productName || name || 'Item',
+        storeLabel,
+        priceNum: typeof priceNum === 'number' && Number.isFinite(priceNum) ? priceNum : null,
+        precoLabel: precoLabel || null,
+      }));
+      const total = itemsPayload.reduce((s, x) => s + (typeof x.priceNum === 'number' ? x.priceNum : 0), 0);
+
+      const { data: listRow, error: insErr } = await supabase
+        .from('shopping_lists')
+        .insert({
+          partnership_id: partnershipId,
+          owner_user_id: userId,
+          created_by: userId,
+          total,
+          items: itemsPayload,
+        })
+        .select('id')
+        .single();
+      if (insErr) throw insErr;
+
+      const groupId = listRow?.id;
+      if (groupId) {
+        const rows = shoppingBag.map(({ offerId, id, productName, name, storeLabel, priceNum, precoLabel }) => ({
+          partnership_id: partnershipId,
+          owner_user_id: userId,
+          added_by: userId,
+          name: productName || name || 'Item',
+          quantity: 1,
+          source_type: 'map',
+          unit_price: typeof priceNum === 'number' && Number.isFinite(priceNum) ? priceNum : null,
+          price_label: precoLabel || null,
+          store_label: storeLabel || null,
+          map_offer_id: offerId != null ? String(offerId) : String(id),
+          shopping_list_group_id: groupId,
+        }));
+        const { error: itemsErr } = await supabase.from('shopping_list_items').insert(rows);
+        if (itemsErr) {
+          await supabase.from('shopping_lists').delete().eq('id', groupId);
+          throw itemsErr;
+        }
+      }
+      clearSelectedProducts();
+      setMapBagBanner('Produtos salvos na lista com sucesso.');
+      await fetchPartnershipAndItems();
+    } catch (e) {
+      setMapBagBanner(e?.message || 'Não foi possível salvar os produtos.');
+    } finally {
+      setSavingMapBag(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
@@ -281,6 +369,40 @@ export default function ShoppingListPage() {
             </span>
           )}
         </p>
+
+        {shoppingBag.length > 0 ? (
+          <section className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-bold text-emerald-900">Carrinho do mapa</p>
+                <p className="text-xs text-emerald-800">
+                  {shoppingBagTotals.itemsCount} itens • {formatMoney(shoppingBagTotals.totalPrice)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveMapBag}
+                disabled={savingMapBag}
+                className="rounded-lg bg-[#2ECC49] px-3 py-2 text-xs font-semibold text-white hover:bg-[#22a83a] disabled:opacity-60"
+              >
+                {savingMapBag ? 'Salvando…' : 'Salvar produtos'}
+              </button>
+            </div>
+            <div className="mt-2 max-h-36 space-y-1 overflow-y-auto">
+              {shoppingBag.map((item) => (
+                <div key={item.id} className="flex items-start justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-xs">
+                  <span className="line-clamp-1 flex-1 text-gray-700">{item.productName || item.name}</span>
+                  <span className="shrink-0 font-semibold text-emerald-700">
+                    {typeof item.priceNum === 'number' ? formatMoney(item.priceNum) : item.precoLabel || '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {mapBagBanner ? (
+              <p className="mt-2 text-xs font-medium text-emerald-900">{mapBagBanner}</p>
+            ) : null}
+          </section>
+        ) : null}
 
         {userId ? (
           <ProximityAlertsSettings userId={userId} pendingNames={pendingNamesForProximity} />

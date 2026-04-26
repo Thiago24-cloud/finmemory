@@ -4,10 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Map, BarChart3, User, ScanLine, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useMapCart } from './map/MapCartContext';
 
 export function BottomNav() {
   const router = useRouter();
   const pathname = router.pathname;
+  const { shoppingBagTotals } = useMapCart();
+  const bagCount = Number(shoppingBagTotals?.itemsCount || 0);
 
   const tabBtn = (active) =>
     cn(
@@ -23,6 +26,11 @@ export function BottomNav() {
         <div className="flex flex-1 justify-start items-end gap-0.5 sm:gap-1 pl-0.5">
           <button type="button" onClick={() => router.push('/mapa')} className={tabBtn(pathname === '/mapa')}>
             <Map className={cn('h-5 w-5 transition-transform', pathname === '/mapa' && 'scale-110')} />
+            {bagCount > 0 ? (
+              <span className="absolute -top-1 right-0 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white shadow-sm">
+                {bagCount > 99 ? '99+' : bagCount}
+              </span>
+            ) : null}
             <span className={cn('text-[10px]', pathname === '/mapa' ? 'font-bold' : 'font-medium')}>Mapas</span>
             {pathname === '/mapa' && (
               <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
