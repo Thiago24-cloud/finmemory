@@ -231,6 +231,8 @@ export type EstablishmentDetailSheetProps = {
   canConfirmPrice: boolean;
   appUserId?: string | null;
   onOfferSeenUpdated?: (offerId: string, observedAt: string) => void;
+  onToggleCart?: (product: NormalizedProduct) => void;
+  isCartSelected?: (product: NormalizedProduct) => boolean;
 };
 
 export default function EstablishmentDetailSheet({
@@ -245,6 +247,8 @@ export default function EstablishmentDetailSheet({
   canConfirmPrice,
   appUserId,
   onOfferSeenUpdated,
+  onToggleCart,
+  isCartSelected,
 }: EstablishmentDetailSheetProps) {
   const [vh, setVh] = useState(640);
   const [search, setSearch] = useState('');
@@ -580,6 +584,7 @@ export default function EstablishmentDetailSheet({
                   const locked = Boolean(appUserId && isConfirmLocked(appUserId, p.confirmId));
                   const done = confirmed.has(p.key) || locked;
                   const busy = busyId === p.key;
+                  const inCart = Boolean(isCartSelected?.(p));
                   return (
                     <motion.article
                       key={p.key}
@@ -628,6 +633,19 @@ export default function EstablishmentDetailSheet({
                           )}
                           {done ? 'Confirmado ✓' : 'Confirmar preço'}
                         </button>
+                        {onToggleCart ? (
+                          <button
+                            type="button"
+                            onClick={() => onToggleCart(p)}
+                            className={`mt-1 flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                              inCart
+                                ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300'
+                                : 'border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-emerald-500/50 hover:text-emerald-300'
+                            }`}
+                          >
+                            {inCart ? '✓ Na cesta' : '+ Cesta'}
+                          </button>
+                        ) : null}
                       </div>
                     </motion.article>
                   );

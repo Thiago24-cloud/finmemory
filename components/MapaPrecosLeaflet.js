@@ -3099,6 +3099,57 @@ export default function MapaPrecosLeaflet({
 
   const cartOfferIdSet = useMemo(() => new Set(promoCart.map((x) => x.offerId || x.id)), [promoCart]);
 
+  const isDetailSheetProductInCart = useCallback(
+    (product) => {
+      if (!product) return false;
+      const baseId = String(product.confirmId || product.id || '');
+      if (!baseId) return false;
+      if (product.cardType === 'encarte') return cartOfferIdSet.has(`encarte-${baseId}`);
+      return cartOfferIdSet.has(baseId);
+    },
+    [cartOfferIdSet]
+  );
+
+  const toggleCartFromDetailSheet = useCallback(
+    (product) => {
+      if (!product) return;
+      const pid = String(product.confirmId || product.id || '');
+      if (!pid) return;
+      if (product.cardType === 'encarte') {
+        const row = shopPromotions.find((r) => String(r.id) === pid);
+        if (row) {
+          toggleSelectedPromotionItem(row);
+          return;
+        }
+      }
+      const offer = shopOffers.find((o) => String(o.id) === pid);
+      if (offer) {
+        toggleCartOffer(offer);
+        return;
+      }
+      const storeLabel = shopStore?.name || 'Loja';
+      toggleSelectedProduct({
+        id: product.cardType === 'encarte' ? `encarte-${pid}` : pid,
+        offerId: product.cardType === 'encarte' ? `encarte-${pid}` : pid,
+        name: product.name,
+        productName: product.name,
+        price: typeof product.price === 'number' ? product.price : null,
+        priceNum: typeof product.price === 'number' ? product.price : null,
+        precoLabel: typeof product.price === 'number' ? `R$ ${formatBRLPriceNum(product.price)}` : null,
+        imageUrl: product.imageUrl || null,
+        storeLabel,
+        storeName: storeLabel,
+        placeId: shopStore?.place_id || null,
+        storeId: shopStore?.id || null,
+        storeGeo:
+          Number.isFinite(Number(shopStore?.lat)) && Number.isFinite(Number(shopStore?.lng))
+            ? { lat: Number(shopStore.lat), lng: Number(shopStore.lng) }
+            : null,
+      });
+    },
+    [shopPromotions, shopOffers, toggleSelectedPromotionItem, toggleCartOffer, toggleSelectedProduct, shopStore]
+  );
+
   useEffect(() => {
     if (!userMapPosition || promoCart.length === 0) {
       setNearbyBagAlert(null);
@@ -4129,6 +4180,8 @@ export default function MapaPrecosLeaflet({
           onVisualMetrics={handleShopSheetVisualMetrics}
           canConfirmPrice={Boolean(session?.user?.email)}
           appUserId={session?.user?.supabaseId}
+          onToggleCart={toggleCartFromDetailSheet}
+          isCartSelected={isDetailSheetProductInCart}
           onOfferSeenUpdated={(offerId, observedAt) => {
             setShopOffers((prev) =>
               prev.map((o) =>
