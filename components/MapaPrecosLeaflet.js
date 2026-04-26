@@ -2695,6 +2695,10 @@ export default function MapaPrecosLeaflet({
 
   const handleShopSheetVisualMetrics = useCallback((m) => {
     setMobileShopSheetMapBottomPadPx(Math.max(0, Math.round(Number(m?.bottomInsetPx) || 0)));
+    if (typeof m?.snap === 'string') {
+      // EstablishmentDetailSheet não usa onSnapChange externo; capturamos o snap por métricas.
+      setShopSheetSnap(m.snap);
+    }
   }, []);
 
   useEffect(() => {
