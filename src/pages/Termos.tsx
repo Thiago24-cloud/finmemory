@@ -99,8 +99,8 @@ const Termos = () => {
             <h2 className="text-lg font-semibold text-foreground">9. Contato</h2>
             <p className="text-muted-foreground leading-relaxed">
               Para dúvidas ou solicitações, entre em contato pelo e-mail:{" "}
-              <a href="mailto:suporte@finmemory.com" className="text-primary hover:underline">
-                suporte@finmemory.com
+              <a href="mailto:finmemory.oficial@gmail.com" className="text-primary hover:underline">
+                finmemory.oficial@gmail.com
               </a>
             </p>
           </section>

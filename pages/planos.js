@@ -59,14 +59,6 @@ function LiLocked({ children, onUnlock }) {
   );
 }
 
-export async function getServerSideProps() {
-  return {
-    props: {
-      stripePublishableConfigured: Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim()),
-    },
-  };
-}
-
 const UPSELL_COPY = {
   radar: {
     title: 'Ative o radar de ofertas',
@@ -85,7 +77,7 @@ const UPSELL_COPY = {
   },
 };
 
-export default function PlanosPage({ stripePublishableConfigured }) {
+export default function PlanosPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [upsell, setUpsell] = useState(null);
@@ -125,13 +117,12 @@ export default function PlanosPage({ stripePublishableConfigured }) {
           </p>
         </div>
 
-        {!stripePublishableConfigured ? (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-6">
-            Os botões de pagamento só funcionam com{' '}
-            <code className="text-xs">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> no ambiente (local e Cloud Run), além
-            de <code className="text-xs">STRIPE_SECRET_KEY</code> e os Price IDs no servidor.
-          </p>
-        ) : null}
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-6">
+          Se o checkout não abrir, valide o ambiente: execute <code className="text-xs">npm run validate-env</code> e
+          confirme <code className="text-xs">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>,{' '}
+          <code className="text-xs">STRIPE_SECRET_KEY</code>, <code className="text-xs">STRIPE_WEBHOOK_SECRET</code> e
+          os Price IDs do Stripe.
+        </p>
 
         {/* Modal upsell (cadeado no plano Grátis) */}
         {upsell ? (
@@ -161,7 +152,7 @@ export default function PlanosPage({ stripePublishableConfigured }) {
                 Cancele quando quiser. Assinatura mensal via Stripe.
               </p>
               <div className="mt-5 flex flex-col gap-2">
-                {stripePublishableConfigured && authed ? (
+                {authed ? (
                   <UpgradeBtn
                     plan={upsell.plan}
                     userId={session.user.supabaseId}
@@ -170,10 +161,12 @@ export default function PlanosPage({ stripePublishableConfigured }) {
                   >
                     {upsell.cta}
                   </UpgradeBtn>
-                ) : (
+                ) : status === 'authenticated' ? (
                   <p className="text-center text-sm text-amber-800">
                     Configure o Stripe para concluir a assinatura aqui.
                   </p>
+                ) : (
+                  <p className="text-center text-sm text-gray-500">A carregar…</p>
                 )}
                 <button
                   type="button"
@@ -226,24 +219,14 @@ export default function PlanosPage({ stripePublishableConfigured }) {
               <LiOff>Open Finance</LiOff>
             </ul>
             {authed ? (
-              stripePublishableConfigured ? (
-                <UpgradeBtn
-                  plan="plus"
-                  userId={session.user.supabaseId}
-                  userEmail={session.user.email}
-                  className="mt-6 w-full rounded-lg bg-gradient-to-r from-gray-900 to-gray-800 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-gray-800 hover:to-gray-900"
-                >
-                  Assinar Plus
-                </UpgradeBtn>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="mt-6 w-full rounded-lg border border-amber-200 bg-amber-50 py-2.5 text-sm font-semibold text-amber-900"
-                >
-                  Stripe em configuração
-                </button>
-              )
+              <UpgradeBtn
+                plan="plus"
+                userId={session.user.supabaseId}
+                userEmail={session.user.email}
+                className="mt-6 w-full rounded-lg bg-gradient-to-r from-gray-900 to-gray-800 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-gray-800 hover:to-gray-900"
+              >
+                Assinar Plus
+              </UpgradeBtn>
             ) : (
               <p className="mt-6 text-center text-sm text-gray-500">A carregar…</p>
             )}
@@ -267,24 +250,14 @@ export default function PlanosPage({ stripePublishableConfigured }) {
               <Li>Suporte prioritário</Li>
             </ul>
             {authed ? (
-              stripePublishableConfigured ? (
-                <UpgradeBtn
-                  plan="pro"
-                  userId={session.user.supabaseId}
-                  userEmail={session.user.email}
-                  className="mt-6 w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-blue-500 hover:to-blue-600"
-                >
-                  Assinar Pro
-                </UpgradeBtn>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="mt-6 w-full rounded-lg border border-amber-200 bg-amber-50 py-2.5 text-sm font-semibold text-amber-900"
-                >
-                  Stripe em configuração
-                </button>
-              )
+              <UpgradeBtn
+                plan="pro"
+                userId={session.user.supabaseId}
+                userEmail={session.user.email}
+                className="mt-6 w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-blue-500 hover:to-blue-600"
+              >
+                Assinar Pro
+              </UpgradeBtn>
             ) : (
               <p className="mt-6 text-center text-sm text-gray-500">A carregar…</p>
             )}
@@ -305,24 +278,14 @@ export default function PlanosPage({ stripePublishableConfigured }) {
               <Li>1 conta por membro</Li>
             </ul>
             {authed ? (
-              stripePublishableConfigured ? (
-                <UpgradeBtn
-                  plan="familia"
-                  userId={session.user.supabaseId}
-                  userEmail={session.user.email}
-                  className="mt-6 w-full rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-emerald-500 hover:to-emerald-600"
-                >
-                  Assinar Família
-                </UpgradeBtn>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="mt-6 w-full rounded-lg border border-amber-200 bg-amber-50 py-2.5 text-sm font-semibold text-amber-900"
-                >
-                  Stripe em configuração
-                </button>
-              )
+              <UpgradeBtn
+                plan="familia"
+                userId={session.user.supabaseId}
+                userEmail={session.user.email}
+                className="mt-6 w-full rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-emerald-500 hover:to-emerald-600"
+              >
+                Assinar Família
+              </UpgradeBtn>
             ) : (
               <p className="mt-6 text-center text-sm text-gray-500">A carregar…</p>
             )}

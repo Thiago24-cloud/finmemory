@@ -641,7 +641,7 @@ export default function EstablishmentDetailSheet({
                 Confirmações contam para o ranking semanal e XP (máx. 1 por oferta/dia).
               </p>
               <a
-                href="https://instagram.com/finmemory"
+                href="https://instagram.com/finmemory.oficial"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-orange-400"

@@ -28,11 +28,82 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+function uniqueHttpUrls(values) {
+  const out = [];
+  const seen = new Set();
+  for (const v of values || []) {
+    const s = String(v || '').trim();
+    if (!s) continue;
+    if (!/^https?:\/\//i.test(s)) continue;
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
+function collectArtifactUrls(item) {
+  const produtos = Array.isArray(item?.produtos) ? item.produtos : [];
+  const fromArtifacts = [];
+  const artifacts = item?.artifacts && typeof item.artifacts === 'object' ? item.artifacts : null;
+  if (artifacts?.source_page_url) fromArtifacts.push(artifacts.source_page_url);
+  if (Array.isArray(artifacts?.flyer_asset_urls)) fromArtifacts.push(...artifacts.flyer_asset_urls);
+
+  const fromProdutos = [];
+  for (const p of produtos) {
+    const md = p?.metadata && typeof p.metadata === 'object' ? p.metadata : null;
+    if (!md) continue;
+    fromProdutos.push(
+      md.storePageUrl,
+      md.source_page_url,
+      md.source_url,
+      md.flyer_url,
+      md.pdf_url
+    );
+  }
+  return uniqueHttpUrls([...fromArtifacts, ...fromProdutos]).slice(0, 20);
+}
+
+function getProductValidityInfo(produto) {
+  const rawDate =
+    produto?.expiry_date ||
+    produto?.valid_until ||
+    produto?.validade ||
+    produto?.expires_at ||
+    null;
+  const validityInferred = Boolean(produto?.metadata?.validity_inferred);
+  if (!rawDate) {
+    return {
+      modeLabel: validityInferred ? 'Automática' : 'Manual',
+      modeTone: validityInferred ? 'amber' : 'emerald',
+      dateLabel: 'Sem data',
+      daysLeftLabel: '',
+    };
+  }
+  const d = new Date(String(rawDate));
+  const validDate = !Number.isNaN(d.getTime());
+  const dateLabel = validDate ? d.toLocaleDateString('pt-BR') : String(rawDate);
+  let daysLeftLabel = '';
+  if (validDate) {
+    const ms = d.getTime() - Date.now();
+    const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+    if (days > 0) daysLeftLabel = `vence em ${days} dia(s)`;
+    else if (days === 0) daysLeftLabel = 'vence hoje';
+    else daysLeftLabel = `vencido há ${Math.abs(days)} dia(s)`;
+  }
+  return {
+    modeLabel: validityInferred ? 'Automática' : 'Manual',
+    modeTone: validityInferred ? 'amber' : 'emerald',
+    dateLabel,
+    daysLeftLabel,
+  };
+}
+
 function OrigemBadge({ origem }) {
   const color =
-    origem?.includes('dia') ? 'bg-red-100 text-red-700' :
-    origem?.includes('assai') ? 'bg-orange-100 text-orange-700' :
-    'bg-gray-100 text-gray-600';
+    origem?.includes('dia') ? 'bg-red-500/15 text-red-200 border border-red-500/30' :
+    origem?.includes('assai') ? 'bg-orange-500/15 text-orange-200 border border-orange-500/30' :
+    'bg-white/10 text-gray-300 border border-white/15';
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>
       {origem || 'desconhecido'}
@@ -42,7 +113,14 @@ function OrigemBadge({ origem }) {
 
 export default function BotFilaPage() {
   const [items, setItems] = useState([]);
+  const [sortBy, setSortBy] = useState('desconto');
+  const [scopeFilter, setScopeFilter] = useState('todos');
+  const [cityView, setCityView] = useState('all');
+  const [cityFilter, setCityFilter] = useState('all');
   const [legacyGroups, setLegacyGroups] = useState([]);
+  const [ingestRejections, setIngestRejections] = useState([]);
+  const [extractionHealth, setExtractionHealth] = useState({ total: 0, jsonPercent: 0, htmlPercent: 0 });
+  const [showIngestLog, setShowIngestLog] = useState(false);
   const [legacyFilter, setLegacyFilter] = useState('todos');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
@@ -51,6 +129,7 @@ export default function BotFilaPage() {
   const [migrateModal, setMigrateModal] = useState(false);
   const [migratePreview, setMigratePreview] = useState(null);
   const [migrateBusy, setMigrateBusy] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
@@ -60,18 +139,76 @@ export default function BotFilaPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/bot-fila');
+      const params = new URLSearchParams({
+        sort: sortBy,
+        scope: scopeFilter,
+        cityView,
+        city: cityFilter,
+        limit: '250',
+      });
+      const res = await fetch(`/api/admin/bot-fila?${params.toString()}`);
       const json = await res.json();
       setItems(json.items || []);
       setLegacyGroups(json.legacyGroups || []);
+      setIngestRejections(json.ingestRejections || []);
+      setExtractionHealth(json.extractionHealth || { total: 0, jsonPercent: 0, htmlPercent: 0 });
     } catch {
       showToast('Erro ao carregar fila', false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scopeFilter, sortBy, cityView, cityFilter]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setSelectedIndex((prev) => {
+      if (items.length === 0) return 0;
+      if (prev < 0) return 0;
+      if (prev >= items.length) return items.length - 1;
+      return prev;
+    });
+  }, [items.length]);
+
+  useEffect(() => {
+    const handler = (event) => {
+      const tag = event.target?.tagName?.toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || event.target?.isContentEditable;
+      if (isTyping) return;
+      if (event.key === 'j' || event.key === 'J') {
+        event.preventDefault();
+        setSelectedIndex((prev) => Math.min(prev + 1, Math.max(0, items.length - 1)));
+      } else if (event.key === 'k' || event.key === 'K') {
+        event.preventDefault();
+        setSelectedIndex((prev) => Math.max(prev - 1, 0));
+      } else if ((event.key === 'v' || event.key === 'V') && items[selectedIndex]) {
+        event.preventDefault();
+        setExpandedId((prev) => (prev === items[selectedIndex].id ? null : items[selectedIndex].id));
+      } else if ((event.key === 'a' || event.key === 'A') && items[selectedIndex]) {
+        event.preventDefault();
+        act(items[selectedIndex].id, 'aprovar');
+      } else if ((event.key === 'r' || event.key === 'R') && items[selectedIndex]) {
+        event.preventDefault();
+        act(items[selectedIndex].id, 'rejeitar');
+      } else if (event.key === 'Backspace' && items[selectedIndex]) {
+        event.preventDefault();
+        act(items[selectedIndex].id, 'rejeitar');
+      } else if (event.key === '1') {
+        event.preventDefault();
+        setCityView('all');
+      } else if (event.key === '2') {
+        event.preventDefault();
+        setCityView('capital');
+      } else if (event.key === '3') {
+        event.preventDefault();
+        setCityView('interior');
+      } else if (event.key === 'l' || event.key === 'L') {
+        event.preventDefault();
+        setShowIngestLog((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [items, selectedIndex]);
 
   const openMigrateModal = async () => {
     setMigrateModal(true);
@@ -168,12 +305,12 @@ export default function BotFilaPage() {
       <Head>
         <title>Fila do Bot — FinMemory Admin</title>
       </Head>
-      <div className="min-h-screen bg-[#f4f1ec] text-[#1a1a1a]">
-        <header className="border-b border-black/10 bg-white/90 backdrop-blur px-4 py-4 sm:px-6">
+      <div className="min-h-screen bg-[#090d12] text-[#e8edf2]">
+        <header className="border-b border-[#2ECC49]/30 bg-[#0f1720]/90 backdrop-blur px-4 py-4 sm:px-6">
           <div className="mx-auto flex max-w-3xl items-center justify-between">
             <div>
               <h1 className="text-xl font-bold tracking-tight">Fila do Bot</h1>
-              <p className="text-sm text-gray-600">Promoções enviadas pelo scraper aguardando aprovação.</p>
+              <p className="text-sm text-gray-300">Promoções enviadas pelo scraper aguardando aprovação.</p>
             </div>
             <Link href="/admin" className="text-sm font-medium text-[#2ECC49] hover:underline">
               ← Admin
@@ -185,33 +322,104 @@ export default function BotFilaPage() {
           {toast && (
             <div
               className={`mb-4 rounded-xl px-4 py-3 text-sm font-medium ${
-                toast.ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                toast.ok ? 'bg-[#2ECC49]/15 text-[#a7f3b5] border border-[#2ECC49]/35' : 'bg-red-500/10 text-red-200 border border-red-500/40'
               }`}
             >
               {toast.msg}
             </div>
           )}
 
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-gray-600">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#2ECC49]/30 bg-[#101820] p-3">
+            <p className="text-sm text-gray-300">
               {loading ? 'Carregando…' : `${items.length} entrada(s) pendente(s)`}
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="rounded-lg border border-[#2ECC49]/40 bg-[#0b1118] px-3 py-1.5 text-sm text-[#d7ffe0]"
+              >
+                <option value="desconto">Maior desconto</option>
+                <option value="expiracao">Expira primeiro</option>
+                <option value="recentes">Mais recentes</option>
+              </select>
+              <select
+                value={scopeFilter}
+                onChange={(e) => setScopeFilter(e.target.value)}
+                className="rounded-lg border border-[#2ECC49]/40 bg-[#0b1118] px-3 py-1.5 text-sm text-[#d7ffe0]"
+              >
+                <option value="todos">Todas regiões</option>
+                <option value="Estadual">Estadual</option>
+                <option value="Grande SP">Grande SP</option>
+                <option value="cidade">Cidade</option>
+              </select>
+              <select
+                value={cityView}
+                onChange={(e) => setCityView(e.target.value)}
+                className="rounded-lg border border-[#2ECC49]/40 bg-[#0b1118] px-3 py-1.5 text-sm text-[#d7ffe0]"
+              >
+                <option value="all">1: Estado Todo</option>
+                <option value="capital">2: Capital</option>
+                <option value="interior">3: Interior</option>
+              </select>
+              <select
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                className="rounded-lg border border-[#2ECC49]/40 bg-[#0b1118] px-3 py-1.5 text-sm text-[#d7ffe0]"
+              >
+                <option value="all">Cidade: todas</option>
+                {Array.from(new Set(items.map((it) => it?.locality_city).filter(Boolean))).sort().map((city) => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
               <button
                 onClick={openMigrateModal}
-                className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+                className="rounded-lg border border-amber-300/50 bg-amber-500/15 px-3 py-1.5 text-sm font-semibold text-amber-200 hover:bg-amber-500/25"
               >
                 🔄 Migrar Dia Legacy
               </button>
               <button
                 onClick={load}
                 disabled={loading}
-                className="rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-lg border border-[#2ECC49]/40 bg-[#0b1118] px-3 py-1.5 text-sm font-medium text-[#d7ffe0] hover:bg-[#112219] disabled:opacity-50"
               >
                 Atualizar
               </button>
             </div>
           </div>
+          <p className="mb-4 text-xs text-gray-400">
+            Atalhos: <span className="text-[#2ECC49]">J/K</span> navegar · <span className="text-[#2ECC49]">V</span> expandir · <span className="text-[#2ECC49]">A</span> aprovar · <span className="text-[#2ECC49]">R</span> rejeitar
+            {' '}· <span className="text-[#2ECC49]">Backspace</span> descartar · <span className="text-[#2ECC49]">1/2/3</span> Estado/Capital/Interior · <span className="text-[#2ECC49]">L</span> log de rejeições
+          </p>
+          {showIngestLog && (
+            <section className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-red-200">Área de Erros (últimas 5 rejeições)</h3>
+                <span className="text-[11px] text-red-100/90">
+                  Saúde fontes ({extractionHealth.total || 0} ofertas): {extractionHealth.jsonPercent || 0}% via JSON, {extractionHealth.htmlPercent || 0}% via HTML
+                </span>
+                <button
+                  onClick={() => setShowIngestLog(false)}
+                  className="text-xs text-red-200 underline"
+                >
+                  ocultar
+                </button>
+              </div>
+              {ingestRejections.length === 0 ? (
+                <p className="text-xs text-red-100/80">Nenhuma rejeição registrada.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {ingestRejections.slice(0, 5).map((row, idx) => (
+                    <li key={`${row.timestamp}-${idx}`} className="rounded-lg border border-red-500/30 bg-black/20 px-3 py-2 text-xs text-red-100">
+                      <span className="font-semibold">{row.provider}</span> · {row.field} · {row.reason}
+                      {row.productName ? ` · ${row.productName}` : ''}
+                      {row.runId ? ` · run ${row.runId}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           <section className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <h2 className="text-sm font-semibold text-amber-900">Legado no mapa (invisível ao público)</h2>
@@ -344,28 +552,65 @@ export default function BotFilaPage() {
           )}
 
           <ul className="space-y-3">
-            {items.map((item) => {
+            {items.map((item, index) => {
               const produtos = Array.isArray(item.produtos) ? item.produtos : [];
+              const artifactUrls = collectArtifactUrls(item);
               const isExpanded = expandedId === item.id;
               const isBusy = busy === item.id + 'aprovar' || busy === item.id + 'rejeitar';
 
               return (
                 <li
                   key={item.id}
-                  className="rounded-2xl border border-black/10 bg-white shadow-sm"
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={`rounded-2xl border shadow-sm ${
+                    selectedIndex === index
+                      ? 'border-[#2ECC49] bg-[#0f1720] ring-1 ring-[#2ECC49]/60'
+                      : 'border-white/10 bg-[#101820]'
+                  }`}
                 >
                   <div className="flex flex-wrap items-start gap-3 p-4 sm:items-center">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-[#111]">{item.store_name}</span>
+                        <span className="font-semibold text-[#e8edf2]">{item.store_name}</span>
                         <OrigemBadge origem={item.origem} />
+                        <span className="rounded-full bg-[#2ECC49]/15 px-2 py-0.5 text-xs font-semibold text-[#8bf9a3]">
+                          {item.locality_scope || 'Estadual'}{item.locality_city ? ` · ${item.locality_city}` : ''}
+                        </span>
+                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-gray-300">
+                          fonte: {item.extraction_strategy || 'unknown'}
+                        </span>
+                        {item.locality_region ? (
+                          <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-200">
+                            {item.locality_region}
+                          </span>
+                        ) : null}
                       </div>
                       {item.store_address && (
-                        <p className="mt-0.5 text-xs text-gray-500">{item.store_address}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">{item.store_address}</p>
                       )}
                       <p className="mt-1 text-xs text-gray-400">
                         {produtos.length} produto(s) · recebido em {formatDate(item.created_at)}
+                        {item.max_discount_percent != null ? ` · desconto máx ${item.max_discount_percent}%` : ''}
+                        {item.nearest_expiry_at ? ` · expira ${formatDate(item.nearest_expiry_at)}` : ''}
                       </p>
+                      {artifactUrls.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <a
+                            href={artifactUrls[0]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-md border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/20"
+                          >
+                            Ver folheto original
+                          </a>
+                          <a
+                            href={`/api/admin/bot-fila-artifact?url=${encodeURIComponent(artifactUrls[0])}`}
+                            className="rounded-md border border-indigo-400/35 bg-indigo-500/10 px-2.5 py-1 text-[11px] font-semibold text-indigo-200 hover:bg-indigo-500/20"
+                          >
+                            Baixar folheto
+                          </a>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
@@ -394,8 +639,42 @@ export default function BotFilaPage() {
 
                   {isExpanded && (
                     <div className="border-t border-black/5 px-4 pb-4 pt-3">
+                      {artifactUrls.length > 0 ? (
+                        <div className="mb-3 rounded-xl border border-cyan-400/25 bg-cyan-500/10 p-3">
+                          <p className="text-xs font-semibold text-cyan-100">
+                            Folheto/artefatos de origem (fallback para curadoria manual)
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {artifactUrls.map((url, idx) => (
+                              <div key={`${item.id}-art-${idx}`} className="flex flex-wrap gap-1">
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-md border border-cyan-300/35 bg-cyan-500/15 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
+                                >
+                                  Ver origem {idx + 1}
+                                </a>
+                                <a
+                                  href={`/api/admin/bot-fila-artifact?url=${encodeURIComponent(url)}`}
+                                  className="rounded-md border border-indigo-300/35 bg-indigo-500/15 px-2 py-1 text-[11px] text-indigo-100 hover:bg-indigo-500/25"
+                                >
+                                  Baixar
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="grid gap-2 sm:grid-cols-2">
                         {produtos.map((p, i) => (
+                          (() => {
+                            const validity = getProductValidityInfo(p);
+                            const validityClass =
+                              validity.modeTone === 'amber'
+                                ? 'border-amber-400/40 bg-amber-500/10 text-amber-100'
+                                : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100';
+                            return (
                           <div
                             key={i}
                             className="flex items-center gap-3 rounded-xl border border-black/5 bg-gray-50 p-3"
@@ -409,14 +688,29 @@ export default function BotFilaPage() {
                               />
                             )}
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">{p.nome || p.name || '—'}</p>
-                              {p.preco != null && (
+                              <p className="truncate text-sm font-medium">{p.product_name || p.nome || p.name || '—'}</p>
+                              {p.current_price != null || p.preco != null ? (
                                 <p className="text-sm font-semibold text-[#2ECC49]">
-                                  R$ {Number(p.preco).toFixed(2)}
+                                  R$ {Number(p.current_price ?? p.preco).toFixed(2)}
                                 </p>
-                              )}
+                              ) : null}
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${validityClass}`}>
+                                  Validade {validity.modeLabel}
+                                </span>
+                                <span className="rounded-full border border-cyan-400/35 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-100">
+                                  {validity.dateLabel}
+                                </span>
+                                {validity.daysLeftLabel ? (
+                                  <span className="rounded-full border border-zinc-400/35 bg-zinc-500/10 px-2 py-0.5 text-[10px] font-semibold text-zinc-100">
+                                    {validity.daysLeftLabel}
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
+                            );
+                          })()
                         ))}
                       </div>
                     </div>

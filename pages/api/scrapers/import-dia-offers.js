@@ -4,8 +4,9 @@ import { randomUUID } from 'crypto';
 import { geocodeAddress } from '../../../lib/geocode';
 import {
   INGEST_SOURCE_DIA_STORE_PAGE,
-  buildDiaGptPromoRun,
   enqueuePromocoes,
+  resolveIngestProvider,
+  ProviderValidationError,
 } from '../../../lib/ingest';
 
 const { buildDiaOffersExtractionPrompt } = require('../../../lib/diaOffersGptPrompt.js');
@@ -33,6 +34,19 @@ function stripHtmlToText(html) {
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function extractFlyerAssetUrls(html) {
+  const text = String(html || '');
+  if (!text) return [];
+  const urls = new Set();
+  const re = /https?:\/\/[^\s"'<>]+?\.(?:pdf|png|jpe?g|webp)(?:\?[^\s"'<>]*)?/gi;
+  let m;
+  while ((m = re.exec(text))) {
+    urls.add(m[0]);
+    if (urls.size >= 25) break;
+  }
+  return [...urls];
 }
 
 export default async function handler(req, res) {
@@ -86,6 +100,7 @@ export default async function handler(req, res) {
 
     const html = await resp.text();
     const text = stripHtmlToText(html);
+    const flyerAssetUrls = extractFlyerAssetUrls(html);
     const truncated = text.slice(0, 25000); // evita estouro de tokens
 
     // 2) Extrai promoções com GPT (prompt partilhado com jobs/agent.js — ver lib/diaOffersGptPrompt.js)
@@ -120,41 +135,47 @@ export default async function handler(req, res) {
       lng = coords.lng;
     }
 
-    const built = buildDiaGptPromoRun(parsed, {
+    const provider = resolveIngestProvider('dia_store_page');
+    const providerPayload = provider({
+      source: 'dia_store_page',
+      parsed,
       lat,
       lng,
       runId,
-      storePageUrl: url,
-      mapCategory: categoryBase,
+      storeUrl: url,
+      metadata: { uf: 'SP', state: 'SP' },
+      categoryBase,
     });
-    if ('error' in built) {
-      return res.status(422).json({ error: built.error });
-    }
+    const produtos = Array.isArray(providerPayload.produtos) ? providerPayload.produtos : [];
 
-    if (!built.pricePoints || built.pricePoints.length === 0) {
+    if (produtos.length === 0) {
       return res.status(200).json({
         success: true,
         queued: false,
         runId,
-        storeName: built.storeDisplayName,
         note: 'Nenhuma oferta válida extraída',
         offersExtracted: offers.length,
       });
     }
 
-    const produtos = built.pricePoints.map((p) => ({
-      nome: p.product_name || p.name || '',
-      preco: p.price ?? null,
-      imagem_url: p.image_url || null,
-    }));
-
     const queued = await enqueuePromocoes(supabase, {
-      storeName: built.storeDisplayName,
-      storeAddress: built.storeAddress || null,
-      storeLat: lat,
-      storeLng: lng,
+      storeName: providerPayload.storeName,
+      storeAddress: providerPayload.storeAddress || null,
+      storeLat: providerPayload.storeLat,
+      storeLng: providerPayload.storeLng,
+      localityScope: providerPayload.localityScope,
+      localityCity: providerPayload.localityCity,
+      localityRegion: providerPayload.localityRegion || null,
+      localityState: providerPayload.localityState,
+      dddCode: providerPayload.dddCode || null,
+      isStatewide: Boolean(providerPayload.isStatewide),
       produtos,
-      origem: INGEST_SOURCE_DIA_STORE_PAGE,
+      artifacts: {
+        source_page_url: url,
+        flyer_asset_urls: flyerAssetUrls,
+        run_id: runId,
+      },
+      origem: providerPayload.origem || INGEST_SOURCE_DIA_STORE_PAGE,
     });
 
     if (!queued.ok) {
@@ -165,12 +186,15 @@ export default async function handler(req, res) {
       success: true,
       queued: true,
       runId,
-      storeName: built.storeDisplayName,
+      storeName: providerPayload.storeName,
       offersExtracted: offers.length,
       produtosEnfileirados: produtos.length,
       note: 'Enviado para fila de aprovação em /admin/bot-fila',
     });
   } catch (e) {
+    if (e instanceof ProviderValidationError) {
+      return res.status(422).json({ error: e.message, details: e.details || null });
+    }
     console.error('import-dia-offers error:', e);
     return res.status(500).json({ error: e?.message || 'Erro interno' });
   }

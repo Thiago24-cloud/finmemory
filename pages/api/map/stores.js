@@ -140,8 +140,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const ttlHours = 24;
-    const cutoffIso = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
+    // Mantém a janela de ofertas alinhada com /api/map/points:
+    // promoções podem viver mais tempo que preços comuns.
+    const defaultTtlHours = Math.max(
+      1,
+      Number.parseInt(process.env.MAP_DEFAULT_TTL_HOURS || '24', 10) || 24
+    );
+    const promoTtlHours = Math.max(
+      defaultTtlHours,
+      Number.parseInt(process.env.MAP_PROMO_TTL_HOURS || '168', 10) || 168
+    );
+    const normalCutoffIso = new Date(Date.now() - defaultTtlHours * 60 * 60 * 1000).toISOString();
+    const promoCutoffIso = new Date(Date.now() - promoTtlHours * 60 * 60 * 1000).toISOString();
     const promoThresholdKm = Number(process.env.MAP_STORE_OFFERS_RADIUS_KM) || 1.25;
     const chainSlugRadiusKm =
       Number.parseFloat(process.env.MAP_STORE_OFFERS_CHAIN_SLUG_RADIUS_KM || '') || 2.5;
@@ -179,32 +189,56 @@ export default async function handler(req, res) {
       .limit(storeLimit);
 
     // Sem image_url: em projetos sem migração da coluna o SELECT falha e o endpoint inteiro quebra.
-    const promoPointsQuery = supabase
+    const promoPointsPromoQuery = supabase
       .from('price_points')
       .select(
         'id, lat, lng, category, store_name, product_name, created_at, price, product_id'
       )
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .in('source', ['bot_fila_aprovado', 'admin_manual'])
-      .gte('created_at', cutoffIso)
+      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual'])
+      .ilike('category', '%promo%')
+      .gte('created_at', promoCutoffIso)
       .gte('lat', latMin)
       .lte('lat', latMax)
       .gte('lng', lngMin)
       .lte('lng', lngMax)
       .limit(2000);
 
-    const [{ data, error }, { data: promoPoints, error: promoErr }] =
-      await Promise.all([storesQuery, promoPointsQuery]);
+    const promoPointsNormalQuery = supabase
+      .from('price_points')
+      .select(
+        'id, lat, lng, category, store_name, product_name, created_at, price, product_id'
+      )
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual'])
+      .not('category', 'ilike', '%promo%')
+      .gte('created_at', normalCutoffIso)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .limit(2000);
+
+    const [
+      { data, error },
+      { data: promoPointsPromo, error: promoPromoErr },
+      { data: promoPointsNormal, error: promoNormalErr },
+    ] = await Promise.all([storesQuery, promoPointsPromoQuery, promoPointsNormalQuery]);
 
     if (error) {
       console.error('Erro ao buscar stores:', error);
       return res.status(500).json({ error: error.message });
     }
 
-    if (promoErr) {
-      console.warn('Aviso: erro ao buscar promo points para tem_oferta_hoje:', promoErr.message);
+    if (promoPromoErr) {
+      console.warn('Aviso: erro ao buscar promo points (promo):', promoPromoErr.message);
     }
+    if (promoNormalErr) {
+      console.warn('Aviso: erro ao buscar promo points (normal):', promoNormalErr.message);
+    }
+    const promoPoints = [...(promoPointsPromo || []), ...(promoPointsNormal || [])];
     let pinSuppressions = [];
     try {
       pinSuppressions = await fetchActiveMapPinSuppressions(supabase);

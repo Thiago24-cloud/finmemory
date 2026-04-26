@@ -199,7 +199,7 @@ function createPriceGroupBrandIcon(hexColor, bundleCount, compact, logoUrl) {
     : '';
   const html = `<div class="finmemory-store-pin-wrap finmemory-price-pin-logo" style="line-height:0;position:relative;display:inline-block;width:${size}px;height:${size}px;">
 <div style="width:${size}px;height:${size}px;border-radius:50%;background:#fff;border:2.5px solid ${hexColor};box-shadow:0 2px 10px rgba(0,0,0,0.2);overflow:hidden;display:flex;align-items:center;justify-content:center;">
-<img src="${safeSrc}" alt="" width="${inner}" height="${inner}" style="width:${inner}px;height:${inner}px;object-fit:contain;display:block;pointer-events:none;" referrerpolicy="no-referrer" decoding="async" />
+<img src="${safeSrc}" alt="" width="${inner}" height="${inner}" style="width:${inner}px;height:${inner}px;object-fit:contain;display:block;pointer-events:none;" referrerpolicy="no-referrer" decoding="async" onerror="this.style.display='none';this.parentNode.style.background='${fill}'" />
 </div>
 ${bundleBadge}
 </div>`;
@@ -370,7 +370,7 @@ ${headlineBlock}
 <div style="position:relative;display:inline-block;width:40px;height:40px;">
 ${promoDot}
 <div style="width:40px;height:40px;border-radius:50%;background:#fff;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.35);overflow:hidden;display:flex;align-items:center;justify-content:center;">
-<img src="${safeSrc}" alt="" width="32" height="32" style="width:32px;height:32px;object-fit:contain;display:block;pointer-events:none;" referrerpolicy="no-referrer" decoding="async" />
+<img src="${safeSrc}" alt="" width="32" height="32" style="width:32px;height:32px;object-fit:contain;display:block;pointer-events:none;" referrerpolicy="no-referrer" decoding="async" onerror="this.style.display='none';this.parentNode.style.background='${badgeFill}';this.parentNode.style.borderColor='${promoHue}'" />
 </div>
 ${bundleBadge}
 </div></div>`;
@@ -400,6 +400,8 @@ function StoreMarkers({
   mapPriceCountByStoreId = null,
   /** Desktop sidebar: pin da loja aberta pulsa ao hover nas promoções na lista */
   pulseStoreId = null,
+  /** Ref para forçar reload externo (ex.: após Quick Add ou realtime event). */
+  reloadRef = null,
 }) {
   const { map, zoom } = useMapAndZoom();
   const searchActive = searchQuery.trim().length >= 2;
@@ -439,6 +441,10 @@ function StoreMarkers({
       clearTimeout(storeFetchDebounceRef.current);
     };
   }, [map, fetchStoresInBounds]);
+
+  useEffect(() => {
+    if (reloadRef) reloadRef.current = fetchStoresInBounds;
+  }, [reloadRef, fetchStoresInBounds]);
 
   /** Pesquisa aplica-se ao nome da loja (ex.: "Dia"); se nenhuma loja bater, mostra todas (ex.: "arroz" é produto). */
   const effectiveQuery = String(storeFilterName || searchQuery || '')
@@ -521,28 +527,6 @@ function StoreMarkerItem({
     if (pinned && isClientUsablePinLogoRef(pinned)) return pinned;
     return getStoreLogoPinSrc(store.name);
   }, [store.name, store.pin_logo_url]);
-  const [logoLoadOk, setLogoLoadOk] = useState(false);
-
-  useEffect(() => {
-    if (!logoUrl) {
-      setLogoLoadOk(false);
-      return undefined;
-    }
-    let cancelled = false;
-    setLogoLoadOk(false);
-    const img = new Image();
-    img.onload = () => {
-      if (!cancelled) setLogoLoadOk(true);
-    };
-    img.onerror = () => {
-      if (!cancelled) setLogoLoadOk(false);
-    };
-    img.referrerPolicy = 'no-referrer';
-    img.src = logoUrl;
-    return () => {
-      cancelled = true;
-    };
-  }, [logoUrl]);
 
   const pinColor = useMemo(
     () => getStorePinMainColor(store.type, store.id),
@@ -556,7 +540,7 @@ function StoreMarkerItem({
   }, [store.pin_headline_price, store.offer_preview]);
   const icon = useMemo(
     () =>
-      logoUrl && logoLoadOk
+      logoUrl
         ? createStoreIconWithLogo(
             logoUrl,
             mapPriceBundleCount,
@@ -574,7 +558,6 @@ function StoreMarkerItem({
           ),
     [
       logoUrl,
-      logoLoadOk,
       store.type,
       store.tem_oferta_hoje,
       store.id,
@@ -2533,34 +2516,12 @@ function PriceGroupMarker({ group, searchQuery, cartOfferIdSet, onMapPointCartTo
 
   const groupLogoSrc = useMemo(() => getHomogeneousGroupLogoPinSrc(group), [group]);
 
-  const [groupLogoOk, setGroupLogoOk] = useState(false);
-  useEffect(() => {
-    if (!groupLogoSrc) {
-      setGroupLogoOk(false);
-      return undefined;
-    }
-    let cancelled = false;
-    setGroupLogoOk(false);
-    const img = new Image();
-    img.onload = () => {
-      if (!cancelled) setGroupLogoOk(true);
-    };
-    img.onerror = () => {
-      if (!cancelled) setGroupLogoOk(false);
-    };
-    img.referrerPolicy = 'no-referrer';
-    img.src = groupLogoSrc;
-    return () => {
-      cancelled = true;
-    };
-  }, [groupLogoSrc]);
-
   const customIcon = useMemo(() => {
-    if (groupLogoSrc && groupLogoOk) {
+    if (groupLogoSrc) {
       return createPriceGroupBrandIcon(main, count, compactPins, groupLogoSrc);
     }
     return createCategoryIcon(main, count, compactPins);
-  }, [main, count, compactPins, groupLogoSrc, groupLogoOk]);
+  }, [main, count, compactPins, groupLogoSrc]);
   const priceLabelStyle = useMemo(() => getMapPinOpenAirLabelStyle(main), [main]);
 
   return (
@@ -2648,6 +2609,7 @@ export default function MapaPrecosLeaflet({
   const [locais, setLocais] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const reloadPointsRef = useRef(() => {});
+  const storeReloadRef = useRef(() => {});
   const [storeNearby, setStoreNearby] = useState(null);
   const [dismissedStorePrompt, setDismissedStorePrompt] = useState(false);
   /** Última posição de &quot;Minha localização&quot; — usada como origem nas rotas (padrão Google Maps). */
@@ -3256,9 +3218,39 @@ export default function MapaPrecosLeaflet({
     const id = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         reloadPointsRef.current?.();
+        storeReloadRef.current?.();
       }
     }, 50000);
     return () => clearInterval(id);
+  }, []);
+
+  /** Realtime: Quick Add / bots inserem price_points → atualiza pontos e lojas sem mover o mapa. */
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return undefined;
+    const ch = sb
+      .channel('map_store_refresh')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'price_points' }, () => {
+        reloadPointsRef.current?.();
+        storeReloadRef.current?.();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stores' }, () => {
+        storeReloadRef.current?.();
+      })
+      .subscribe();
+    return () => { sb.removeChannel(ch); };
+  }, []);
+
+  /** Ao voltar para a aba (ex.: após Quick Add em outra página), recarrega pins e lojas imediatamente. */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        reloadPointsRef.current?.();
+        storeReloadRef.current?.();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   const mapBlockInteraction =
@@ -3320,6 +3312,7 @@ export default function MapaPrecosLeaflet({
           onVisibleStoresChange={setStoresVisibleOnMap}
           mapPriceCountByStoreId={mapPriceCountByStoreId}
           pulseStoreId={desktopSidebarPulseStoreId}
+          reloadRef={storeReloadRef}
         />
         <MapShopSheetDragLock
           locked={isMobileMapSheet && shopOpen && shopSheetSnap === 'expanded'}

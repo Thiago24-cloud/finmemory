@@ -185,7 +185,7 @@ export default function SettingsPage() {
               Faltam {Math.max(0, 100 - (xpStats.xp_points % 100))} XP para o nível {xpStats.level + 1}
             </p>
             <a
-              href="https://instagram.com/finmemory"
+              href="https://instagram.com/finmemory.oficial"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-4 inline-flex items-center gap-2 text-xs text-zinc-400 transition-colors hover:text-orange-400"

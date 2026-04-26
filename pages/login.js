@@ -266,6 +266,17 @@ export default function LoginPage() {
           >
             {busy ? 'Aguarde...' : mode === 'signup' ? 'Criar conta e entrar' : 'Entrar'}
           </button>
+          <p className="mt-3 text-xs text-center text-gray-500">
+            Ao continuar, você concorda com nossos{' '}
+            <Link href="/termos" className="text-[#2ECC49] underline">
+              Termos de Serviço
+            </Link>{' '}
+            e{' '}
+            <Link href="/privacidade" className="text-[#2ECC49] underline">
+              Política de Privacidade
+            </Link>
+            .
+          </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button type="button" onClick={doResendVerification} className="rounded-lg py-2 text-xs border border-gray-300">
               Reenviar confirmação

@@ -8,6 +8,121 @@ import {
 } from '../../../lib/promoQueueProcessing';
 import { getCachedImageUrlFromDb } from '../../../lib/mapProductImageCache';
 import { resolveOwnerUserId } from '../../../lib/botPromoOwner';
+import { getLatestIngestRejections } from '../../../lib/ingest/rejectionLog';
+
+const GRANDE_SP_CITIES = new Set([
+  'sao paulo', 'guarulhos', 'osasco', 'santo andre', 'sao bernardo do campo', 'sao caetano do sul',
+  'diadema', 'maua', 'barueri', 'carapicuiba', 'itapecerica da serra', 'embu das artes', 'taboao da serra',
+  'cotia', 'itapevi', 'jandira', 'santana de parnaiba', 'franco da rocha', 'caieiras', 'francisco morato',
+  'ribeirao pires', 'rio grande da serra', 'mogi das cruzes', 'suzano', 'poa', 'ferraz de vasconcelos'
+]);
+const LITORAL_SP_CITIES = new Set([
+  'santos', 'sao vicente', 'praia grande', 'guaruja', 'cubatao', 'bertioga', 'itaniaem', 'peruibe', 'mongagua',
+  'caraguatatuba', 'ubatuba', 'ilhabela', 'sao sebastiao',
+]);
+
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function inferLocalityFromItem(item) {
+  const city = String(item?.locality_city || item?.cidade || '').trim();
+  const scope = String(item?.locality_scope || item?.escopo_localidade || '').trim();
+  if (scope) return { locality_scope: scope, locality_city: city || null, locality_region: item?.locality_region || inferRegionByCity(city) };
+  if (!city) return { locality_scope: 'Estadual', locality_city: null, locality_region: null };
+  const scopeByCity = GRANDE_SP_CITIES.has(normalizeText(city)) ? 'Grande SP' : 'Cidade';
+  return { locality_scope: scopeByCity, locality_city: city, locality_region: item?.locality_region || inferRegionByCity(city) };
+}
+
+function inferRegionByCity(city) {
+  const n = normalizeText(city);
+  if (!n) return null;
+  if (n === 'sao paulo') return 'Capital';
+  if (LITORAL_SP_CITIES.has(n)) return 'Litoral';
+  return 'Interior';
+}
+
+function parseDateSafe(value) {
+  if (!value) return null;
+  const iso = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function computeProdutoDiscount(produto) {
+  const promo = Number(produto?.current_price ?? produto?.preco ?? produto?.price ?? produto?.promo_price);
+  const original = Number(produto?.preco_de ?? produto?.original_price ?? produto?.price_from);
+  if (!Number.isFinite(promo) || !Number.isFinite(original) || original <= 0 || promo <= 0 || promo >= original) {
+    return null;
+  }
+  return Number((((original - promo) / original) * 100).toFixed(2));
+}
+
+function summarizeQueueItem(item) {
+  const produtos = Array.isArray(item?.produtos) ? item.produtos : [];
+  let maxDiscount = null;
+  let nearestExpiry = null;
+  let inferredScope = null;
+  let inferredCity = null;
+  let inferredRegion = null;
+  let inferredStatewide = item?.is_statewide === true;
+  const strategyCount = {};
+  for (const p of produtos) {
+    const d = computeProdutoDiscount(p);
+    if (d != null && (maxDiscount == null || d > maxDiscount)) maxDiscount = d;
+    const exp = parseDateSafe(p?.expiry_date || p?.validade || p?.valid_until || p?.expires_at);
+    if (exp && (!nearestExpiry || exp < nearestExpiry)) nearestExpiry = exp;
+    if (p?.is_statewide === true) inferredStatewide = true;
+    const strategy = String(p?.metadata?.extraction_strategy || p?.extraction_strategy || 'unknown');
+    strategyCount[strategy] = (strategyCount[strategy] || 0) + 1;
+    if (!inferredScope) {
+      const loc = inferLocalityFromItem(p);
+      inferredScope = loc.locality_scope;
+      inferredCity = loc.locality_city;
+      inferredRegion = loc.locality_region;
+    }
+  }
+  const isStatewide = inferredStatewide || item?.locality_scope === 'Estadual';
+  const dominantStrategy = Object.entries(strategyCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
+  return {
+    ...item,
+    locality_scope: isStatewide ? 'Estadual' : (item?.locality_scope || inferredScope || 'Estadual'),
+    locality_city: isStatewide ? null : (item?.locality_city || inferredCity || null),
+    locality_region: isStatewide ? null : (item?.locality_region || inferredRegion || inferRegionByCity(item?.locality_city)),
+    is_statewide: Boolean(isStatewide),
+    extraction_strategy: dominantStrategy,
+    max_discount_percent: maxDiscount,
+    nearest_expiry_at: nearestExpiry ? nearestExpiry.toISOString() : null,
+  };
+}
+
+function buildExtractionHealth(items, maxOffers = 100) {
+  const strategyCount = {};
+  let total = 0;
+  for (const row of items || []) {
+    const produtos = Array.isArray(row?.produtos) ? row.produtos : [];
+    for (const p of produtos) {
+      const strategy = String(p?.metadata?.extraction_strategy || p?.extraction_strategy || 'unknown');
+      strategyCount[strategy] = (strategyCount[strategy] || 0) + 1;
+      total += 1;
+      if (total >= maxOffers) break;
+    }
+    if (total >= maxOffers) break;
+  }
+  const jsonCount = (strategyCount.next_data || 0) + (strategyCount.ld_json || 0) + (strategyCount.parsed_object || 0);
+  const htmlCount = strategyCount.html_regex || 0;
+  return {
+    total,
+    strategyCount,
+    jsonPercent: total > 0 ? Math.round((jsonCount / total) * 100) : 0,
+    htmlPercent: total > 0 ? Math.round((htmlCount / total) * 100) : 0,
+  };
+}
 
 function getSupabaseAdmin() {
   return createClient(
@@ -40,11 +155,17 @@ export default async function handler(req, res) {
 
   // GET — lista pendentes
   if (req.method === 'GET') {
+    const sortBy = String(req.query?.sort || 'recentes');
+    const scopeFilter = String(req.query?.scope || 'todos');
+    const cityView = String(req.query?.cityView || 'all');
+    const cityFilter = String(req.query?.city || '').trim();
+    const limit = Math.max(50, Math.min(600, Number(req.query?.limit) || 250));
     const { data, error } = await supabase
       .from('bot_promocoes_fila')
       .select('*')
       .eq('status', 'pendente')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
     if (error) return res.status(500).json({ error: error.message });
 
@@ -73,8 +194,39 @@ export default async function handler(req, res) {
       if (row.price == null || Number(row.price) === 0) it.preco_zero++;
       if (isSupermarketUrl(row.image_url)) it.imagem_suja++;
     }
+    const extractionHealth = buildExtractionHealth(data || [], 100);
+    const enriched = (data || []).map(summarizeQueueItem).filter((item) => {
+      if (scopeFilter === 'todos') return true;
+      if (scopeFilter === 'cidade') return item.locality_scope === 'Cidade';
+      return item.locality_scope === scopeFilter;
+    }).filter((item) => {
+      if (cityView === 'capital') return normalizeText(item.locality_city) === 'sao paulo';
+      if (cityView === 'interior') return item.locality_region === 'Interior';
+      return true;
+    }).filter((item) => {
+      if (!cityFilter || cityFilter === 'all') return true;
+      return normalizeText(item.locality_city) === normalizeText(cityFilter);
+    });
+    enriched.sort((a, b) => {
+      if (sortBy === 'desconto') {
+        return (b.max_discount_percent || -1) - (a.max_discount_percent || -1);
+      }
+      if (sortBy === 'expiracao') {
+        if (!a.nearest_expiry_at && !b.nearest_expiry_at) return 0;
+        if (!a.nearest_expiry_at) return 1;
+        if (!b.nearest_expiry_at) return -1;
+        return new Date(a.nearest_expiry_at).getTime() - new Date(b.nearest_expiry_at).getTime();
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
     const legacyGroups = Array.from(byStore.values()).sort((a, b) => b.count - a.count);
-    return res.status(200).json({ items: data, legacyGroups });
+    return res.status(200).json({
+      items: enriched,
+      legacyGroups,
+      ingestRejections: getLatestIngestRejections(5),
+      extractionHealth,
+    });
   }
 
   // POST — aprovar ou rejeitar
@@ -182,7 +334,7 @@ export default async function handler(req, res) {
       if (cached) {
         split.ready.push({
           name: p._normalized_name || p.nome || p.name || '',
-          price: Number(p.preco),
+          price: Number(p.current_price ?? p.preco),
           image_url: cached,
           raw: p,
         });
@@ -191,19 +343,41 @@ export default async function handler(req, res) {
       }
     }
 
-    const rows = split.ready.map((p) => ({
-      user_id: ownerUserId,
-      store_name: item.store_name,
-      lat: item.store_lat,
-      lng: item.store_lng,
-      product_name: p.name,
-      price: Number(p.price),
-      image_url: p.image_url || null,
-      category: 'Supermercado - Promoção',
-      source: 'bot_fila_aprovado',
-      created_at: now,
-      atualizado_em: now,
-    }));
+    const rows = split.ready.map((p) => {
+      const originalPrice = Number(p?.raw?.original_price ?? p?.raw?.preco_de ?? p?.raw?.price_from);
+      const discountPercent =
+        Number.isFinite(originalPrice) && originalPrice > 0 && Number(p.price) > 0 && Number(p.price) < originalPrice
+          ? Number((((originalPrice - Number(p.price)) / originalPrice) * 100).toFixed(2))
+          : null;
+      const loc = inferLocalityFromItem(p?.raw || {});
+      const isStatewide = Boolean(item.is_statewide || p?.raw?.is_statewide || item.locality_scope === 'Estadual');
+      return {
+        user_id: ownerUserId,
+        store_name: item.store_name,
+        lat: item.store_lat,
+        lng: item.store_lng,
+        product_name: p.name,
+        price: Number(p.price),
+        image_url: p.image_url || null,
+        category: 'Supermercado - Promoção',
+        // O mapa público só considera promoções aprovadas com source "bot_fila_aprovado".
+        // Não usar metadata.source aqui para evitar "aprova no admin, mas some no mapa".
+        source: 'bot_fila_aprovado',
+        created_at: now,
+        atualizado_em: now,
+        locality_scope: isStatewide ? 'Estadual' : (item.locality_scope || loc.locality_scope || 'Estadual'),
+        locality_city: isStatewide ? null : (item.locality_city || loc.locality_city || null),
+        locality_region: isStatewide
+          ? null
+          : (item.locality_region || loc.locality_region || inferRegionByCity(item.locality_city || loc.locality_city)),
+        locality_state: 'SP',
+        ddd_code: item.ddd_code || p?.raw?.ddd_code || null,
+        is_statewide: isStatewide,
+        expires_at: p.valid_until || p?.raw?.expiry_date || p?.raw?.validade || p?.raw?.valid_until || null,
+        discount_percent: discountPercent,
+        unit_normalized: p.unit || null,
+      };
+    });
 
     if (rows.length > 0) {
       const { error: insertErr } = await supabase.from('price_points').insert(rows);

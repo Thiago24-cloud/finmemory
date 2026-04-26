@@ -41,16 +41,23 @@ if (-not $vars["NEXTAUTH_URL"]) {
     }
 }
 
-# Chaves necessárias para o Cloud Run (auth + Supabase + Mapbox)
+# Chaves necessárias para o Cloud Run (auth + Supabase + Mapbox + Stripe)
 $required = @(
     "NEXTAUTH_URL", "NEXTAUTH_SECRET",
+    "FINMEMORY_ADMIN_EMAILS",
     "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
     "GOOGLE_REDIRECT_URI",
     "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN"
+    "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN",
+    "NEXT_PUBLIC_APP_URL",
+    # Stripe — server-side runtime (não embutidas no bundle)
+    "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PLUS_PRICE_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_FAMILIA_PRICE_ID"
 )
 # Garantir callback Google = NEXTAUTH_URL + /api/auth/callback/google
 $vars["GOOGLE_REDIRECT_URI"] = $vars["NEXTAUTH_URL"].TrimEnd('/') + "/api/auth/callback/google"
+# STRIPE_APP_BASE_URL é exclusivo de dev local (aponta para localhost) — nunca enviar para produção
+$vars.Remove("STRIPE_APP_BASE_URL") | Out-Null
 $pairs = @()
 foreach ($k in $required) {
     if ($vars[$k]) {

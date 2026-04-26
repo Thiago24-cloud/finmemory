@@ -1,11 +1,10 @@
 import { useCallback, useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 
-const publishableKey =
-  typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY : '';
-
 let stripePromise;
 function getStripe() {
+  const publishableKey =
+    typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY : '';
   if (!publishableKey) return null;
   if (!stripePromise) stripePromise = loadStripe(publishableKey);
   return stripePromise;
@@ -61,7 +60,11 @@ export default function UpgradeButton({
         return;
       }
       const stripe = await getStripe();
-      if (!stripe || !data.sessionId) throw new Error('Stripe.js ou sessão em falta.');
+      if (!stripe || !data.sessionId) {
+        throw new Error(
+          'Checkout não pôde abrir pelo fallback Stripe.js. Verifique NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY e tente novamente.'
+        );
+      }
       const { error } = await stripe.redirectToCheckout({ sessionId: data.sessionId });
       if (error) throw error;
     } catch (e) {
@@ -72,10 +75,6 @@ export default function UpgradeButton({
       setLoading(false);
     }
   }, [plan]);
-
-  if (!publishableKey) {
-    return null;
-  }
 
   return (
     <div>

@@ -10,8 +10,20 @@
  */
 
 import { logValidationReport } from '../lib/env-validator.mjs';
+import dotenv from 'dotenv';
+import fs from 'node:fs';
+import path from 'node:path';
 
 console.log('🔍 FinMemory - Validação de Ambiente\n');
+
+// Carrega .env locais antes de validar para evitar falso negativo no diagnóstico local.
+const cwd = process.cwd();
+for (const filename of ['.env', '.env.local', '.env.production']) {
+  const filePath = path.join(cwd, filename);
+  if (fs.existsSync(filePath)) {
+    dotenv.config({ path: filePath, override: false });
+  }
+}
 
 // Verifica se está em ambiente de build
 const isBuild = process.env.npm_lifecycle_event === 'build';

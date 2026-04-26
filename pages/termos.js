@@ -81,7 +81,7 @@ export default function Termos() {
 
         <section style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>9. Contato</h2>
-          <p>Para dúvidas ou solicitações, entre em contato pelo e-mail: <a href="mailto:suporte@finmemory.com" style={{ color: '#2ECC49' }}>suporte@finmemory.com</a></p>
+          <p>Para dúvidas ou solicitações, entre em contato pelo e-mail: <a href="mailto:finmemory.oficial@gmail.com" style={{ color: '#2ECC49' }}>finmemory.oficial@gmail.com</a></p>
         </section>
       </main>
     </>
