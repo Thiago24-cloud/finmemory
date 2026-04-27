@@ -7,13 +7,15 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import Image from 'next/image';
-import { Search, PlusCircle, Menu, ListChecks, Navigation, Zap } from 'lucide-react';
+import { Search, PlusCircle, Menu, ListChecks, Navigation, Zap, Camera, Route, Wallet, Sparkles } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import { MAP_THEMES, MAP_THEME_STORAGE_KEY } from '../lib/colors';
 import { useMatchMedia } from '../lib/useMatchMedia';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { MapOverlayCategoryChips } from '../components/map/MapOverlayCategoryChips';
+import { FinancePlansInline } from '../components/FinancePlansInline';
+import { BRAND } from '../lib/brandTokens';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -22,6 +24,19 @@ const MAP_MAP_PADDING_TOP_PX = 0;
 /** Altura aproximada da faixa flutuante (safe area + barra pesquisa + fila de chips — mobile em 2 linhas). */
 const MAP_OVERLAY_TOP_LOGGED_PX = 132;
 const MAP_OVERLAY_TOP_GUEST_PX = 56;
+
+function formatCurrencyBRL(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '--';
+  return n.toFixed(2).replace('.', ',');
+}
+
+function formatDistancePtBr(meters) {
+  const n = Number(meters);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n < 1000) return `${Math.round(n)} m`;
+  return `${(n / 1000).toFixed(1).replace('.', ',')} km`;
+}
 
 export async function getServerSideProps(ctx) {
   try {
@@ -56,6 +71,14 @@ export default function MapaPage() {
   const [chipsShouldHide, setChipsShouldHide] = useState(false);
   const searchInputRef = useRef(null);
   const narrowScreen = useMatchMedia('(max-width: 767px)');
+  const parsedPlanningItems = searchQuery
+    .split(/[,;\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+  const planningMode = parsedPlanningItems.length > 0;
+  const [planningSummary, setPlanningSummary] = useState(null);
+  const [planningActionRequest, setPlanningActionRequest] = useState({ id: 0, mode: '' });
 
   const wazeUi = router.isReady && router.query.waze === '1';
   const mapPaddingTopPx = MAP_MAP_PADDING_TOP_PX;
@@ -131,6 +154,10 @@ export default function MapaPage() {
             searchQuery={debouncedSearch}
             promoOnly={promoOnly}
             wazeUi={wazeUi}
+            planningMode={planningMode}
+            planningItems={parsedPlanningItems}
+            onPlanningSummaryChange={setPlanningSummary}
+            planningActionRequest={planningActionRequest}
             headerOffsetPx={mapPaddingTopPx}
             overlayTopPx={mapOverlayTopPx}
             onDetailOpenChange={handleDetailOpenChange}
@@ -196,7 +223,13 @@ export default function MapaPage() {
                     ref={searchInputRef}
                     type="search"
                     enterKeyHint="search"
-                    placeholder={narrowScreen ? 'Pesquise aqui' : 'Pesquise produtos, lojas ou região'}
+                    placeholder={
+                      planningMode
+                        ? 'Lista ativa: edite os itens (ex.: arroz, carne, cerveja)'
+                        : (narrowScreen
+                            ? 'O que você precisa comprar hoje?'
+                            : 'O que você precisa comprar hoje? (ex.: arroz, carne, cerveja)')
+                    }
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
@@ -261,6 +294,95 @@ export default function MapaPage() {
                   setMapChipSelection={setMapChipSelection}
                 />
               </div>
+
+              {!planningMode && !isDetailOpen ? (
+                <div
+                  className={`pointer-events-auto w-full rounded-2xl border px-3 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.14)] ${
+                    wazeUi
+                      ? 'border-[#2a2d3a] bg-[#13161f]/95'
+                      : 'border-white/60 bg-white/95'
+                  }`}
+                >
+                  <p className={`text-[11px] font-semibold ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-500'}`}>
+                    Escolha por onde quer começar
+                  </p>
+                  <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <Link
+                      href="/add-receipt"
+                      className={`flex min-h-[58px] items-center gap-2 rounded-xl px-3 py-2 no-underline ${
+                        wazeUi
+                          ? 'bg-[#1a1d27] text-[#f3f4f6] hover:bg-[#222634]'
+                          : 'bg-[#eefbf1] text-[#106b2a] hover:bg-[#e3f7e9]'
+                      }`}
+                    >
+                      <Camera className="h-5 w-5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold">Escanear Nota Fiscal</p>
+                        <p className={`truncate text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-[#357a46]'}`}>
+                          Acabei de comprar, quero organizar meus gastos.
+                        </p>
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => searchInputRef.current?.focus()}
+                      className={`flex min-h-[58px] items-center gap-2 rounded-xl px-3 py-2 text-left ${
+                        wazeUi
+                          ? 'bg-[#1a1d27] text-[#f3f4f6] hover:bg-[#222634]'
+                          : 'bg-[#eef4ff] text-[#0f3e9c] hover:bg-[#e4edff]'
+                      }`}
+                    >
+                      <Search className="h-5 w-5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold">O que você precisa comprar hoje?</p>
+                        <p className={`truncate text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-[#37517f]'}`}>
+                          Vou sair agora e quero saber onde está mais barato/perto.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {planningMode ? (
+                <div
+                  className={`pointer-events-auto w-full rounded-2xl border px-3 py-2.5 ${
+                    wazeUi
+                      ? 'border-[#2a2d3a] bg-[#13161f]/95 text-[#e5e7eb]'
+                      : 'border-gray-200 bg-white/95 text-gray-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold">Radar da Lista ativo</p>
+                      <p className={`truncate text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-500'}`}>
+                        Mostrando prioridades para {parsedPlanningItems.length} item(ns).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                        wazeUi ? 'bg-[#222634] text-[#d1d5db]' : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {parsedPlanningItems.map((item) => (
+                      <span
+                        key={item}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          wazeUi ? 'bg-[#222634] text-[#d1d5db]' : 'bg-[#f3f4f6] text-gray-700'
+                        }`}
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         ) : (
@@ -367,6 +489,175 @@ export default function MapaPage() {
             </div>
           </SheetContent>
         </Sheet>
+
+        {session && planningMode && !isDetailExpanded ? (
+          <div
+            className="pointer-events-none absolute inset-x-0 z-[18] px-3 pb-[calc(68px+env(safe-area-inset-bottom))]"
+            style={{ bottom: 0 }}
+          >
+            <div className="pointer-events-auto mx-auto grid w-full max-w-[760px] grid-cols-1 gap-2 md:grid-cols-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'money' }))
+                }
+                disabled={!planningSummary?.cheapest}
+                className={`rounded-2xl border px-3 py-3 text-left shadow-[0_8px_20px_rgba(0,0,0,0.16)] ${
+                  wazeUi
+                    ? 'border-[#2a2d3a] bg-[#13161f] text-[#f3f4f6]'
+                    : 'border-gray-200 bg-white text-gray-900'
+                } ${planningSummary?.cheapest ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+              >
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-emerald-500" />
+                  <p className="text-xs font-bold">Foco Dinheiro</p>
+                  {planningSummary?.cheapest?.badge ? (
+                    <span
+                      className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        wazeUi ? 'bg-[#1f2937] text-emerald-300' : 'bg-emerald-50 text-emerald-700'
+                      }`}
+                    >
+                      {planningSummary.cheapest.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm font-bold">
+                  Menor preço total:{' '}
+                  {planningSummary?.cheapest
+                    ? `R$ ${formatCurrencyBRL(planningSummary.cheapest.total)}`
+                    : 'calculando...'}
+                </p>
+                <p className={`mt-0.5 text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-500'}`}>
+                  {planningSummary?.cheapest
+                    ? `${planningSummary.cheapest.coveredItems}/${planningSummary.itemsCount} itens em ${planningSummary.cheapest.storesCount} mercado(s).`
+                    : 'Buscando melhor combinação por item...'}
+                </p>
+                {planningSummary?.cheapest?.actionLabel ? (
+                  <p className={`mt-1 text-[10px] font-medium ${wazeUi ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                    {planningSummary.cheapest.actionLabel}
+                  </p>
+                ) : null}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'time' }))
+                }
+                disabled={!planningSummary?.oneStore}
+                className={`rounded-2xl border px-3 py-3 text-left shadow-[0_8px_20px_rgba(0,0,0,0.16)] ${
+                  wazeUi
+                    ? 'border-[#2a2d3a] bg-[#13161f] text-[#f3f4f6]'
+                    : 'border-gray-200 bg-white text-gray-900'
+                } ${planningSummary?.oneStore ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+              >
+                <div className="flex items-center gap-2">
+                  <Route className="h-4 w-4 text-sky-500" />
+                  <p className="text-xs font-bold">Foco Tempo</p>
+                  {planningSummary?.oneStore?.badge ? (
+                    <span
+                      className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        wazeUi ? 'bg-[#1f2937] text-sky-300' : 'bg-sky-50 text-sky-700'
+                      }`}
+                    >
+                      {planningSummary.oneStore.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm font-bold">
+                  Tudo em 1 lugar:{' '}
+                  {planningSummary?.oneStore
+                    ? `R$ ${formatCurrencyBRL(planningSummary.oneStore.total)}`
+                    : 'calculando...'}
+                </p>
+                <p className={`mt-0.5 text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-500'}`}>
+                  {planningSummary?.oneStore
+                    ? `${planningSummary.oneStore.coveredItems}/${planningSummary.itemsCount} itens em ${planningSummary.oneStore.storeName}.`
+                    : 'Buscando loja com maior cobertura da sua lista...'}
+                </p>
+                {planningSummary?.oneStore ? (
+                  <p className={`mt-1 text-[10px] font-medium ${wazeUi ? 'text-sky-300' : 'text-sky-700'}`}>
+                    {planningSummary.oneStore.actionLabel}
+                    {planningSummary.oneStore.distanceMeters != null
+                      ? ` • ${formatDistancePtBr(planningSummary.oneStore.distanceMeters)}`
+                      : ''}
+                    {planningSummary.oneStore.exclusivesCount > 0
+                      ? ` • ${planningSummary.oneStore.exclusivesCount} item(ns) exclusivo(s)`
+                      : ''}
+                  </p>
+                ) : null}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'quality' }))
+                }
+                disabled={!planningSummary?.quality}
+                className={`rounded-2xl border px-3 py-3 text-left shadow-[0_8px_20px_rgba(0,0,0,0.16)] ${
+                  wazeUi
+                    ? 'border-[#2a2d3a] bg-[#13161f] text-[#f3f4f6]'
+                    : 'border-gray-200 bg-white text-gray-900'
+                } ${planningSummary?.quality ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-violet-500" />
+                  <p className="text-xs font-bold">Foco Qualidade</p>
+                  {planningSummary?.quality?.badge ? (
+                    <span
+                      className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        wazeUi ? 'bg-[#1f2937] text-violet-300' : 'bg-violet-50 text-violet-700'
+                      }`}
+                    >
+                      {planningSummary.quality.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm font-bold">
+                  Curadoria premium:{' '}
+                  {planningSummary?.quality ? `R$ ${formatCurrencyBRL(planningSummary.quality.total)}` : 'calculando...'}
+                </p>
+                <p className={`mt-0.5 text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-500'}`}>
+                  {planningSummary?.quality
+                    ? `${planningSummary.quality.coveredItems}/${planningSummary.itemsCount} itens em ${planningSummary.quality.storeName}.`
+                    : 'Buscando melhor loja para itens diferenciados...'}
+                </p>
+                {planningSummary?.quality ? (
+                  <p className={`mt-1 text-[10px] font-medium ${wazeUi ? 'text-violet-300' : 'text-violet-700'}`}>
+                    {planningSummary.quality.actionLabel}
+                    {planningSummary.quality.distanceMeters != null
+                      ? ` • ${formatDistancePtBr(planningSummary.quality.distanceMeters)}`
+                      : ''}
+                    {planningSummary.quality.exclusivesCount > 0
+                      ? ` • ${planningSummary.quality.exclusivesCount} item(ns) exclusivo(s)`
+                      : ''}
+                  </p>
+                ) : null}
+              </button>
+            </div>
+            <div
+              className={`pointer-events-auto mx-auto mt-2 w-full max-w-[760px] rounded-2xl border px-3 py-2 text-[11px] ${
+                wazeUi ? 'border-[#2a2d3a] bg-[#13161f] text-[#d1d5db]' : 'border-gray-200 bg-white text-gray-700'
+              }`}
+              style={
+                wazeUi
+                  ? undefined
+                  : {
+                      borderColor: BRAND.primarySoftBorder,
+                      background: BRAND.primarySoftBg,
+                      color: BRAND.primaryText,
+                    }
+              }
+            >
+              <FinancePlansInline
+                className="m-0"
+                emphasize
+                showLink
+                linkClassName="font-semibold text-[#2ECC49] no-underline hover:underline"
+              />
+            </div>
+          </div>
+        ) : null}
 
         <BottomNav />
       </div>

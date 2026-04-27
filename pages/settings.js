@@ -8,6 +8,8 @@ import { BottomNav } from '../components/BottomNav';
 import ProximityAlertsSettings from '../components/ProximityAlertsSettings';
 import PlanGuard from '../components/PlanGuard';
 import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
+import { PLAN_LABELS } from '../lib/planAccess';
+import { BRAND } from '../lib/brandTokens';
 
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
 const UpgradePlus = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
@@ -27,6 +29,16 @@ export default function SettingsPage() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
   const [deleteAccountErr, setDeleteAccountErr] = useState('');
+  const [subscriptionStatus, setSubscriptionStatus] = useState({
+    loading: false,
+    plano: 'free',
+    plano_ativo: false,
+    stripe_subscription_status: '',
+    next_billing_at: null,
+    cancel_at_period_end: false,
+    error: '',
+  });
+  const [billingPortalBusy, setBillingPortalBusy] = useState(false);
 
   useEffect(() => {
     if (status !== 'authenticated') return undefined;
@@ -49,6 +61,48 @@ export default function SettingsPage() {
         if (!cancelled) setXpStats({ xp_points: 0, contributions_count: 0, level: 1 });
       }
     })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    let cancelled = false;
+    async function loadSubscriptionStatus() {
+      setSubscriptionStatus((prev) => ({ ...prev, loading: true, error: '' }));
+      try {
+        const res = await fetch('/api/stripe/subscription-status');
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setSubscriptionStatus((prev) => ({
+            ...prev,
+            loading: false,
+            error: data?.error || 'Falha ao carregar assinatura',
+          }));
+          return;
+        }
+        setSubscriptionStatus({
+          loading: false,
+          plano: String(data.plano || 'free').toLowerCase(),
+          plano_ativo: Boolean(data.plano_ativo),
+          stripe_subscription_status: String(data.stripe_subscription_status || ''),
+          next_billing_at: data.next_billing_at || null,
+          cancel_at_period_end: Boolean(data.cancel_at_period_end),
+          error: '',
+        });
+      } catch (e) {
+        if (!cancelled) {
+          setSubscriptionStatus((prev) => ({
+            ...prev,
+            loading: false,
+            error: e?.message || 'Erro de rede ao carregar assinatura',
+          }));
+        }
+      }
+    }
+    void loadSubscriptionStatus();
     return () => {
       cancelled = true;
     };
@@ -135,6 +189,25 @@ export default function SettingsPage() {
       setDeleteAccountErr(e?.message || 'Erro de rede.');
     } finally {
       setDeleteAccountBusy(false);
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    setBillingPortalBusy(true);
+    try {
+      const res = await fetch('/api/stripe/create-billing-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.url) {
+        throw new Error(data?.error || 'Não foi possível abrir o portal de cobrança');
+      }
+      window.location.assign(data.url);
+    } catch (e) {
+      alert(e?.message || 'Não foi possível abrir o portal Stripe');
+    } finally {
+      setBillingPortalBusy(false);
     }
   };
 
@@ -230,10 +303,75 @@ export default function SettingsPage() {
                 plan="familia"
                 userId={session.user.supabaseId}
                 userEmail={session.user.email}
-                className="w-full rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white"
+                className="w-full rounded-lg py-2 text-sm font-semibold text-white"
+                style={{ backgroundColor: BRAND.primary }}
               >
                 Assinar Família — R$ 29,90/mês
               </UpgradePlus>
+            </div>
+          </div>
+        ) : null}
+
+        {status === 'authenticated' && session?.user ? (
+          <div
+            className="mb-6 overflow-hidden rounded-2xl p-4 shadow-sm"
+            style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg }}
+          >
+            <h2 className="text-base font-semibold text-gray-900">Centro de Assinatura</h2>
+            <p className="mt-1 text-sm text-gray-600">Status do pagamento e ativação do seu plano em tempo real.</p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-xl bg-white px-3 py-2" style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}>
+                <p className="text-[11px] text-gray-500">Plano atual</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {PLAN_LABELS[String(subscriptionStatus.plano || 'free')] || 'Grátis'}
+                </p>
+              </div>
+              <div className="rounded-xl bg-white px-3 py-2" style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}>
+                <p className="text-[11px] text-gray-500">Situação</p>
+                <p className="text-sm font-semibold" style={{ color: subscriptionStatus.plano_ativo ? BRAND.primaryText : '#111827' }}>
+                  {subscriptionStatus.plano_ativo ? 'Ativo' : 'Inativo'}
+                  {subscriptionStatus.cancel_at_period_end ? ' (encerrando no fim do ciclo)' : ''}
+                </p>
+              </div>
+              <div
+                className="rounded-xl bg-white px-3 py-2 sm:col-span-2"
+                style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}
+              >
+                <p className="text-[11px] text-gray-500">Próxima renovação</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {subscriptionStatus.next_billing_at
+                    ? new Date(subscriptionStatus.next_billing_at).toLocaleDateString('pt-BR')
+                    : 'Sem cobrança futura no momento'}
+                </p>
+              </div>
+            </div>
+            {subscriptionStatus.error ? (
+              <p className="mt-2 text-xs text-red-600">{subscriptionStatus.error}</p>
+            ) : null}
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => router.replace(router.asPath)}
+                disabled={subscriptionStatus.loading}
+                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {subscriptionStatus.loading ? 'Atualizando…' : 'Atualizar status'}
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenBillingPortal}
+                disabled={billingPortalBusy}
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                style={{ backgroundColor: BRAND.primary }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = BRAND.primaryHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = BRAND.primary;
+                }}
+              >
+                {billingPortalBusy ? 'Abrindo…' : 'Gerenciar assinatura'}
+              </button>
             </div>
           </div>
         ) : null}

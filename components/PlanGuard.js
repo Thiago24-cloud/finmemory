@@ -20,7 +20,12 @@ export default function PlanGuard({ feature, title, body, children, className = 
   const planLabel = PLAN_LABELS[requiredPlan] || 'Pro';
 
   const defaultTitle = `Funcionalidade exclusiva do Plano ${planLabel}`;
-  const defaultBody = 'Assine agora para liberar o acesso total ao seu mapa de preços.';
+  const defaultBody =
+    requiredPlan === 'pro'
+      ? 'No Pro você libera Open Finance e metas inteligentes. Se quiser dividir orçamento e controle da casa, escolha o plano Família.'
+      : requiredPlan === 'familia'
+        ? 'O plano Família libera gestão compartilhada de orçamento, limites por membro e visão consolidada da casa.'
+        : 'Assine agora para liberar o acesso total ao seu mapa de preços.';
 
   return (
     <div className={`relative overflow-hidden rounded-xl ${className}`}>

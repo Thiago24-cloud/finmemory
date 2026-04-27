@@ -419,6 +419,8 @@ ${bundleBadge}
 function StoreMarkers({
   storeFilterName = '',
   searchQuery = '',
+  planningMode = false,
+  planningItems = [],
   onRequestStoreShop,
   userOrigin = null,
   cartOfferIdSet,
@@ -480,11 +482,44 @@ function StoreMarkers({
     .trim()
     .toLowerCase();
 
+  const planningTerms = useMemo(
+    () =>
+      (Array.isArray(planningItems) ? planningItems : [])
+        .map((v) =>
+          String(v || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/\p{M}/gu, '')
+            .trim()
+        )
+        .filter((v) => v.length >= 2),
+    [planningItems]
+  );
+
   const visibleStores = useMemo(() => {
-    if (effectiveQuery.length < 2) return stores;
-    const matched = stores.filter((s) => String(s.name || '').toLowerCase().includes(effectiveQuery));
-    return matched.length > 0 ? matched : stores;
-  }, [stores, effectiveQuery]);
+    let base = stores;
+    if (planningMode && planningTerms.length > 0) {
+      const matchesPlanning = (store) => {
+        const haystack = [
+          store.name,
+          ...(Array.isArray(store.offer_products) ? store.offer_products : []),
+          ...(Array.isArray(store.offer_preview) ? store.offer_preview.map((o) => o?.product_name) : []),
+        ]
+          .map((v) =>
+            String(v || '')
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/\p{M}/gu, '')
+          )
+          .join(' | ');
+        return planningTerms.some((term) => haystack.includes(term));
+      };
+      base = stores.filter(matchesPlanning);
+    }
+    if (effectiveQuery.length < 2) return base;
+    const matched = base.filter((s) => String(s.name || '').toLowerCase().includes(effectiveQuery));
+    return matched.length > 0 ? matched : base;
+  }, [stores, effectiveQuery, planningMode, planningTerms]);
 
   useEffect(() => {
     onVisibleStoresChange?.(visibleStores);
@@ -977,6 +1012,69 @@ function MapRegionFly({ searchQuery, searchIntent, onRegionFitted }) {
     });
     map.fitBounds(bounds, { padding: [44, 44], maxZoom: 14, animate: true });
   }, [map, searchIntent, onRegionFitted]);
+
+  return null;
+}
+
+function PlanningActionController({
+  request,
+  summary,
+  storesVisibleOnMap,
+  onOpenStore,
+  setMapUsefulPanTick,
+  onApplyMoneyPlan,
+}) {
+  const map = useMap();
+  const lastHandledIdRef = useRef(null);
+
+  useEffect(() => {
+    const id = Number(request?.id || 0);
+    if (!id || id === lastHandledIdRef.current) return;
+    lastHandledIdRef.current = id;
+
+    const mode = String(request?.mode || '');
+    if (mode === 'money') {
+      const picks = Array.isArray(summary?.cheapest?.picks) ? summary.cheapest.picks : [];
+      const coords = picks
+        .map((p) => [Number(p?.lat), Number(p?.lng)])
+        .filter((c) => Number.isFinite(c[0]) && Number.isFinite(c[1]));
+      if (coords.length === 0) return;
+      try {
+        onApplyMoneyPlan?.(picks);
+        if (coords.length === 1) {
+          map.flyTo(coords[0], Math.max(map.getZoom(), 15), { duration: 0.45 });
+        } else {
+          const bounds = L.latLngBounds(coords);
+          map.fitBounds(bounds, { padding: [44, 44], maxZoom: 16, animate: true, duration: 0.45 });
+        }
+        setMapUsefulPanTick?.((n) => n + 1);
+      } catch (e) {
+        console.warn('planning money fitBounds', e);
+      }
+      return;
+    }
+
+    if (mode === 'time' || mode === 'quality') {
+      const targetName = String(mode === 'quality' ? summary?.quality?.storeName : summary?.oneStore?.storeName)
+        .trim()
+        .toLowerCase();
+      if (!targetName) return;
+      const store = (storesVisibleOnMap || []).find(
+        (s) => String(s?.name || '').trim().toLowerCase() === targetName
+      );
+      if (!store) return;
+      try {
+        const lat = Number(store.lat);
+        const lng = Number(store.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          map.flyTo([lat, lng], Math.max(map.getZoom(), 15), { duration: 0.45 });
+        }
+        onOpenStore?.(store);
+      } catch (e) {
+        console.warn('planning time openStore', e);
+      }
+    }
+  }, [request, summary, storesVisibleOnMap, onOpenStore, map, setMapUsefulPanTick, onApplyMoneyPlan]);
 
   return null;
 }
@@ -2632,6 +2730,10 @@ export default function MapaPrecosLeaflet({
   searchQuery = '',
   promoOnly = false,
   wazeUi = false,
+  planningMode = false,
+  planningItems = [],
+  onPlanningSummaryChange,
+  planningActionRequest,
   headerOffsetPx = 56,
   overlayTopPx,
   onDetailOpenChange,
@@ -2879,6 +2981,26 @@ export default function MapaPrecosLeaflet({
     if (promoOnly) {
       base = base.filter(isPromoPoint);
     }
+    if (planningMode && Array.isArray(planningItems) && planningItems.length > 0) {
+      const terms = planningItems
+        .map((v) =>
+          String(v || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/\p{M}/gu, '')
+            .trim()
+        )
+        .filter((v) => v.length >= 2);
+      if (terms.length > 0) {
+        base = base.filter((p) => {
+          const h = `${p.produto || ''} ${p.nome || ''} ${p.categoria || ''}`
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/\p{M}/gu, '');
+          return terms.some((term) => h.includes(term));
+        });
+      }
+    }
     if (!applyProductTextFilter || q.length < 2) return base;
     return base.filter(
       (p) =>
@@ -2889,6 +3011,197 @@ export default function MapaPrecosLeaflet({
   }, [locais, searchQuery, promoOnly, applyProductTextFilter]);
 
   const priceGroups = useMemo(() => groupPointsByLocation(visibleLocais), [visibleLocais]);
+
+  const planningSummary = useMemo(() => {
+    if (!planningMode || !Array.isArray(planningItems) || planningItems.length === 0) return null;
+    const normalize = (v) =>
+      String(v || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .trim();
+    const terms = planningItems.map(normalize).filter((v) => v.length >= 2);
+    if (terms.length === 0) return null;
+
+    const points = (visibleLocais || []).filter((p) => Number.isFinite(parsePriceToNumber(p.preco)));
+    if (points.length === 0) {
+      return {
+        itemsCount: terms.length,
+        matchedItems: 0,
+        cheapest: null,
+        oneStore: null,
+      };
+    }
+
+    const pointMatchesTerm = (p, term) =>
+      normalize(`${p.produto || ''} ${p.nome || ''} ${p.categoria || ''}`).includes(term);
+
+    // Estratégia 1: menor total (pode combinar múltiplos mercados)
+    const cheapestByTerm = [];
+    for (const term of terms) {
+      const matches = points
+        .filter((p) => pointMatchesTerm(p, term))
+        .map((p) => ({ ...p, priceNum: parsePriceToNumber(p.preco) }))
+        .filter((p) => Number.isFinite(p.priceNum))
+        .sort((a, b) => a.priceNum - b.priceNum);
+      if (matches.length > 0) cheapestByTerm.push(matches[0]);
+    }
+    const cheapestTotal = cheapestByTerm.reduce((acc, p) => acc + Number(p.priceNum || 0), 0);
+    const cheapestStores = new Set(cheapestByTerm.map((p) => String(p.nome || '').trim()).filter(Boolean));
+
+    // Estratégia 2: tudo em um lugar (score híbrido: cobertura + proximidade + preço + exclusividade)
+    const byStore = new Map();
+    for (const p of points) {
+      const key = String(p.nome || '').trim() || 'Loja';
+      if (!byStore.has(key)) byStore.set(key, []);
+      byStore.get(key).push(p);
+    }
+    const termStoreCount = new Map();
+    for (const term of terms) {
+      let count = 0;
+      for (const storePoints of byStore.values()) {
+        const hasTerm = storePoints.some((p) => pointMatchesTerm(p, term));
+        if (hasTerm) count += 1;
+      }
+      termStoreCount.set(term, count);
+    }
+    const userLat = Number(userMapPosition?.lat);
+    const userLng = Number(userMapPosition?.lng);
+    const userHasLocation = Number.isFinite(userLat) && Number.isFinite(userLng);
+    let oneStoreBest = null;
+    let qualityBest = null;
+    const oneStoreCandidates = [];
+    for (const [storeName, storePoints] of byStore.entries()) {
+      const chosen = [];
+      for (const term of terms) {
+        const match = storePoints
+          .filter((p) => pointMatchesTerm(p, term))
+          .map((p) => ({ ...p, priceNum: parsePriceToNumber(p.preco) }))
+          .filter((p) => Number.isFinite(p.priceNum))
+          .sort((a, b) => a.priceNum - b.priceNum)[0];
+        if (match) chosen.push(match);
+      }
+      if (chosen.length === 0) continue;
+      const total = chosen.reduce((acc, p) => acc + Number(p.priceNum || 0), 0);
+      const coveredItems = chosen.length;
+      const coverageScore = terms.length > 0 ? coveredItems / terms.length : 0;
+      let distanceMeters = null;
+      if (userHasLocation) {
+        const first = chosen[0];
+        const lat = Number(first?.lat);
+        const lng = Number(first?.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          distanceMeters = haversineMeters(userLat, userLng, lat, lng);
+        }
+      }
+      const proximityScore =
+        distanceMeters == null
+          ? 0.5
+          : Math.max(0, Math.min(1, 1 - Math.min(distanceMeters, 5000) / 5000));
+      const priceScore =
+        cheapestTotal > 0 && coveredItems > 0
+          ? Math.max(0, Math.min(1, (cheapestTotal / Math.max(total, 0.01)) * (coveredItems / terms.length)))
+          : 0;
+      const exclusiveCount = terms.reduce((acc, term) => {
+        if (termStoreCount.get(term) === 1 && chosen.some((p) => pointMatchesTerm(p, term))) return acc + 1;
+        return acc;
+      }, 0);
+      const exclusivityScore = terms.length > 0 ? exclusiveCount / terms.length : 0;
+      const score = coverageScore * 0.45 + proximityScore * 0.3 + priceScore * 0.2 + exclusivityScore * 0.05;
+      const candidate = {
+        storeName,
+        coveredItems,
+        total,
+        distanceMeters,
+        score,
+        priceScore,
+        coverageScore,
+        exclusivityScore,
+        exclusiveCount,
+        chosen,
+      };
+      oneStoreCandidates.push(candidate);
+    }
+    oneStoreCandidates.sort((a, b) => b.score - a.score || b.coveredItems - a.coveredItems || a.total - b.total);
+    if (oneStoreCandidates.length > 0) {
+      oneStoreBest = oneStoreCandidates[0];
+      const qualitySorted = [...oneStoreCandidates].sort(
+        (a, b) =>
+          b.exclusiveCount - a.exclusiveCount ||
+          b.coverageScore - a.coverageScore ||
+          a.distanceMeters - b.distanceMeters ||
+          a.total - b.total
+      );
+      qualityBest = qualitySorted[0] || null;
+    }
+
+    return {
+      itemsCount: terms.length,
+      matchedItems: cheapestByTerm.length,
+      cheapest: cheapestByTerm.length
+        ? {
+            total: Number(cheapestTotal.toFixed(2)),
+            storesCount: cheapestStores.size || 1,
+            coveredItems: cheapestByTerm.length,
+            actionLabel:
+              (cheapestStores.size || 1) > 1 ? 'Economia máxima em múltiplos mercados' : 'Economia máxima em loja única',
+            badge: (cheapestStores.size || 1) > 1 ? 'Rota de economia' : 'Preço competitivo',
+            picks: cheapestByTerm.map((p) => ({
+              id: p.id,
+              storeName: p.nome || '',
+              productName: p.produto || '',
+              lat: Number(p.lat),
+              lng: Number(p.lng),
+              price: Number(p.priceNum || 0),
+            })),
+          }
+        : null,
+      oneStore: oneStoreBest
+        ? {
+            total: Number(oneStoreBest.total.toFixed(2)),
+            coveredItems: oneStoreBest.coveredItems,
+            storeName: oneStoreBest.storeName,
+            score: Number(oneStoreBest.score.toFixed(4)),
+            coveragePct: Math.round(oneStoreBest.coverageScore * 100),
+            distanceMeters:
+              oneStoreBest.distanceMeters == null ? null : Math.round(Number(oneStoreBest.distanceMeters || 0)),
+            exclusivesCount: oneStoreBest.exclusiveCount,
+            badge:
+              oneStoreBest.exclusiveCount > 0
+                ? 'Vitrine exclusiva'
+                : oneStoreBest.coverageScore >= 0.85
+                  ? 'Lista completa'
+                  : 'Conveniência',
+            actionLabel:
+              oneStoreBest.exclusiveCount > 0
+                ? 'Encontre itens exclusivos em um só lugar'
+                : oneStoreBest.coverageScore >= 0.85
+                  ? 'Resolva quase toda a lista sem trocar de mercado'
+                  : 'Compra prática perto de você',
+          }
+        : null,
+      quality: qualityBest
+        ? {
+            storeName: qualityBest.storeName,
+            coveredItems: qualityBest.coveredItems,
+            total: Number(qualityBest.total.toFixed(2)),
+            distanceMeters: qualityBest.distanceMeters == null ? null : Math.round(Number(qualityBest.distanceMeters || 0)),
+            exclusivesCount: qualityBest.exclusiveCount,
+            badge: qualityBest.exclusiveCount > 0 ? 'Premium/Exclusivos' : 'Curadoria de qualidade',
+            actionLabel:
+              qualityBest.exclusiveCount > 0
+                ? 'Itens exclusivos e diferenciados para sua lista'
+                : 'Loja com melhor curadoria para os itens buscados',
+          }
+        : null,
+    };
+  }, [planningMode, planningItems, visibleLocais, userMapPosition]);
+
+  useEffect(() => {
+    if (typeof onPlanningSummaryChange === 'function') {
+      onPlanningSummaryChange(planningSummary);
+    }
+  }, [planningSummary, onPlanningSummaryChange]);
 
   const { priceGroupsForMarkers, mapPriceCountByStoreId } = useMemo(
     () => mergePriceGroupsOntoNearbyStores(priceGroups, storesVisibleOnMap),
@@ -3344,6 +3657,40 @@ export default function MapaPrecosLeaflet({
     setRoutePickerOpen(false);
   }, [firstMissionStop, estimatedSavingsTotal, missionRoute.stops]);
 
+  const handleApplyMoneyPlanningPicks = useCallback(
+    (picks) => {
+      const normalized = (Array.isArray(picks) ? picks : [])
+        .map((p) => {
+          const id = String(p?.id || '').trim();
+          const lat = Number(p?.lat);
+          const lng = Number(p?.lng);
+          const price = Number(p?.price);
+          if (!id || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          return {
+            id,
+            offerId: id,
+            name: p?.productName || 'Oferta',
+            productName: p?.productName || 'Oferta',
+            price: Number.isFinite(price) ? price : null,
+            priceNum: Number.isFinite(price) ? price : null,
+            precoLabel: Number.isFinite(price) ? `R$ ${formatBRLPriceNum(price)}` : null,
+            storeLabel: p?.storeName || 'Loja',
+            storeName: p?.storeName || 'Loja',
+            storeGeo: { lat, lng },
+          };
+        })
+        .filter(Boolean);
+      if (normalized.length === 0) return;
+      setSelectedProducts((prev) => {
+        const byId = new Map((Array.isArray(prev) ? prev : []).map((x) => [String(x?.offerId || x?.id || ''), x]));
+        for (const item of normalized) byId.set(String(item.offerId), item);
+        return Array.from(byId.values()).filter((x) => String(x?.offerId || x?.id || '').trim());
+      });
+      toast.success('Rota sugerida montada com os melhores preços.');
+    },
+    [setSelectedProducts]
+  );
+
   const isDetailSheetProductInCart = useCallback(
     (product) => {
       if (!product) return false;
@@ -3738,6 +4085,8 @@ export default function MapaPrecosLeaflet({
         <MissionRouteMarkers stops={missionRoute.stops} />
         <StoreMarkers
           searchQuery={searchQuery}
+          planningMode={planningMode}
+          planningItems={planningItems}
           onRequestStoreShop={handleRequestStoreShop}
           userOrigin={userMapPosition}
           cartOfferIdSet={cartOfferIdSet}
@@ -3758,6 +4107,14 @@ export default function MapaPrecosLeaflet({
           bottomPadPx={mapOverlayBottomPadPx}
           leftPadPx={desktopShopSidebarWidthPx}
           panTick={mapUsefulPanTick}
+        />
+        <PlanningActionController
+          request={planningActionRequest}
+          summary={planningSummary}
+          storesVisibleOnMap={storesVisibleOnMap}
+          onOpenStore={handleRequestStoreShop}
+          setMapUsefulPanTick={setMapUsefulPanTick}
+          onApplyMoneyPlan={handleApplyMoneyPlanningPicks}
         />
       </MapContainer>
 

@@ -10,6 +10,10 @@ export default function MapaPrecos({
   searchQuery = '',
   promoOnly = false,
   wazeUi = false,
+  planningMode = false,
+  planningItems = [],
+  onPlanningSummaryChange,
+  planningActionRequest,
   headerOffsetPx = 120,
   /** Quando o mapa vai até ao topo (padding 0), posição dos painéis / botão GPS — ver pages/mapa.js */
   overlayTopPx,
@@ -23,6 +27,10 @@ export default function MapaPrecos({
         searchQuery={searchQuery}
         promoOnly={promoOnly}
         wazeUi={wazeUi}
+        planningMode={planningMode}
+        planningItems={planningItems}
+        onPlanningSummaryChange={onPlanningSummaryChange}
+        planningActionRequest={planningActionRequest}
         headerOffsetPx={headerOffsetPx}
         overlayTopPx={overlayTopPx}
         onDetailOpenChange={onDetailOpenChange}

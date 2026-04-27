@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { cn } from '../../lib/utils';
+import { FinancePlansInline } from '../FinancePlansInline';
 
 function NotaFiscalHeroIcon({ className }) {
   return (
@@ -68,6 +69,7 @@ export function FeaturedScanReceiptCTA({ className }) {
           <h2 className="text-base sm:text-lg font-bold text-[#14532d] m-0 leading-snug">
             Tire foto e automatize produtos e preços na hora
           </h2>
+          <FinancePlansInline className="mt-1.5 mb-0 text-[11px] text-[#166534]" />
         </div>
       </div>
     </Link>

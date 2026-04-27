@@ -14,11 +14,14 @@ import { UnifiedHistoryList } from '../components/dashboard/UnifiedHistoryList';
 import { OpenFinanceBankCarousel } from '../components/dashboard/OpenFinanceBankCarousel';
 import { FeaturedScanReceiptCTA } from '../components/dashboard/FeaturedScanReceiptCTA';
 import { CalculatorDockProvider, useCalculatorDock } from '../components/dashboard/CalculatorDockContext';
+import { FinancePlansInline } from '../components/FinancePlansInline';
+import PlanGuard from '../components/PlanGuard';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
 import { DashboardOnboardingTour } from '../components/onboarding/DashboardOnboardingTour';
+import { BRAND } from '../lib/brandTokens';
 import {
   isDashboardOnboardingDoneLocal,
   setDashboardOnboardingDoneLocal,
@@ -110,6 +113,7 @@ export default function Dashboard() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const [stripeSuccessBanner, setStripeSuccessBanner] = useState(false);
+  const [stripeSyncState, setStripeSyncState] = useState({ loading: false, plan: 'free', active: false, error: '' });
   const [openFinanceAccountId, setOpenFinanceAccountId] = useState(null);
   const openFinance = useOpenFinanceSummary({
     enabled: status === 'authenticated',
@@ -136,11 +140,45 @@ export default function Dashboard() {
   // Após retorno do Stripe Checkout: atualiza sessão para refletir novo plano sem re-login
   useEffect(() => {
     if (router.query.stripe !== 'success') return;
-    setStripeSuccessBanner(true);
-    update(); // re-executa JWT callback → lê plano atualizado do DB
-    const url = new URL(window.location.href);
-    url.searchParams.delete('stripe');
-    window.history.replaceState({}, '', url.toString());
+    let cancelled = false;
+    async function syncPaidPlan() {
+      setStripeSuccessBanner(true);
+      setStripeSyncState({ loading: true, plan: 'free', active: false, error: '' });
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          const res = await fetch('/api/stripe/sync-plan-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!cancelled && res.ok && json?.plano_ativo && json?.plano && json.plano !== 'free') {
+            await update();
+            setStripeSyncState({
+              loading: false,
+              plan: String(json.plano),
+              active: true,
+              error: '',
+            });
+            break;
+          }
+        } catch (_) {
+          // retry curto
+        }
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 1200));
+      }
+      if (!cancelled) {
+        setStripeSyncState((prev) =>
+          prev.active ? prev : { loading: false, plan: 'free', active: false, error: 'Pagamento recebido. Finalizando ativação do plano...' }
+        );
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('stripe');
+      window.history.replaceState({}, '', url.toString());
+    }
+    void syncPaidPlan();
+    return () => {
+      cancelled = true;
+    };
   }, [router.query.stripe, update]);
 
   // Debug: Log quando transactions mudar
@@ -873,12 +911,27 @@ export default function Dashboard() {
               ) : (
                 <>
             {stripeSuccessBanner && (
-              <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                <span>Assinatura ativada! Seu plano foi atualizado.</span>
+              <div
+                className="mb-4 flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+                style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg, color: BRAND.primaryText }}
+              >
+                <span>
+                  {stripeSyncState.loading
+                    ? 'Confirmando seu pagamento e ativando o plano...'
+                    : stripeSyncState.active
+                      ? `Plano ${String(stripeSyncState.plan || '').toUpperCase()} ativo! Recursos premium liberados.`
+                      : stripeSyncState.error || 'Pagamento confirmado. Estamos atualizando seu plano agora.'}
+                </span>
                 <button
                   type="button"
                   onClick={() => setStripeSuccessBanner(false)}
-                  className="shrink-0 rounded p-0.5 hover:bg-emerald-100"
+                  className="shrink-0 rounded p-0.5"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = BRAND.primarySoftHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
                   aria-label="Fechar"
                 >
                   <X className="h-4 w-4" />
@@ -936,10 +989,16 @@ export default function Dashboard() {
             />
             <FeaturedScanReceiptCTA />
 
-            <section
-              className="mb-6 rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
-              aria-label="Open Finance"
+            <PlanGuard
+              feature="open_finance"
+              title="Open Finance no Plano Pro"
+              body="Conecte seus bancos com automação total no Pro. Para orçamento compartilhado da casa, use o plano Família."
+              className="mb-6"
             >
+              <section
+                className="rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
+                aria-label="Open Finance"
+              >
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div>
                   <h2 className="text-sm font-semibold text-[#333] m-0">Open Finance</h2>
@@ -1004,7 +1063,14 @@ export default function Dashboard() {
                 Movimentos do banco e das notas aparecem juntos em <strong className="text-[#333]">Histórico</strong>{' '}
                 abaixo; linhas duplicadas somem quando a nota corresponde ao extrato.
               </p>
-            </section>
+              <FinancePlansInline
+                className="mt-2 text-[11px] text-[#4b5563] m-0"
+                emphasize
+                showLink
+                linkClassName="font-semibold text-[#2ECC49] hover:underline"
+              />
+              </section>
+            </PlanGuard>
 
             <Link
               href="/calculadora"

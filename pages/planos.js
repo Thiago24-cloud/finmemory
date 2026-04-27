@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowLeft, Check, Lock, X } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import { PLAN_LABELS } from '../lib/planAccess';
+import { BRAND } from '../lib/brandTokens';
 
 const UpgradeBtn = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
@@ -115,6 +117,14 @@ export default function PlanosPage() {
             Compare o que inclui cada nível. Passe o rato pelos cartões para destacar. A assinatura abre no Stripe
             Checkout (pagamento seguro).
           </p>
+          {authed ? (
+            <p
+              className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg, color: BRAND.primaryText }}
+            >
+              Plano ativo: {PLAN_LABELS[String(session?.user?.plano || 'free').toLowerCase()] || 'Grátis'}
+            </p>
+          ) : null}
         </div>
 
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-6">
