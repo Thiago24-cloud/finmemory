@@ -12,6 +12,8 @@ function formatCurrency(value) {
 export default function FloatingCartBar({
   itemsCount = 0,
   totalPrice = 0,
+  estimatedSavings = 0,
+  ctaLabel = 'Lista',
   onOpenList,
   onOpenBag,
   className = ''
@@ -40,8 +42,11 @@ export default function FloatingCartBar({
             <ShoppingCart className="h-4 w-4 text-emerald-300" />
           </div>
           <div>
-            <p className="text-sm font-semibold">{itemsCount} item(ns) na sacola</p>
-            <p className="text-[11px] text-emerald-200">{formatCurrency(totalPrice)}</p>
+            <p className="text-sm font-semibold">{itemsCount} item(ns) na missão</p>
+            <p className="text-[11px] text-emerald-200">
+              {formatCurrency(totalPrice)}
+              {estimatedSavings > 0 ? ` • economia estimada ${formatCurrency(estimatedSavings)}` : ''}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -57,7 +62,7 @@ export default function FloatingCartBar({
             onClick={onOpenList}
             className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-[#0f1117] no-underline hover:bg-emerald-400"
           >
-            Lista
+            {ctaLabel}
           </Link>
         </div>
       </div>

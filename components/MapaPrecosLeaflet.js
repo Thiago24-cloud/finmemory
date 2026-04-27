@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from 'react-leaflet';
 import { displayPromoProductName, promoCategoryBadgeLabel, promoShelfLabel } from '../lib/mapOfferDisplay';
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
 import L from 'leaflet';
@@ -12,6 +12,7 @@ import { ShoppingCart, Loader2, Check, X, Navigation, Clock } from 'lucide-react
 import { toast } from 'sonner';
 import { openGoogleMapsDirectionsPreferCurrentLocation, openWazeNavigation } from '../lib/mapDirections';
 import { getMapThemeById, getCategoryColor, getStorePinMainColor, MAP_THEMES } from '../lib/colors';
+import { trackBackendEvent, trackEvent } from '../lib/analytics';
 import { SAO_PAULO_STATE_CENTER, SAO_PAULO_STATE_ZOOM } from '../lib/saoPauloStateMap';
 import { getSupabase } from '../lib/supabase';
 import { parsePriceToNumber } from '../lib/parseMapPrice';
@@ -20,6 +21,7 @@ import { getMapProductImageSrcForImg } from '../lib/mapImageProxy';
 import { useMatchMedia } from '../lib/useMatchMedia';
 import { isClientUsablePinLogoRef } from '../lib/mapPinLogoUrl';
 import { getHomogeneousGroupLogoPinSrc, getStoreLogoPinSrc } from '../lib/storeLogos';
+import { scheduleMissionFollowupNotification } from '../lib/missionFollowupNotification';
 import MapMobileBottomSheet from './map/MapMobileBottomSheet';
 import EstablishmentDetailSheet from './map/EstablishmentDetailSheet';
 import FloatingCartBar from './map/FloatingCartBar';
@@ -163,7 +165,7 @@ const DEFAULT_ICON = L.icon({
 });
 
 /** Pin de preço: preenchimento suave da mesma cor + contorno forte + número na cor de destaque (unificado com o rótulo). */
-function createCategoryIcon(hexColor, bundleCount = 1, compact = false) {
+function createCategoryIcon(hexColor, bundleCount = 1, compact = false, isOpportunity = false) {
   const n = Math.max(1, Number(bundleCount) || 1);
   const isBundle = n > 1;
   const size = compact ? (isBundle ? 34 : 28) : isBundle ? 40 : 32;
@@ -174,9 +176,10 @@ function createCategoryIcon(hexColor, bundleCount = 1, compact = false) {
   const label = isBundle
     ? `<span style="font-size:${compact ? 12 : 13}px;font-weight:800;color:${ink};line-height:1;">${n}</span>`
     : `<span style="display:block;width:${dot}px;height:${dot}px;border-radius:50%;background:${ink};box-shadow:0 0 0 1.5px rgba(255,255,255,.95);"></span>`;
+  const auraClass = isOpportunity ? ' finmemory-price-pin-opportunity' : '';
   return L.divIcon({
     className: 'custom-pin custom-pin-price',
-    html: `<div style="background:${fill};width:${size}px;height:${size}px;border-radius:50%;border:2.5px solid ${hexColor};box-shadow:0 2px 10px rgba(15,23,42,0.18);display:flex;align-items:center;justify-content:center;">${label}</div>`,
+    html: `<div class="finmemory-price-pin-shell${auraClass}" style="position:relative;background:${fill};width:${size}px;height:${size}px;border-radius:50%;border:2.5px solid ${hexColor};box-shadow:0 2px 10px rgba(15,23,42,0.18);display:flex;align-items:center;justify-content:center;">${label}${isOpportunity ? `<span aria-hidden="true" style="position:absolute;top:-5px;left:-5px;border-radius:999px;background:#f59e0b;color:#111827;border:1.5px solid rgba(255,255,255,0.95);padding:1px 5px;font-size:9px;font-weight:800;letter-spacing:0.02em;">TOP</span>` : ''}</div>`,
     iconSize: [size, size],
     iconAnchor: [half, half],
     popupAnchor: [0, -half]
@@ -184,7 +187,7 @@ function createCategoryIcon(hexColor, bundleCount = 1, compact = false) {
 }
 
 /** Círculo de oferta com logo da rede (Dia, Mambo, Pomar da Vila, etc.) + badge de quantidade. */
-function createPriceGroupBrandIcon(hexColor, bundleCount, compact, logoUrl) {
+function createPriceGroupBrandIcon(hexColor, bundleCount, compact, logoUrl, isOpportunity = false) {
   const n = Math.max(1, Number(bundleCount) || 1);
   const isBundle = n > 1;
   const size = compact ? (isBundle ? 38 : 32) : isBundle ? 44 : 36;
@@ -200,15 +203,29 @@ function createPriceGroupBrandIcon(hexColor, bundleCount, compact, logoUrl) {
   const bundleBadge = isBundle
     ? `<div aria-hidden="true" style="position:absolute;right:-4px;bottom:-4px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:${fill};border:2px solid ${hexColor};box-shadow:0 1px 5px rgba(15,23,42,0.28);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:${ink};line-height:1;z-index:2;">${badgeLabel}</div>`
     : '';
-  const html = `<div class="finmemory-store-pin-wrap finmemory-price-pin-logo" style="line-height:0;position:relative;display:inline-block;width:${size}px;height:${size}px;">
+  const html = `<div class="finmemory-store-pin-wrap finmemory-price-pin-logo${isOpportunity ? ' finmemory-price-pin-opportunity' : ''}" style="line-height:0;position:relative;display:inline-block;width:${size}px;height:${size}px;">
 <div style="width:${size}px;height:${size}px;border-radius:50%;background:#fff;border:2.5px solid ${hexColor};box-shadow:0 2px 10px rgba(0,0,0,0.2);overflow:hidden;display:flex;align-items:center;justify-content:center;">
 <img src="${safeSrc}" alt="" width="${inner}" height="${inner}" style="width:${inner}px;height:${inner}px;object-fit:contain;display:block;pointer-events:none;" referrerpolicy="no-referrer" decoding="async" onerror="this.style.display='none';this.parentNode.style.background='${fill}'" />
 </div>
 ${bundleBadge}
+${isOpportunity ? `<div aria-hidden="true" style="position:absolute;top:-5px;left:-5px;border-radius:999px;background:#f59e0b;color:#111827;border:1.5px solid rgba(255,255,255,0.95);padding:1px 5px;font-size:9px;font-weight:800;letter-spacing:0.02em;z-index:3;">TOP</div>` : ''}
 </div>`;
   return L.divIcon({
     className: 'custom-pin custom-pin-price custom-pin-price--brand',
     html,
+    iconSize: [size, size],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half],
+  });
+}
+
+function createMissionStopIcon(stopNumber = 1) {
+  const n = Math.max(1, Number(stopNumber) || 1);
+  const size = 34;
+  const half = size / 2;
+  return L.divIcon({
+    className: 'custom-pin finmemory-mission-stop-pin',
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:linear-gradient(135deg,#2ECC49 0%,#16a34a 100%);border:2px solid rgba(255,255,255,0.95);box-shadow:0 6px 16px rgba(22,163,74,0.45);display:flex;align-items:center;justify-content:center;color:#052e16;font-weight:900;font-size:13px;line-height:1;">${n}</div>`,
     iconSize: [size, size],
     iconAnchor: [half, half],
     popupAnchor: [0, -half],
@@ -230,6 +247,15 @@ function truncateMapLabel(text, max = 36) {
   if (!s) return '';
   if (s.length <= max) return s;
   return `${s.slice(0, Math.max(0, max - 1))}…`;
+}
+
+function normalizeProductKey(name) {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 /** Rótulo permanente para grupo de preços no mesmo local */
@@ -2518,13 +2544,23 @@ function PriceGroupMarker({ group, searchQuery, cartOfferIdSet, onMapPointCartTo
   const compactPins = useMatchMedia('(max-width: 767px)');
 
   const groupLogoSrc = useMemo(() => getHomogeneousGroupLogoPinSrc(group), [group]);
+  const isOpportunityGroup = useMemo(() => {
+    if (!Array.isArray(group?.points) || group.points.length < 2) return false;
+    const priced = group.points
+      .map((p) => numericPriceForSum(p?.preco, p?.categoria, p?.id))
+      .filter((n) => typeof n === 'number' && Number.isFinite(n) && n > 0);
+    if (priced.length < 2) return false;
+    const min = Math.min(...priced);
+    const avg = priced.reduce((s, n) => s + n, 0) / priced.length;
+    return min <= avg * 0.82;
+  }, [group]);
 
   const customIcon = useMemo(() => {
     if (groupLogoSrc) {
-      return createPriceGroupBrandIcon(main, count, compactPins, groupLogoSrc);
+      return createPriceGroupBrandIcon(main, count, compactPins, groupLogoSrc, isOpportunityGroup);
     }
-    return createCategoryIcon(main, count, compactPins);
-  }, [main, count, compactPins, groupLogoSrc]);
+    return createCategoryIcon(main, count, compactPins, isOpportunityGroup);
+  }, [main, count, compactPins, groupLogoSrc, isOpportunityGroup]);
   const priceLabelStyle = useMemo(() => getMapPinOpenAirLabelStyle(main), [main]);
 
   return (
@@ -2568,6 +2604,26 @@ function PriceGroupMarker({ group, searchQuery, cartOfferIdSet, onMapPointCartTo
         />
       </Popup>
     </Marker>
+  );
+}
+
+function MissionRouteMarkers({ stops }) {
+  if (!Array.isArray(stops) || stops.length === 0) return null;
+  return (
+    <>
+      {stops.map((stop, idx) => (
+        <Marker
+          key={`mission-stop-${idx + 1}-${Number(stop?.lat).toFixed(5)}-${Number(stop?.lng).toFixed(5)}`}
+          position={[Number(stop.lat), Number(stop.lng)]}
+          icon={createMissionStopIcon(idx + 1)}
+          zIndexOffset={3600}
+        >
+          <Tooltip direction="top" offset={[0, -16]} opacity={1} interactive={false}>
+            Parada {idx + 1}
+          </Tooltip>
+        </Marker>
+      ))}
+    </>
   );
 }
 
@@ -2665,6 +2721,7 @@ export default function MapaPrecosLeaflet({
   } = useMapCart();
   const promoCart = shoppingBag;
   const [bagSheetOpen, setBagSheetOpen] = useState(false);
+  const [routePickerOpen, setRoutePickerOpen] = useState(false);
   const [nearbyBagAlert, setNearbyBagAlert] = useState(null);
   const bagAlertCooldownRef = useRef(new Map());
   useBagBackgroundMonitoring(promoCart);
@@ -3099,6 +3156,194 @@ export default function MapaPrecosLeaflet({
 
   const cartOfferIdSet = useMemo(() => new Set(promoCart.map((x) => x.offerId || x.id)), [promoCart]);
 
+  const estimatedSavingsTotal = useMemo(() => {
+    if (!Array.isArray(locais) || locais.length === 0 || promoCart.length === 0) return 0;
+    const refByProduct = new Map();
+    locais.forEach((point) => {
+      const key = normalizeProductKey(point?.produto || point?.product_name);
+      if (!key) return;
+      const priceNum = numericPriceForSum(point?.preco, point?.categoria, point?.id);
+      if (!(typeof priceNum === 'number' && Number.isFinite(priceNum) && priceNum > 0)) return;
+      const prev = refByProduct.get(key) || { min: Number.POSITIVE_INFINITY, sum: 0, count: 0 };
+      prev.min = Math.min(prev.min, priceNum);
+      prev.sum += priceNum;
+      prev.count += 1;
+      refByProduct.set(key, prev);
+    });
+    return promoCart.reduce((acc, item) => {
+      const priceNum = Number(item?.priceNum);
+      if (!(Number.isFinite(priceNum) && priceNum > 0)) return acc;
+      const key = normalizeProductKey(item?.productName || item?.name);
+      if (!key) return acc;
+      const ref = refByProduct.get(key);
+      if (!ref || !Number.isFinite(ref.min)) return acc;
+      const fallbackAvg = ref.count > 0 ? ref.sum / ref.count : ref.min;
+      const baseline = Math.max(ref.min, fallbackAvg);
+      const gain = baseline - priceNum;
+      return gain > 0 ? acc + gain : acc;
+    }, 0);
+  }, [locais, promoCart]);
+
+  const contextualSuggestion = useMemo(() => {
+    if (!Array.isArray(visibleLocais) || visibleLocais.length === 0) return null;
+    const now = Date.now();
+    const byProduct = new Map();
+    visibleLocais.forEach((point) => {
+      const key = normalizeProductKey(point?.produto);
+      if (!key) return;
+      const priceNum = numericPriceForSum(point?.preco, point?.categoria, point?.id);
+      if (!(typeof priceNum === 'number' && Number.isFinite(priceNum) && priceNum > 0)) return;
+      const prev = byProduct.get(key) || { min: Number.POSITIVE_INFINITY, sum: 0, count: 0 };
+      prev.min = Math.min(prev.min, priceNum);
+      prev.sum += priceNum;
+      prev.count += 1;
+      byProduct.set(key, prev);
+    });
+    const cartProductKeys = new Set(promoCart.map((item) => normalizeProductKey(item?.productName || item?.name)));
+    let best = null;
+    visibleLocais.forEach((point) => {
+      const offerId = String(point?.id || '');
+      if (!offerId || cartOfferIdSet.has(offerId)) return;
+      const productKey = normalizeProductKey(point?.produto);
+      if (!productKey || cartProductKeys.has(productKey)) return;
+      const priceNum = numericPriceForSum(point?.preco, point?.categoria, point?.id);
+      if (!(typeof priceNum === 'number' && Number.isFinite(priceNum) && priceNum > 0)) return;
+      const ref = byProduct.get(productKey);
+      if (!ref || !Number.isFinite(ref.min)) return;
+      const baseline = Math.max(ref.min, ref.count > 0 ? ref.sum / ref.count : ref.min);
+      const potentialGain = baseline - priceNum;
+      if (!(potentialGain > 0.15)) return;
+      const observedAtTs = point?.observed_at ? new Date(point.observed_at).getTime() : NaN;
+      const freshnessBoost = Number.isFinite(observedAtTs) && now - observedAtTs <= 1000 * 60 * 60 * 8 ? 0.6 : 0;
+      const score = potentialGain + freshnessBoost;
+      if (!best || score > best.score) {
+        best = {
+          score,
+          offer: point,
+          potentialGain,
+        };
+      }
+    });
+    return best;
+  }, [visibleLocais, promoCart, cartOfferIdSet]);
+
+  const primaryCtaLabel = promoCart.length > 0 ? 'Ir economizar agora' : 'Lista';
+
+  const missionRoute = useMemo(() => {
+    const stops = [];
+    const seenStops = new Set();
+    promoCart.forEach((item) => {
+      const lat = Number(item?.storeGeo?.lat ?? item?.storeLat ?? item?.lat);
+      const lng = Number(item?.storeGeo?.lng ?? item?.storeLng ?? item?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const key = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+      if (seenStops.has(key)) return;
+      seenStops.add(key);
+      stops.push({ lat, lng });
+    });
+    if (stops.length === 0) return { points: [], totalMeters: 0, etaMin: 0, stops: [] };
+    let current =
+      userMapPosition && Number.isFinite(Number(userMapPosition.lat)) && Number.isFinite(Number(userMapPosition.lng))
+        ? { lat: Number(userMapPosition.lat), lng: Number(userMapPosition.lng) }
+        : null;
+    const remaining = stops.slice();
+    const route = [];
+    const routeStops = [];
+    if (current) route.push(current);
+    while (remaining.length > 0) {
+      if (!current) {
+        current = remaining.shift();
+        route.push(current);
+        continue;
+      }
+      let nearestIdx = 0;
+      let nearestDist = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < remaining.length; i += 1) {
+        const cand = remaining[i];
+        const d = haversineMeters(current.lat, current.lng, cand.lat, cand.lng);
+        if (d < nearestDist) {
+          nearestDist = d;
+          nearestIdx = i;
+        }
+      }
+      const next = remaining.splice(nearestIdx, 1)[0];
+      route.push(next);
+      routeStops.push(next);
+      current = next;
+    }
+    let totalMeters = 0;
+    for (let i = 1; i < route.length; i += 1) {
+      totalMeters += haversineMeters(route[i - 1].lat, route[i - 1].lng, route[i].lat, route[i].lng);
+    }
+    // Velocidade urbana média em deslocamento curto.
+    const etaMin = totalMeters > 0 ? Math.max(1, Math.round(totalMeters / 430)) : 0;
+    return {
+      points: route.map((pt) => [pt.lat, pt.lng]),
+      totalMeters,
+      etaMin,
+      stops: routeStops.length > 0 ? routeStops : stops,
+    };
+  }, [promoCart, userMapPosition]);
+
+  const missionDistanceKm = useMemo(
+    () => (missionRoute.totalMeters > 0 ? missionRoute.totalMeters / 1000 : 0),
+    [missionRoute.totalMeters]
+  );
+
+  const firstMissionStop = missionRoute.stops?.[0] || null;
+
+  const handleStartMissionRoute = useCallback(() => {
+    if (!firstMissionStop) {
+      toast.message('Selecione ao menos uma parada para iniciar a rota.');
+      return;
+    }
+    trackEvent('rota_iniciada', {
+      stops_count: missionRoute.stops?.length || 0,
+      estimated_savings: Number(estimatedSavingsTotal || 0),
+    });
+    void trackBackendEvent('rota_iniciada', '/mapa');
+    setRoutePickerOpen(true);
+  }, [firstMissionStop, missionRoute.stops, estimatedSavingsTotal]);
+
+  const handleOpenMissionInGoogle = useCallback(async () => {
+    if (!firstMissionStop) return;
+    openGoogleMapsDirectionsPreferCurrentLocation(
+      { lat: firstMissionStop.lat, lng: firstMissionStop.lng },
+      userMapPosition || null
+    );
+    const scheduled = await scheduleMissionFollowupNotification({
+      delayMinutes: 30,
+      estimatedSavings: estimatedSavingsTotal,
+      stopsCount: missionRoute.stops?.length || 0,
+    });
+    if (scheduled?.ok) {
+      trackEvent('push_agendado', {
+        source: 'google_maps',
+        delay_minutes: 30,
+      });
+      void trackBackendEvent('push_agendado', '/mapa');
+    }
+    setRoutePickerOpen(false);
+  }, [firstMissionStop, userMapPosition, estimatedSavingsTotal, missionRoute.stops]);
+
+  const handleOpenMissionInWaze = useCallback(async () => {
+    if (!firstMissionStop) return;
+    openWazeNavigation({ lat: firstMissionStop.lat, lng: firstMissionStop.lng });
+    const scheduled = await scheduleMissionFollowupNotification({
+      delayMinutes: 30,
+      estimatedSavings: estimatedSavingsTotal,
+      stopsCount: missionRoute.stops?.length || 0,
+    });
+    if (scheduled?.ok) {
+      trackEvent('push_agendado', {
+        source: 'waze',
+        delay_minutes: 30,
+      });
+      void trackBackendEvent('push_agendado', '/mapa');
+    }
+    setRoutePickerOpen(false);
+  }, [firstMissionStop, estimatedSavingsTotal, missionRoute.stops]);
+
   const isDetailSheetProductInCart = useCallback(
     (product) => {
       if (!product) return false;
@@ -3465,6 +3710,32 @@ export default function MapaPrecosLeaflet({
           onMapPointCartToggle={toggleCartFromMapPoint}
           userOrigin={userMapPosition}
         />
+        {missionRoute.points.length >= 2 ? (
+          <>
+            <Polyline
+              positions={missionRoute.points}
+              pathOptions={{
+                color: '#22c55e',
+                weight: 9,
+                opacity: 0.2,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+            <Polyline
+              positions={missionRoute.points}
+              pathOptions={{
+                color: '#2ECC49',
+                weight: 4,
+                opacity: 0.98,
+                dashArray: '10 8',
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+          </>
+        ) : null}
+        <MissionRouteMarkers stops={missionRoute.stops} />
         <StoreMarkers
           searchQuery={searchQuery}
           onRequestStoreShop={handleRequestStoreShop}
@@ -3527,6 +3798,94 @@ export default function MapaPrecosLeaflet({
               ? `por R$ ${formatBRLPriceNum(nearbyBagAlert.item.priceNum)}`
               : 'está disponível aqui'}
             .
+          </div>
+        </div>
+      ) : null}
+
+      {promoCart.length > 0 && !shopOpen && !mobileStorePreview ? (
+        <div className="pointer-events-none absolute left-3 right-3 z-[1101] top-[max(74px,env(safe-area-inset-top)+70px)] sm:left-4 sm:right-auto sm:max-w-[390px]">
+          <div className="pointer-events-auto rounded-2xl border border-emerald-300/45 bg-[#0f1117]/94 px-3.5 py-3 text-white shadow-[0_14px_32px_rgba(16,185,129,0.35)] backdrop-blur-md">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-300">Dashboard de missao</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5">
+                <p className="text-[10px] text-emerald-100/80">Economia</p>
+                <p className="text-sm font-bold text-emerald-300">R$ {formatBRLPriceNum(estimatedSavingsTotal)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5">
+                <p className="text-[10px] text-emerald-100/80">Distancia</p>
+                <p className="text-sm font-bold text-emerald-300">{missionDistanceKm > 0 ? `${missionDistanceKm.toFixed(1)} km` : '—'}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5">
+                <p className="text-[10px] text-emerald-100/80">Tempo</p>
+                <p className="text-sm font-bold text-emerald-300">{missionRoute.etaMin > 0 ? `${missionRoute.etaMin} min` : '—'}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleStartMissionRoute}
+              className="mt-2.5 inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 px-3 py-2 text-xs font-extrabold text-[#052e16] shadow-[0_10px_18px_rgba(16,185,129,0.35)] hover:from-emerald-300 hover:to-emerald-400"
+            >
+              Iniciar Rota
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!shopOpen && !mobileStorePreview && contextualSuggestion?.offer ? (
+        <div className="absolute bottom-[11.2rem] left-3 right-3 z-[1102] sm:left-4 sm:right-auto sm:max-w-[420px]">
+          <div className="rounded-2xl border border-white/15 bg-[#111827]/94 p-3 text-white shadow-[0_14px_26px_rgba(15,23,42,0.35)] backdrop-blur-md">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-300">Proximo passo sugerido</p>
+            <p className="mt-1 text-sm leading-snug text-zinc-100">
+              <span className="font-semibold">{displayPromoProductName(contextualSuggestion.offer?.produto, contextualSuggestion.offer?.nome)}</span>{' '}
+              em <span className="font-medium text-emerald-300">{contextualSuggestion.offer?.nome || 'loja proxima'}</span>.
+            </p>
+            <p className="mt-1 text-xs text-zinc-300">
+              Potencial de economia: <span className="font-semibold text-emerald-300">R$ {formatBRLPriceNum(contextualSuggestion.potentialGain)}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => toggleCartFromMapPoint(contextualSuggestion.offer)}
+              className="mt-2.5 inline-flex rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-[#0f1117] hover:bg-emerald-400"
+            >
+              Adicionar a rota
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {routePickerOpen ? (
+        <div className="fixed inset-0 z-[1115] bg-black/50 px-4 py-20" onClick={() => setRoutePickerOpen(false)}>
+          <div
+            className="mx-auto w-full max-w-sm rounded-2xl border border-white/15 bg-[#0f1117] p-4 text-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-emerald-300">Iniciar rota de economia</p>
+            <p className="mt-1 text-xs text-zinc-300">
+              Escolha o app para abrir a primeira parada da missao.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleOpenMissionInGoogle}
+                className="rounded-xl border border-blue-300/40 bg-blue-500/10 px-3 py-2 text-xs font-bold text-blue-200 hover:bg-blue-500/20"
+              >
+                Abrir no Google Maps
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenMissionInWaze}
+                className="rounded-xl border border-sky-300/40 bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-200 hover:bg-sky-500/20"
+              >
+                Abrir no Waze
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRoutePickerOpen(false)}
+              className="mt-2.5 w-full rounded-xl border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       ) : null}
@@ -3689,6 +4048,8 @@ export default function MapaPrecosLeaflet({
         <FloatingCartBar
           itemsCount={promoCart.length}
           totalPrice={shoppingBagTotals.totalPrice}
+          estimatedSavings={estimatedSavingsTotal}
+          ctaLabel={primaryCtaLabel}
           onOpenBag={() => setBagSheetOpen(true)}
           onOpenList={() => {
             /* Link no próprio componente */

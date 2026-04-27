@@ -10,6 +10,12 @@ import Image from 'next/image';
 import { cn } from '../lib/utils';
 import { parseMoneyInput } from '../lib/parseMoneyInput';
 import { ExpressionValueField } from '../components/ui/ExpressionValueField';
+import {
+  cancelMissionFollowupNotification,
+  clearMissionActiveContext,
+  getMissionActiveContext,
+} from '../lib/missionFollowupNotification';
+import { trackBackendEvent, trackEvent } from '../lib/analytics';
 
 /**
  * Página de captura e processamento de nota fiscal via OCR.
@@ -194,6 +200,16 @@ export default function AddReceipt() {
     const t = router.query.tab;
     if (t === 'nfce' || t === 'qr') setScanTab('nfce');
   }, [router.isReady, router.query.tab]);
+
+  useEffect(() => {
+    // Se o utilizador já veio escanear a nota, cancelamos o lembrete da missão.
+    void cancelMissionFollowupNotification().then((result) => {
+      if (result?.ok) {
+        trackEvent('push_cancelado', { reason: 'entered_add_receipt' });
+        void trackBackendEvent('push_cancelado', '/add-receipt');
+      }
+    });
+  }, []);
 
   const setTab = (tab) => {
     setScanTab(tab);
@@ -452,6 +468,17 @@ export default function AddReceipt() {
 
       setStep(STEPS.SUCCESS);
       setMapFeedback(shareOnMap ? { mapPointsAdded: result.mapPointsAdded ?? 0, mapError: result.mapError ?? null } : null);
+
+      const missionCtx = getMissionActiveContext();
+      if (missionCtx?.scheduledAt && Date.now() - Number(missionCtx.scheduledAt) <= 1000 * 60 * 60 * 12) {
+        trackEvent('nota_escaneada_pos_rota', {
+          delay_minutes: missionCtx.delayMinutes || 30,
+          stops_count: missionCtx.stopsCount || 0,
+          estimated_savings: Number(missionCtx.estimatedSavings || 0),
+        });
+        void trackBackendEvent('nota_escaneada_pos_rota', '/add-receipt');
+        clearMissionActiveContext();
+      }
 
       // Redirecionar após 2 segundos
       setTimeout(() => {
