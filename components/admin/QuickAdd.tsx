@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { CURADORIA_STORE_PRESETS } from '../../lib/curadoriaStorePresets';
 
 type CuradoriaPreset = (typeof CURADORIA_STORE_PRESETS)[number];
@@ -89,6 +89,55 @@ function parseProducts(raw: string) {
   return out;
 }
 
+function formatCnpjFromDigits(digits: string) {
+  const d = String(digits || '').replace(/\D/g, '');
+  if (d.length !== 14) return digits;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12, 14)}`;
+}
+
+function digitsOnlyCnpjInput(raw: string) {
+  return String(raw || '').replace(/\D/g, '');
+}
+
+/** Uma unidade: `endereço completo` + Tab ou `|` + CNPJ. Sem separador = só endereço (CNPJ vem do repositório ao executar). */
+function parseFranchiseUnitLine(line: string): { address: string; cnpjDigits: string } | null {
+  const raw = line.trim();
+  if (!raw) return null;
+  const tab = raw.indexOf('\t');
+  if (tab !== -1) {
+    return {
+      address: raw.slice(0, tab).trim(),
+      cnpjDigits: digitsOnlyCnpjInput(raw.slice(tab + 1)),
+    };
+  }
+  const pipe = raw.lastIndexOf('|');
+  if (pipe > 0) {
+    const maybeAddr = raw.slice(0, pipe).trim();
+    const maybeCnpj = digitsOnlyCnpjInput(raw.slice(pipe + 1));
+    if (maybeCnpj.length === 14) {
+      return { address: maybeAddr, cnpjDigits: maybeCnpj };
+    }
+  }
+  return { address: raw, cnpjDigits: '' };
+}
+
+async function fetchBookCnpjDigits(storeName: string, address: string): Promise<string | null> {
+  const n = storeName.trim();
+  const a = address.trim();
+  if (n.length < 2 || a.length < 4) return null;
+  try {
+    const qs = new URLSearchParams({ address: a, store_name: n });
+    const r = await fetch(`/api/admin/store-address-book?${qs.toString()}`, { credentials: 'include' });
+    const j = (await r.json()) as { match?: { cnpj_digits?: string } | null };
+    if (r.ok && j.match?.cnpj_digits && String(j.match.cnpj_digits).length === 14) {
+      return String(j.match.cnpj_digits);
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export default function QuickAdd() {
   const [uiMode, setUiMode] = useState<'manual' | 'vision'>('vision');
   const [storeName, setStoreName] = useState('');
@@ -139,6 +188,17 @@ export default function QuickAdd() {
   const [removePinMsg, setRemovePinMsg] = useState('');
   const [removePinBusy, setRemovePinBusy] = useState(false);
 
+  /** Repositório admin: CNPJ + endereços já usados (evita repetir; franquia = vários endereços). */
+  const [storeKind, setStoreKind] = useState<'isolated' | 'franchise'>('isolated');
+  /** Modo franquia: uma linha por unidade — `endereço [Tab ou |] CNPJ`; só endereço se o CNPJ já estiver no repositório. */
+  const [franchiseUnitsRaw, setFranchiseUnitsRaw] = useState('');
+  const [franchiseBookFillBusy, setFranchiseBookFillBusy] = useState(false);
+  const [franchiseBookFillMsg, setFranchiseBookFillMsg] = useState('');
+  const [bookHints, setBookHints] = useState<
+    { store_name: string; address_raw: string; cnpj_digits: string; is_franchise: boolean }[]
+  >([]);
+  const [bookLoading, setBookLoading] = useState(false);
+
   const [curatedOptStoreId, setCuratedOptStoreId] = useState('');
   const [curatedOptNote, setCuratedOptNote] = useState('');
   const [curatedOptConfirm, setCuratedOptConfirm] = useState(false);
@@ -151,30 +211,79 @@ export default function QuickAdd() {
     setSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status, message } : s)));
   }
 
-  async function run() {
-    setError('');
-    setDone(false);
-    setProgress(0);
-    setSteps(INITIAL_STEPS);
-    setRunning(true);
+  const saveBookRow = useCallback(
+    async (addressLine: string, cnpjDigits: string) => {
+      const d = digitsOnlyCnpjInput(cnpjDigits);
+      if (d.length !== 14 || !storeName.trim() || !addressLine.trim()) return;
+      try {
+        await fetch('/api/admin/store-address-book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            store_name: storeName.trim(),
+            address: addressLine.trim(),
+            cnpj: d,
+            is_franchise: storeKind === 'franchise',
+          }),
+        });
+      } catch {
+        /* silencioso — repositório é auxiliar */
+      }
+    },
+    [storeName, storeKind]
+  );
 
-    let products: ReturnType<typeof parseProducts>;
-    try {
-      products = parseProducts(productsRaw);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Formato inválido';
-      setError(`Formato de produtos inválido: ${msg}`);
-      setRunning(false);
-      return;
-    }
-
+  async function runPipelineOnce(
+    addr: string,
+    products: ReturnType<typeof parseProducts>,
+    batchHint?: string,
+    cnpjForUnit?: string
+  ): Promise<'done' | 'fatal' | 'error'> {
+    const cnpjDigits = cnpjForUnit != null ? digitsOnlyCnpjInput(cnpjForUnit) : digitsOnlyCnpjInput(storeCnpj);
+    const cnpjPayload =
+      cnpjDigits.length === 14 ? formatCnpjFromDigits(cnpjDigits) : undefined;
     const payload = {
-      store: { name: storeName, address: storeAddress, cnpj: storeCnpj || undefined },
+      store: { name: storeName, address: addr, cnpj: cnpjPayload },
       products,
       category: 'Supermercado - Promoção',
     };
 
     abortRef.current = new AbortController();
+    let outcome: 'done' | 'fatal' | 'error' = 'error';
+
+    if (batchHint) {
+      updateStep('validate', 'pending', batchHint);
+    }
+
+    const consumeAdminSseBlocks = (blocks: string[]) => {
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        const dataLine = block.split('\n').find((l) => l.startsWith('data: '));
+        if (!dataLine) continue;
+        let event: {
+          step: string;
+          status?: StepStatus;
+          message?: string;
+          data?: { progress?: number };
+        };
+        try {
+          event = JSON.parse(dataLine.slice(6)) as typeof event;
+        } catch {
+          continue;
+        }
+
+        if (event.step === 'done') {
+          outcome = 'done';
+        } else if (event.step === 'fatal') {
+          setError(event.message || 'Erro fatal');
+          outcome = 'fatal';
+        } else if (event.step && event.status) {
+          updateStep(event.step, event.status, event.message || '');
+          if (event.data?.progress != null) setProgress(event.data.progress);
+        }
+      }
+    };
 
     try {
       const res = await fetch('/api/admin/quick-add', {
@@ -194,49 +303,17 @@ export default function QuickAdd() {
           /* ignore */
         }
         setError(msg);
-        setRunning(false);
-        return;
+        return 'error';
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
         setError('Resposta sem corpo (stream)');
-        setRunning(false);
-        return;
+        return 'error';
       }
 
       const decoder = new TextDecoder();
       let buffer = '';
-
-      const consumeAdminSseBlocks = (blocks: string[]) => {
-        for (const block of blocks) {
-          if (!block.trim()) continue;
-          const dataLine = block.split('\n').find((l) => l.startsWith('data: '));
-          if (!dataLine) continue;
-          let event: {
-            step: string;
-            status?: StepStatus;
-            message?: string;
-            data?: { progress?: number };
-          };
-          try {
-            event = JSON.parse(dataLine.slice(6)) as typeof event;
-          } catch {
-            continue;
-          }
-
-          if (event.step === 'done') {
-            setDone(true);
-            setRunning(false);
-          } else if (event.step === 'fatal') {
-            setError(event.message || 'Erro fatal');
-            setRunning(false);
-          } else if (event.step && event.status) {
-            updateStep(event.step, event.status, event.message || '');
-            if (event.data?.progress != null) setProgress(event.data.progress);
-          }
-        }
-      };
 
       for (;;) {
         const { done: streamDone, value } = await reader.read();
@@ -257,7 +334,220 @@ export default function QuickAdd() {
       if (err instanceof Error && err.name !== 'AbortError') {
         setError(`Erro de conexão: ${err.message}`);
       }
+      return 'error';
+    }
+
+    return outcome;
+  }
+
+  async function run() {
+    setError('');
+    setDone(false);
+    setProgress(0);
+    setRunning(true);
+
+    let products: ReturnType<typeof parseProducts>;
+    try {
+      products = parseProducts(productsRaw);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Formato inválido';
+      setError(`Formato de produtos inválido: ${msg}`);
       setRunning(false);
+      return;
+    }
+
+    const name = storeName.trim();
+    if (!name) {
+      setError('Informe o nome da loja.');
+      setRunning(false);
+      return;
+    }
+
+    type Unit = { address: string; cnpjDigits: string };
+    let units: Unit[];
+
+    if (storeKind === 'franchise') {
+      const lines = franchiseUnitsRaw.split(/\n/).map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) {
+        setError('No modo franquia, indique pelo menos uma linha (uma unidade por linha).');
+        setRunning(false);
+        return;
+      }
+      const built: Unit[] = [];
+      for (let li = 0; li < lines.length; li += 1) {
+        const parsed = parseFranchiseUnitLine(lines[li]);
+        if (!parsed || !parsed.address) {
+          setError(`Linha ${li + 1}: endereço inválido ou vazio.`);
+          setRunning(false);
+          return;
+        }
+        let { address, cnpjDigits } = parsed;
+        if (cnpjDigits.length !== 14) {
+          const fromBook = await fetchBookCnpjDigits(name, address);
+          if (fromBook) cnpjDigits = fromBook;
+        }
+        if (cnpjDigits.length !== 14) {
+          setError(
+            `Linha ${li + 1}: CNPJ desta unidade em falta (inclua após Tab ou | no fim da linha, ou grave antes no repositório com nome + endereço iguais).`
+          );
+          setRunning(false);
+          return;
+        }
+        built.push({ address, cnpjDigits });
+      }
+      units = built;
+    } else {
+      const addr = storeAddress.trim();
+      if (!addr) {
+        setError('Informe o endereço.');
+        setRunning(false);
+        return;
+      }
+      let cnpjDigits = digitsOnlyCnpjInput(storeCnpj);
+      if (cnpjDigits.length !== 14) {
+        const fromBook = await fetchBookCnpjDigits(name, addr);
+        if (fromBook) cnpjDigits = fromBook;
+      }
+      units = [{ address: addr, cnpjDigits }];
+    }
+
+    try {
+      for (let i = 0; i < units.length; i += 1) {
+        const { address: addr, cnpjDigits } = units[i];
+        setSteps(INITIAL_STEPS);
+        const batchHint =
+          units.length > 1
+            ? `Unidade ${i + 1}/${units.length} — mesmos produtos, CNPJ desta loja (${addr.slice(0, 72)}${addr.length > 72 ? '…' : ''})`
+            : undefined;
+
+        const outcome = await runPipelineOnce(addr, products, batchHint, cnpjDigits);
+        if (outcome !== 'done') {
+          setRunning(false);
+          return;
+        }
+        if (cnpjDigits.length === 14) {
+          await saveBookRow(addr, cnpjDigits);
+        }
+      }
+      setDone(true);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const fillFranchiseCnpjsFromBook = useCallback(async () => {
+    const name = storeName.trim();
+    if (name.length < 2) {
+      setFranchiseBookFillMsg('Indique o nome da loja (igual ao usado ao gravar no repositório).');
+      return;
+    }
+    const lines = franchiseUnitsRaw.split(/\n');
+    if (!lines.some((l) => l.trim())) {
+      setFranchiseBookFillMsg('Cole ou escreva pelo menos um endereço por linha.');
+      return;
+    }
+    setFranchiseBookFillBusy(true);
+    setFranchiseBookFillMsg('');
+    let filled = 0;
+    let already = 0;
+    let missed = 0;
+    const out: string[] = [];
+    try {
+      for (const line of lines) {
+        if (!line.trim()) {
+          out.push('');
+          continue;
+        }
+        const parsed = parseFranchiseUnitLine(line);
+        if (!parsed?.address) {
+          out.push(line.trimEnd());
+          continue;
+        }
+        const { address, cnpjDigits: existing } = parsed;
+        if (existing.length === 14) {
+          out.push(`${address}\t${formatCnpjFromDigits(existing)}`);
+          already += 1;
+          continue;
+        }
+        const fromBook = await fetchBookCnpjDigits(name, address);
+        if (fromBook) {
+          out.push(`${address}\t${formatCnpjFromDigits(fromBook)}`);
+          filled += 1;
+        } else {
+          out.push(line.trim());
+          missed += 1;
+        }
+      }
+      const newRaw = out.join('\n');
+      setFranchiseUnitsRaw((prev) => (prev === newRaw ? prev : newRaw));
+      const parts: string[] = [];
+      if (filled) parts.push(`${filled} completado(s) pelo repositório`);
+      if (already) parts.push(`${already} já com CNPJ válido (linhas normalizadas)`);
+      if (missed) parts.push(`${missed} sem correspondência — confira nome da loja e o texto do endereço`);
+      setFranchiseBookFillMsg(parts.length ? parts.join(' · ') : 'Nada a alterar.');
+    } catch {
+      setFranchiseBookFillMsg('Erro ao consultar o repositório.');
+    } finally {
+      setFranchiseBookFillBusy(false);
+    }
+  }, [storeName, franchiseUnitsRaw]);
+
+  const tryAutofillCnpjFromBook = useCallback(async () => {
+    if (storeKind !== 'isolated') return;
+    const d = digitsOnlyCnpjInput(storeCnpj);
+    if (d.length >= 14) return;
+    const a = storeAddress.trim();
+    const n = storeName.trim();
+    const fromBook = await fetchBookCnpjDigits(n, a);
+    if (fromBook) setStoreCnpj(formatCnpjFromDigits(fromBook));
+  }, [storeAddress, storeName, storeCnpj, storeKind]);
+
+  useEffect(() => {
+    let q = '';
+    if (storeKind === 'franchise') {
+      const firstLine = franchiseUnitsRaw.split(/\n/).find((l) => l.trim());
+      const parsed = firstLine ? parseFranchiseUnitLine(firstLine) : null;
+      const addrPart = parsed?.address?.trim() ?? '';
+      q = addrPart.length >= 3 ? addrPart : storeName.trim();
+    } else {
+      q = (storeAddress.trim().length >= 3 ? storeAddress : storeName).trim();
+    }
+    if (q.length < 2) {
+      setBookHints([]);
+      return undefined;
+    }
+    const t = window.setTimeout(async () => {
+      setBookLoading(true);
+      try {
+        const r = await fetch(`/api/admin/store-address-book?q=${encodeURIComponent(q.slice(0, 120))}`, {
+          credentials: 'include',
+        });
+        const j = (await r.json()) as {
+          items?: { store_name: string; address_raw: string; cnpj_digits: string; is_franchise: boolean }[];
+        };
+        if (r.ok && Array.isArray(j.items)) setBookHints(j.items);
+        else setBookHints([]);
+      } catch {
+        setBookHints([]);
+      } finally {
+        setBookLoading(false);
+      }
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [storeAddress, storeName, storeKind, franchiseUnitsRaw]);
+
+  function applyBookHint(row: (typeof bookHints)[number]) {
+    setStoreName(row.store_name);
+    if (row.is_franchise) {
+      setStoreKind('franchise');
+      setFranchiseUnitsRaw(`${row.address_raw}\t${row.cnpj_digits}`);
+      setStoreAddress('');
+      setStoreCnpj('');
+    } else {
+      setStoreKind('isolated');
+      setStoreAddress(row.address_raw);
+      setStoreCnpj(formatCnpjFromDigits(row.cnpj_digits));
+      setFranchiseUnitsRaw('');
     }
   }
 
@@ -268,6 +558,11 @@ export default function QuickAdd() {
     setDone(false);
     setError('');
     setProgress(0);
+    setStoreKind('isolated');
+    setFranchiseUnitsRaw('');
+    setFranchiseBookFillMsg('');
+    setFranchiseBookFillBusy(false);
+    setBookHints([]);
   }
 
   function resetVision() {
@@ -1097,23 +1392,154 @@ export default function QuickAdd() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-1">Endereço *</label>
-              <input
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                value={storeAddress}
-                onChange={(e) => setStoreAddress(e.target.value)}
-                placeholder="Ex: Rua Harmonia, 123, Vila Madalena, SP"
-              />
+              <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Tipo de cadastro</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+                  <input
+                    type="radio"
+                    name="store-kind"
+                    checked={storeKind === 'isolated'}
+                    onChange={() => setStoreKind('isolated')}
+                    className="accent-blue-500"
+                  />
+                  Loja isolada (um endereço)
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+                  <input
+                    type="radio"
+                    name="store-kind"
+                    checked={storeKind === 'franchise'}
+                    onChange={() => setStoreKind('franchise')}
+                    className="accent-blue-500"
+                  />
+                  Franquia (rede — várias unidades, mesmo encarte)
+                </label>
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
+                Em franquia (ex.: supermercado do dia), cada filial costuma ter{' '}
+                <span className="text-gray-400">CNPJ diferente</span>: indique um por linha. O mesmo catálogo de
+                produtos é publicado em todas. Se já gravou nome + endereço + CNPJ antes, pode deixar só o endereço na
+                linha e o sistema completa o CNPJ a partir do repositório ao executar.
+              </p>
             </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-1">CNPJ (opcional)</label>
-              <input
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                value={storeCnpj}
-                onChange={(e) => setStoreCnpj(e.target.value)}
-                placeholder="00.000.000/0001-00"
-              />
-            </div>
+            {storeKind === 'isolated' ? (
+              <>
+                <div>
+                  <label className="text-xs text-gray-400 uppercase tracking-widest block mb-1">Endereço *</label>
+                  <input
+                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                    value={storeAddress}
+                    onChange={(e) => setStoreAddress(e.target.value)}
+                    onBlur={() => void tryAutofillCnpjFromBook()}
+                    placeholder="Ex: Rua Harmonia, 123, Vila Madalena, SP"
+                  />
+                  {bookLoading ? (
+                    <p className="mt-1 text-[11px] text-gray-500">A carregar sugestões do repositório…</p>
+                  ) : null}
+                  {bookHints.length > 0 ? (
+                    <div className="mt-2 rounded border border-gray-700 bg-gray-950/50 p-2">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Sugestões (repositório)</p>
+                      <ul className="max-h-32 space-y-1 overflow-y-auto text-xs">
+                        {bookHints.map((row) => (
+                          <li key={`${row.cnpj_digits}-${row.address_raw}`}>
+                            <button
+                              type="button"
+                              onClick={() => applyBookHint(row)}
+                              className="w-full rounded px-2 py-1.5 text-left text-gray-200 hover:bg-gray-800"
+                            >
+                              <span className="font-medium text-gray-100">{row.store_name}</span>
+                              <span className="block text-[11px] text-gray-400">{row.address_raw}</span>
+                              <span className="text-[10px] text-gray-500">
+                                CNPJ {formatCnpjFromDigits(row.cnpj_digits)}
+                                {row.is_franchise ? ' · franquia' : ''}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 uppercase tracking-widest block mb-1">CNPJ (opcional)</label>
+                  <input
+                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                    value={storeCnpj}
+                    onChange={(e) => setStoreCnpj(e.target.value)}
+                    placeholder="00.000.000/0001-00"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Com 14 dígitos, gravamos no repositório após publicação (para autocompletar na próxima vez com o
+                    mesmo nome e endereço).
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="text-xs text-gray-400 uppercase tracking-widest block mb-1">
+                  Unidades da rede * (uma por linha)
+                </label>
+                <textarea
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 h-40 resize-y font-mono text-[13px]"
+                  value={franchiseUnitsRaw}
+                  onChange={(e) => {
+                    setFranchiseUnitsRaw(e.target.value);
+                    setFranchiseBookFillMsg('');
+                  }}
+                  placeholder={
+                    'Cada linha: endereço completo, depois Tab ou | e o CNPJ daquela filial.\n' +
+                    'Ex.:\n' +
+                    'Av. Paulista, 1000, SP\t12.345.678/0001-90\n' +
+                    'Rua das Flores, 50, Campinas | 98.765.432/0001-10\n\n' +
+                    'Se o CNPJ já estiver gravado para esse nome + endereço, pode colar só o endereço na linha.'
+                  }
+                />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Ordem de publicação: linha 1, depois 2… Mesmos produtos em todas; CNPJ e geocoding por unidade.
+                </p>
+                <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
+                  <button
+                    type="button"
+                    disabled={
+                      running || franchiseBookFillBusy || !storeName.trim() || !franchiseUnitsRaw.trim()
+                    }
+                    onClick={() => void fillFranchiseCnpjsFromBook()}
+                    className="w-full rounded border border-amber-700/80 bg-amber-950/40 px-3 py-2 text-left text-xs font-medium text-amber-100 hover:bg-amber-900/50 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
+                  >
+                    {franchiseBookFillBusy ? 'A consultar o repositório…' : 'Completar CNPJs do repositório'}
+                  </button>
+                  {franchiseBookFillMsg ? (
+                    <p className="text-[11px] leading-snug text-gray-400 sm:max-w-xl">{franchiseBookFillMsg}</p>
+                  ) : null}
+                </div>
+                {bookLoading ? (
+                  <p className="mt-1 text-[11px] text-gray-500">A carregar sugestões do repositório…</p>
+                ) : null}
+                {bookHints.length > 0 ? (
+                  <div className="mt-2 rounded border border-gray-700 bg-gray-950/50 p-2">
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Sugestões (repositório)</p>
+                    <ul className="max-h-32 space-y-1 overflow-y-auto text-xs">
+                      {bookHints.map((row) => (
+                        <li key={`${row.cnpj_digits}-${row.address_raw}`}>
+                          <button
+                            type="button"
+                            onClick={() => applyBookHint(row)}
+                            className="w-full rounded px-2 py-1.5 text-left text-gray-200 hover:bg-gray-800"
+                          >
+                            <span className="font-medium text-gray-100">{row.store_name}</span>
+                            <span className="block text-[11px] text-gray-400">{row.address_raw}</span>
+                            <span className="text-[10px] text-gray-500">
+                              CNPJ {formatCnpjFromDigits(row.cnpj_digits)}
+                              {row.is_franchise ? ' · franquia' : ''}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            )}
             <div>
               <label className="text-xs text-gray-400 uppercase tracking-widest block mb-1">
                 Produtos — JSON ou linhas (nome;12,99 ou nome,12,99) *
@@ -1133,7 +1559,11 @@ export default function QuickAdd() {
             <button
               type="button"
               onClick={run}
-              disabled={!storeName || !storeAddress || !productsRaw}
+              disabled={
+                !storeName.trim() ||
+                !productsRaw.trim() ||
+                (storeKind === 'isolated' ? !storeAddress.trim() : !franchiseUnitsRaw.trim())
+              }
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold py-3 rounded transition-colors text-sm tracking-widest uppercase"
             >
               Executar Pipeline →
