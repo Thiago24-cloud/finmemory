@@ -7,7 +7,19 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
 import Image from 'next/image';
-import { Search, PlusCircle, Menu, ListChecks, Navigation, Zap, Camera, Route, Wallet, Sparkles } from 'lucide-react';
+import {
+  Search,
+  PlusCircle,
+  Menu,
+  ListChecks,
+  Navigation,
+  Zap,
+  Camera,
+  Route,
+  Wallet,
+  Sparkles,
+  ShoppingCart,
+} from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import { MAP_THEMES, MAP_THEME_STORAGE_KEY } from '../lib/colors';
@@ -100,6 +112,42 @@ export default function MapaPage() {
     if (parts.length) setSearchQuery(parts.join(', '));
   }, [router.isReady, router.query.lista]);
 
+  /** Landing em cima do mapa: nota fiscal vs lista — não faz parte da barra de pesquisa. */
+  const [mapLandingOpen, setMapLandingOpen] = useState(false);
+  const dismissMapLanding = useCallback(() => {
+    try {
+      sessionStorage.setItem('finmemory_map_landing_dismissed', '1');
+    } catch {
+      /* ignore */
+    }
+    setMapLandingOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!session || wazeUi) {
+      setMapLandingOpen(false);
+      return;
+    }
+    if (!router.isReady) return;
+    if (router.query.lista) {
+      setMapLandingOpen(false);
+      return;
+    }
+    try {
+      if (sessionStorage.getItem('finmemory_map_landing_dismissed') === '1') {
+        setMapLandingOpen(false);
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (searchQuery.trim().length > 0 || planningMode) {
+      setMapLandingOpen(false);
+      return;
+    }
+    setMapLandingOpen(true);
+  }, [session, wazeUi, router.isReady, router.query.lista, searchQuery, planningMode]);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(t);
@@ -163,7 +211,7 @@ export default function MapaPage() {
       <Head>
         <title>FinMemory – Onde está mais barato? | App de compras e análise de custos</title>
       </Head>
-      <div className="fixed inset-0 w-full h-full bg-[#e8e4de]">
+      <div className="fixed inset-0 z-40 w-full h-full bg-[#e8e4de]">
         <div className="absolute inset-0 w-full h-full">
           <MapaPrecos
             mapThemeId={mapThemeId}
@@ -180,6 +228,58 @@ export default function MapaPage() {
             onDetailExpandedChange={handleDetailExpandedChange}
           />
         </div>
+
+        {session && mapLandingOpen && !wazeUi ? (
+          <div
+            className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-black/50 px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="map-landing-title"
+          >
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-black/10">
+              <p className="text-center text-xs font-semibold uppercase tracking-wide text-[#2ECC49]">
+                FinMemory
+              </p>
+              <h2 id="map-landing-title" className="mt-1 text-center text-xl font-bold text-gray-900">
+                Como quer começar?
+              </h2>
+              <p className="mt-2 text-center text-sm leading-relaxed text-gray-600">
+                Isto fica por cima do mapa só para escolher o fluxo. O mapa de preços continua atrás.
+              </p>
+              <div className="mt-6 flex flex-col gap-3">
+                <Link
+                  href="/add-receipt"
+                  onClick={dismissMapLanding}
+                  className="flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-emerald-200 bg-[#eefbf1] px-4 py-3 no-underline transition-colors hover:bg-[#e3f7e9]"
+                >
+                  <Camera className="h-6 w-6 shrink-0 text-[#106b2a]" aria-hidden />
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-bold text-[#106b2a]">Escanear nota fiscal</p>
+                    <p className="text-xs text-[#357a46]">Já comprei — organizar gastos e histórico.</p>
+                  </div>
+                </Link>
+                <Link
+                  href="/shopping-list"
+                  onClick={dismissMapLanding}
+                  className="flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-sky-200 bg-[#eef4ff] px-4 py-3 no-underline transition-colors hover:bg-[#e4edff]"
+                >
+                  <ShoppingCart className="h-6 w-6 shrink-0 text-[#0f3e9c]" aria-hidden />
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-bold text-[#0f3e9c]">Lista de compras</p>
+                    <p className="text-xs text-[#37517f]">Montar o que falta — fotos do catálogo e depois ver no mapa.</p>
+                  </div>
+                </Link>
+              </div>
+              <button
+                type="button"
+                onClick={dismissMapLanding}
+                className="mt-5 w-full rounded-xl border border-gray-200 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Só quero ver o mapa de preços
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {showSharedBanner && (
           <div
@@ -241,10 +341,10 @@ export default function MapaPage() {
                     enterKeyHint="search"
                     placeholder={
                       planningMode
-                        ? 'Lista ativa: edite os itens (ex.: arroz, carne, cerveja)'
-                        : (narrowScreen
-                            ? 'O que você precisa comprar hoje?'
-                            : 'O que você precisa comprar hoje? (ex.: arroz, carne, cerveja)')
+                        ? 'Lista no mapa: edite os itens (ex.: arroz, carne, cerveja)'
+                        : narrowScreen
+                          ? 'Buscar ofertas, lojas ou produtos'
+                          : 'Buscar ofertas, lojas ou produtos no mapa'
                     }
                     value={searchQuery}
                     onChange={(e) => {
@@ -310,55 +410,6 @@ export default function MapaPage() {
                   setMapChipSelection={setMapChipSelection}
                 />
               </div>
-
-              {!planningMode && !isDetailOpen ? (
-                <div
-                  className={`pointer-events-auto w-full rounded-2xl border px-3 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.14)] ${
-                    wazeUi
-                      ? 'border-[#2a2d3a] bg-[#13161f]/95'
-                      : 'border-white/60 bg-white/95'
-                  }`}
-                >
-                  <p className={`text-[11px] font-semibold ${wazeUi ? 'text-[#9ca3af]' : 'text-gray-500'}`}>
-                    Escolha por onde quer começar
-                  </p>
-                  <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <Link
-                      href="/add-receipt"
-                      className={`flex min-h-[58px] items-center gap-2 rounded-xl px-3 py-2 no-underline ${
-                        wazeUi
-                          ? 'bg-[#1a1d27] text-[#f3f4f6] hover:bg-[#222634]'
-                          : 'bg-[#eefbf1] text-[#106b2a] hover:bg-[#e3f7e9]'
-                      }`}
-                    >
-                      <Camera className="h-5 w-5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold">Escanear Nota Fiscal</p>
-                        <p className={`truncate text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-[#357a46]'}`}>
-                          Acabei de comprar, quero organizar meus gastos.
-                        </p>
-                      </div>
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => searchInputRef.current?.focus()}
-                      className={`flex min-h-[58px] items-center gap-2 rounded-xl px-3 py-2 text-left ${
-                        wazeUi
-                          ? 'bg-[#1a1d27] text-[#f3f4f6] hover:bg-[#222634]'
-                          : 'bg-[#eef4ff] text-[#0f3e9c] hover:bg-[#e4edff]'
-                      }`}
-                    >
-                      <Search className="h-5 w-5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold">O que você precisa comprar hoje?</p>
-                        <p className={`truncate text-[10px] ${wazeUi ? 'text-[#9ca3af]' : 'text-[#37517f]'}`}>
-                          Vou sair agora e quero saber onde está mais barato/perto.
-                        </p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              ) : null}
 
               {planningMode ? (
                 <div
