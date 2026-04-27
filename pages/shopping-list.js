@@ -2,11 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Plus, Trash2, Check, Filter, MapPin, StickyNote } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Trash2, Check, Filter, MapPin, StickyNote, Navigation, Bell } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 import ProximityAlertsSettings from '../components/ProximityAlertsSettings';
 import { getSupabase } from '../lib/supabase';
 import { useMapCart } from '../components/map/MapCartContext';
+import { matchShoppingListProductFromCatalog } from '../lib/shoppingListCatalogMatch';
 
 const FILTER_STATUS = [
   { value: 'all', label: 'Todos' },
@@ -58,6 +59,7 @@ export default function ShoppingListPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [savingMapBag, setSavingMapBag] = useState(false);
   const [mapBagBanner, setMapBagBanner] = useState('');
+  const [deferBusy, setDeferBusy] = useState(false);
   const { shoppingBag, shoppingBagTotals, clearSelectedProducts } = useMapCart();
 
   const userId = session?.user?.supabaseId || (typeof window !== 'undefined' && localStorage.getItem('user_id'));
@@ -131,6 +133,36 @@ export default function ShoppingListPage() {
         .filter((i) => !i.checked)
         .map((i) => String(i.name || '').trim())
         .filter(Boolean),
+    [items]
+  );
+
+  /** Anotações pendentes para abrir no mapa (planejador). */
+  const pendingNoteNamesForMap = useMemo(
+    () =>
+      items
+        .filter((i) => !i.checked && i.source_type !== 'map')
+        .map((i) => String(i.name || '').trim())
+        .filter(Boolean),
+    [items]
+  );
+
+  const mapaListaHref = useMemo(() => {
+    if (!pendingNoteNamesForMap.length) return '/mapa';
+    const q = pendingNoteNamesForMap.slice(0, 12).join(',');
+    return `/mapa?lista=${encodeURIComponent(q)}`;
+  }, [pendingNoteNamesForMap]);
+
+  /** Itens manuais ainda sem “comprar depois” explícito — marcamos para o fluxo de radar. */
+  const deferCandidateIds = useMemo(
+    () =>
+      items
+        .filter(
+          (i) =>
+            !i.checked &&
+            i.source_type !== 'map' &&
+            (!i.shopping_intent || i.shopping_intent === 'plan_today')
+        )
+        .map((i) => i.id),
     [items]
   );
 
@@ -215,16 +247,41 @@ export default function ShoppingListPage() {
     try {
       const supabase = getSupabase();
       if (!supabase) return;
-      await supabase.from('shopping_list_items').insert({
+      const { catalog_product_id, list_thumbnail_url } = await matchShoppingListProductFromCatalog(
+        supabase,
+        name
+      );
+      const row = {
         partnership_id: partnership?.id ?? null,
         owner_user_id: userId,
         name,
         added_by: userId,
-      });
+        source_type: 'note',
+        shopping_intent: 'plan_today',
+      };
+      if (catalog_product_id) row.catalog_product_id = catalog_product_id;
+      if (list_thumbnail_url) row.list_thumbnail_url = list_thumbnail_url;
+      await supabase.from('shopping_list_items').insert(row);
       setNewName('');
       await fetchPartnershipAndItems();
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleMarkNotesForLater = async () => {
+    if (!deferCandidateIds.length || !userId) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+    setDeferBusy(true);
+    try {
+      await supabase
+        .from('shopping_list_items')
+        .update({ shopping_intent: 'saved_deferred' })
+        .in('id', deferCandidateIds);
+      await fetchPartnershipAndItems();
+    } finally {
+      setDeferBusy(false);
     }
   };
 
@@ -305,19 +362,48 @@ export default function ShoppingListPage() {
 
       const groupId = listRow?.id;
       if (groupId) {
-        const rows = shoppingBag.map(({ offerId, id, productName, name, storeLabel, priceNum, precoLabel }) => ({
-          partnership_id: partnershipId,
-          owner_user_id: userId,
-          added_by: userId,
-          name: productName || name || 'Item',
-          quantity: 1,
-          source_type: 'map',
-          unit_price: typeof priceNum === 'number' && Number.isFinite(priceNum) ? priceNum : null,
-          price_label: precoLabel || null,
-          store_label: storeLabel || null,
-          map_offer_id: offerId != null ? String(offerId) : String(id),
-          shopping_list_group_id: groupId,
-        }));
+        const enriched = await Promise.all(
+          shoppingBag.map(async ({ offerId, id, productName, name, storeLabel, priceNum, precoLabel }) => {
+            const label = productName || name || 'Item';
+            const { catalog_product_id, list_thumbnail_url } = await matchShoppingListProductFromCatalog(
+              supabase,
+              label
+            );
+            return {
+              offerId,
+              id,
+              productName,
+              name,
+              storeLabel,
+              priceNum,
+              precoLabel,
+              label,
+              catalog_product_id,
+              list_thumbnail_url,
+            };
+          })
+        );
+        const rows = enriched.map(
+          ({ offerId, id, label, storeLabel, priceNum, precoLabel, catalog_product_id, list_thumbnail_url }) => {
+            const r = {
+              partnership_id: partnershipId,
+              owner_user_id: userId,
+              added_by: userId,
+              name: label,
+              quantity: 1,
+              source_type: 'map',
+              shopping_intent: 'map_active',
+              unit_price: typeof priceNum === 'number' && Number.isFinite(priceNum) ? priceNum : null,
+              price_label: precoLabel || null,
+              store_label: storeLabel || null,
+              map_offer_id: offerId != null ? String(offerId) : String(id),
+              shopping_list_group_id: groupId,
+            };
+            if (catalog_product_id) r.catalog_product_id = catalog_product_id;
+            if (list_thumbnail_url) r.list_thumbnail_url = list_thumbnail_url;
+            return r;
+          }
+        );
         const { error: itemsErr } = await supabase.from('shopping_list_items').insert(rows);
         if (itemsErr) {
           await supabase.from('shopping_lists').delete().eq('id', groupId);
@@ -408,12 +494,12 @@ export default function ShoppingListPage() {
           <ProximityAlertsSettings userId={userId} pendingNames={pendingNamesForProximity} />
         ) : null}
 
-        <form onSubmit={handleAdd} className="flex gap-2 mb-4">
+        <form onSubmit={handleAdd} className="flex gap-2 mb-2">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nova anotação (lembrete)"
+            placeholder="O que precisa comprar? (ex.: manga, carne…)"
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49]"
           />
           <button
@@ -424,6 +510,34 @@ export default function ShoppingListPage() {
             <Plus className="h-5 w-5" />
           </button>
         </form>
+        <p className="text-[11px] text-gray-500 mb-3">
+          Ao adicionar, procuramos no catálogo e no mapa uma foto para mostrar na lista.
+        </p>
+
+        {pendingNoteNamesForMap.length > 0 || deferCandidateIds.length > 0 ? (
+          <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:flex-wrap">
+            {pendingNoteNamesForMap.length > 0 ? (
+              <Link
+                href={mapaListaHref}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+              >
+                <Navigation className="h-4 w-4 shrink-0" aria-hidden />
+                Ver no mapa (ofertas desta lista)
+              </Link>
+            ) : null}
+            {deferCandidateIds.length > 0 ? (
+              <button
+                type="button"
+                disabled={deferBusy}
+                onClick={() => void handleMarkNotesForLater()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+              >
+                <Bell className="h-4 w-4 shrink-0" aria-hidden />
+                {deferBusy ? 'A gravar…' : 'Guardar para comprar depois (radar)'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Filtros: estado (Todos / Pendentes / Concluídos) e período (por dia de uso) */}
         <div className="mb-4">
@@ -511,6 +625,14 @@ export default function ShoppingListPage() {
                               key={item.id}
                               className="flex items-start gap-3 p-3 bg-white/90"
                             >
+                              {item.list_thumbnail_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.list_thumbnail_url}
+                                  alt=""
+                                  className="mt-0.5 h-11 w-11 shrink-0 rounded-lg border border-gray-100 object-cover bg-gray-50"
+                                />
+                              ) : null}
                               <button
                                 type="button"
                                 onClick={() => toggleChecked(item)}
@@ -534,6 +656,9 @@ export default function ShoppingListPage() {
                                 </div>
                                 {item.store_label ? (
                                   <p className="text-xs text-gray-500 mt-0.5">{item.store_label}</p>
+                                ) : null}
+                                {item.shopping_intent === 'saved_deferred' ? (
+                                  <p className="text-[10px] font-medium text-amber-700 mt-0.5">Comprar depois · radar</p>
                                 ) : null}
                               </div>
                               <button
@@ -575,6 +700,16 @@ export default function ShoppingListPage() {
                           key={item.id}
                           className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-card-lovable border border-gray-100"
                         >
+                          {item.list_thumbnail_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={item.list_thumbnail_url}
+                              alt=""
+                              className="h-12 w-12 shrink-0 rounded-lg border border-gray-100 object-cover bg-gray-50"
+                            />
+                          ) : (
+                            <div className="h-12 w-12 shrink-0 rounded-lg bg-gray-100 border border-dashed border-gray-200" aria-hidden />
+                          )}
                           <button
                             type="button"
                             onClick={() => toggleChecked(item)}
@@ -582,9 +717,14 @@ export default function ShoppingListPage() {
                           >
                             {item.checked ? <Check className="h-4 w-4" /> : null}
                           </button>
-                          <span className={`flex-1 ${item.checked ? 'line-through text-[#666]' : 'text-[#333]'}`}>
-                            {item.name}
+                          <span className={`flex-1 min-w-0 ${item.checked ? 'line-through text-[#666]' : 'text-[#333]'}`}>
+                            <span className="font-medium">{item.name}</span>
                             {item.quantity > 1 && ` (${item.quantity}${item.unit || ''})`}
+                            {item.shopping_intent === 'saved_deferred' ? (
+                              <span className="ml-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                depois
+                              </span>
+                            ) : null}
                           </span>
                           <button
                             type="button"

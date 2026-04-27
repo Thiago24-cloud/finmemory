@@ -84,6 +84,22 @@ export default function MapaPage() {
   const mapPaddingTopPx = MAP_MAP_PADDING_TOP_PX;
   const mapOverlayTopPx = session ? MAP_OVERLAY_TOP_LOGGED_PX : MAP_OVERLAY_TOP_GUEST_PX;
 
+  /** Lista vinda de /shopping-list (?lista=manga,pera) — preenche o planejador de compras. */
+  const listaParamAppliedRef = useRef(null);
+  useEffect(() => {
+    if (!router.isReady) return;
+    const raw = router.query.lista;
+    if (typeof raw !== 'string' || !raw.trim()) return;
+    if (listaParamAppliedRef.current === raw) return;
+    listaParamAppliedRef.current = raw;
+    const parts = raw
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+    if (parts.length) setSearchQuery(parts.join(', '));
+  }, [router.isReady, router.query.lista]);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(t);
