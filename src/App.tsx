@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import AddReceipt from "./pages/AddReceipt";
 import MapaPrecos from "./pages/MapaPrecos";
+import { ShoppingProvider } from "@/context/ShoppingProvider";
 import SharePrice from "./pages/SharePrice";
 import ManualEntry from "./pages/ManualEntry";
 import Partnership from "./pages/Partnership";
@@ -37,7 +38,16 @@ const App = () => (
             <Route path="/contas" element={<ProtectedRoute><Contas /></ProtectedRoute>} />
             <Route path="/calculadora" element={<ProtectedRoute><Calculadora /></ProtectedRoute>} />
             <Route path="/add-receipt" element={<ProtectedRoute><AddReceipt /></ProtectedRoute>} />
-            <Route path="/mapa-precos" element={<ProtectedRoute><MapaPrecos /></ProtectedRoute>} />
+            <Route
+              path="/mapa-precos"
+              element={
+                <ProtectedRoute>
+                  <ShoppingProvider>
+                    <MapaPrecos />
+                  </ShoppingProvider>
+                </ProtectedRoute>
+              }
+            />
             <Route path="/share-price" element={<ProtectedRoute><SharePrice /></ProtectedRoute>} />
             <Route path="/manual-entry" element={<ProtectedRoute><ManualEntry /></ProtectedRoute>} />
             <Route path="/partnership" element={<ProtectedRoute><Partnership /></ProtectedRoute>} />
