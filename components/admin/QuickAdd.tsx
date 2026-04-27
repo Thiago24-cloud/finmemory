@@ -441,7 +441,7 @@ export default function QuickAdd() {
       setFranchiseBookFillMsg('Indique o nome da loja (igual ao usado ao gravar no repositório).');
       return;
     }
-    const lines = franchiseUnitsRaw.split(/\n');
+    const lines = franchiseUnitsRaw.split('\n');
     if (!lines.some((l) => l.trim())) {
       setFranchiseBookFillMsg('Cole ou escreva pelo menos um endereço por linha.');
       return;
