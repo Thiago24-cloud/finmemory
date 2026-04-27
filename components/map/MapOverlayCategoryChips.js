@@ -17,36 +17,37 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { MAP_CHIPS } from '../../lib/appMicrocopy';
 
 /**
  * Chips estilo Google Maps: à direita da pesquisa, com setas para rolar conteúdo oculto.
  */
 const FILTER_CHIPS = [
-  { id: 'todos', label: 'Todos', Icon: LayoutGrid, promoOnly: false, search: '' },
-  { id: 'dia', label: 'Produtos DIA', Icon: ShoppingBag, promoOnly: true, search: 'dia' },
-  { id: 'hortifruti', label: 'Hortifruti', Icon: Apple, promoOnly: false, search: 'hortifruti' },
-  { id: 'mercearia', label: 'Mercearia', Icon: Wheat, promoOnly: false, search: 'mercearia' },
-  { id: 'bebidas', label: 'Bebidas', Icon: Wine, promoOnly: false, search: 'bebida' },
+  { id: 'todos', label: MAP_CHIPS.todos, Icon: LayoutGrid, promoOnly: false, search: '' },
+  { id: 'dia', label: MAP_CHIPS.dia, Icon: ShoppingBag, promoOnly: true, search: 'dia' },
+  { id: 'hortifruti', label: MAP_CHIPS.hortifruti, Icon: Apple, promoOnly: false, search: 'hortifruti' },
+  { id: 'mercearia', label: MAP_CHIPS.mercearia, Icon: Wheat, promoOnly: false, search: 'mercearia' },
+  { id: 'bebidas', label: MAP_CHIPS.bebidas, Icon: Wine, promoOnly: false, search: 'bebida' },
   {
     id: 'congelados',
-    label: 'Congelados e Resfriados',
+    label: MAP_CHIPS.congelados,
     Icon: Snowflake,
     promoOnly: false,
     search: 'congelado',
   },
   {
     id: 'cuidados',
-    label: 'Cuidados Pessoais',
+    label: MAP_CHIPS.cuidados,
     Icon: Sparkles,
     promoOnly: false,
     search: 'higiene',
   },
-  { id: 'limpeza', label: 'Limpeza', Icon: Droplets, promoOnly: false, search: 'limpeza' },
+  { id: 'limpeza', label: MAP_CHIPS.limpeza, Icon: Droplets, promoOnly: false, search: 'limpeza' },
 ];
 
 const LINK_CHIPS = [
-  { id: 'barcode', label: 'Código de barras', Icon: ScanBarcode, href: '/scan-product' },
-  { id: 'favoritos', label: 'Favoritos', Icon: Heart, href: '/shopping-list' },
+  { id: 'barcode', label: MAP_CHIPS.barcode, Icon: ScanBarcode, href: '/scan-product' },
+  { id: 'favoritos', label: MAP_CHIPS.favoritos, Icon: Heart, href: '/shopping-list' },
 ];
 
 const SCROLL_STEP = 200;

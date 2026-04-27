@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { BarChart3, Tags, Users, List, ScanBarcode, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { QUICK_ACTION_TITLE } from '../../lib/appMicrocopy';
 
 const SECONDARY_ACTIONS = [
   {
     href: '/simulador',
     label: 'Simulador',
-    title: 'Simular saldo, rede de apoio e crédito',
+    title: QUICK_ACTION_TITLE.simulador,
     Icon: Sparkles,
     wrapClass:
       'bg-gradient-to-br from-purple-950 to-zinc-900 text-purple-200 border border-purple-500/35 hover:from-purple-900 hover:to-zinc-900',
@@ -15,7 +16,7 @@ const SECONDARY_ACTIONS = [
   {
     href: '/scan-product',
     label: 'Código de barras',
-    title: 'Ler código de barras',
+    title: QUICK_ACTION_TITLE.barcode,
     wide: true,
     Icon: ScanBarcode,
     wrapClass:
@@ -53,7 +54,7 @@ const SECONDARY_ACTIONS = [
 ];
 
 /**
- * Ações rápidas — grelha (escanear nota no card principal e na barra inferior).
+ * Atalhos — grelha (NF-e no centro da barra).
  */
 export function QuickActions({ className }) {
   const secondaryBtn =

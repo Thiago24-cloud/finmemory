@@ -28,6 +28,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/S
 import { MapOverlayCategoryChips } from '../components/map/MapOverlayCategoryChips';
 import { FinancePlansInline } from '../components/FinancePlansInline';
 import { BRAND } from '../lib/brandTokens';
+import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -309,7 +310,7 @@ export default function MapaPage() {
                     ? 'bg-[#303134] text-[#e5e5e5] shadow-black/40 hover:bg-[#3c4043]'
                     : 'border border-[#dadce0] bg-white text-gray-800 hover:bg-gray-50'
                 }`}
-                aria-label={wazeUi ? 'Menu do planejador (modo Waze dos preços)' : 'Menu do planejador de compras'}
+                aria-label={wazeUi ? MAP_ARIA.plannerMenuWaze : MAP_ARIA.plannerMenu}
                 title={wazeUi ? 'Waze dos preços' : undefined}
               >
                 <Menu className="h-5 w-5" />
@@ -331,7 +332,7 @@ export default function MapaPage() {
                         ? 'border-[#5f6368]/55 bg-[#303134] text-[#e8eaed] hover:bg-[#3c4043]'
                         : 'border-gray-200/90 bg-white text-gray-800 hover:bg-gray-50'
                     }`}
-                    aria-label={wazeUi ? 'Menu (Waze dos preços)' : 'Menu'}
+                    aria-label={wazeUi ? MAP_ARIA.menuMobileWaze : 'Menu'}
                   >
                     <Menu className="h-5 w-5" />
                   </button>
@@ -341,10 +342,10 @@ export default function MapaPage() {
                     enterKeyHint="search"
                     placeholder={
                       planningMode
-                        ? 'Lista no mapa: edite os itens (ex.: arroz, carne, cerveja)'
+                        ? MAP_PLACEHOLDERS.planningList
                         : narrowScreen
-                          ? 'Buscar ofertas, lojas ou produtos'
-                          : 'Buscar ofertas, lojas ou produtos no mapa'
+                          ? MAP_PLACEHOLDERS.searchShort
+                          : MAP_PLACEHOLDERS.searchLong
                     }
                     value={searchQuery}
                     onChange={(e) => {
@@ -354,7 +355,7 @@ export default function MapaPage() {
                     className={`min-w-0 flex-1 border-0 bg-transparent py-3 pl-3 pr-1 text-[15px] leading-snug focus:outline-none md:py-2.5 md:pl-3.5 md:text-sm ${
                       wazeUi ? 'text-[#e8eaed] placeholder-[#9aa0a6]' : 'text-[#202124] placeholder-[#5f6368]'
                     }`}
-                    aria-label="Pesquisar no mapa"
+                    aria-label={MAP_ARIA.searchMap}
                   />
                   <div
                     className={`flex shrink-0 items-center pr-1.5 pl-0 ${
@@ -382,8 +383,8 @@ export default function MapaPage() {
                       className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors md:h-9 md:w-9 ${
                         wazeUi ? 'text-[#8ab4f8] hover:bg-[#3c4043]' : 'text-[#1a73e8] hover:bg-[#f1f3f4]'
                       }`}
-                      aria-label="Ir para a minha localização no mapa"
-                      title="Minha localização"
+                      aria-label={MAP_ARIA.locateMe}
+                      title={MAP_ARIA.locateMe}
                     >
                       <Navigation className="h-[19px] w-[19px] md:h-[18px] md:w-[18px]" strokeWidth={2.25} />
                     </button>

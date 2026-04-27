@@ -2,37 +2,32 @@ import { useEffect, useCallback, useState } from 'react';
 import { Sparkles, ChevronRight, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { setDashboardOnboardingDoneLocal } from '../../lib/dashboardOnboardingStorage';
+import { BRAND_APP_NAME, MONTH_FILTER, BOTTOM_NAV } from '../../lib/appMicrocopy';
 
 const STEPS = [
   {
-    title: 'Bem-vindo ao Finmemory',
-    body:
-      'É a sua primeira vez por aqui. Vamos mostrar em poucos passos onde está cada função — pode pular quando quiser.',
+    title: `Bem-vindo ao ${BRAND_APP_NAME}`,
+    body: 'Primeira vez? Em poucos passos mostramos o essencial. Pode saltar a qualquer momento.',
   },
   {
     title: 'Saldo e mês',
-    body:
-      'No topo você vê o resumo dos gastos. Use o filtro “Ver gastos por mês” para focar em um mês específico.',
+    body: `No topo vê o resumo. O filtro “${MONTH_FILTER.label}” foca um mês.`,
   },
   {
     title: 'Escanear e mapa',
-    body:
-      'Escanear: tire foto da nota ou use o QR da NFC-e. Mapa: compare preços e ofertas perto de você.',
+    body: 'NF-e: foto ou QR. Mapa: preços e ofertas perto de si.',
   },
   {
-    title: 'Ações rápidas',
-    body:
-      'Código de barras, preço da comunidade, cartões, gasto manual, parceria, lista de compras, relatórios e categorias — atalhos na área colorida abaixo.',
+    title: 'Atalhos',
+    body: 'A grelha colorida: código de barras, parceria, lista, relatórios, categorias e mais.',
   },
   {
-    title: 'Suas notas',
-    body:
-      'A lista das suas compras fica abaixo. Use a busca para achar por loja, categoria ou produto.',
+    title: 'Histórico',
+    body: 'As compras ficam abaixo. Busque por loja, categoria ou produto.',
   },
   {
     title: 'Menu inferior',
-    body:
-      'Mapas, Gastos e Perfil ficam sempre no rodapé para mudar de área rapidamente.',
+    body: `${BOTTOM_NAV.map}, ${BOTTOM_NAV.spending}, ${BOTTOM_NAV.simulador} e ${BOTTOM_NAV.profile} — sempre à mão.`,
   },
 ];
 

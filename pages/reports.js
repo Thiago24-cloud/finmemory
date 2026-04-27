@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, BarChart3, Loader2 } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
 import PlanGuard from '../components/PlanGuard';
+import { MONTH_FILTER } from '../lib/appMicrocopy';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
@@ -151,8 +152,8 @@ export default function ReportsPage() {
 
         {availableMonths.length > 0 && (
           <div className="mb-4">
-            <label htmlFor="reports-month-filter" className="block text-sm font-medium text-foreground mb-2">
-              Ver gastos por mês
+            <label htmlFor="reports-month-filter" className="mb-2 block text-sm font-medium text-foreground">
+              {MONTH_FILTER.label}
             </label>
             <select
               id="reports-month-filter"
@@ -160,7 +161,7 @@ export default function ReportsPage() {
               onChange={(e) => setSelectedMonth(e.target.value || null)}
               className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             >
-              <option value="">Todos os meses</option>
+              <option value="">{MONTH_FILTER.allMonths}</option>
               {availableMonths.map((ym) => {
                 const [y, m] = ym.split('-');
                 const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1);

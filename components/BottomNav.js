@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Map, BarChart3, User, ScanLine, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { BOTTOM_NAV } from '../lib/appMicrocopy';
 import { useMapCart } from './map/MapCartContext';
 
 export function BottomNav() {
@@ -31,7 +32,7 @@ export function BottomNav() {
                 {bagCount > 99 ? '99+' : bagCount}
               </span>
             ) : null}
-            <span className={cn('text-[10px]', pathname === '/mapa' ? 'font-bold' : 'font-medium')}>Mapas</span>
+            <span className={cn('text-[10px]', pathname === '/mapa' ? 'font-bold' : 'font-medium')}>{BOTTOM_NAV.map}</span>
             {pathname === '/mapa' && (
               <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
             )}
@@ -45,7 +46,7 @@ export function BottomNav() {
               className={cn('h-5 w-5 transition-transform', pathname === '/dashboard' && 'scale-110')}
             />
             <span className={cn('text-[10px]', pathname === '/dashboard' ? 'font-bold' : 'font-medium')}>
-              Gastos
+              {BOTTOM_NAV.spending}
             </span>
             {pathname === '/dashboard' && (
               <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
@@ -63,7 +64,7 @@ export function BottomNav() {
           >
             <Sparkles className={cn('h-5 w-5 transition-transform', pathname === '/simulador' && 'scale-110')} />
             <span className={cn('text-[9px] sm:text-[10px] leading-tight', pathname === '/simulador' ? 'font-bold' : 'font-medium')}>
-              Simulador
+              {BOTTOM_NAV.simulador}
             </span>
             {pathname === '/simulador' && (
               <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
@@ -76,7 +77,7 @@ export function BottomNav() {
           >
             <User className={cn('h-5 w-5 transition-transform', pathname === '/settings' && 'scale-110')} />
             <span className={cn('text-[10px]', pathname === '/settings' ? 'font-bold' : 'font-medium')}>
-              Perfil
+              {BOTTOM_NAV.profile}
             </span>
             {pathname === '/settings' && (
               <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
@@ -94,7 +95,7 @@ export function BottomNav() {
             'border border-emerald-500/40 hover:brightness-[1.03] active:scale-[0.97] transition-transform',
             scanActive && 'ring-[#bbf7d0] ring-offset-2 ring-offset-white'
           )}
-          aria-label="Escanear nota fiscal"
+          aria-label={BOTTOM_NAV.scanAria}
         >
           <ScanLine className="h-7 w-7" strokeWidth={2.25} />
         </Link>

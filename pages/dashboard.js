@@ -22,6 +22,7 @@ import { canAccess } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
 import { DashboardOnboardingTour } from '../components/onboarding/DashboardOnboardingTour';
 import { BRAND } from '../lib/brandTokens';
+import { MONTH_FILTER, DASHBOARD } from '../lib/appMicrocopy';
 import {
   isDashboardOnboardingDoneLocal,
   setDashboardOnboardingDoneLocal,
@@ -1091,8 +1092,8 @@ export default function Dashboard() {
             {/* Filtro por mês */}
             {availableMonths.length > 0 && (
               <div className="mb-4">
-                <label htmlFor="month-filter" className="block text-sm font-medium text-[#333] mb-2">
-                  Ver gastos por mês
+                <label htmlFor="month-filter" className="mb-2 block text-sm font-medium text-[#333]">
+                  {MONTH_FILTER.label}
                 </label>
                 <select
                   id="month-filter"
@@ -1100,7 +1101,7 @@ export default function Dashboard() {
                   onChange={(e) => setSelectedMonth(e.target.value || null)}
                   className="w-full px-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent"
                 >
-                  <option value="">Todos os meses</option>
+                  <option value="">{MONTH_FILTER.allMonths}</option>
                   {availableMonths.map((ym) => {
                     const [y, m] = ym.split('-');
                     const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1);
@@ -1114,7 +1115,7 @@ export default function Dashboard() {
                 </select>
               </div>
             )}
-            <p className="text-sm font-semibold text-neutral-800 tracking-tight mb-3">Ações rápidas</p>
+            <p className="mb-3 text-sm font-semibold tracking-tight text-neutral-800">{DASHBOARD.quickSectionTitle}</p>
             <QuickActions className="mb-4" />
 
             {/* Lixeira: notas excluídas – restaurar por engano */}
@@ -1128,7 +1129,7 @@ export default function Dashboard() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-[#333]">Lixeira</p>
-                <p className="text-xs text-[#666]">Excluiu uma nota sem querer? Restaure daqui.</p>
+                <p className="text-xs text-[#666]">{DASHBOARD.trashSubtitle}</p>
               </div>
               <span className="text-[#666] text-sm shrink-0">Abrir</span>
             </button>
@@ -1151,11 +1152,11 @@ export default function Dashboard() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#999] pointer-events-none" aria-hidden />
                   <input
                     type="search"
-                    placeholder="Buscar no histórico (nota, banco, categoria, produto)..."
+                    placeholder={DASHBOARD.historySearchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] placeholder:text-[#999] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/50 focus:border-[#2ECC49]"
-                    aria-label="Buscar no histórico unificado"
+                    aria-label={DASHBOARD.historySearchAria}
                   />
                 </div>
               )}

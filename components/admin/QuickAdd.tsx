@@ -99,7 +99,7 @@ function digitsOnlyCnpjInput(raw: string) {
   return String(raw || '').replace(/\D/g, '');
 }
 
-/** Uma unidade: `endereço completo` + Tab ou `|` + CNPJ. Sem separador = só endereço (CNPJ vem do repositório ao executar). */
+/** Uma unidade: endereço + Tab, `|`, ou `=` + CNPJ (14 dígitos à direita). Sem CNPJ válido = só endereço (repositório ao executar). */
 function parseFranchiseUnitLine(line: string): { address: string; cnpjDigits: string } | null {
   const raw = line.trim();
   if (!raw) return null;
@@ -109,6 +109,15 @@ function parseFranchiseUnitLine(line: string): { address: string; cnpjDigits: st
       address: raw.slice(0, tab).trim(),
       cnpjDigits: digitsOnlyCnpjInput(raw.slice(tab + 1)),
     };
+  }
+  for (let i = raw.length - 1; i >= 0; i -= 1) {
+    if (raw[i] !== '=') continue;
+    const left = raw.slice(0, i).trim();
+    const right = raw.slice(i + 1).trim();
+    const d = digitsOnlyCnpjInput(right);
+    if (d.length === 14 && left.length >= 3) {
+      return { address: left, cnpjDigits: d };
+    }
   }
   const pipe = raw.lastIndexOf('|');
   if (pipe > 0) {
@@ -190,7 +199,7 @@ export default function QuickAdd() {
 
   /** Repositório admin: CNPJ + endereços já usados (evita repetir; franquia = vários endereços). */
   const [storeKind, setStoreKind] = useState<'isolated' | 'franchise'>('isolated');
-  /** Modo franquia: uma linha por unidade — `endereço [Tab ou |] CNPJ`; só endereço se o CNPJ já estiver no repositório. */
+  /** Modo franquia: uma linha por unidade — `endereço` + Tab, | ou = + CNPJ; só endereço se o CNPJ já estiver no repositório. */
   const [franchiseUnitsRaw, setFranchiseUnitsRaw] = useState('');
   const [franchiseBookFillBusy, setFranchiseBookFillBusy] = useState(false);
   const [franchiseBookFillMsg, setFranchiseBookFillMsg] = useState('');
@@ -388,7 +397,7 @@ export default function QuickAdd() {
         }
         if (cnpjDigits.length !== 14) {
           setError(
-            `Linha ${li + 1}: CNPJ desta unidade em falta (inclua após Tab ou | no fim da linha, ou grave antes no repositório com nome + endereço iguais).`
+            `Linha ${li + 1}: CNPJ desta unidade em falta (use Tab, | ou = antes do CNPJ, ou grave no repositório com o mesmo nome + endereço).`
           );
           setRunning(false);
           return;
@@ -1487,10 +1496,11 @@ export default function QuickAdd() {
                     setFranchiseBookFillMsg('');
                   }}
                   placeholder={
-                    'Cada linha: endereço completo, depois Tab ou | e o CNPJ daquela filial.\n' +
+                    'Cada linha: endereço completo, depois Tab, | ou = e o CNPJ da filial.\n' +
                     'Ex.:\n' +
                     'Av. Paulista, 1000, SP\t12.345.678/0001-90\n' +
-                    'Rua das Flores, 50, Campinas | 98.765.432/0001-10\n\n' +
+                    'Rua das Flores, 50, Campinas | 98.765.432/0001-10\n' +
+                    'R. Pio XI, 1320 = 37.259.759/0001-01\n\n' +
                     'Se o CNPJ já estiver gravado para esse nome + endereço, pode colar só o endereço na linha.'
                   }
                 />
