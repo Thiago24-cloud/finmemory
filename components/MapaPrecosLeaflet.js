@@ -2813,6 +2813,8 @@ export default function MapaPrecosLeaflet({
   const [bagSheetOpen, setBagSheetOpen] = useState(false);
   const [routePickerOpen, setRoutePickerOpen] = useState(false);
   const [nearbyBagAlert, setNearbyBagAlert] = useState(null);
+  const [suggestionIntentReady, setSuggestionIntentReady] = useState(false);
+  const [activeSuggestionStore, setActiveSuggestionStore] = useState(null);
   const bagAlertCooldownRef = useRef(new Map());
   useBagBackgroundMonitoring(promoCart);
 
@@ -3201,6 +3203,16 @@ export default function MapaPrecosLeaflet({
   }, []);
 
   const handleRequestStoreShop = useCallback((store) => {
+    setSuggestionIntentReady(true);
+    setActiveSuggestionStore({
+      storeId: store?.id || null,
+      placeId: store?.place_id || null,
+      storeName: store?.name || null,
+      lat: Number(store?.lat),
+      lng: Number(store?.lng),
+      source: 'store_pin',
+      updatedAt: Date.now(),
+    });
     setMobileStorePreview(null);
     setShopStore(store);
     setShopOpen(true);
@@ -3370,6 +3382,7 @@ export default function MapaPrecosLeaflet({
   const toggleCartOffer = useCallback(
     (offer, storeLabelOverride) => {
       const id = String(offer.id);
+      const alreadyInCart = promoCart.some((item) => String(item?.offerId || item?.id) === id);
       const storeLabel = storeLabelOverride || shopStore?.name || 'Loja';
       const resolved = firstPositivePriceNumber(offer?.price, offer?.promo_price, offer?.club_price);
       const rawForFormat =
@@ -3405,8 +3418,20 @@ export default function MapaPrecosLeaflet({
         precoLabel,
         imageUrl: offer?.promo_image_url || offer?.image_url || null,
       });
+      if (!alreadyInCart) {
+        setSuggestionIntentReady(true);
+        setActiveSuggestionStore({
+          storeId: shopStore?.id || offer?.store_id || null,
+          placeId: shopStore?.place_id || offer?.place_id || null,
+          storeName: storeLabel,
+          lat: Number(shopStore?.lat ?? offer?.store_lat),
+          lng: Number(shopStore?.lng ?? offer?.store_lng),
+          source: 'cart_add',
+          updatedAt: Date.now(),
+        });
+      }
     },
-    [shopStore, toggleSelectedProduct]
+    [promoCart, shopStore, toggleSelectedProduct]
   );
 
   const toggleCartFromMapPoint = useCallback(
@@ -3446,6 +3471,21 @@ export default function MapaPrecosLeaflet({
   }, [cartTotalNumeric, budgetCap]);
 
   const cartOfferIdSet = useMemo(() => new Set(promoCart.map((x) => x.offerId || x.id)), [promoCart]);
+  const latestCartStoreFocus = useMemo(() => {
+    if (!Array.isArray(promoCart) || promoCart.length === 0) return null;
+    const last = promoCart[promoCart.length - 1];
+    const lat = Number(last?.storeGeo?.lat ?? last?.storeLat ?? last?.lat);
+    const lng = Number(last?.storeGeo?.lng ?? last?.storeLng ?? last?.lng);
+    return {
+      storeId: last?.storeId || null,
+      placeId: last?.placeId || null,
+      storeName: last?.storeName || last?.storeLabel || null,
+      lat,
+      lng,
+      source: 'cart_latest',
+      updatedAt: Date.now(),
+    };
+  }, [promoCart]);
 
   const estimatedSavingsTotal = useMemo(() => {
     if (!Array.isArray(locais) || locais.length === 0 || promoCart.length === 0) return 0;
@@ -3476,10 +3516,40 @@ export default function MapaPrecosLeaflet({
   }, [locais, promoCart]);
 
   const contextualSuggestion = useMemo(() => {
+    if (!suggestionIntentReady) return null;
     if (!Array.isArray(visibleLocais) || visibleLocais.length === 0) return null;
     const now = Date.now();
+    const preferredStore = latestCartStoreFocus || activeSuggestionStore;
+    const hasPreferredStore = Boolean(
+      preferredStore?.storeId ||
+      preferredStore?.placeId ||
+      String(preferredStore?.storeName || '').trim() ||
+      (Number.isFinite(preferredStore?.lat) && Number.isFinite(preferredStore?.lng))
+    );
+    const sameStorePoint = (point) => {
+      if (!preferredStore) return true;
+      if (preferredStore.storeId && point?.store_id && String(point.store_id) === String(preferredStore.storeId)) {
+        return true;
+      }
+      if (preferredStore.placeId && point?.place_id && String(point.place_id) === String(preferredStore.placeId)) {
+        return true;
+      }
+      const preferredName = String(preferredStore.storeName || '').trim().toLowerCase();
+      const pointName = String(point?.nome || '').trim().toLowerCase();
+      if (preferredName && pointName && preferredName === pointName) return true;
+      if (Number.isFinite(preferredStore?.lat) && Number.isFinite(preferredStore?.lng)) {
+        const pLat = Number(point?.lat);
+        const pLng = Number(point?.lng);
+        if (Number.isFinite(pLat) && Number.isFinite(pLng)) {
+          return haversineMeters(preferredStore.lat, preferredStore.lng, pLat, pLng) <= 220;
+        }
+      }
+      return false;
+    };
+    const candidatePoints = hasPreferredStore ? visibleLocais.filter(sameStorePoint) : visibleLocais;
+    if (hasPreferredStore && candidatePoints.length === 0) return null;
     const byProduct = new Map();
-    visibleLocais.forEach((point) => {
+    candidatePoints.forEach((point) => {
       const key = normalizeProductKey(point?.produto);
       if (!key) return;
       const priceNum = numericPriceForSum(point?.preco, point?.categoria, point?.id);
@@ -3492,7 +3562,7 @@ export default function MapaPrecosLeaflet({
     });
     const cartProductKeys = new Set(promoCart.map((item) => normalizeProductKey(item?.productName || item?.name)));
     let best = null;
-    visibleLocais.forEach((point) => {
+    candidatePoints.forEach((point) => {
       const offerId = String(point?.id || '');
       if (!offerId || cartOfferIdSet.has(offerId)) return;
       const productKey = normalizeProductKey(point?.produto);
@@ -3516,7 +3586,7 @@ export default function MapaPrecosLeaflet({
       }
     });
     return best;
-  }, [visibleLocais, promoCart, cartOfferIdSet]);
+  }, [suggestionIntentReady, visibleLocais, promoCart, cartOfferIdSet, latestCartStoreFocus, activeSuggestionStore]);
 
   const primaryCtaLabel = promoCart.length > 0 ? 'Ir economizar agora' : 'Lista';
 
@@ -3533,11 +3603,19 @@ export default function MapaPrecosLeaflet({
       stops.push({ lat, lng });
     });
     if (stops.length === 0) return { points: [], totalMeters: 0, etaMin: 0, stops: [] };
+    const preferredStopLat = Number(latestCartStoreFocus?.lat);
+    const preferredStopLng = Number(latestCartStoreFocus?.lng);
+    const preferredStop =
+      Number.isFinite(preferredStopLat) && Number.isFinite(preferredStopLng)
+        ? stops.find((s) => haversineMeters(s.lat, s.lng, preferredStopLat, preferredStopLng) <= 220) || null
+        : null;
     let current =
       userMapPosition && Number.isFinite(Number(userMapPosition.lat)) && Number.isFinite(Number(userMapPosition.lng))
         ? { lat: Number(userMapPosition.lat), lng: Number(userMapPosition.lng) }
         : null;
-    const remaining = stops.slice();
+    const remaining = preferredStop
+      ? [preferredStop, ...stops.filter((s) => s !== preferredStop)]
+      : stops.slice();
     const route = [];
     const routeStops = [];
     if (current) route.push(current);
@@ -3545,6 +3623,14 @@ export default function MapaPrecosLeaflet({
       if (!current) {
         current = remaining.shift();
         route.push(current);
+        continue;
+      }
+      if (routeStops.length === 0 && preferredStop) {
+        route.push(preferredStop);
+        routeStops.push(preferredStop);
+        current = preferredStop;
+        const idx = remaining.findIndex((s) => s === preferredStop);
+        if (idx >= 0) remaining.splice(idx, 1);
         continue;
       }
       let nearestIdx = 0;
@@ -3574,7 +3660,7 @@ export default function MapaPrecosLeaflet({
       etaMin,
       stops: routeStops.length > 0 ? routeStops : stops,
     };
-  }, [promoCart, userMapPosition]);
+  }, [promoCart, userMapPosition, latestCartStoreFocus]);
 
   const missionDistanceKm = useMemo(
     () => (missionRoute.totalMeters > 0 ? missionRoute.totalMeters / 1000 : 0),
@@ -4138,7 +4224,7 @@ export default function MapaPrecosLeaflet({
         </div>
       ) : null}
 
-      {!shopOpen && !mobileStorePreview && contextualSuggestion?.offer ? (
+      {!shopOpen && !mobileStorePreview && suggestionIntentReady && contextualSuggestion?.offer ? (
         <div className="absolute bottom-[11.2rem] left-3 right-3 z-[1102] sm:left-4 sm:right-auto sm:max-w-[420px]">
           <div className="rounded-2xl border border-white/15 bg-[#111827]/94 p-3 text-white shadow-[0_14px_26px_rgba(15,23,42,0.35)] backdrop-blur-md">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-300">Proximo passo sugerido</p>
