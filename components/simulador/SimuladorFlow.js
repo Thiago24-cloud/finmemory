@@ -77,6 +77,7 @@ export function SimuladorFlow() {
   const [remoteReady, setRemoteReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
   const lastSentRef = useRef('');
+  const [debouncedState, setDebouncedState] = useState(state);
 
   const fetchHints = useCallback(async () => {
     if (status !== 'authenticated') return;
@@ -154,6 +155,11 @@ export function SimuladorFlow() {
       /* ignore */
     }
   }, [state, mounted]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedState(state), 220);
+    return () => clearTimeout(t);
+  }, [state]);
 
   useEffect(() => {
     if (!remoteReady || status !== 'authenticated') return;
@@ -261,8 +267,8 @@ export function SimuladorFlow() {
   );
 
   const projection = useMemo(() => {
-    const supportInflows = state.hasSupport
-      ? state.contacts
+    const supportInflows = debouncedState.hasSupport
+      ? debouncedState.contacts
           .filter((c) => c.name?.trim() && Number(c.amount) > 0)
           .map((c) => ({
             name: c.name.trim(),
@@ -273,36 +279,59 @@ export function SimuladorFlow() {
       : [];
 
     const extraInflows =
-      state.extraEnabled && Number(state.extraAmount) > 0
+      debouncedState.extraEnabled && Number(debouncedState.extraAmount) > 0
         ? [
             {
-              label: state.extraLabel?.trim() || 'Entrada extra',
-              day: Number(state.extraDay) || 1,
-              amount: Number(state.extraAmount) || 0,
-              reliability: (Number(state.extraReliabilityPct) || 0) / 100,
+              label: debouncedState.extraLabel?.trim() || 'Entrada extra',
+              day: Number(debouncedState.extraDay) || 1,
+              amount: Number(debouncedState.extraAmount) || 0,
+              reliability: (Number(debouncedState.extraReliabilityPct) || 0) / 100,
             },
           ]
         : [];
 
     const scheduledOutflows = buildHeavyBillScheduledOutflows({
-      heavyBillAmount: Number(state.heavyBillAmount) || 0,
-      heavyBillDay: Number(state.heavyBillDay) || 1,
-      creditDueDay: Number(state.creditDueDay) || 10,
-      deferralPct: Number(state.reliefPct) || 0,
+      heavyBillAmount: Number(debouncedState.heavyBillAmount) || 0,
+      heavyBillDay: Number(debouncedState.heavyBillDay) || 1,
+      creditDueDay: Number(debouncedState.creditDueDay) || 10,
+      deferralPct: Number(debouncedState.reliefPct) || 0,
       daysInMonth: dim,
     });
 
     return projectSimuladorMonth({
       startingBalance: adjustedStartingBalance,
-      dailyBurn: Number(state.dailyBurn) || 0,
-      salaryDay: Number(state.salaryDay) > 0 ? Number(state.salaryDay) : null,
-      salaryAmount: Number(state.salaryAmount) || 0,
+      dailyBurn: Number(debouncedState.dailyBurn) || 0,
+      salaryDay: Number(debouncedState.salaryDay) > 0 ? Number(debouncedState.salaryDay) : null,
+      salaryAmount: Number(debouncedState.salaryAmount) || 0,
       supportInflows,
-      extraInflows: state.extraCommitted ? [] : extraInflows,
+      extraInflows: debouncedState.extraCommitted ? [] : extraInflows,
       scheduledOutflows,
-      stressMode: state.stressMode,
+      stressMode: debouncedState.stressMode,
+      variableIncomeShockPct: debouncedState.stressMode ? 30 : 0,
     });
-  }, [state, dim, adjustedStartingBalance]);
+  }, [debouncedState, dim, adjustedStartingBalance]);
+  const uncertaintyBands = useMemo(() => {
+    const bands = [];
+    if (debouncedState.hasSupport) {
+      for (const c of debouncedState.contacts || []) {
+        const rel = Number(c?.reliability) || 0;
+        if (!(Number(c?.amount) > 0)) continue;
+        bands.push({
+          day: Number(c?.day) || 1,
+          opacity: rel >= 0.9 ? 0.12 : rel >= 0.6 ? 0.26 : 0.44,
+        });
+      }
+    }
+    if (debouncedState.extraEnabled && Number(debouncedState.extraAmount) > 0 && !debouncedState.extraCommitted) {
+      const rel = (Number(debouncedState.extraReliabilityPct) || 0) / 100;
+      bands.push({
+        day: Number(debouncedState.extraDay) || 1,
+        opacity: rel >= 0.9 ? 0.12 : rel >= 0.6 ? 0.26 : 0.44,
+      });
+    }
+    return bands;
+  }, [debouncedState]);
+  const baselineMonthlyExpense = useMemo(() => Number(hints?.baseline?.avgExpenseLast3Months) || 0, [hints]);
 
   const salaryProjection = useMemo(() => {
     const salaryDay = Math.min(31, Math.max(1, Number(state.salaryDay) || 1));
@@ -375,6 +404,14 @@ export function SimuladorFlow() {
       return { ...s, contacts: next };
     });
   };
+  const setReliabilityByConfidence = useCallback((id, confidence) => {
+    const map = {
+      certo: 0.95,
+      provavel: 0.75,
+      incerto: 0.4,
+    };
+    updateContact(id, { reliability: map[confidence] ?? 0.75 });
+  }, []);
 
   const steps = 4;
   const canNext =
@@ -690,18 +727,25 @@ export function SimuladorFlow() {
                         </div>
                       </div>
                       <div>
-                        <div className="flex justify-between text-xs text-zinc-500 mb-1">
-                          <span>Confiabilidade da entrada</span>
-                          <span className="text-purple-300">{Math.round((c.reliability || 0) * 100)}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={Math.round((c.reliability || 0) * 100)}
-                          onChange={(e) => updateContact(c.id, { reliability: Number(e.target.value) / 100 })}
-                          className="w-full accent-purple-500"
-                        />
+                        <label className={labelClass}>Nível de certeza</label>
+                        <select
+                          className={fieldClass}
+                          value={
+                            (c.reliability || 0) >= 0.9
+                              ? 'certo'
+                              : (c.reliability || 0) >= 0.6
+                                ? 'provavel'
+                                : 'incerto'
+                          }
+                          onChange={(e) => setReliabilityByConfidence(c.id, e.target.value)}
+                        >
+                          <option value="certo">Certo</option>
+                          <option value="provavel">Provável</option>
+                          <option value="incerto">Incerto</option>
+                        </select>
+                        <p className="mt-1 text-[10px] text-zinc-500">
+                          Usado no gráfico: entradas incertas ficam com maior opacidade (risco).
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -904,21 +948,27 @@ export function SimuladorFlow() {
             <Card className="border-purple-500/20">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <span className="text-sm font-semibold text-zinc-200">Radar de saldo</span>
-                <label className="flex items-center gap-2 text-xs text-zinc-400">
-                  <input
-                    type="checkbox"
-                    className="accent-purple-500"
-                    checked={state.stressMode}
-                    onChange={(e) => set({ stressMode: e.target.checked })}
-                  />
-                  E se não cair?
-                </label>
+                <button
+                  type="button"
+                  onClick={() => set({ stressMode: !state.stressMode })}
+                  className={cn(
+                    'rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                    state.stressMode
+                      ? 'border-orange-500/60 bg-orange-500/15 text-orange-200'
+                      : 'border-zinc-700 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500'
+                  )}
+                >
+                  Cenário de Estresse (−30% variáveis)
+                </button>
               </div>
               <SimuladorRadarChart
                 points={projection.points}
                 gaps={projection.gaps}
                 stressMode={state.stressMode}
                 onDayFocus={setFocusedDay}
+                baselineMonthlyExpense={baselineMonthlyExpense}
+                uncertaintyBands={uncertaintyBands}
+                firstNegativeDay={projection.firstNegativeDay}
               />
             </Card>
 

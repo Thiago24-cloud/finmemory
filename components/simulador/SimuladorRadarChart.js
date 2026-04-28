@@ -11,7 +11,15 @@ function formatBrl(n) {
 /**
  * Gráfico de linha (SVG) — radar de saldo no mês.
  */
-export function SimuladorRadarChart({ points, gaps = [], stressMode, onDayFocus }) {
+export function SimuladorRadarChart({
+  points,
+  gaps = [],
+  stressMode,
+  onDayFocus,
+  baselineMonthlyExpense = 0,
+  uncertaintyBands = [],
+  firstNegativeDay = null,
+}) {
   if (!points?.length) return null;
 
   const w = 320;
@@ -36,6 +44,10 @@ export function SimuladorRadarChart({ points, gaps = [], stressMode, onDayFocus 
   const linePts = points.map((p, i) => `${xFor(i).toFixed(1)},${yFor(p.balance).toFixed(1)}`);
   const pathLine = `M ${linePts.join(' L ')}`;
   const pathArea = `${pathLine} L ${xFor(points.length - 1).toFixed(1)},${(padT + innerH).toFixed(1)} L ${xFor(0).toFixed(1)},${(padT + innerH).toFixed(1)} Z`;
+  const baselineY =
+    Number.isFinite(Number(baselineMonthlyExpense)) && baselineMonthlyExpense > 0
+      ? yFor(Number(baselineMonthlyExpense))
+      : null;
 
   const gapRects = (gaps || []).map((g, idx) => {
     const i0 = Math.max(0, g.from - 1);
@@ -51,6 +63,22 @@ export function SimuladorRadarChart({ points, gaps = [], stressMode, onDayFocus 
         height={innerH}
         fill="url(#simGapGrad)"
         opacity={0.4}
+      />
+    );
+  });
+  const uncertaintyRects = (uncertaintyBands || []).map((u, idx) => {
+    const i = Math.max(0, Math.min(points.length - 1, Number(u.day || 1) - 1));
+    const x = xFor(i) - 2;
+    const intensity = Math.max(0.08, Math.min(0.55, Number(u.opacity) || 0.12));
+    return (
+      <rect
+        key={`unc-${idx}`}
+        x={x}
+        y={padT}
+        width={4}
+        height={innerH}
+        fill={`rgba(251,146,60,${intensity})`}
+        rx={2}
       />
     );
   });
@@ -96,6 +124,19 @@ export function SimuladorRadarChart({ points, gaps = [], stressMode, onDayFocus 
         </defs>
 
         {gapRects}
+        {uncertaintyRects}
+
+        {baselineY != null && (
+          <line
+            x1={padL}
+            y1={baselineY}
+            x2={padL + innerW}
+            y2={baselineY}
+            stroke="rgba(161,161,170,0.8)"
+            strokeDasharray="4 4"
+            strokeWidth={1.2}
+          />
+        )}
 
         <path d={pathArea} fill="url(#simAreaGrad)" stroke="none" />
         <path
@@ -106,6 +147,7 @@ export function SimuladorRadarChart({ points, gaps = [], stressMode, onDayFocus 
           strokeLinejoin="round"
           strokeLinecap="round"
           filter="url(#simGlow)"
+          style={{ transition: 'd 280ms ease, stroke 180ms ease' }}
         />
 
         {markerDays.map((m) => {
@@ -138,6 +180,16 @@ export function SimuladorRadarChart({ points, gaps = [], stressMode, onDayFocus 
         <text x={padL} y={14} className="fill-zinc-400 text-[9px]">
           {stressMode ? 'Cenário: sem entradas incertas' : 'Saldo previsto'}
         </text>
+        {baselineY != null && (
+          <text x={padL + innerW} y={Math.max(10, baselineY - 4)} textAnchor="end" className="fill-zinc-500 text-[9px]">
+            Baseline 3m: {formatBrl(baselineMonthlyExpense)}
+          </text>
+        )}
+        {firstNegativeDay != null ? (
+          <text x={padL + 2} y={h - 16} className="fill-red-300 text-[9px] font-medium">
+            Burn rate: caixa negativo no dia {firstNegativeDay}
+          </text>
+        ) : null}
       </svg>
       <p className="text-center text-[10px] text-zinc-500 mt-1">
         Mínimo no mês: {formatBrl(Math.min(...vals))}

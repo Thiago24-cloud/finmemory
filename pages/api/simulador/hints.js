@@ -37,6 +37,11 @@ function safeAbsNumber(v) {
   return Number.isFinite(n) ? Math.abs(n) : 0;
 }
 
+function monthKeyFromIso(isoDate) {
+  const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-/);
+  return m ? `${m[1]}-${m[2]}` : null;
+}
+
 /**
  * GET /api/simulador/hints
  * Sugestões a partir de Open Finance (contas, mês atual, crédito manual) e histórico de créditos.
@@ -213,6 +218,36 @@ export default async function handler(req, res) {
   const totalDebits28d = openFinanceDebits28d + ocrManualDebits28d;
   const dailyBurnReal28d = Math.round((totalDebits28d / 28) * 100) / 100;
 
+  const since90 = isoDateDaysAgo(95);
+  const { data: bankTx90d, error: bank90Err } = await supabase
+    .from('bank_transactions')
+    .select('amount, type, date')
+    .eq('user_id', userId)
+    .gte('date', since90)
+    .order('date', { ascending: false })
+    .limit(3000);
+  const monthlyDebits = new Map();
+  if (bank90Err) {
+    console.warn('[simulador/hints] bank_transactions 90d:', bank90Err.message);
+  } else if (Array.isArray(bankTx90d)) {
+    for (const row of bankTx90d) {
+      const type = String(row?.type || '').toUpperCase();
+      const amount = Number(row?.amount || 0);
+      const isDebitByType = type === 'DEBIT' || type === 'EXPENSE';
+      const isDebitBySignal = !Number.isNaN(amount) && amount < 0;
+      if (!(isDebitByType || isDebitBySignal)) continue;
+      const monthKey = monthKeyFromIso(row?.date);
+      if (!monthKey) continue;
+      monthlyDebits.set(monthKey, (monthlyDebits.get(monthKey) || 0) + safeAbsNumber(amount));
+    }
+  }
+  const last3 = [...monthlyDebits.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 3)
+    .map(([month, total]) => ({ month, total: Math.round(total * 100) / 100 }));
+  const avgExpenseLast3Months =
+    last3.length > 0 ? Math.round((last3.reduce((acc, x) => acc + x.total, 0) / last3.length) * 100) / 100 : 0;
+
   const { data: cards, error: cardErr } = await supabase
     .from('manual_credit_cards')
     .select('id, label, due_day, closing_day, credit_limit')
@@ -250,6 +285,10 @@ export default async function handler(req, res) {
       totalDebits: Math.round(totalDebits28d * 100) / 100,
       openFinanceDebits: Math.round(openFinanceDebits28d * 100) / 100,
       ocrManualDebits: Math.round(ocrManualDebits28d * 100) / 100,
+    },
+    baseline: {
+      avgExpenseLast3Months,
+      monthlyDebitsLast3Months: last3,
     },
     manualCards,
     hasOpenFinance: accountsOut.length > 0,
