@@ -6,7 +6,7 @@ import { cn } from '../../lib/utils';
  * Card de saldo total – usa valor real calculado das transações. Botão para ocultar/mostrar.
  * label: opcional, ex. "Gasto do mês" quando filtrado por mês.
  */
-export function BalanceCard({ balance, className, label }) {
+export function BalanceCard({ balance, className, label, loading = false }) {
   const [isVisible, setIsVisible] = useState(true);
 
   const formattedBalance = new Intl.NumberFormat('pt-BR', {
@@ -32,9 +32,9 @@ export function BalanceCard({ balance, className, label }) {
         </button>
       </div>
       <div className="text-[2rem] md:text-[2.25rem] font-bold text-[#333] leading-tight" aria-live="polite">
-        {isVisible ? formattedBalance : '••••••'}
+        {loading ? '••••••' : isVisible ? formattedBalance : '••••••'}
       </div>
-      <p className="text-[#666] text-xs mt-2">Atualizado agora</p>
+      <p className="text-[#666] text-xs mt-2">{loading ? 'Atualizando saldos…' : 'Atualizado agora'}</p>
     </div>
   );
 }

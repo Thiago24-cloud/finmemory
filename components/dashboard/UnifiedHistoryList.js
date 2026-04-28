@@ -159,9 +159,53 @@ export function UnifiedHistoryList({
   const [editInitialRaw, setEditInitialRaw] = useState('');
   const [savingId, setSavingId] = useState(null);
   const [openFinanceDetail, setOpenFinanceDetail] = useState(null);
+  const [quickCategoryFilter, setQuickCategoryFilter] = useState('all');
+  const [calcFeedbackRowId, setCalcFeedbackRowId] = useState(null);
 
   const loading = openFinanceLoading || finMemoryLoading;
-  const totalRows = useMemo(() => groups.reduce((n, g) => n + g.items.length, 0), [groups]);
+  const categoryChips = useMemo(() => {
+    const counts = new Map();
+    groups.forEach((group) => {
+      group.items.forEach(({ kind, data }) => {
+        const raw = kind === 'openfinance' ? data?.category : data?.categoria;
+        const category = String(raw || '').trim();
+        if (!category) return;
+        counts.set(category, (counts.get(category) || 0) + 1);
+      });
+    });
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([category, count]) => ({ category, count }));
+  }, [groups]);
+  const visibleGroups = useMemo(() => {
+    if (quickCategoryFilter === 'all') return groups;
+    return groups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(({ kind, data }) => {
+          const raw = kind === 'openfinance' ? data?.category : data?.categoria;
+          return String(raw || '').trim() === quickCategoryFilter;
+        }),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [groups, quickCategoryFilter]);
+  const totalRows = useMemo(() => visibleGroups.reduce((n, g) => n + g.items.length, 0), [visibleGroups]);
+
+  const pushCalcAmount = useCallback(
+    (rowId, amount, sign, flyLabel, evt) => {
+      if (!calcDock) return;
+      calcDock.appendAmount(amount, sign, {
+        flyFrom: { clientX: evt.clientX, clientY: evt.clientY },
+        flyLabel,
+      });
+      setCalcFeedbackRowId(String(rowId));
+      setTimeout(() => {
+        setCalcFeedbackRowId((prev) => (prev === String(rowId) ? null : prev));
+      }, 650);
+    },
+    [calcDock]
+  );
 
   const handleDelete = async (id) => {
     if (!userId || !onDeleted) return;
@@ -290,7 +334,39 @@ export function UnifiedHistoryList({
           : ''}
       </p>
 
-      {groups.map(({ dateKey, items }) => (
+      {categoryChips.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <button
+            type="button"
+            onClick={() => setQuickCategoryFilter('all')}
+            className={cn(
+              'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold',
+              quickCategoryFilter === 'all'
+                ? 'border-[#2ECC49] bg-[#2ECC49]/10 text-[#15803d]'
+                : 'border-[#e5e7eb] bg-white text-[#475569]'
+            )}
+          >
+            Todas
+          </button>
+          {categoryChips.map((chip) => (
+            <button
+              key={chip.category}
+              type="button"
+              onClick={() => setQuickCategoryFilter(chip.category)}
+              className={cn(
+                'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold',
+                quickCategoryFilter === chip.category
+                  ? 'border-[#2ECC49] bg-[#2ECC49]/10 text-[#15803d]'
+                  : 'border-[#e5e7eb] bg-white text-[#475569]'
+              )}
+            >
+              {chip.category} ({chip.count})
+            </button>
+          ))}
+        </div>
+      )}
+
+      {visibleGroups.map(({ dateKey, items }) => (
         <section key={dateKey}>
           <h3 className="text-[11px] font-semibold text-[#a3a3a3] uppercase tracking-wide mb-2 px-0.5">
             {formatDateLabel(dateKey)}
@@ -329,12 +405,15 @@ export function UnifiedHistoryList({
                             <button
                               type="button"
                               onClick={(e) =>
-                                calcDock.appendAmount(ofAmount, '+', {
-                                  flyFrom: { clientX: e.clientX, clientY: e.clientY },
-                                  flyLabel: `${isCredit ? '+' : '−'}${formatMoneyAbs(t.amount)}`,
-                                })
+                                pushCalcAmount(
+                                  `of-${t.id}`,
+                                  ofAmount,
+                                  '+',
+                                  `${isCredit ? '+' : '−'}${formatMoneyAbs(t.amount)}`,
+                                  e
+                                )
                               }
-                              className="p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
+                              className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
                               title="Somar na calculadora"
                               aria-label="Somar na calculadora"
                             >
@@ -343,12 +422,15 @@ export function UnifiedHistoryList({
                             <button
                               type="button"
                               onClick={(e) =>
-                                calcDock.appendAmount(ofAmount, '-', {
-                                  flyFrom: { clientX: e.clientX, clientY: e.clientY },
-                                  flyLabel: `${isCredit ? '+' : '−'}${formatMoneyAbs(t.amount)}`,
-                                })
+                                pushCalcAmount(
+                                  `of-${t.id}`,
+                                  ofAmount,
+                                  '-',
+                                  `${isCredit ? '+' : '−'}${formatMoneyAbs(t.amount)}`,
+                                  e
+                                )
                               }
-                              className="p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
+                              className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
                               title="Subtrair na calculadora"
                               aria-label="Subtrair na calculadora"
                             >
@@ -359,7 +441,10 @@ export function UnifiedHistoryList({
                         {calcDock && Number.isFinite(ofAmount) && ofAmount > 0 ? (
                           <button
                             type="button"
-                            className={`text-[15px] font-semibold tabular-nums ${colorClass} rounded-lg px-1.5 py-0.5 -mr-1 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left`}
+                              className={cn(
+                                `text-[15px] font-semibold tabular-nums ${colorClass} rounded-lg px-2 py-1 -mr-1 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left`,
+                                calcFeedbackRowId === `of-${t.id}` && 'ring-2 ring-[#2ECC49]/35 bg-emerald-50/60'
+                              )}
                             title="Toque para somar na calculadora · Arraste até à calculadora"
                             aria-label={`Somar ${formatMoneyAbs(t.amount)} na calculadora`}
                             draggable
@@ -381,10 +466,13 @@ export function UnifiedHistoryList({
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              calcDock.appendAmount(ofAmount, '+', {
-                                flyFrom: { clientX: e.clientX, clientY: e.clientY },
-                                flyLabel: `${isCredit ? '+' : '−'}${formatMoneyAbs(t.amount)}`,
-                              });
+                              pushCalcAmount(
+                                `of-${t.id}`,
+                                ofAmount,
+                                '+',
+                                `${isCredit ? '+' : '−'}${formatMoneyAbs(t.amount)}`,
+                                e
+                              );
                             }}
                           >
                             {isCredit ? '+' : '−'}
@@ -498,12 +586,15 @@ export function UnifiedHistoryList({
                               <button
                                 type="button"
                                 onClick={(e) =>
-                                  calcDock.appendAmount(displayValue, '+', {
-                                    flyFrom: { clientX: e.clientX, clientY: e.clientY },
-                                    flyLabel: `${isIncome ? '+' : '−'}${formatCurrency(displayValue)}`,
-                                  })
+                                  pushCalcAmount(
+                                    `fm-${transaction.id}`,
+                                    displayValue,
+                                    '+',
+                                    `${isIncome ? '+' : '−'}${formatCurrency(displayValue)}`,
+                                    e
+                                  )
                                 }
-                                className="p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
+                                className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
                                 title="Somar na calculadora"
                                 aria-label="Somar na calculadora"
                               >
@@ -512,12 +603,15 @@ export function UnifiedHistoryList({
                               <button
                                 type="button"
                                 onClick={(e) =>
-                                  calcDock.appendAmount(displayValue, '-', {
-                                    flyFrom: { clientX: e.clientX, clientY: e.clientY },
-                                    flyLabel: `${isIncome ? '+' : '−'}${formatCurrency(displayValue)}`,
-                                  })
+                                  pushCalcAmount(
+                                    `fm-${transaction.id}`,
+                                    displayValue,
+                                    '-',
+                                    `${isIncome ? '+' : '−'}${formatCurrency(displayValue)}`,
+                                    e
+                                  )
                                 }
-                                className="p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
+                                className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
                                 title="Subtrair na calculadora"
                                 aria-label="Subtrair na calculadora"
                               >
@@ -529,7 +623,8 @@ export function UnifiedHistoryList({
                             <button
                               type="button"
                               className={cn(
-                                'text-[15px] font-semibold tabular-nums shrink-0 whitespace-nowrap rounded-lg px-1.5 py-0.5 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left',
+                                'text-[15px] font-semibold tabular-nums shrink-0 whitespace-nowrap rounded-lg px-2 py-1 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left',
+                                calcFeedbackRowId === `fm-${transaction.id}` && 'ring-2 ring-[#2ECC49]/35 bg-emerald-50/60',
                                 isIncome ? 'text-emerald-600' : 'text-red-600'
                               )}
                               title="Toque para somar na calculadora · Arraste até à calculadora"
@@ -553,10 +648,13 @@ export function UnifiedHistoryList({
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                calcDock.appendAmount(displayValue, '+', {
-                                  flyFrom: { clientX: e.clientX, clientY: e.clientY },
-                                  flyLabel: `${isIncome ? '+' : '−'}${formatCurrency(displayValue)}`,
-                                });
+                                pushCalcAmount(
+                                  `fm-${transaction.id}`,
+                                  displayValue,
+                                  '+',
+                                  `${isIncome ? '+' : '−'}${formatCurrency(displayValue)}`,
+                                  e
+                                );
                               }}
                             >
                               {isIncome ? '+' : '−'}

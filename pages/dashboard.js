@@ -157,6 +157,7 @@ export default function Dashboard() {
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
+  const [openFinancePromoDismissed, setOpenFinancePromoDismissed] = useState(false);
 
   // Após retorno do Stripe Checkout: atualiza sessão para refletir novo plano sem re-login
   useEffect(() => {
@@ -717,6 +718,9 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return;
     if (!localStorage.getItem('finmemory_tip_gmail')) setTipGmailDismissed(false);
     if (!localStorage.getItem('finmemory_tip_map')) setTipMapDismissed(false);
+    if (localStorage.getItem('finmemory_open_finance_promo_dismissed') === '1') {
+      setOpenFinancePromoDismissed(true);
+    }
   }, []);
 
   // Check URL params for first sync (só no browser)
@@ -912,6 +916,7 @@ export default function Dashboard() {
   const totalBalance = useMemo(() => {
     return (filteredTransactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
   }, [filteredTransactions]);
+  const balanceLoading = loading && (transactions || []).length === 0;
 
   const transactionCount = (transactions || []).length;
   const userLevel = transactionCount < 10 ? 'Iniciante' : transactionCount < 50 ? 'Regular' : 'Expert';
@@ -997,6 +1002,7 @@ export default function Dashboard() {
             <div className="mb-4">
               <BalanceCard
                 balance={totalBalance}
+                loading={balanceLoading}
                 className="mb-0"
                 label={selectedMonth ? 'Gasto do mês' : undefined}
               />
@@ -1010,12 +1016,29 @@ export default function Dashboard() {
             />
             <FeaturedScanReceiptCTA />
 
-            <PlanGuard
-              feature="open_finance"
-              title="Open Finance no Plano Pro"
-              body="Conecte seus bancos com automação total no Pro. Para orçamento compartilhado da casa, use o plano Família."
-              className="mb-6"
-            >
+            {!openFinancePromoDismissed && (
+              <div className="mb-2 -mt-1 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenFinancePromoDismissed(true);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('finmemory_open_finance_promo_dismissed', '1');
+                    }
+                  }}
+                  className="text-[11px] font-semibold text-[#64748b] hover:text-[#334155] underline-offset-2 hover:underline"
+                >
+                  Ocultar card Pro
+                </button>
+              </div>
+            )}
+            {!openFinancePromoDismissed && (
+              <PlanGuard
+                feature="open_finance"
+                title="Open Finance no Plano Pro"
+                body="Conecte seus bancos com automação total no Pro. Para orçamento compartilhado da casa, use o plano Família."
+                className="mb-6"
+              >
               <section
                 className="rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
                 aria-label="Open Finance"
@@ -1091,7 +1114,8 @@ export default function Dashboard() {
                 linkClassName="font-semibold text-[#2ECC49] hover:underline"
               />
               </section>
-            </PlanGuard>
+              </PlanGuard>
+            )}
 
             <Link
               href="/calculadora"
