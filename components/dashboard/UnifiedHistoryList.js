@@ -12,7 +12,6 @@ import {
   Fuel,
   Home,
   Info,
-  MapPin,
   Pencil,
   Pill,
   Receipt,
@@ -111,16 +110,6 @@ function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-function canPublishToMap(transaction) {
-  if (!transaction?.data) return false;
-  const txDateStr = String(transaction.data).trim().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(txDateStr)) return false;
-  const txDate = new Date(txDateStr + 'T12:00:00Z');
-  const now = new Date();
-  const diffDays = Math.floor((now - txDate) / (24 * 60 * 60 * 1000));
-  return diffDays >= 0 && diffDays <= 7;
-}
-
 function isTransactionNew(transaction) {
   if (transaction.created_at) {
     const d = new Date(transaction.created_at);
@@ -153,7 +142,6 @@ export function UnifiedHistoryList({
   userId,
   onDeleted,
   onRenamed,
-  onPublishedToMap,
   emptyState = 'default',
   className,
 }) {
@@ -166,8 +154,6 @@ export function UnifiedHistoryList({
 
   const [deletingId, setDeletingId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
-  const [publishingId, setPublishingId] = useState(null);
-  const [publishedToMapIds, setPublishedToMapIds] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [editInitialRaw, setEditInitialRaw] = useState('');
@@ -195,43 +181,6 @@ export function UnifiedHistoryList({
       console.error('Erro ao deletar:', e);
     } finally {
       setDeletingId(null);
-    }
-  };
-
-  const handlePublishToMap = async (transaction) => {
-    const id = transaction.id;
-    if (!id || publishingId) return;
-    setPublishingId(id);
-    let lat = null;
-    let lng = null;
-    try {
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        const pos = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true });
-        });
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
-      }
-    } catch (_) {}
-    try {
-      const res = await fetch(`/api/transactions/${id}/publish-to-map`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(lat != null && lng != null ? { lat, lng } : {}),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setPublishedToMapIds((prev) => new Set(prev).add(id));
-        if (typeof onPublishedToMap === 'function') onPublishedToMap(json.mapPointsAdded);
-        alert(`Pronto! ${json.mapPointsAdded || 0} preço(s) no mapa.`);
-      } else {
-        alert(json.error || 'Não foi possível divulgar no mapa.');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao divulgar no mapa.');
-    } finally {
-      setPublishingId(null);
     }
   };
 
@@ -647,25 +596,6 @@ export function UnifiedHistoryList({
                         </svg>
                         <span className="text-xs font-medium">WhatsApp</span>
                       </button>
-                      {canPublishToMap(transaction) &&
-                        (publishedToMapIds.has(transaction.id) ? (
-                          <span className="flex items-center gap-1 text-xs text-[#059669] px-2">
-                            <MapPin className="h-4 w-4" /> No mapa
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePublishToMap(transaction);
-                            }}
-                            disabled={publishingId === transaction.id}
-                            className="p-2 rounded-xl text-[#059669] hover:bg-[#ecfdf5] flex items-center gap-1 disabled:opacity-50"
-                          >
-                            <MapPin className="h-4 w-4" />
-                            <span className="text-xs font-medium">Mapa</span>
-                          </button>
-                        ))}
                       <Link
                         prefetch={false}
                         href={`/transaction/${transaction.id}/edit`}

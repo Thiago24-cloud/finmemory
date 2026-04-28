@@ -9,7 +9,6 @@ import { getServerSession } from 'next-auth/next';
 import Image from 'next/image';
 import {
   Search,
-  PlusCircle,
   Menu,
   ListChecks,
   Navigation,
@@ -497,14 +496,6 @@ export default function MapaPage() {
               >
                 <ListChecks className="h-5 w-5 text-[#2ECC49]" />
                 Gastos e análise
-              </Link>
-              <Link
-                href="/share-price"
-                onClick={() => setShowMenuSheet(false)}
-                className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm font-semibold text-emerald-900 hover:bg-emerald-100/80 no-underline"
-              >
-                <PlusCircle className="h-5 w-5 text-emerald-600" />
-                Compartilhar preço
               </Link>
               <Link
                 href="/mapa-quick-add"

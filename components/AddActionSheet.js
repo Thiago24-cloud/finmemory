@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { Camera, PenLine, MapPin, ScanBarcode } from 'lucide-react';
+import { Camera, PenLine, ScanBarcode } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/Sheet';
 
 const actions = [
@@ -25,13 +25,6 @@ const actions = [
     desc: 'Digite os dados da compra',
     path: '/manual-entry',
     color: 'bg-warning/10 text-warning',
-  },
-  {
-    icon: MapPin,
-    label: 'Compartilhar Preço',
-    desc: 'Ajude a comunidade com um preço',
-    path: '/share-price',
-    color: 'bg-accent/10 text-accent',
   },
 ];
 

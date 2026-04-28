@@ -232,15 +232,6 @@ function createMissionStopIcon(stopNumber = 1) {
   });
 }
 
-/** Mapeia tipo da loja (API) para categoria do formulário de partilha */
-function storeTypeToCategory(type) {
-  if (!type) return 'Supermercado';
-  const t = String(type).toLowerCase();
-  if (t === 'pharmacy') return 'Farmácia';
-  if (t === 'bakery') return 'Padaria';
-  return 'Supermercado';
-}
-
 /** Texto ao lado do pin (estilo Google Maps): curto para não poluir. */
 function truncateMapLabel(text, max = 36) {
   const s = String(text || '').trim();
@@ -2363,7 +2354,6 @@ function MapShopMobileActionPills({ shopStore, userOrigin, wazeUi }) {
   const lng = Number(shopStore?.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   const dest = { lat, lng };
-  const shareHref = `/share-price?store=${encodeURIComponent(shopStore?.name || '')}&category=${encodeURIComponent('Supermercado - Promoção')}`;
   const basePill =
     'shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold shadow-sm active:scale-[0.98] transition-transform no-underline';
   const googleCls = `${basePill} bg-[#1a73e8] text-white`;
@@ -2773,8 +2763,6 @@ export default function MapaPrecosLeaflet({
   const [carregando, setCarregando] = useState(false);
   const reloadPointsRef = useRef(() => {});
   const storeReloadRef = useRef(() => {});
-  const [storeNearby, setStoreNearby] = useState(null);
-  const [dismissedStorePrompt, setDismissedStorePrompt] = useState(false);
   /** Última posição de &quot;Minha localização&quot; — usada como origem nas rotas (padrão Google Maps). */
   const [userMapPosition, setUserMapPosition] = useState(null);
   /** Lojas visíveis no mapa (bounds) — para esconder pin de “N preços” no mesmo sítio do pin da loja. */
@@ -3208,18 +3196,8 @@ export default function MapaPrecosLeaflet({
     [priceGroups, storesVisibleOnMap]
   );
 
-  const handleLocationFound = useCallback((lat, lng) => {
-    setDismissedStorePrompt(false);
-    fetch(`/api/map/stores?lat=${lat}&lng=${lng}&radius=150`)
-      .then((res) => (res.ok ? res.json() : { stores: [] }))
-      .then((data) => {
-        if (Array.isArray(data.stores) && data.stores.length > 0) {
-          setStoreNearby(data.stores[0]);
-        } else {
-          setStoreNearby(null);
-        }
-      })
-      .catch(() => setStoreNearby(null));
+  const handleLocationFound = useCallback(() => {
+    // Mantido como callback para compatibilidade com <MapCenterOnUser />.
   }, []);
 
   const handleRequestStoreShop = useCallback((store) => {
@@ -4118,34 +4096,6 @@ export default function MapaPrecosLeaflet({
         />
       </MapContainer>
 
-      {/* Geo-fencing: "Você está perto de [loja]. Gostaria de compartilhar um preço?" */}
-      {storeNearby && !dismissedStorePrompt && (
-        <div className="absolute left-3 right-3 sm:left-4 sm:right-4 bottom-36 sm:bottom-44 z-[1001] max-w-[320px]">
-          <div className="bg-white rounded-xl shadow-lg border border-emerald-200 p-4 flex flex-col gap-3">
-            <p className="text-sm text-gray-800 font-medium">
-              Você está perto de <span className="font-semibold text-emerald-700">{storeNearby.name}</span>.
-              <br />
-              Gostaria de compartilhar um preço?
-            </p>
-            <div className="flex gap-2">
-              <a
-                href={`/share-price?store=${encodeURIComponent(storeNearby.name)}&category=${encodeURIComponent(storeTypeToCategory(storeNearby.type))}`}
-                className="flex-1 py-2 px-3 rounded-lg bg-emerald-500 text-white text-sm font-semibold text-center hover:bg-emerald-600 no-underline"
-              >
-                Sim, compartilhar
-              </a>
-              <button
-                type="button"
-                onClick={() => setDismissedStorePrompt(true)}
-                className="py-2 px-3 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200"
-              >
-                Agora não
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {nearbyBagAlert ? (
         <div className="pointer-events-none absolute bottom-[9.25rem] left-3 right-3 z-[1102] sm:left-4 sm:right-auto sm:max-w-[360px]">
           <div className="rounded-xl border border-emerald-400/40 bg-[#0f1117]/95 px-3 py-2 text-xs text-emerald-50 shadow-[0_10px_28px_rgba(16,185,129,0.25)] backdrop-blur-md">
@@ -4708,14 +4658,6 @@ export default function MapaPrecosLeaflet({
                 }`}
               >
                 <span>Precos podem variar na loja fisica. Compare antes de fechar compra.</span>
-                <a
-                  href={`/share-price?store=${encodeURIComponent(shopStore?.name || '')}&category=${encodeURIComponent('Supermercado - Promoção')}`}
-                  className={`ml-3 shrink-0 rounded-full px-2.5 py-1 font-semibold no-underline ${
-                    wazeUi ? 'bg-[#2ecc71] text-[#0f1117]' : 'bg-amber-500 text-white'
-                  }`}
-                >
-                  Preco diferente
-                </a>
               </div>
               {shopLoading && (
                 <div className="flex justify-center py-12">
