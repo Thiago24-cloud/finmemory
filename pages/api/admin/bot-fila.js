@@ -54,6 +54,12 @@ function parseDateSafe(value) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function toIsoDateOnly(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 function computeProdutoDiscount(produto) {
   const promo = Number(produto?.current_price ?? produto?.preco ?? produto?.price ?? produto?.promo_price);
   const original = Number(produto?.preco_de ?? produto?.original_price ?? produto?.price_from);
@@ -399,6 +405,23 @@ export default async function handler(req, res) {
 
     const produtos = Array.isArray(item.produtos) ? item.produtos : [];
     const now = new Date().toISOString();
+    const defaultExpiryDate = toIsoDateOnly(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const withValidityFallback = (produto) => {
+      const rawExpiry =
+        produto?.valid_until ||
+        produto?.validade ||
+        produto?.expires_at ||
+        produto?.expiry_date ||
+        null;
+      const resolvedExpiry = toIsoDateOnly(rawExpiry) || defaultExpiryDate;
+      return resolvedExpiry
+        ? {
+            ...produto,
+            valid_until: resolvedExpiry,
+          }
+        : { ...produto };
+    };
+    const produtosWithValidity = produtos.map(withValidityFallback);
 
     const resolvedOwnerUserId = await resolveOwnerUserId(supabase, session.user.email);
     const fallbackSessionUserId =
@@ -426,7 +449,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Não foi possível resolver store_id na RPC find_or_create_store.' });
     }
 
-    const split = splitProdutosByPublishReadiness(produtos);
+    const split = splitProdutosByPublishReadiness(produtosWithValidity);
     const missingImageAfterCache = [];
     for (const p of split.pendingImage) {
       // Tenta resolver do cache interno antes de devolver para fila de imagem.
@@ -474,7 +497,10 @@ export default async function handler(req, res) {
         locality_state: 'SP',
         ddd_code: item.ddd_code || p?.raw?.ddd_code || null,
         is_statewide: isStatewide,
-        expires_at: p.valid_until || p?.raw?.expiry_date || p?.raw?.validade || p?.raw?.valid_until || null,
+        expires_at:
+          toIsoDateOnly(p.valid_until || p?.raw?.expiry_date || p?.raw?.validade || p?.raw?.valid_until) ||
+          defaultExpiryDate ||
+          null,
         discount_percent: discountPercent,
         unit_normalized: p.unit || null,
       };
@@ -492,7 +518,7 @@ export default async function handler(req, res) {
       await supabase
         .from('bot_promocoes_fila')
         .update({
-          produtos: remaining,
+          produtos: remaining.map(withValidityFallback),
           reviewed_at: null,
           reviewed_by: null,
         })
@@ -510,7 +536,12 @@ export default async function handler(req, res) {
 
     await supabase
       .from('bot_promocoes_fila')
-      .update({ status: 'aprovado', reviewed_at: now, reviewed_by: session.user.email })
+      .update({
+        produtos: produtosWithValidity,
+        status: 'aprovado',
+        reviewed_at: now,
+        reviewed_by: session.user.email,
+      })
       .eq('id', id);
 
     return res.status(200).json({ ok: true, inserted: rows.length, owner_user_id: ownerUserId });
