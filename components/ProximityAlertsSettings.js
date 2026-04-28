@@ -8,6 +8,7 @@ import {
   getProximityRadiusM,
   setProximityRadiusM,
   PROXIMITY_RADIUS_PRESETS,
+  forceProximityCheckNow,
   startProximityMonitoring,
   stopProximityMonitoring,
 } from '../lib/proximity/proximityAlerts';
@@ -23,7 +24,7 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
   const [isNative, setIsNative] = useState(false);
   const [platform, setPlatform] = useState('web');
   const [enabled, setEnabled] = useState(false);
-  const [radiusM, setRadiusM] = useState(350);
+  const [radiusM, setRadiusM] = useState(450);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState('');
   const [fetchedNames, setFetchedNames] = useState([]);
@@ -142,6 +143,21 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
     setProximityRadiusM(v);
   }, []);
 
+  const runImmediateTest = useCallback(async () => {
+    setHint('');
+    setBusy(true);
+    try {
+      const result = await forceProximityCheckNow({ radiusM });
+      if (!result?.ok) {
+        setHint('Não foi possível rodar o teste imediato do radar. Verifique a permissão de localização.');
+      } else {
+        setHint('Teste imediato executado. Se você estiver perto de uma loja da lista, a notificação deve aparecer.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [radiusM]);
+
   if (!isNative) {
     return (
       <section className="mb-5 p-4 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
@@ -186,6 +202,10 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
             os itens pendentes da lista. No Android aparece uma notificação persistente enquanto o monitor está
             ativo; no iOS, permissão de localização &quot;Sempre&quot; dá o melhor resultado em segundo plano.
           </p>
+          <p className="text-xs text-gray-500 mt-1 leading-snug">
+            Para funcionar com a tela desligada no Android: permita localização <strong>O tempo todo</strong> e
+            desative a otimização de bateria para o FinMemory nas configurações do aparelho.
+          </p>
           {autoLoadList && listLoading ? (
             <p className="text-xs text-gray-400 mt-2 flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> A carregar itens da lista…
@@ -219,8 +239,7 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
               })}
             </select>
             <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-              300–350&nbsp;m costuma bastar em áreas densas; 400–500&nbsp;m dá mais margem em ruas largas ou
-              periferia.
+              O Radar de Ofertas está configurado com raio de 450&nbsp;m para disparar os alertas de proximidade.
             </p>
           </div>
           <button
@@ -231,6 +250,15 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {enabled ? 'Desativar alertas' : 'Ativar alertas de proximidade'}
+          </button>
+          <button
+            type="button"
+            onClick={runImmediateTest}
+            disabled={busy || !enabled || !userId || listLoading}
+            className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-[#116C2B] bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Testar Radar Agora
           </button>
           {hint ? <p className="text-xs text-amber-800 mt-2 leading-snug">{hint}</p> : null}
         </div>
