@@ -175,6 +175,12 @@ function getSupabaseAdmin() {
   );
 }
 
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || '').trim()
+  );
+}
+
 async function checkAdmin(req, res) {
   const session = await getServerSession(req, res, authOptions);
   if (!session?.user?.email) {
@@ -394,7 +400,10 @@ export default async function handler(req, res) {
     const produtos = Array.isArray(item.produtos) ? item.produtos : [];
     const now = new Date().toISOString();
 
-    const ownerUserId = await resolveOwnerUserId(supabase, session.user.email);
+    const resolvedOwnerUserId = await resolveOwnerUserId(supabase, session.user.email);
+    const fallbackSessionUserId =
+      isUuid(session?.user?.supabaseId) ? String(session.user.supabaseId).trim() : null;
+    const ownerUserId = resolvedOwnerUserId || fallbackSessionUserId;
     if (!ownerUserId) {
       return res.status(500).json({
         error:
