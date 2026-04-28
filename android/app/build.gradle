@@ -1,5 +1,51 @@
 apply plugin: 'com.android.application'
 
+import java.util.Properties
+import java.io.FileInputStream
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreExampleFile = rootProject.file("keystore.properties.example")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+} else if (keystoreExampleFile.exists()) {
+    // Local fallback to support teams that keep secrets in a local example file.
+    keystoreProperties.load(new FileInputStream(keystoreExampleFile))
+}
+
+def releaseStoreFile = keystoreProperties.getProperty("storeFile")
+        ?: System.getenv("FM_UPLOAD_STORE_FILE")
+        ?: project.findProperty("FM_UPLOAD_STORE_FILE")
+def releaseStorePassword = keystoreProperties.getProperty("storePassword")
+        ?: System.getenv("FM_UPLOAD_STORE_PASSWORD")
+        ?: project.findProperty("FM_UPLOAD_STORE_PASSWORD")
+def releaseKeyAlias = keystoreProperties.getProperty("keyAlias")
+        ?: System.getenv("FM_UPLOAD_KEY_ALIAS")
+        ?: project.findProperty("FM_UPLOAD_KEY_ALIAS")
+def releaseKeyPassword = keystoreProperties.getProperty("keyPassword")
+        ?: System.getenv("FM_UPLOAD_KEY_PASSWORD")
+        ?: project.findProperty("FM_UPLOAD_KEY_PASSWORD")
+def releaseStoreFileRef = null
+if (releaseStoreFile) {
+    def moduleRelative = file(releaseStoreFile)
+    def moduleNormalized = file(
+            releaseStoreFile
+                    .replace("\\", "/")
+                    .replaceFirst("^app/", "")
+    )
+    def rootRelative = rootProject.file(releaseStoreFile)
+    def absolutePath = new File(releaseStoreFile)
+    if (absolutePath.isAbsolute() && absolutePath.exists()) {
+        releaseStoreFileRef = absolutePath
+    } else if (moduleRelative.exists()) {
+        releaseStoreFileRef = moduleRelative
+    } else if (moduleNormalized.exists()) {
+        releaseStoreFileRef = moduleNormalized
+    } else {
+        releaseStoreFileRef = rootRelative
+    }
+}
+
 android {
     namespace = "br.com.finmemory.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +62,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            storeFile file('finmemory-final.jks')
+            storePassword 'Observador 2001'
+            keyAlias 'finmemory'
+            keyPassword 'Observador 2001'
+        }
+    }
     buildTypes {
         release {
+            if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.warn("Release signing is not configured. Configure keystore.properties or FM_UPLOAD_* env vars.")
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

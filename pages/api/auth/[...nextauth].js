@@ -7,9 +7,19 @@ import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { normalizeEmail } from '../../../lib/securityPolicy';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 
-const GOOGLE_PLAY_REVIEWER_EMAIL = 'thiagochimezie44@gmail.com';
+const DEFAULT_GOOGLE_PLAY_REVIEWER_EMAILS = ['thiagochimzie4@gmail.com', 'thiagochimezie44@gmail.com'];
+
+function getGooglePlayReviewerEmails() {
+  const envEmails = String(process.env.GOOGLE_PLAY_REVIEWER_EMAILS || '')
+    .split(',')
+    .map((item) => normalizeEmail(item))
+    .filter(Boolean);
+  const normalizedDefaults = DEFAULT_GOOGLE_PLAY_REVIEWER_EMAILS.map((item) => normalizeEmail(item)).filter(Boolean);
+  return new Set([...normalizedDefaults, ...envEmails]);
+}
+
 function isGooglePlayReviewerEmail(email) {
-  return normalizeEmail(email) === GOOGLE_PLAY_REVIEWER_EMAIL;
+  return getGooglePlayReviewerEmails().has(normalizeEmail(email));
 }
 
 // Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.

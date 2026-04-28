@@ -22,7 +22,6 @@ export default function LoginPage() {
   const resetEmail = typeof router.query?.email === 'string' ? router.query.email : '';
   const verified = router.query?.verified === '1';
   const resetOk = router.query?.resetOk === '1';
-  const reviewerEmail = 'thiagochimezie44@gmail.com';
 
   const doLogin = async () => {
     setBusy(true);
@@ -212,13 +211,6 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2"
           />
-          <button
-            type="button"
-            onClick={() => setEmail(reviewerEmail)}
-            className="mb-3 w-full rounded-lg border border-emerald-200 bg-emerald-50 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
-          >
-            Usar conta de revisão Google Play ({reviewerEmail})
-          </button>
           <input
             type="password"
             placeholder="Sua senha"
