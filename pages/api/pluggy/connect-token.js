@@ -63,9 +63,28 @@ export default async function handler(req, res) {
 
   try {
     const pluggy = new PluggyClient({ clientId, clientSecret });
-    const { accessToken } = await pluggy.createConnectToken(undefined, {
-      clientUserId: pluggyClientUserId,
-    });
+    let accessToken = null;
+    // Pede contas + cartões de crédito ao iniciar o Connect.
+    // Mantemos fallback para payload mínimo caso a conta/provedor não aceite "products".
+    const tokenPayloads = [
+      { clientUserId: pluggyClientUserId, products: ['ACCOUNTS', 'CREDIT_CARDS'] },
+      { clientUserId: pluggyClientUserId, products: ['ACCOUNTS', 'CREDIT'] },
+      { clientUserId: pluggyClientUserId },
+    ];
+    for (const payload of tokenPayloads) {
+      try {
+        const tokenResp = await pluggy.createConnectToken(undefined, payload);
+        if (tokenResp?.accessToken) {
+          accessToken = tokenResp.accessToken;
+          break;
+        }
+      } catch (e) {
+        // tenta próximo payload
+      }
+    }
+    if (!accessToken) {
+      throw new Error('Não foi possível criar connect token do Pluggy');
+    }
 
     /**
      * Padrão: produção — lista conectores reais (Nubank, Itaú, etc.).

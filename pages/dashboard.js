@@ -67,6 +67,26 @@ function getYearMonthKey(value) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function dedupePluggyTransactions(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) return Array.isArray(rows) ? rows : [];
+  const seen = new Set();
+  return rows.filter((row) => {
+    if (String(row?.source || '').toLowerCase() !== 'pluggy') return true;
+    const nome = String(row?.estabelecimento || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+    const data = String(row?.data || '').slice(0, 10);
+    const hora = String(row?.hora || '').slice(0, 8);
+    const valor = Number(row?.total) || 0;
+    const key = `${data}|${hora}|${valor}|${nome}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getLatestYear(monthKeys) {
   let latest = null;
   monthKeys.forEach((ym) => {
@@ -408,7 +428,7 @@ export default function Dashboard() {
           
           if (!errorWithoutProducts) {
             console.log('✅ Transações carregadas sem produtos:', dataWithoutProducts?.length || 0);
-            setTransactions(Array.isArray(dataWithoutProducts) ? dataWithoutProducts : []);
+            setTransactions(dedupePluggyTransactions(Array.isArray(dataWithoutProducts) ? dataWithoutProducts : []));
             return;
           }
         }
@@ -429,7 +449,7 @@ export default function Dashboard() {
         console.log('   ⚠️ Nenhuma transação retornada da query');
       }
       
-      const transactionsArray = Array.isArray(data) ? data : [];
+      const transactionsArray = dedupePluggyTransactions(Array.isArray(data) ? data : []);
       console.log('   Definindo transações no estado:', transactionsArray.length, 'transação(ões)');
       setTransactions(transactionsArray);
       

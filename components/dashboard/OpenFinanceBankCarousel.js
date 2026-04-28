@@ -32,20 +32,9 @@ export function OpenFinanceBankCarousel({
 
   const allSelected = selectedAccountId == null || selectedAccountId === '';
   const normalizedAccounts = Array.isArray(accounts) ? accounts : [];
+  const visibleAccounts = normalizedAccounts;
 
-  const isDebitLike = (account) => {
-    const t = String(account?.account_type || '')
-      .normalize('NFD')
-      .replace(/\p{M}/gu, '')
-      .toLowerCase();
-    if (!t) return true;
-    if (t.includes('credit') || t.includes('credito')) return false;
-    return true;
-  };
-
-  const debitAccounts = normalizedAccounts.filter(isDebitLike);
-
-  const itemBrandText = debitAccounts.reduce((acc, account) => {
+  const itemBrandText = visibleAccounts.reduce((acc, account) => {
     const itemId = String(account?.item_id || '').trim();
     if (!itemId) return acc;
     if (acc[itemId]) return acc;
@@ -63,9 +52,9 @@ export function OpenFinanceBankCarousel({
     return acc;
   }, {});
 
-  const showAllChip = debitAccounts.length > 1;
+  const showAllChip = visibleAccounts.length > 1;
 
-  if (!loading && debitAccounts.length === 0) {
+  if (!loading && visibleAccounts.length === 0) {
     return null;
   }
 
@@ -84,7 +73,7 @@ export function OpenFinanceBankCarousel({
         className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory -mx-1 px-1"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {loading && debitAccounts.length === 0 ? (
+        {loading && visibleAccounts.length === 0 ? (
           <>
             {[1, 2, 3].map((i) => (
               <div
@@ -118,7 +107,7 @@ export function OpenFinanceBankCarousel({
                 <p className="text-[10px] text-[#64748b] m-0 leading-snug">Receitas e despesas de todas as contas</p>
               </button>
             )}
-            {debitAccounts.map((a) => {
+            {visibleAccounts.map((a) => {
               const label = a.display_name || a.name || 'Conta';
               const itemId = String(a?.item_id || '').trim();
               const bankIdentity = itemBrandText[itemId] || label;
@@ -250,7 +239,7 @@ export function OpenFinanceBankCarousel({
       </div>
       <p className="text-[10px] text-[#888] mt-1.5 px-0.5 m-0">
         {canFilter
-          ? 'Toque no cartão para filtrar por conta e enviar o saldo à calculadora · Toque de novo na mesma conta para ver todas.'
+          ? 'Toque no cartão para filtrar por conta/cartão e enviar o saldo à calculadora · Toque de novo no mesmo para ver todos.'
           : 'Conectado · valores do Pluggy'}
         {calcDock
           ? ' Para somar vários saldos: use +, −, × ou ÷ na calculadora e depois toque no próximo cartão.'

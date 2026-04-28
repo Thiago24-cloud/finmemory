@@ -10,7 +10,7 @@ import { TransactionList } from "@/components/dashboard/TransactionList";
 import { EditTransactionSheet } from "@/components/dashboard/EditTransactionSheet";
 import { CoupleSummary } from "@/components/dashboard/CoupleSummary";
 import { BottomNav } from "@/components/BottomNav";
-import { ChevronLeft, ChevronRight, Users, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -31,7 +31,30 @@ interface Transaction {
   categoria: string;
   forma_pagamento: string;
   items: TransactionItem[];
+  source?: string | null;
+  hora?: string | null;
 }
+
+const dedupePluggyTransactions = (rows: Transaction[]): Transaction[] => {
+  if (!Array.isArray(rows) || rows.length < 2) return Array.isArray(rows) ? rows : [];
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const source = String((row as any)?.source || "").toLowerCase();
+    if (source !== "pluggy") return true;
+    const nome = String(row.estabelecimento || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+    const data = String(row.data || "").slice(0, 10);
+    const hora = String((row as any)?.hora || "").slice(0, 8);
+    const valor = Number(row.total) || 0;
+    const key = `${data}|${hora}|${valor}|${nome}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -84,8 +107,7 @@ const Dashboard = () => {
     if (error) {
       toast.error("Erro ao carregar transações");
     } else {
-      setTransactions(
-        (data || []).map((t: any) => ({
+      const mapped: Transaction[] = (data || []).map((t: any) => ({
           id: t.id,
           user_id: t.user_id,
           estabelecimento: t.estabelecimento,
@@ -94,8 +116,10 @@ const Dashboard = () => {
           categoria: t.categoria || "Outros",
           forma_pagamento: t.forma_pagamento || "",
           items: Array.isArray(t.items) ? t.items : [],
-        }))
-      );
+          source: t.source || null,
+          hora: t.hora || null,
+        }));
+      setTransactions(dedupePluggyTransactions(mapped));
     }
     setLoading(false);
   };
@@ -167,6 +191,11 @@ const Dashboard = () => {
     }, 2000);
   };
 
+  const handleRefreshStatement = async () => {
+    await fetchTransactions();
+    toast.success("Extrato atualizado.");
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
@@ -207,6 +236,16 @@ const Dashboard = () => {
           onClick={() => navigate("/calculadora")}
         >
           Calculadora de economia
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full mb-4"
+          onClick={handleRefreshStatement}
+          disabled={loading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Atualizar extrato
         </Button>
         <CobrancasMiniCard
           selectedMonth={selectedMonth}
