@@ -130,6 +130,44 @@ function parseFranchiseUnitLine(line: string): { address: string; cnpjDigits: st
   return { address: raw, cnpjDigits: '' };
 }
 
+/**
+ * Permite quebrar "endereço + CNPJ" em 2 linhas no textarea.
+ * Regra: se a linha atual não tem CNPJ e a próxima parece só continuação
+ * (com CNPJ), juntamos as duas antes de parsear.
+ */
+function normalizeFranchiseUnitInputLines(raw: string): string[] {
+  const lines = raw
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const out: string[] = [];
+  const cnpjInlineRe = /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const current = lines[i];
+    const next = lines[i + 1];
+    if (!next) {
+      out.push(current);
+      continue;
+    }
+
+    const currentParsed = parseFranchiseUnitLine(current);
+    const currentHasCnpj = (currentParsed?.cnpjDigits || '').length === 14 || cnpjInlineRe.test(current);
+    const nextParsed = parseFranchiseUnitLine(next);
+    const nextHasCnpj = (nextParsed?.cnpjDigits || '').length === 14 || cnpjInlineRe.test(next);
+
+    if (!currentHasCnpj && nextHasCnpj) {
+      out.push(`${current} ${next}`.replace(/\s+/g, ' ').trim());
+      i += 1; // consumiu a próxima linha como continuação
+      continue;
+    }
+
+    out.push(current);
+  }
+
+  return out;
+}
+
 async function fetchBookCnpjDigits(storeName: string, address: string): Promise<string | null> {
   const n = storeName.trim();
   const a = address.trim();
@@ -376,7 +414,7 @@ export default function QuickAdd() {
     let units: Unit[];
 
     if (storeKind === 'franchise') {
-      const lines = franchiseUnitsRaw.split(/\n/).map((l) => l.trim()).filter(Boolean);
+      const lines = normalizeFranchiseUnitInputLines(franchiseUnitsRaw);
       if (!lines.length) {
         setError('No modo franquia, indique pelo menos uma linha (uma unidade por linha).');
         setRunning(false);
@@ -450,7 +488,7 @@ export default function QuickAdd() {
       setFranchiseBookFillMsg('Indique o nome da loja (igual ao usado ao gravar no repositório).');
       return;
     }
-    const lines = franchiseUnitsRaw.split('\n');
+    const lines = normalizeFranchiseUnitInputLines(franchiseUnitsRaw);
     if (!lines.some((l) => l.trim())) {
       setFranchiseBookFillMsg('Cole ou escreva pelo menos um endereço por linha.');
       return;
@@ -1501,6 +1539,7 @@ export default function QuickAdd() {
                     'Av. Paulista, 1000, SP\t12.345.678/0001-90\n' +
                     'Rua das Flores, 50, Campinas | 98.765.432/0001-10\n' +
                     'R. Pio XI, 1320 = 37.259.759/0001-01\n\n' +
+                    'Pode quebrar um mesmo endereço em 2 linhas (o painel junta automaticamente).\n\n' +
                     'Se o CNPJ já estiver gravado para esse nome + endereço, pode colar só o endereço na linha.'
                   }
                 />
