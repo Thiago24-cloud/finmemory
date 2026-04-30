@@ -243,7 +243,7 @@ const MapaPrecos = () => {
           });
           const nextLocation: [number, number] = [pos.coords.longitude, pos.coords.latitude];
           setUserLocation(nextLocation);
-          map.flyTo({ center: nextLocation, zoom: 13 });
+          map.flyTo({ center: nextLocation, zoom: 18 });
           return;
         }
 
@@ -252,7 +252,7 @@ const MapaPrecos = () => {
             (pos) => {
               const nextLocation: [number, number] = [pos.coords.longitude, pos.coords.latitude];
               setUserLocation(nextLocation);
-              map.flyTo({ center: nextLocation, zoom: 13 });
+              map.flyTo({ center: nextLocation, zoom: 18 });
             },
             () => {}
           );

@@ -78,6 +78,8 @@ Testes do FinMemory.mp4
 # Local-only secrets / temp artifacts
 finmemory-service-account.json
 android/keystore
+android/keystore.properties
+android/app/google-services.json
 supabase/.temp/
 print mambo .png
 _smart-receipt-scanner/

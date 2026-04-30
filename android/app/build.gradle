@@ -64,18 +64,20 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file('finmemory-final.jks')
-            storePassword 'Observador 2001'
-            keyAlias 'finmemory'
-            keyPassword 'Observador 2001'
+            if (releaseStoreFileRef) {
+                storeFile releaseStoreFileRef
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
     buildTypes {
         release {
-            if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+            if (releaseStoreFileRef && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
                 signingConfig signingConfigs.release
             } else {
-                logger.warn("Release signing is not configured. Configure keystore.properties or FM_UPLOAD_* env vars.")
+                logger.warn("Release signing is not configured. Configure android/keystore.properties or FM_UPLOAD_* env vars.")
             }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

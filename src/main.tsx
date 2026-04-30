@@ -4,31 +4,25 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import App from "./App.tsx";
 
 async function initPushNotifications() {
-  if (!Capacitor.isNativePlatform()) {
-    alert("Push só funciona no app nativo (Android/iOS), não no navegador.");
-    return;
-  }
+  if (!Capacitor.isNativePlatform()) return;
 
-  // Captura o token quando registrar
   PushNotifications.addListener("registration", (token) => {
-    alert("TOKEN FCM:\n" + token.value);
+    console.log("[FCM] Token:", token.value);
   });
 
-  // Captura erro se falhar
   PushNotifications.addListener("registrationError", (err) => {
-    alert("ERRO REGISTRO PUSH: " + JSON.stringify(err));
+    console.error("[FCM] Erro no registro:", JSON.stringify(err));
   });
 
   const result = await PushNotifications.requestPermissions();
-  alert("Permissão de push: " + result.receive);
+  console.log("[FCM] Permissão:", result.receive);
 
   if (result.receive === "granted") {
     await PushNotifications.register();
   } else {
-    alert("Permissão de notificação negada. Ative nas configurações do app.");
+    console.warn("[FCM] Permissão de notificação negada.");
   }
 }
 
-void initPushNotifications();
-
 createRoot(document.getElementById("root")!).render(<App />);
+void initPushNotifications();

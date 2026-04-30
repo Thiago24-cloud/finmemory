@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TransactionItem {
@@ -6,10 +8,6 @@ interface TransactionItem {
   valor_total: number;
 }
 
-/**
- * After saving a transaction, auto-create price_points from items + geolocation.
- * Uses browser geolocation; if unavailable, skips silently.
- */
 export async function createPricePointsFromTransaction({
   userId,
   storeName,
@@ -23,21 +21,36 @@ export async function createPricePointsFromTransaction({
 }) {
   if (!items.length || !storeName) return;
 
-  // Try to get current position
   let lat: number | null = null;
   let lng: number | null = null;
 
   try {
-    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        timeout: 5000,
-        maximumAge: 300000, // 5 min cache
+    if (Capacitor.isNativePlatform()) {
+      const permission = await Geolocation.requestPermissions();
+      if (
+        permission.location !== "granted" &&
+        permission.coarseLocation !== "granted"
+      ) {
+        console.log("Geolocation permission denied, skipping price point creation");
+        return;
+      }
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000,
       });
-    });
-    lat = pos.coords.latitude;
-    lng = pos.coords.longitude;
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } else {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 5000,
+          maximumAge: 300000,
+        });
+      });
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    }
   } catch {
-    // No geolocation available – skip creating price points
     console.log("Geolocation unavailable, skipping price point creation");
     return;
   }
