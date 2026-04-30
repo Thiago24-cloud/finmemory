@@ -76,6 +76,7 @@ teste-pre-deploy.md
 Testes do FinMemory.mp4
 
 # Local-only secrets / temp artifacts
+finmemory-service-account.json
 android/keystore
 supabase/.temp/
 print mambo .png

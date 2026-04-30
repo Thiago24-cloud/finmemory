@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 import { Target } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
@@ -224,16 +226,43 @@ const MapaPrecos = () => {
       zoom: 12,
     });
     map.addControl(new maplibregl.NavigationControl(), "bottom-right");
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
+
+    const locateUser = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const permission = await Geolocation.requestPermissions();
+          if (
+            permission.location !== "granted" &&
+            permission.coarseLocation !== "granted"
+          ) {
+            return;
+          }
+          const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 10000,
+          });
           const nextLocation: [number, number] = [pos.coords.longitude, pos.coords.latitude];
           setUserLocation(nextLocation);
           map.flyTo({ center: nextLocation, zoom: 13 });
-        },
-        () => {}
-      );
-    }
+          return;
+        }
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const nextLocation: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+              setUserLocation(nextLocation);
+              map.flyTo({ center: nextLocation, zoom: 13 });
+            },
+            () => {}
+          );
+        }
+      } catch {
+        // Mantém centro padrão quando localização falha.
+      }
+    };
+
+    void locateUser();
     mapRef.current = map;
     return () => {
       map.remove();

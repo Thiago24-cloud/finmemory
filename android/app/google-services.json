@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "836908221936",
+    "project_id": "exalted-entry-480904-s9",
+    "storage_bucket": "exalted-entry-480904-s9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836908221936:android:290153bcbe611794ed8935",
+        "android_client_info": {
+          "package_name": "br.com.finmemory.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDc_Ku_080poEmf38-Lw6M4eaBrxQGr4dM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836908221936:android:c06e86ba398d4807ed8935",
+        "android_client_info": {
+          "package_name": "com.finmemory.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDc_Ku_080poEmf38-Lw6M4eaBrxQGr4dM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, MapPin, Loader2, CheckCircle, ImageIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -40,22 +42,51 @@ const SharePrice = () => {
   }, []);
 
   const getLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error("Geolocalização não suportada pelo navegador");
-      return;
-    }
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude);
-        setLng(pos.coords.longitude);
-        setLocating(false);
-      },
-      () => {
+
+    const fetchLocation = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const permission = await Geolocation.requestPermissions();
+          if (
+            permission.location !== "granted" &&
+            permission.coarseLocation !== "granted"
+          ) {
+            toast.error("Permissão de localização negada");
+            return;
+          }
+
+          const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 10000,
+          });
+          setLat(pos.coords.latitude);
+          setLng(pos.coords.longitude);
+          return;
+        }
+
+        if (!navigator.geolocation) {
+          toast.error("Geolocalização não suportada pelo navegador");
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setLat(pos.coords.latitude);
+            setLng(pos.coords.longitude);
+          },
+          () => {
+            toast.error("Não foi possível obter sua localização");
+          }
+        );
+      } catch {
         toast.error("Não foi possível obter sua localização");
+      } finally {
         setLocating(false);
       }
-    );
+    };
+
+    void fetchLocation();
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

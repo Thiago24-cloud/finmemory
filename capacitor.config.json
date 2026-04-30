@@ -2,10 +2,6 @@
   "appId": "br.com.finmemory.app",
   "appName": "FinMemory",
   "webDir": "www",
-  "server": {
-    "url": "https://finmemory-836908221936.southamerica-east1.run.app",
-    "cleartext": false
-  },
   "android": {
     "allowMixedContent": true
   },
