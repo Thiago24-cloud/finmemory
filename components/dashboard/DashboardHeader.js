@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils';
  * Header do dashboard – logo, avatar, nome do usuário (dados reais da sessão NextAuth), lembretes/notificações e sair.
  */
 export function DashboardHeader({ user, onSignOut, className }) {
-  const userName = user?.name || (user?.email && user.email.split('@')[0]) || 'Usuário';
+  const userName = user?.name || 'Usuário';
   const avatarUrl = user?.image;
   const initials = userName.slice(0, 2).toUpperCase();
 

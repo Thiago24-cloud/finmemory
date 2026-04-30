@@ -40,6 +40,10 @@ const DEFAULT_MAP_ZOOM = SAO_PAULO_STATE_ZOOM;
 
 /** Com zoom baixo, esconder nomes ao lado dos pins (menos poluição, como no Google Maps). Busca ativa mostra nomes. */
 const MAP_LABEL_MIN_ZOOM = 15;
+const MAP_ZOOM_USER_LOCATION = 16;
+const MAP_ZOOM_SINGLE_STORE_FOCUS = 17;
+const MAP_ZOOM_MULTI_STORE_FOCUS = 16;
+const MAP_ZOOM_REGION_OVERVIEW = 15;
 
 function useMapZoom() {
   const map = useMap();
@@ -529,11 +533,18 @@ function StoreMarkers({
     try {
       if (matched.length === 1) {
         const s = matched[0];
-        map.flyTo([Number(s.lat), Number(s.lng)], Math.max(map.getZoom(), 15), { duration: 0.45 });
+        map.flyTo([Number(s.lat), Number(s.lng)], Math.max(map.getZoom(), MAP_ZOOM_SINGLE_STORE_FOCUS), {
+          duration: 0.45,
+        });
         return;
       }
       const bounds = L.latLngBounds(matched.map((s) => [Number(s.lat), Number(s.lng)]));
-      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 17, animate: true, duration: 0.45 });
+      map.fitBounds(bounds, {
+        padding: [48, 48],
+        maxZoom: MAP_ZOOM_MULTI_STORE_FOCUS,
+        animate: true,
+        duration: 0.45,
+      });
     } catch (e) {
       console.warn('fitBounds lojas (busca):', e);
     }
@@ -711,7 +722,13 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
     setError(null);
     setLocating(true);
     // setView: false — um único flyTo no handler evita animação dupla e “pulos” do mapa
-    map.locate({ setView: false, watch: false, maxZoom: 16, timeout: 15000, enableHighAccuracy: true });
+    map.locate({
+      setView: false,
+      watch: false,
+      maxZoom: MAP_ZOOM_USER_LOCATION,
+      timeout: 15000,
+      enableHighAccuracy: true,
+    });
   }, [map]);
 
   useEffect(() => {
@@ -1001,7 +1018,7 @@ function MapRegionFly({ searchQuery, searchIntent, onRegionFitted }) {
       clearTimeout(fallback);
       finish();
     });
-    map.fitBounds(bounds, { padding: [44, 44], maxZoom: 14, animate: true });
+    map.fitBounds(bounds, { padding: [44, 44], maxZoom: MAP_ZOOM_REGION_OVERVIEW, animate: true });
   }, [map, searchIntent, onRegionFitted]);
 
   return null;
@@ -1036,7 +1053,12 @@ function PlanningActionController({
           map.flyTo(coords[0], Math.max(map.getZoom(), 15), { duration: 0.45 });
         } else {
           const bounds = L.latLngBounds(coords);
-          map.fitBounds(bounds, { padding: [44, 44], maxZoom: 16, animate: true, duration: 0.45 });
+          map.fitBounds(bounds, {
+            padding: [44, 44],
+            maxZoom: MAP_ZOOM_MULTI_STORE_FOCUS,
+            animate: true,
+            duration: 0.45,
+          });
         }
         setMapUsefulPanTick?.((n) => n + 1);
       } catch (e) {

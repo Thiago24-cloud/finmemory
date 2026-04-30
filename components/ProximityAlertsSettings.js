@@ -21,6 +21,7 @@ import {
  * `pendingNames`: se omitido (undefined), carrega a lista automaticamente (útil em /settings).
  */
 export default function ProximityAlertsSettings({ userId, pendingNames: pendingNamesProp }) {
+  const PROXIMITY_ALARMS_AVAILABLE = false;
   const [isNative, setIsNative] = useState(false);
   const [platform, setPlatform] = useState('web');
   const [enabled, setEnabled] = useState(false);
@@ -70,6 +71,13 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
 
   useEffect(() => {
     if (!isNative || !userId) return;
+    if (!PROXIMITY_ALARMS_AVAILABLE) {
+      setEnabled(false);
+      setProximityAlertsStored(false);
+      setHint('Radar de alertas em segundo plano: Em breve.');
+      stopProximityMonitoring();
+      return undefined;
+    }
 
     if (!enabled) {
       stopProximityMonitoring();
@@ -125,7 +133,7 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
       cancelled = true;
       stopProximityMonitoring({ clearTargets: false });
     };
-  }, [isNative, userId, enabled, namesKey, pendingNames.length, radiusM]);
+  }, [isNative, userId, enabled, namesKey, pendingNames.length, radiusM, PROXIMITY_ALARMS_AVAILABLE]);
 
   const toggle = useCallback(async () => {
     const next = !enabled;
@@ -168,9 +176,8 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
           <div className="flex-1 min-w-0">
             <h2 className="text-sm font-bold text-[#333]">Alertas perto da loja</h2>
             <p className="text-xs text-gray-600 mt-1 leading-snug">
-              Esta função usa GPS e notificações em <strong>segundo plano</strong>. Só está disponível na{' '}
-              <strong>app FinMemory para Android ou iOS</strong> (instalada a partir da loja ou do build Capacitor),
-              não no site aberto no Chrome ou Safari.
+              Esta função usa GPS e notificações em <strong>segundo plano</strong> e está marcada como{' '}
+              <strong>Em breve</strong> no MVP atual.
             </p>
             <p className="text-xs text-gray-500 mt-2 leading-snug">
               No telemóvel: abre a app → <strong>Lista de compras</strong> ou <strong>Ajustes</strong> → ativa
@@ -198,13 +205,10 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-bold text-[#333]">Alertas perto da loja</h2>
           <p className="text-xs text-gray-500 mt-1 leading-snug">
-            Avisa quando estiver dentro do raio que escolher abaixo de um ponto do mapa com produto parecido com
-            os itens pendentes da lista. No Android aparece uma notificação persistente enquanto o monitor está
-            ativo; no iOS, permissão de localização &quot;Sempre&quot; dá o melhor resultado em segundo plano.
+            O mapeamento de preços com localização em primeiro plano continua ativo normalmente enquanto o app estiver aberto.
           </p>
           <p className="text-xs text-gray-500 mt-1 leading-snug">
-            Para funcionar com a tela desligada no Android: permita localização <strong>O tempo todo</strong> e
-            desative a otimização de bateria para o FinMemory nas configurações do aparelho.
+            Alertas em segundo plano estão temporariamente desativados no MVP para simplificar a publicação nas lojas.
           </p>
           {autoLoadList && listLoading ? (
             <p className="text-xs text-gray-400 mt-2 flex items-center gap-2">
@@ -219,7 +223,7 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
               id="finmemory-proximity-radius"
               value={radiusM}
               onChange={onRadiusChange}
-              disabled={busy}
+              disabled={busy || !PROXIMITY_ALARMS_AVAILABLE}
               className="w-full max-w-[220px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-[#333] focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent disabled:opacity-50"
             >
               {PROXIMITY_RADIUS_PRESETS.map((m) => {
@@ -244,17 +248,17 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
           </div>
           <button
             type="button"
-            onClick={toggle}
-            disabled={busy || !userId || listLoading}
+            onClick={PROXIMITY_ALARMS_AVAILABLE ? toggle : undefined}
+            disabled={busy || !userId || listLoading || !PROXIMITY_ALARMS_AVAILABLE}
             className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#2ECC49] hover:bg-[#22a83a] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {enabled ? 'Desativar alertas' : 'Ativar alertas de proximidade'}
+            {PROXIMITY_ALARMS_AVAILABLE ? (enabled ? 'Desativar alertas' : 'Ativar alertas de proximidade') : 'Em breve'}
           </button>
           <button
             type="button"
             onClick={runImmediateTest}
-            disabled={busy || !enabled || !userId || listLoading}
+            disabled={busy || !enabled || !userId || listLoading || !PROXIMITY_ALARMS_AVAILABLE}
             className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-[#116C2B] bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

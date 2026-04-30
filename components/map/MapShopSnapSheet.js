@@ -10,6 +10,12 @@ const SNAP = MAP_SHOP_SNAP;
 
 /** Desaceleração suave (perto do Maps) — sem “snap” seco */
 const TRANSITION = 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)';
+const DRAG_DEADZONE_PX_ANDROID = 3;
+const DRAG_DEADZONE_PX_IOS = 5;
+const SWIPE_VELOCITY_ANDROID = 0.5;
+const SWIPE_VELOCITY_IOS = 0.62;
+const SWIPE_DISTANCE_ANDROID = 52;
+const SWIPE_DISTANCE_IOS = 64;
 
 function pctForSnap(s) {
   if (s === 'expanded') return SNAP.expanded;
@@ -61,6 +67,15 @@ export default function MapShopSnapSheet({
   children,
   onVisualMetrics,
 }) {
+  const isIOS = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = String(navigator.userAgent || '').toLowerCase();
+    return /iphone|ipad|ipod/.test(ua);
+  }, []);
+  const dragDeadzonePx = isIOS ? DRAG_DEADZONE_PX_IOS : DRAG_DEADZONE_PX_ANDROID;
+  const swipeVelocityThreshold = isIOS ? SWIPE_VELOCITY_IOS : SWIPE_VELOCITY_ANDROID;
+  const swipeDistanceThreshold = isIOS ? SWIPE_DISTANCE_IOS : SWIPE_DISTANCE_ANDROID;
+
   const sheetRef = useRef(null);
   const gestureRef = useRef(null);
   const suppressClickRef = useRef(false);
@@ -109,15 +124,22 @@ export default function MapShopSnapSheet({
       const deltaPx = endY - startY;
       const duration = Date.now() - startT;
       const snapNow = sheetSnapRef.current;
+      const velocity = duration > 0 ? deltaPx / duration : 0;
 
       let nextSnap = snapNow;
 
-      if (Math.abs(deltaPx) < 15 && duration < 200 && snapNow === 'peek') {
+      if (Math.abs(deltaPx) < 12 && duration < 180 && snapNow === 'peek') {
         nextSnap = 'expanded';
-      } else if (deltaPx > 60) {
+      } else if (velocity >= swipeVelocityThreshold) {
+        // Swipe-down rápido fecha/recolhe sem exigir grande distância.
+        nextSnap = snapNow === 'expanded' ? 'peek' : 'closed';
+      } else if (velocity <= -swipeVelocityThreshold) {
+        // Swipe-up rápido expande imediatamente.
+        nextSnap = 'expanded';
+      } else if (deltaPx > swipeDistanceThreshold) {
         if (snapNow === 'expanded') nextSnap = 'peek';
         else if (snapNow === 'peek') nextSnap = 'closed';
-      } else if (deltaPx < -60) {
+      } else if (deltaPx < -swipeDistanceThreshold) {
         nextSnap = 'expanded';
       } else {
         nextSnap = nearestSnap(currentPct);
@@ -141,7 +163,7 @@ export default function MapShopSnapSheet({
       }
       requestAnimationFrame(() => reportVisualMetrics());
     },
-    [onRequestClose, onSheetSnapChange, reportVisualMetrics]
+    [onRequestClose, onSheetSnapChange, reportVisualMetrics, swipeDistanceThreshold, swipeVelocityThreshold]
   );
 
   useEffect(() => {
@@ -179,10 +201,11 @@ export default function MapShopSnapSheet({
       anchorPct: anchor,
       startY: y,
       startT: Date.now(),
+      engaged: false,
     };
     dragPctLiveRef.current = anchor;
-    draggingRef.current = true;
-    setIsDragging(true);
+    draggingRef.current = false;
+    setIsDragging(false);
     scheduleVisualMetrics();
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -194,9 +217,17 @@ export default function MapShopSnapSheet({
   const onPointerMove = (e) => {
     const g = gestureRef.current;
     if (!g || !e.isPrimary || e.pointerId !== g.pointerId) return;
+    const movedPx = e.clientY - g.startY;
+    if (!g.engaged && Math.abs(movedPx) < dragDeadzonePx) return;
+    if (!g.engaged) {
+      g.engaged = true;
+      draggingRef.current = true;
+      setIsDragging(true);
+    }
     const vh = typeof window !== 'undefined' ? window.innerHeight : 640;
-    const delta = ((e.clientY - g.startY) / vh) * 100;
-    const next = Math.min(100, Math.max(4, g.anchorPct + delta));
+    const delta = (movedPx / vh) * 100;
+    const minPct = isIOS ? 3 : 4;
+    const next = Math.min(100, Math.max(minPct, g.anchorPct + delta));
     dragPctLiveRef.current = next;
     // Aplica direto ao DOM — zero re-render por frame durante o arraste.
     if (sheetRef.current) {
@@ -217,6 +248,11 @@ export default function MapShopSnapSheet({
       /* ignore */
     }
     const endY = e.clientY;
+    if (!g.engaged) {
+      draggingRef.current = false;
+      setIsDragging(false);
+      return;
+    }
     const currentPct = dragPctLiveRef.current;
     resolveGestureEnd(g.startY, endY, g.startT, g.anchorPct, currentPct);
   };
@@ -234,8 +270,6 @@ export default function MapShopSnapSheet({
     }
     draggingRef.current = false;
     setIsDragging(false);
-    setDragTranslatePct(null);
-    draggingRef.current = false;
     dragPctLiveRef.current = pctForSnap(sheetSnapRef.current);
     if (sheetRef.current) sheetRef.current.style.transform = '';
     requestAnimationFrame(() => reportVisualMetrics());

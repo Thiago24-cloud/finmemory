@@ -1,8 +1,20 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Plus, Trash2, Check, Filter, MapPin, StickyNote, Navigation } from 'lucide-react';
+import {
+  ArrowLeft,
+  Loader2,
+  Plus,
+  Trash2,
+  Check,
+  Filter,
+  MapPin,
+  StickyNote,
+  Navigation,
+  Mic,
+  MicOff,
+} from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 import { getSupabase } from '../lib/supabase';
 import { useMapCart } from '../components/map/MapCartContext';
@@ -36,6 +48,52 @@ function itemInPeriod(item, period) {
   return true;
 }
 
+function normalizeUnit(rawUnit) {
+  const u = String(rawUnit || '').toLowerCase().trim();
+  if (!u) return null;
+  if (['kg', 'quilo', 'quilos'].includes(u)) return 'kg';
+  if (['g', 'grama', 'gramas'].includes(u)) return 'g';
+  if (['l', 'lt', 'litro', 'litros'].includes(u)) return 'l';
+  if (['ml', 'mililitro', 'mililitros'].includes(u)) return 'ml';
+  if (['dz', 'duzia', 'dúzia'].includes(u)) return 'dz';
+  if (['un', 'und', 'unidade', 'unidades'].includes(u)) return 'un';
+  if (['pacote', 'pacotes'].includes(u)) return 'pct';
+  if (['caixa', 'caixas'].includes(u)) return 'cx';
+  return u;
+}
+
+function parseVoiceItems(rawTranscript) {
+  const base = String(rawTranscript || '')
+    .toLowerCase()
+    .replace(/\b(eu|quero|comprar|preciso|coloca|coloque|botar|bota|adiciona|adicionar|na|no|lista|de compras|por favor)\b/g, ' ')
+    .replace(/[.!?;:]/g, ',')
+    .replace(/\s+e\s+/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!base) return /** @type {Array<{name:string, quantity:number, unit:string|null}>} */ ([]);
+  const parts = base.split(',').map((s) => s.trim()).filter((s) => s.length >= 2);
+  const dedupe = new Set();
+  const out = [];
+  for (const partRaw of parts) {
+    let part = partRaw;
+    let quantity = 1;
+    let unit = null;
+    const m = part.match(/^(\d+(?:[.,]\d+)?)\s*(kg|quilo|quilos|g|grama|gramas|l|lt|litro|litros|ml|mililitro|mililitros|un|und|unidade|unidades|duzia|dúzia|dz|pacote|pacotes|caixa|caixas)?\s*(?:de\s+)?(.+)$/i);
+    if (m) {
+      quantity = Number(String(m[1]).replace(',', '.')) || 1;
+      unit = normalizeUnit(m[2] || null);
+      part = String(m[3] || '').trim();
+    }
+    part = part.replace(/^(de|da|do|dos|das)\s+/i, '').trim();
+    if (part.length < 2) continue;
+    const key = `${part}|${quantity}|${unit || ''}`;
+    if (dedupe.has(key)) continue;
+    dedupe.add(key);
+    out.push({ name: part, quantity, unit });
+  }
+  return out;
+}
+
 export default function ShoppingListPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -51,6 +109,14 @@ export default function ShoppingListPage() {
   const [mapBagBanner, setMapBagBanner] = useState('');
   /** Compra imediata vs planeamento (semana/mês). */
   const [listBucket, setListBucket] = useState('now');
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceContinuous, setVoiceContinuous] = useState(false);
+  const [voicePulse, setVoicePulse] = useState(false);
+  const [voiceHint, setVoiceHint] = useState('');
+  const recognitionRef = useRef(null);
+  const voiceBusyRef = useRef(false);
+  const continuousAddedNamesRef = useRef([]);
   const { shoppingBag, shoppingBagTotals, clearSelectedProducts } = useMapCart();
 
   const userId = session?.user?.supabaseId || (typeof window !== 'undefined' && localStorage.getItem('user_id'));
@@ -62,6 +128,49 @@ export default function ShoppingListPage() {
     }
     fetchPartnershipAndItems();
   }, [userId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (!SpeechRecognition) {
+      setVoiceSupported(false);
+      return;
+    }
+    setVoiceSupported(true);
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      setVoiceListening(true);
+      setVoiceHint('Ouvindo... fale os itens separados por pausa ou "e".');
+    };
+    recognition.onerror = () => {
+      setVoiceListening(false);
+      setVoiceHint('Não foi possível captar o áudio. Tente novamente.');
+    };
+    recognition.onend = () => {
+      setVoiceListening(false);
+      if (voiceContinuous && recognitionRef.current && !voiceBusyRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch (_) {
+          setVoiceContinuous(false);
+        }
+      }
+    };
+    recognitionRef.current = recognition;
+    return () => {
+      recognitionRef.current = null;
+      try {
+        recognition.stop();
+      } catch (_) {
+        /* ignore */
+      }
+    };
+  }, [voiceContinuous]);
 
   const fetchPartnershipAndItems = async () => {
     const supabase = getSupabase();
@@ -250,6 +359,141 @@ export default function ShoppingListPage() {
     } finally {
       setAdding(false);
     }
+  };
+
+  const addNamedItem = async (supabase, rawName, quantityInput = 1, unitInput = null) => {
+    const name = String(rawName || '').trim();
+    if (!name) return;
+    const quantity = Number.isFinite(Number(quantityInput)) ? Math.max(1, Number(quantityInput)) : 1;
+    const unit = unitInput ? String(unitInput).trim() : null;
+    const { catalog_product_id, list_thumbnail_url } = await matchShoppingListProductFromCatalog(
+      supabase,
+      name
+    );
+    const row = {
+      partnership_id: partnership?.id ?? null,
+      owner_user_id: userId,
+      name,
+      added_by: userId,
+      source_type: 'note',
+      shopping_intent: listBucket === 'later' ? 'saved_deferred' : 'plan_today',
+      quantity,
+      unit,
+    };
+    if (catalog_product_id) row.catalog_product_id = catalog_product_id;
+    if (list_thumbnail_url) row.list_thumbnail_url = list_thumbnail_url;
+    await supabase.from('shopping_list_items').insert(row);
+  };
+
+  const handleVoiceAdd = async () => {
+    if (!voiceSupported || !recognitionRef.current || adding || !userId || voiceBusyRef.current) return;
+    setVoiceHint('');
+    voiceBusyRef.current = true;
+    recognitionRef.current.onresult = async (event) => {
+      const transcript = event?.results?.[0]?.[0]?.transcript || '';
+      const parsed = parseVoiceItems(transcript);
+      if (!parsed.length) {
+        setVoiceHint('Não entendi os itens. Ex.: "manga, mamão e uva".');
+        voiceBusyRef.current = false;
+        return;
+      }
+      setAdding(true);
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        for (const item of parsed) {
+          // serial para manter o mesmo fluxo de match do catálogo
+          // e evitar concorrência de inserts no mesmo estado de lista.
+          // eslint-disable-next-line no-await-in-loop
+          await addNamedItem(supabase, item.name, item.quantity, item.unit);
+        }
+        setVoiceHint(
+          `Adicionado por voz: ${parsed
+            .map((p) => `${p.quantity > 1 ? `${p.quantity}${p.unit ? ` ${p.unit}` : 'x'} ` : ''}${p.name}`)
+            .join(', ')}.`
+        );
+        setNewName('');
+        await fetchPartnershipAndItems();
+        if (voiceContinuous) {
+          continuousAddedNamesRef.current = [
+            ...new Set([...continuousAddedNamesRef.current, ...parsed.map((p) => p.name)]),
+          ];
+        } else if (listBucket === 'now') {
+          const voiced = parsed.map((p) => p.name);
+          const mergedNames = [...new Set([...pendingNoteNamesForMap, ...voiced])];
+          const q = mergedNames.slice(0, 12).join(',');
+          router.push(q ? `/mapa?lista=${encodeURIComponent(q)}` : '/mapa');
+        }
+      } finally {
+        setAdding(false);
+        voiceBusyRef.current = false;
+      }
+    };
+    try {
+      recognitionRef.current.start();
+    } catch (_) {
+      setVoiceHint('Microfone indisponível no momento.');
+      voiceBusyRef.current = false;
+    }
+  };
+
+  const beep = useCallback((kind = 'start') => {
+    if (typeof window === 'undefined') return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    try {
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = kind === 'start' ? 980 : 520;
+      gain.gain.value = 0.0001;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const now = ctx.currentTime;
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+      osc.start(now);
+      osc.stop(now + 0.14);
+      setTimeout(() => {
+        try {
+          ctx.close();
+        } catch (_) {
+          /* ignore */
+        }
+      }, 240);
+    } catch (_) {
+      /* ignore (autoplay block / device policy) */
+    }
+  }, []);
+
+  const handleToggleContinuousVoice = async () => {
+    if (!voiceSupported || !recognitionRef.current || adding || !userId) return;
+    if (voiceContinuous) {
+      setVoiceContinuous(false);
+      setVoicePulse(false);
+      try {
+        recognitionRef.current.stop();
+      } catch (_) {
+        /* ignore */
+      }
+      beep('stop');
+      if (listBucket === 'now' && continuousAddedNamesRef.current.length > 0) {
+        const mergedNames = [...new Set([...pendingNoteNamesForMap, ...continuousAddedNamesRef.current])];
+        continuousAddedNamesRef.current = [];
+        const q = mergedNames.slice(0, 12).join(',');
+        router.push(q ? `/mapa?lista=${encodeURIComponent(q)}` : '/mapa');
+      }
+      setVoiceHint('Escuta contínua encerrada.');
+      return;
+    }
+    continuousAddedNamesRef.current = [];
+    setVoiceContinuous(true);
+    setVoicePulse(true);
+    beep('start');
+    setTimeout(() => setVoicePulse(false), 260);
+    setVoiceHint('Escuta contínua ativa. Fale itens em sequência. Toque em "Parar" para finalizar.');
+    await handleVoiceAdd();
   };
 
   const handleMoveItemBucket = async (item, target) => {
@@ -471,8 +715,44 @@ export default function ShoppingListPage() {
           >
             <Plus className="h-6 w-6" />
           </button>
+          <button
+            type="button"
+            onClick={handleVoiceAdd}
+            disabled={!voiceSupported || voiceListening || adding || voiceContinuous}
+            className="shrink-0 rounded-xl border border-gray-300 bg-white p-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            aria-label="Adicionar por voz"
+            title={
+              voiceSupported
+                ? 'Adicionar itens por voz'
+                : 'Reconhecimento de voz não suportado neste navegador'
+            }
+          >
+            {voiceListening ? <MicOff className="h-6 w-6 text-red-600" /> : <Mic className="h-6 w-6" />}
+          </button>
+          <button
+            type="button"
+            onClick={handleToggleContinuousVoice}
+            disabled={!voiceSupported || adding}
+            className={`shrink-0 rounded-xl px-3 text-xs font-bold ${
+              voiceContinuous
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+            } disabled:opacity-50`}
+          >
+            {voiceContinuous ? 'Parar' : '🎤 contínuo'}
+          </button>
         </form>
-        <p className="mb-4 text-[10px] text-gray-400">Tentamos achar foto no catálogo.</p>
+        {voicePulse ? (
+          <p className="mb-2 mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+            <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-emerald-600" />
+            microfone ativo
+          </p>
+        ) : null}
+        <p className="mb-1 text-[10px] text-gray-400">Tentamos achar foto no catálogo.</p>
+        <p className="mb-4 text-[10px] text-gray-400">
+          Dica voz: toque no microfone e diga, por exemplo, "manga, mamão e uva".
+        </p>
+        {voiceHint ? <p className="mb-3 text-xs font-medium text-emerald-700">{voiceHint}</p> : null}
 
         {listBucket === 'now' && pendingNoteNamesForMap.length > 0 ? (
           <Link

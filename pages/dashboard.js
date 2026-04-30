@@ -28,6 +28,7 @@ import {
   setDashboardOnboardingDoneLocal,
 } from '../lib/dashboardOnboardingStorage';
 import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
+import { normalizePluggyMoney } from '../lib/pluggyMoney';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
 let supabaseInstance = null;
@@ -85,6 +86,14 @@ function dedupePluggyTransactions(rows) {
     seen.add(key);
     return true;
   });
+}
+
+function getTransactionTotalForDashboard(row) {
+  const raw = Number(row?.total) || 0;
+  if (String(row?.source || '').toLowerCase() === 'pluggy') {
+    return normalizePluggyMoney(raw);
+  }
+  return raw;
 }
 
 function getLatestYear(monthKeys) {
@@ -914,7 +923,7 @@ export default function Dashboard() {
     (filteredTransactions || []).length > 0 || openFinanceTransactionsForMonth.length > 0;
 
   const totalBalance = useMemo(() => {
-    return (filteredTransactions || []).reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+    return (filteredTransactions || []).reduce((sum, t) => sum + getTransactionTotalForDashboard(t), 0);
   }, [filteredTransactions]);
   const balanceLoading = loading && (transactions || []).length === 0;
 

@@ -38,6 +38,7 @@ import {
 import { pickOpenFinanceEssentialFields } from '../../lib/openFinanceTransactionEssentials';
 import { useCalculatorDockOptional } from './CalculatorDockContext';
 import { CALC_DRAG_MIME } from '../../lib/calcDragMime';
+import { normalizePluggyMoney } from '../../lib/pluggyMoney';
 
 function categoryIconOpenFinance(category) {
   const c = (category || '').toLowerCase();
@@ -108,6 +109,14 @@ function formatDateShort(dateStr) {
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+function getFinMemoryDisplayTotal(transaction) {
+  const raw = Number(transaction?.total) || 0;
+  if (String(transaction?.source || '').toLowerCase() === 'pluggy') {
+    return normalizePluggyMoney(raw);
+  }
+  return raw;
 }
 
 function isTransactionNew(transaction) {
@@ -326,7 +335,7 @@ export function UnifiedHistoryList({
         <h2 className="text-lg font-semibold text-[#333] m-0">Histórico</h2>
         <span className="text-sm text-[#666] tabular-nums">{totalRows} movimento(s)</span>
       </div>
-      <p className="text-xs text-[#666] -mt-4 mb-1">
+      <p className="text-[11px] text-[#666] -mt-4 mb-1">
         Toque na linha da <strong>nota</strong> para abrir; no <strong>nome</strong> para renomear. Só banco: ícone de
         informação para dados resumidos.
         {calcDock
@@ -368,10 +377,10 @@ export function UnifiedHistoryList({
 
       {visibleGroups.map(({ dateKey, items }) => (
         <section key={dateKey}>
-          <h3 className="text-[11px] font-semibold text-[#a3a3a3] uppercase tracking-wide mb-2 px-0.5">
+          <h3 className="text-[10px] font-semibold text-[#a3a3a3] uppercase tracking-wide mb-1.5 px-0.5">
             {formatDateLabel(dateKey)}
           </h3>
-          <ul className="rounded-3xl border border-[#e8e8e8] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-[#f0f0f0]">
+          <ul className="rounded-2xl border border-[#e8e8e8] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-[#f0f0f0]">
             {items.map(({ kind, data: t }) => {
               if (kind === 'openfinance') {
                 const isCredit = t.type === 'CREDIT';
@@ -382,15 +391,15 @@ export function UnifiedHistoryList({
                 const ofAmount = Math.abs(Number(t.amount));
                 return (
                   <li key={`of-${t.id}`} className="bg-white">
-                    <div className="flex items-center gap-3 px-3 py-3.5">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${bgClass}`}>
-                        <Icon className={`h-5 w-5 ${colorClass}`} aria-hidden />
+                    <div className="flex items-center gap-2.5 px-2.5 py-2.5">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${bgClass}`}>
+                        <Icon className={`h-4 w-4 ${colorClass}`} aria-hidden />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-[#111] text-[15px] leading-snug truncate">
+                        <p className="font-semibold text-[#111] text-[14px] leading-snug truncate">
                           {t.description || 'Sem descrição'}
                         </p>
-                        <p className="text-xs text-[#888] truncate mt-0.5">
+                        <p className="text-[11px] text-[#888] truncate mt-0.5">
                           {[t.category, t.account_name].filter(Boolean).join(' · ')}
                         </p>
                       </div>
@@ -413,11 +422,11 @@ export function UnifiedHistoryList({
                                   e
                                 )
                               }
-                              className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
+                              className="min-h-[28px] min-w-[28px] p-1 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
                               title="Somar na calculadora"
                               aria-label="Somar na calculadora"
                             >
-                              <Plus className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
+                              <Plus className="h-3 w-3 text-emerald-600" aria-hidden />
                             </button>
                             <button
                               type="button"
@@ -430,11 +439,11 @@ export function UnifiedHistoryList({
                                   e
                                 )
                               }
-                              className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
+                              className="min-h-[28px] min-w-[28px] p-1 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
                               title="Subtrair na calculadora"
                               aria-label="Subtrair na calculadora"
                             >
-                              <Minus className="h-3.5 w-3.5 text-red-600" aria-hidden />
+                              <Minus className="h-3 w-3 text-red-600" aria-hidden />
                             </button>
                           </div>
                         )}
@@ -442,7 +451,7 @@ export function UnifiedHistoryList({
                           <button
                             type="button"
                               className={cn(
-                                `text-[15px] font-semibold tabular-nums ${colorClass} rounded-lg px-2 py-1 -mr-1 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left`,
+                                `text-[14px] font-semibold tabular-nums ${colorClass} rounded-lg px-1.5 py-0.5 -mr-1 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left`,
                                 calcFeedbackRowId === `of-${t.id}` && 'ring-2 ring-[#2ECC49]/35 bg-emerald-50/60'
                               )}
                             title="Toque para somar na calculadora · Arraste até à calculadora"
@@ -479,7 +488,7 @@ export function UnifiedHistoryList({
                             {formatMoneyAbs(t.amount)}
                           </button>
                         ) : (
-                          <span className={`text-[15px] font-semibold tabular-nums ${colorClass}`}>
+                          <span className={`text-[14px] font-semibold tabular-nums ${colorClass}`}>
                             {isCredit ? '+' : '−'}
                             {formatMoneyAbs(t.amount)}
                           </span>
@@ -487,11 +496,11 @@ export function UnifiedHistoryList({
                         <button
                           type="button"
                           onClick={() => setOpenFinanceDetail(pickOpenFinanceEssentialFields(t))}
-                          className="p-2 rounded-full text-[#999] hover:bg-[#f3f4f6] hover:text-[#333]"
+                          className="p-1.5 rounded-full text-[#999] hover:bg-[#f3f4f6] hover:text-[#333]"
                           title="Resumo do movimento no banco"
                           aria-label="Ver resumo do banco"
                         >
-                          <Info className="h-4 w-4" />
+                          <Info className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
@@ -500,7 +509,7 @@ export function UnifiedHistoryList({
               }
 
               const transaction = t;
-              const total = Number(transaction.total) || 0;
+              const total = getFinMemoryDisplayTotal(transaction);
               const isIncome = total < 0;
               const displayValue = Math.abs(total);
               const rawName =
@@ -527,15 +536,15 @@ export function UnifiedHistoryList({
                       if (!isEditing) router.push(`/transaction/${transaction.id}`);
                     }}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-3.5 cursor-pointer active:bg-[#fafafa]',
+                      'flex items-center gap-2.5 px-2.5 py-2.5 cursor-pointer active:bg-[#fafafa]',
                       isNew && !isEditing && 'shadow-[inset_0_0_0_2px_rgba(46,204,73,0.35)]'
                     )}
                   >
                     <div
-                      className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-white"
+                      className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-white"
                       style={{ backgroundColor: iconBg }}
                     >
-                      <IconFm className="h-5 w-5" aria-hidden />
+                      <IconFm className="h-4 w-4" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
@@ -564,7 +573,7 @@ export function UnifiedHistoryList({
                         ) : (
                           <p
                             className={cn(
-                              'font-semibold text-[#111] text-[15px] leading-snug truncate flex-1 cursor-text',
+                              'font-semibold text-[#111] text-[14px] leading-snug truncate flex-1 cursor-text',
                               isNew && 'font-bold'
                             )}
                             onClick={(e) => {
@@ -594,11 +603,11 @@ export function UnifiedHistoryList({
                                     e
                                   )
                                 }
-                                className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
+                              className="min-h-[28px] min-w-[28px] p-1 rounded-lg border border-[#e5e7eb] bg-white hover:bg-emerald-50 hover:border-emerald-200 active:scale-95"
                                 title="Somar na calculadora"
                                 aria-label="Somar na calculadora"
                               >
-                                <Plus className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
+                                <Plus className="h-3 w-3 text-emerald-600" aria-hidden />
                               </button>
                               <button
                                 type="button"
@@ -611,11 +620,11 @@ export function UnifiedHistoryList({
                                     e
                                   )
                                 }
-                                className="min-h-[34px] min-w-[34px] p-1.5 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
+                                className="min-h-[28px] min-w-[28px] p-1 rounded-lg border border-[#e5e7eb] bg-white hover:bg-red-50 hover:border-red-200 active:scale-95"
                                 title="Subtrair na calculadora"
                                 aria-label="Subtrair na calculadora"
                               >
-                                <Minus className="h-3.5 w-3.5 text-red-600" aria-hidden />
+                                <Minus className="h-3 w-3 text-red-600" aria-hidden />
                               </button>
                             </div>
                           )}
@@ -623,7 +632,7 @@ export function UnifiedHistoryList({
                             <button
                               type="button"
                               className={cn(
-                                'text-[15px] font-semibold tabular-nums shrink-0 whitespace-nowrap rounded-lg px-2 py-1 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left',
+                                'text-[14px] font-semibold tabular-nums shrink-0 whitespace-nowrap rounded-lg px-1.5 py-0.5 hover:bg-black/[0.05] active:scale-[0.98] cursor-pointer select-none text-left',
                                 calcFeedbackRowId === `fm-${transaction.id}` && 'ring-2 ring-[#2ECC49]/35 bg-emerald-50/60',
                                 isIncome ? 'text-emerald-600' : 'text-red-600'
                               )}
@@ -663,7 +672,7 @@ export function UnifiedHistoryList({
                           ) : (
                             <span
                               className={cn(
-                                'text-[15px] font-semibold tabular-nums shrink-0 whitespace-nowrap',
+                                'text-[14px] font-semibold tabular-nums shrink-0 whitespace-nowrap',
                                 isIncome ? 'text-emerald-600' : 'text-red-600'
                               )}
                             >
@@ -673,32 +682,32 @@ export function UnifiedHistoryList({
                           )}
                         </div>
                       </div>
-                      <p className="text-xs text-[#888] truncate mt-0.5">
+                      <p className="text-[11px] text-[#888] truncate mt-0.5">
                         {[transaction.categoria, numItens > 0 ? `${numItens} itens` : null].filter(Boolean).join(' · ')}
                         {numItens === 0 ? ` · ${formatDateShort(transaction.data)}` : ''}
                       </p>
                     </div>
                   </div>
                   {userId && (
-                    <div className="flex items-center justify-end gap-1 px-3 py-2 border-t border-[#f3f4f6] bg-[#fafafa] flex-wrap">
+                    <div className="flex items-center justify-end gap-1 px-2.5 py-1.5 border-t border-[#f3f4f6] bg-[#fafafa] flex-wrap">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           shareWhatsAppSummary(transaction);
                         }}
-                        className="p-2 rounded-xl text-[#25D366] hover:bg-[#dcfce7] flex items-center gap-1"
+                        className="p-1.5 rounded-lg text-[#25D366] hover:bg-[#dcfce7] flex items-center gap-1"
                       >
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.884 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
                         </svg>
-                        <span className="text-xs font-medium">WhatsApp</span>
+                        <span className="text-[11px] font-medium">WhatsApp</span>
                       </button>
                       <Link
                         prefetch={false}
                         href={`/transaction/${transaction.id}/edit`}
                         onClick={(e) => e.stopPropagation()}
-                        className="p-2 rounded-xl text-[#666] hover:bg-[#e5e7eb]"
+                        className="p-1.5 rounded-lg text-[#666] hover:bg-[#e5e7eb]"
                       >
                         <Pencil className="h-4 w-4" />
                       </Link>
@@ -709,7 +718,7 @@ export function UnifiedHistoryList({
                             e.stopPropagation();
                             setConfirmId(transaction.id);
                           }}
-                          className="p-2 rounded-xl text-[#666] hover:bg-red-50 hover:text-red-600"
+                          className="p-1.5 rounded-lg text-[#666] hover:bg-red-50 hover:text-red-600"
                           disabled={isDeleting}
                         >
                           <Trash2 className="h-4 w-4" />

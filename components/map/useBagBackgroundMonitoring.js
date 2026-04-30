@@ -1,14 +1,6 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
-import { getSupabase } from '../../lib/supabase';
-import {
-  getProximityAlertsStored,
-  getProximityRadiusM,
-  startProximityMonitoring,
-  stopProximityMonitoring,
-} from '../../lib/proximity/proximityAlerts';
 
 export function useBagBackgroundMonitoring(shoppingBag = []) {
   const pendingProductNames = useMemo(() => {
@@ -24,6 +16,9 @@ export function useBagBackgroundMonitoring(shoppingBag = []) {
   const namesKey = useMemo(() => pendingProductNames.join('\u0000'), [pendingProductNames]);
 
   useEffect(() => {
+    // MVP simplificado: monitoramento/alarmes em segundo plano desativados.
+    // Mantemos o código antigo comentado para reativação futura sem retrabalho.
+    /*
     let cancelled = false;
 
     (async () => {
@@ -62,6 +57,8 @@ export function useBagBackgroundMonitoring(shoppingBag = []) {
       cancelled = true;
       stopProximityMonitoring({ clearTargets: false });
     };
+    */
+    return undefined;
   }, [namesKey, pendingProductNames]);
 }
 
