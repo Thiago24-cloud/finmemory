@@ -20,6 +20,24 @@ build/
 .vite/
 coverage/
 
+# Capacitor / Vite webDir output (gerado localmente por `vite build` / `npm run build:mobile`)
+www/assets/
+www/sw.js
+www/favicon.ico
+www/logo.png
+www/logos/
+www/map-logos/
+www/manifest.webmanifest
+www/manifest-admin.webmanifest
+www/placeholder.svg
+www/robots.txt
+www/simulador-mocks/
+www/install-guide/
+
+# Android signing material (nunca versionar)
+*.jks
+*.keystore
+
 # Vercel / Netlify / Firebase
 .vercel/
 .netlify/

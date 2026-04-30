@@ -3,6 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      window.onerror = function(msg, src, line, col, err) {
+        var s = '[FM_ERR] ' + msg + ' | src=' + src + ' | line=' + line + ' | col=' + col + ' | stack=' + (err && err.stack ? err.stack.substring(0,600) : 'none');
+        console.error(s);
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        var r = e.reason; var s = '[FM_REJ] ' + String(r) + ' | stack=' + (r && r.stack ? String(r.stack).substring(0,600) : 'none');
+        console.error(s);
+      });
+    </script>
     <!-- TODO: Set the document title to the name of your application -->
     <title>Lovable App</title>
     <meta name="description" content="Lovable Generated Project" />
