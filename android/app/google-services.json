@@ -16,31 +16,6 @@
       "api_key": [
         {
           "current_key": "AIzaSyBeN5tP020Dtgfbu39pQ05FASysLHPT2Yk"
-        },
-        {
-          "current_key": "AIzaSyDuOLVD1M5k7brPd_Dr8DDs2sOA0Zof30Q"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:836908221936:android:c06e86ba398d4807ed8935",
-        "android_client_info": {
-          "package_name": "com.finmemory.app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBeN5tP020Dtgfbu39pQ05FASysLHPT2Yk"
-        },
-        {
-          "current_key": "AIzaSyDuOLVD1M5k7brPd_Dr8DDs2sOA0Zof30Q"
         }
       ],
       "services": {
