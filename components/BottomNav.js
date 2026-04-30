@@ -2,16 +2,21 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import { Map, BarChart3, User, ScanLine, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BOTTOM_NAV } from '../lib/appMicrocopy';
 import { useMapCart } from './map/MapCartContext';
+import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 
 export function BottomNav() {
   const router = useRouter();
+  const { data: session } = useSession();
   const pathname = router.pathname;
   const { shoppingBagTotals } = useMapCart();
   const bagCount = Number(shoppingBagTotals?.itemsCount || 0);
+  const restrictedFeaturesAllowed = canUseRestrictedFeatures(session?.user?.email);
+  const mapHref = restrictedFeaturesAllowed ? '/mapa' : '/em-breve';
 
   const tabBtn = (active) =>
     cn(
@@ -25,7 +30,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-border/50 safe-area-bottom">
       <div className="max-w-md mx-auto relative flex items-end justify-between h-[4.5rem] px-2 pb-1">
         <div className="flex flex-1 justify-start items-end gap-0.5 sm:gap-1 pl-0.5">
-          <button type="button" onClick={() => router.push('/mapa')} className={tabBtn(pathname === '/mapa')}>
+          <button type="button" onClick={() => router.push(mapHref)} className={tabBtn(pathname === '/mapa')}>
             <Map className={cn('h-5 w-5 transition-transform', pathname === '/mapa' && 'scale-110')} />
             {bagCount > 0 ? (
               <span className="absolute -top-1 right-0 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white shadow-sm">

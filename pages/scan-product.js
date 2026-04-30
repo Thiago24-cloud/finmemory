@@ -8,6 +8,7 @@ import { BottomNav } from '../components/BottomNav';
 import { ProductBarcodeScanner } from '../components/ProductBarcodeScanner';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
+import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 import { getOpenFoodFactsImageUrl } from '../lib/productImageUrl';
 import { cn } from '../lib/utils';
 import { digitsOnly, isValidRetailBarcode } from '../lib/validateGtin';
@@ -21,6 +22,9 @@ export async function getServerSideProps(ctx) {
     const allowed = await canAccess(session.user.email);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    if (!canUseRestrictedFeatures(session.user.email)) {
+      return { redirect: { destination: '/em-breve', permanent: false } };
     }
     return { props: {} };
   } catch (err) {

@@ -2,9 +2,33 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, Loader2, Users, Copy, Check } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
 import { getSupabase } from '../lib/supabase';
+import { authOptions } from './api/auth/[...nextauth]';
+import { canAccess } from '../lib/access-server';
+import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
+
+export async function getServerSideProps(ctx) {
+  try {
+    const session = await getServerSession(ctx.req, ctx.res, authOptions);
+    if (!session?.user?.email) {
+      return { redirect: { destination: '/login?callbackUrl=/partnership', permanent: false } };
+    }
+    const allowed = await canAccess(session.user.email);
+    if (!allowed) {
+      return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    if (!canUseRestrictedFeatures(session.user.email)) {
+      return { redirect: { destination: '/em-breve', permanent: false } };
+    }
+    return { props: {} };
+  } catch (err) {
+    console.error('[partnership getServerSideProps]', err);
+    return { redirect: { destination: '/login?callbackUrl=/partnership', permanent: false } };
+  }
+}
 
 export default function PartnershipPage() {
   const router = useRouter();

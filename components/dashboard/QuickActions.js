@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { BarChart3, Tags, Users, List, ScanBarcode, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { QUICK_ACTION_TITLE } from '../../lib/appMicrocopy';
+import { canUseRestrictedFeatures } from '../../lib/restrictedFeatureAccess';
 
 const SECONDARY_ACTIONS = [
   {
@@ -57,6 +59,19 @@ const SECONDARY_ACTIONS = [
  * Atalhos — grelha (NF-e no centro da barra).
  */
 export function QuickActions({ className }) {
+  const { data: session } = useSession();
+  const restrictedFeaturesAllowed = canUseRestrictedFeatures(session?.user?.email);
+
+  const actions = SECONDARY_ACTIONS.map((action) => {
+    if (
+      restrictedFeaturesAllowed ||
+      !['/scan-product', '/partnership', '/shopping-list'].includes(action.href)
+    ) {
+      return action;
+    }
+    return { ...action, href: '/em-breve' };
+  });
+
   const secondaryBtn =
     'flex flex-col items-center gap-2 w-full max-w-[92px] mx-auto hover:-translate-y-0.5 transition-transform duration-200';
   const secondaryBtnWide =
@@ -69,7 +84,7 @@ export function QuickActions({ className }) {
         role="navigation"
         aria-label="Mais ações"
       >
-        {SECONDARY_ACTIONS.map(({ href, label, title, Icon, wrapClass, labelClass, wide }) => (
+        {actions.map(({ href, label, title, Icon, wrapClass, labelClass, wide }) => (
           <Link
             key={href}
             href={href}

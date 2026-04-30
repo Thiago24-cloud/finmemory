@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth/next';
 import {
   ArrowLeft,
   Loader2,
@@ -24,6 +25,29 @@ import {
   SHOPPING_LIST_FILTER_PERIOD,
   SHOPPING_LIST_FILTER_UI,
 } from '../lib/appMicrocopy';
+import { authOptions } from './api/auth/[...nextauth]';
+import { canAccess } from '../lib/access-server';
+import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
+
+export async function getServerSideProps(ctx) {
+  try {
+    const session = await getServerSession(ctx.req, ctx.res, authOptions);
+    if (!session?.user?.email) {
+      return { redirect: { destination: '/login?callbackUrl=/shopping-list', permanent: false } };
+    }
+    const allowed = await canAccess(session.user.email);
+    if (!allowed) {
+      return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    if (!canUseRestrictedFeatures(session.user.email)) {
+      return { redirect: { destination: '/em-breve', permanent: false } };
+    }
+    return { props: {} };
+  } catch (err) {
+    console.error('[shopping-list getServerSideProps]', err);
+    return { redirect: { destination: '/login?callbackUrl=/shopping-list', permanent: false } };
+  }
+}
 
 function itemInPeriod(item, period) {
   const d = item.created_at ? new Date(item.created_at) : null;

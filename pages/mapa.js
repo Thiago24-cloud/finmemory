@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
+import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 import { MAP_THEMES, MAP_THEME_STORAGE_KEY } from '../lib/colors';
 import { useMatchMedia } from '../lib/useMatchMedia';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
@@ -59,6 +60,9 @@ export async function getServerSideProps(ctx) {
     const allowed = await canAccess(session.user.email);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    if (!canUseRestrictedFeatures(session.user.email)) {
+      return { redirect: { destination: '/em-breve', permanent: false } };
     }
     return { props: {} };
   } catch (err) {
