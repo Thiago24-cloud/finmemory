@@ -11,14 +11,14 @@ function getStripe() {
 }
 
 /**
- * Inicia Checkout Stripe (FinMemory Plus). O utilizador tem de estar logado; o servidor usa a sessão NextAuth.
+ * Inicia Checkout Stripe (FinMemory planos pagos). O utilizador tem de estar logado; o servidor usa a sessão NextAuth.
  * Props opcionais userId / userEmail reservadas para analytics futuros (não são enviadas ao servidor aqui).
  */
 export default function UpgradeButton({
   className = '',
   children,
-  /** @type {'plus' | 'pro' | 'familia'} */
-  plan = 'plus',
+  /** @type {'pro' | 'familia' | 'enterprise'} */
+  plan = 'pro',
   userId: _userId,
   userEmail: _userEmail,
 }) {
@@ -79,7 +79,7 @@ export default function UpgradeButton({
   return (
     <div>
       <button type="button" className={className} onClick={onClick} disabled={loading}>
-        {loading ? 'A abrir…' : children || 'FinMemory Plus'}
+        {loading ? 'A abrir…' : children || 'Assinar FinMemory'}
       </button>
       {err ? (
         <p className="mt-1 text-sm text-red-600" role="alert">

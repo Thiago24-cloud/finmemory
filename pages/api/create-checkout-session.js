@@ -16,7 +16,7 @@ function baseUrl() {
 
 /**
  * POST /api/create-checkout-session
- * Body JSON opcional: { "plan": "plus" | "pro" | "familia" } (default plus).
+ * Body JSON opcional: { "plan": "pro" | "familia" | "enterprise" } (default pro).
  * Price IDs só vêm de variáveis de ambiente no servidor.
  */
 export default async function handler(req, res) {

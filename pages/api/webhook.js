@@ -73,10 +73,12 @@ async function syncUserFromSubscription(supabase, stripe, subscription) {
   let resolvedPlan = 'free';
   if (active) {
     if (planFromPrice) resolvedPlan = planFromPrice;
-    else if (planMeta === 'plus' || planMeta === 'pro' || planMeta === 'familia') resolvedPlan = planMeta;
+    else if (planMeta === 'pro' || planMeta === 'familia' || planMeta === 'família' || planMeta === 'enterprise') {
+      resolvedPlan = planMeta === 'família' ? 'familia' : planMeta;
+    }
     else if (priceId) {
       console.warn('[stripe/webhook] price id sem mapeamento nas env STRIPE_*_PRICE_ID:', priceId);
-      resolvedPlan = 'plus';
+      resolvedPlan = 'pro';
     }
   }
 
@@ -121,7 +123,7 @@ async function syncUserFromSubscription(supabase, stripe, subscription) {
 }
 
 /**
- * POST /api/webhook — eventos Stripe (assinaturas Plus / Pro / Família).
+ * POST /api/webhook — eventos Stripe (assinaturas Pro / Família / Enterprise).
  * Stripe → Webhooks → URL: https://finmemory.com.br/api/webhook
  */
 export default async function handler(req, res) {

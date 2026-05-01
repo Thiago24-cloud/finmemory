@@ -12,7 +12,7 @@ import { PLAN_LABELS } from '../lib/planAccess';
 import { BRAND } from '../lib/brandTokens';
 
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
-const UpgradePlus = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
+const UpgradePlan = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -231,8 +231,8 @@ export default function SettingsPage() {
         {status === 'authenticated' && userId ? (
           <PlanGuard
             feature="radar"
-            title="Radar de Ofertas — Plano Plus"
-            body="Receba alertas quando estiver perto de lojas com promoções da sua lista. Disponível no plano Plus."
+            title="Radar de Ofertas — Plano Pro"
+            body="Receba alertas quando estiver perto de lojas com promoções da sua lista. Disponível no plano Pro."
             className="mb-4"
           >
             <ProximityAlertsSettings userId={userId} />
@@ -273,7 +273,7 @@ export default function SettingsPage() {
           <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <h2 className="text-base font-semibold text-gray-900">Planos FinMemory</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Assinatura no Stripe — Plus, Pro ou Família. Os preços vêm do Stripe Checkout.
+              Assinatura no Stripe — Pro, Família ou Enterprise. Os preços vêm do Stripe Checkout.
             </p>
             <button
               type="button"
@@ -283,31 +283,31 @@ export default function SettingsPage() {
               Ver planos disponíveis
             </button>
             <div className="mt-4 flex flex-col gap-2">
-              <UpgradePlus
-                plan="plus"
+              <UpgradePlan
+                plan="pro"
                 userId={session.user.supabaseId}
                 userEmail={session.user.email}
                 className="w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white"
               >
-                Assinar Plus — R$ 9,90/mês
-              </UpgradePlus>
-              <UpgradePlus
-                plan="pro"
+                Assinar Pro — R$ 24,90/mês
+              </UpgradePlan>
+              <UpgradePlan
+                plan="familia"
                 userId={session.user.supabaseId}
                 userEmail={session.user.email}
                 className="w-full rounded-lg border border-gray-900 bg-white py-2 text-sm font-semibold text-gray-900"
               >
-                Assinar Pro — R$ 19,90/mês
-              </UpgradePlus>
-              <UpgradePlus
-                plan="familia"
+                Assinar Família — R$ 99,90/mês
+              </UpgradePlan>
+              <UpgradePlan
+                plan="enterprise"
                 userId={session.user.supabaseId}
                 userEmail={session.user.email}
                 className="w-full rounded-lg py-2 text-sm font-semibold text-white"
                 style={{ backgroundColor: BRAND.primary }}
               >
-                Assinar Família — R$ 29,90/mês
-              </UpgradePlus>
+                Assinar Enterprise — R$ 17,90/mês
+              </UpgradePlan>
             </div>
           </div>
         ) : null}

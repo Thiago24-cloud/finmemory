@@ -214,28 +214,28 @@ export default function PlanosPage() {
             </button>
           </div>
 
-          {/* Plus */}
+          {/* Enterprise */}
           <div className={cardBase}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Plus</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Enterprise</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">
-              R$ 9,90<span className="text-sm font-normal text-gray-500"> / mês</span>
+              R$ 17,90<span className="text-sm font-normal text-gray-500"> / mês</span>
             </p>
             <ul className="mt-4 space-y-2 flex-1">
-              <Li>Tudo do plano Grátis</Li>
-              <Li>NFC-e ilimitado</Li>
-              <Li>Radar de ofertas (perto de si)</Li>
-              <Li>Histórico completo</Li>
-              <Li>Categorias ilimitadas</Li>
-              <LiOff>Open Finance</LiOff>
+              <Li>Tudo do Pro</Li>
+              <Li>Open Finance — até 3 bancos conectados</Li>
+              <Li>Onboarding guiado pelo escritório parceiro</Li>
+              <Li>Acesso exclusivo via link do contador</Li>
+              <Li>Canal de distribuição para escritórios</Li>
+              <Li>Comissão de 25% ao parceiro contador</Li>
             </ul>
             {authed ? (
               <UpgradeBtn
-                plan="plus"
+                plan="enterprise"
                 userId={session.user.supabaseId}
                 userEmail={session.user.email}
                 className="mt-6 w-full rounded-lg bg-gradient-to-r from-gray-900 to-gray-800 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-gray-800 hover:to-gray-900"
               >
-                Assinar Plus
+                Assinar Enterprise
               </UpgradeBtn>
             ) : (
               <p className="mt-6 text-center text-sm text-gray-500">A carregar…</p>
@@ -249,10 +249,10 @@ export default function PlanosPage() {
             </span>
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 mt-2">Pro</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">
-              R$ 19,90<span className="text-sm font-normal text-gray-500"> / mês</span>
+              R$ 24,90<span className="text-sm font-normal text-gray-500"> / mês</span>
             </p>
             <ul className="mt-4 space-y-2 flex-1">
-              <Li>Tudo do Plus</Li>
+              <Li>Tudo do Free</Li>
               <Li>Open Finance</Li>
               <Li>Scanner EAN</Li>
               <Li>Histórico de preços</Li>
@@ -277,15 +277,15 @@ export default function PlanosPage() {
           <div className={cardBase}>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Família</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">
-              R$ 29,90<span className="text-sm font-normal text-gray-500"> / mês</span>
+              R$ 99,90<span className="text-sm font-normal text-gray-500"> / mês</span>
             </p>
             <ul className="mt-4 space-y-2 flex-1">
               <Li>Tudo do Pro</Li>
               <Li>Até 5 membros</Li>
-              <Li>Gastos compartilhados</Li>
-              <Li>Metas em família</Li>
-              <Li>Painel familiar</Li>
-              <Li>1 conta por membro</Li>
+              <Li>Open Finance — 3 bancos por membro (15 conexões)</Li>
+              <Li>Painel familiar consolidado</Li>
+              <Li>~R$20 por membro/mês</Li>
+              <Li>Melhor custo-benefício para famílias</Li>
             </ul>
             {authed ? (
               <UpgradeBtn

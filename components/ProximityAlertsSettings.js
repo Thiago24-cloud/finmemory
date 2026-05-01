@@ -16,7 +16,7 @@ import {
 /**
  * Alertas de proximidade (lista × mapa).
  * - App nativo (Capacitor): ativa monitoramento + notificações.
- * - Navegador: mostra explicação (GPS em segundo plano não existe no web).
+ * - Navegador: mostra explicação (GPS contínuo em segundo plano não existe no web).
  *
  * `pendingNames`: se omitido (undefined), carrega a lista automaticamente (útil em /settings).
  */
@@ -106,7 +106,7 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
         radiusM,
         onUnauthorized: () => {
           setHint(
-            'Ative localização (ideal: "Sempre") e notificações para o FinMemory nas definições do aparelho.'
+            'Ative localização "durante o uso do app" (não é preciso permitir "Sempre") e notificações para o FinMemory nas definições do aparelho.'
           );
         },
       });
@@ -176,8 +176,8 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
           <div className="flex-1 min-w-0">
             <h2 className="text-sm font-bold text-[#333]">Alertas perto da loja</h2>
             <p className="text-xs text-gray-600 mt-1 leading-snug">
-              Esta função usa GPS e notificações em <strong>segundo plano</strong> e está marcada como{' '}
-              <strong>Em breve</strong> no MVP atual.
+              Esta função combina GPS <strong>só enquanto o app está ao foco</strong> com notificações locais,
+              quando estiver disponível, e está marcada como <strong>Em breve</strong> no MVP atual.
             </p>
             <p className="text-xs text-gray-500 mt-2 leading-snug">
               No telemóvel: abre a app → <strong>Lista de compras</strong> ou <strong>Ajustes</strong> → ativa
@@ -208,7 +208,7 @@ export default function ProximityAlertsSettings({ userId, pendingNames: pendingN
             O mapeamento de preços com localização em primeiro plano continua ativo normalmente enquanto o app estiver aberto.
           </p>
           <p className="text-xs text-gray-500 mt-1 leading-snug">
-            Alertas em segundo plano estão temporariamente desativados no MVP para simplificar a publicação nas lojas.
+            Não pedimos localização &quot;Sempre&quot; nem em segundo plano — alinhado à política da Google Play.
           </p>
           {autoLoadList && listLoading ? (
             <p className="text-xs text-gray-400 mt-2 flex items-center gap-2">

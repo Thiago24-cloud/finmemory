@@ -12,7 +12,8 @@ function resolvePlanFromSubscription(sub) {
   const priceId = typeof priceObj === 'string' ? priceObj : priceObj?.id;
   const mapped = planFromStripePriceId(priceId);
   const planMeta = String(sub?.metadata?.plan || '').toLowerCase();
-  const plan = mapped || (planMeta === 'plus' || planMeta === 'pro' || planMeta === 'familia' ? planMeta : 'plus');
+  const normalizedMeta = planMeta === 'família' ? 'familia' : planMeta;
+  const plan = mapped || (['pro', 'familia', 'enterprise'].includes(normalizedMeta) ? normalizedMeta : 'pro');
   return { plan, active: true, status };
 }
 
