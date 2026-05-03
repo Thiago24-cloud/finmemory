@@ -41,6 +41,7 @@ const nextConfig = {
       '/reports',
       '/calculadora',
       '/listas',
+      '/simulador',
     ];
     return [
       ...appPages.map((source) => ({ source, headers: noStore })),

@@ -471,8 +471,8 @@ export function SimuladorFlow() {
     );
   }, [state.extraEnabled, state.extraRows]);
 
-  /** Um único memo evita cadeia projection → pending → confirm e ambiguidade do minifier perto de `projection`. */
-  const { pendingExtraRows, pendingConfirmDays, focusedDayPendingExtras } = useMemo(() => {
+  /** Um único memo evita cadeia projection → pending → confirm; propriedades lidas após o memo (evita TDZ com nomes minificados). */
+  const pendingExtrasPack = useMemo(() => {
     const monthDim = projection.daysInMonth;
     if (!state.extraEnabled) {
       return {
@@ -498,6 +498,9 @@ export function SimuladorFlow() {
       focusedDayPendingExtras: focusedPending,
     };
   }, [state.extraEnabled, state.extraRows, projection, todayDay, focusedDay]);
+  const pendingExtraRows = pendingExtrasPack.pendingExtraRows;
+  const pendingConfirmDays = pendingExtrasPack.pendingConfirmDays;
+  const focusedDayPendingExtras = pendingExtrasPack.focusedDayPendingExtras;
 
   const salaryProjection = useMemo(() => {
     const salaryDay = Math.min(31, Math.max(1, Number(state.salaryDay) || 1));
