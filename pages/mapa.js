@@ -96,6 +96,16 @@ export default function MapaPage() {
   const planningMode = parsedPlanningItems.length > 0;
   const [planningSummary, setPlanningSummary] = useState(null);
   const [planningActionRequest, setPlanningActionRequest] = useState({ id: 0, mode: '' });
+  /** Tem de vir antes de `showMapLanding` — senão TDZ no bundle (“Cannot access … before initialization”). */
+  const [mapLandingOpen, setMapLandingOpen] = useState(false);
+  const dismissMapLanding = useCallback(() => {
+    try {
+      sessionStorage.setItem('finmemory_map_landing_dismissed', '1');
+    } catch {
+      /* ignore */
+    }
+    setMapLandingOpen(false);
+  }, []);
 
   const wazeUi = router.isReady && router.query.waze === '1';
   const mapPaddingTopPx = MAP_MAP_PADDING_TOP_PX;
@@ -118,17 +128,6 @@ export default function MapaPage() {
       .slice(0, 12);
     if (parts.length) setSearchQuery(parts.join(', '));
   }, [router.isReady, router.query.lista]);
-
-  /** Landing em cima do mapa: nota fiscal vs lista — não faz parte da barra de pesquisa. */
-  const [mapLandingOpen, setMapLandingOpen] = useState(false);
-  const dismissMapLanding = useCallback(() => {
-    try {
-      sessionStorage.setItem('finmemory_map_landing_dismissed', '1');
-    } catch {
-      /* ignore */
-    }
-    setMapLandingOpen(false);
-  }, []);
 
   useEffect(() => {
     if (!session || wazeUi) {
