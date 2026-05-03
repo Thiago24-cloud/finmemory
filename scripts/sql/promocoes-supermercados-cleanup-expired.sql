@@ -1,8 +1,19 @@
 -- =============================================================================
 -- FinMemory — Limpeza de public.promocoes_supermercados (encartes / agente)
--- Rode no SQL Editor do Supabase (preferência: janela com timeout alto ou
--- repetir o bloco DELETE em lotes até afetar 0 linhas).
+-- =============================================================================
 --
+-- ⚠️  SUPABASE SQL EDITOR — VACUUM
+--     O PostgreSQL NÃO permite VACUUM dentro de uma transação (erro 25001).
+--     O editor, ao executar várias instruções de seguida, pode meter tudo no
+--     mesmo bloco transacional. Por isso este ficheiro NÃO inclui VACUUM.
+--
+--     Depois dos DELETEs, abra um NOVO query / novo snippet e execute SÓ o
+--     ficheiro:  promocoes-supermercados-vacuum-analyze.sql
+--     (uma linha: VACUUM ANALYZE …)
+--
+--     Use sempre o comando em inglês: VACUUM ANALYZE — não traduza o SQL.
+--
+-- =============================================================================
 -- Diagnóstico típico: a tabela cresce porque acumula linhas já vencidas
 -- (expira_em < agora) ou inativas (ativo = false) com texto longo (imagem_url).
 -- O app filtra ativo = true e expira_em > now(); o resto pode ser apagado.
@@ -28,7 +39,7 @@ WHERE ativo IS DISTINCT FROM true;
 
 -- ---------------------------------------------------------------------------
 -- 1) Limpeza principal — apaga promoções já vencidas (expira_em no passado)
---    Ajuste o LIMIT se o editor der timeout (ex.: 10_000 ou 50_000).
+--    Ajuste o LIMIT se o editor der timeout (ex.: 10000 ou 50000).
 --    Repita o DELETE até "DELETE 0" (nenhuma linha removida).
 -- ---------------------------------------------------------------------------
 DELETE FROM public.promocoes_supermercados
@@ -54,13 +65,9 @@ WHERE id IN (
 -- );
 
 -- ---------------------------------------------------------------------------
--- 3) Após esvaziar lotes — devolver espaço ao SO e atualizar estatísticas
---    (no Supabase, rode esta linha sozinha depois dos DELETEs; não use
---     dentro da mesma transação que um DELETE gigante.)
+-- 3) Verificação final (pode correr no mesmo snippet que os DELETEs)
+--    Para libertar espaço no disco / estatísticas: ficheiro separado VACUUM.
 -- ---------------------------------------------------------------------------
-VACUUM ANALYZE public.promocoes_supermercados;
-
--- Verificação final
 SELECT
   pg_size_pretty(pg_total_relation_size('public.promocoes_supermercados')) AS tabela_total_apos,
   (SELECT count(*) FROM public.promocoes_supermercados) AS linhas_restantes;
