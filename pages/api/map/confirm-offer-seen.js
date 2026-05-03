@@ -83,7 +83,11 @@ async function tryAwardGamification(supabase, appUserId, establishmentId, source
 
 /**
  * POST /api/map/confirm-offer-seen
- * Corpo: { offerId: string, storeId: string } — atualiza recência + gamificação (XP) no máx. 1x/dia por oferta.
+ * Corpo: { offerId: string, storeId: string } — gamificação (XP) no máx. 1x/dia por oferta.
+ *
+ * Encartes (`public.promotions`) e ofertas do agente (`promocoes_supermercados`, id `promo-…`)
+ * passam a não aparecer no painel da loja após confirmação: `active` / `ativo` = false.
+ * `price_points` só atualiza recência (`atualizado_em` / `expires_at` quando aplicável).
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -127,12 +131,15 @@ export default async function handler(req, res) {
       if (!UUID_RE.test(raw)) {
         return res.status(400).json({ error: 'Esta oferta não suporta confirmação automática' });
       }
-      const { error } = await supabase.from('promocoes_supermercados').update({ atualizado_em: nowIso }).eq('id', raw);
+      const { error } = await supabase
+        .from('promocoes_supermercados')
+        .update({ atualizado_em: nowIso, ativo: false })
+        .eq('id', raw);
       if (error) return res.status(400).json({ error: error.message });
       if (appUserId) {
         gamification = await tryAwardGamification(supabase, appUserId, storeId, 'agent_promotion', raw);
       }
-      return res.status(200).json({ ok: true, observed_at: nowIso, ...gamification });
+      return res.status(200).json({ ok: true, observed_at: nowIso, retired_from_list: true, ...gamification });
     }
 
     if (UUID_RE.test(idStr)) {
@@ -143,10 +150,16 @@ export default async function handler(req, res) {
         .eq('store_id', storeId)
         .maybeSingle();
       if (!prErr && pr?.id) {
+        const { error: retireErr } = await supabase
+          .from('promotions')
+          .update({ active: false })
+          .eq('id', idStr)
+          .eq('store_id', storeId);
+        if (retireErr) return res.status(400).json({ error: retireErr.message });
         if (appUserId) {
           gamification = await tryAwardGamification(supabase, appUserId, storeId, 'encarte', idStr);
         }
-        return res.status(200).json({ ok: true, observed_at: nowIso, ...gamification });
+        return res.status(200).json({ ok: true, observed_at: nowIso, retired_from_list: true, ...gamification });
       }
 
       // Algumas linhas antigas (source=bot_fila_aprovado) podem ter expires_at nulo

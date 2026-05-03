@@ -3487,8 +3487,16 @@ export default function MapaPrecosLeaflet({
           toast.success(`+${data.xp_awarded} XP — Obrigado por colaborar!`);
         } else if (data.reason === 'already_today') {
           toast.message('Você já confirmou esta oferta hoje. Valeu!');
+        } else if (data.retired_from_list) {
+          toast.success('Oferta confirmada e retirada da lista para todos.');
         } else {
           toast.success('Obrigado! A data do preço foi atualizada para todos.');
+        }
+        if (data.retired_from_list) {
+          const oid = String(offer.id);
+          setShopPromotions((prev) =>
+            prev.filter((r) => String(r.id) !== oid && String(r.id) !== oid.replace(/^promo-/i, ''))
+          );
         }
       } catch (e) {
         toast.error(e?.message || 'Erro ao confirmar');
@@ -5143,12 +5151,18 @@ export default function MapaPrecosLeaflet({
           appUserId={session?.user?.supabaseId}
           onToggleCart={toggleCartFromDetailSheet}
           isCartSelected={isDetailSheetProductInCart}
-          onOfferSeenUpdated={(offerId, observedAt) => {
+          onOfferSeenUpdated={(offerId, observedAt, retiredFromList) => {
             setShopOffers((prev) =>
               prev.map((o) =>
                 String(o.id) === String(offerId) ? { ...o, observed_at: observedAt, time_ago: 'Agora' } : o
               )
             );
+            if (retiredFromList) {
+              const oid = String(offerId);
+              setShopPromotions((prev) =>
+                prev.filter((r) => String(r.id) !== oid && String(r.id) !== oid.replace(/^promo-/i, ''))
+              );
+            }
           }}
         />
       ) : null}

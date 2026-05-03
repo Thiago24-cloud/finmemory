@@ -268,7 +268,7 @@ export type EstablishmentDetailSheetProps = {
   }) => void;
   canConfirmPrice: boolean;
   appUserId?: string | null;
-  onOfferSeenUpdated?: (offerId: string, observedAt: string) => void;
+  onOfferSeenUpdated?: (offerId: string, observedAt: string, retiredFromList?: boolean) => void;
   onToggleCart?: (product: NormalizedProduct) => void;
   isCartSelected?: (product: NormalizedProduct) => boolean;
 };
@@ -292,6 +292,8 @@ export default function EstablishmentDetailSheet({
   const [cat, setCat] = useState('all');
   const [snap, setSnap] = useState<SheetSnap>('mid');
   const [confirmed, setConfirmed] = useState(() => new Set<string>());
+  /** Ofertas retiradas do mapa após confirmação (encarte / agente); price_points não usa isto. */
+  const [retiredConfirmIds, setRetiredConfirmIds] = useState(() => new Set<string>());
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const snapRef = useRef<SheetSnap>('mid');
@@ -384,10 +386,15 @@ export default function EstablishmentDetailSheet({
   }, [open, store?.id]);
 
   const storeNameHint = String(store?.name || '');
-  const normalized = useMemo(
-    () => buildNormalizedList(offers, promotions, storeNameHint),
-    [offers, promotions, storeNameHint]
-  );
+  useEffect(() => {
+    setRetiredConfirmIds(new Set());
+    setConfirmed(new Set());
+  }, [store?.id]);
+
+  const normalized = useMemo(() => {
+    const base = buildNormalizedList(offers, promotions, storeNameHint);
+    return base.filter((row) => !retiredConfirmIds.has(row.confirmId));
+  }, [offers, promotions, storeNameHint, retiredConfirmIds]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -428,13 +435,19 @@ export default function EstablishmentDetailSheet({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Não foi possível confirmar');
       const iso = data.observed_at || new Date().toISOString();
-      onOfferSeenUpdated?.(p.confirmId, iso);
+      const retired = Boolean(data.retired_from_list);
+      onOfferSeenUpdated?.(p.confirmId, iso, retired);
+      if (retired) {
+        setRetiredConfirmIds((prev) => new Set(prev).add(p.confirmId));
+      }
       setConfirmed((prev) => new Set(prev).add(p.key));
       if (appUserId) setConfirmLock(appUserId, p.confirmId);
       if (data.awarded && data.xp_awarded) {
         toast.success(`+${data.xp_awarded} XP — Obrigado por colaborar!`);
       } else if (data.reason === 'already_today') {
         toast.message('Você já confirmou esta oferta hoje. Valeu!');
+      } else if (retired) {
+        toast.success('Oferta confirmada e retirada da lista para todos.');
       } else {
         toast.success('Obrigado! A data do preço foi atualizada para todos.');
       }
