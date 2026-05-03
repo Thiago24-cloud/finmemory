@@ -28,6 +28,7 @@
     "promo:sonda": "npm run sonda --prefix finmemory-agent",
     "pluggy:register-webhook": "node -r dotenv/config scripts/register-pluggy-webhook.js",
     "pluggy:fix-webhook-secrets": "node -r dotenv/config scripts/fix-pluggy-webhook-secrets.js",
+    "pluggy:resync-transacoes-institution": "node scripts/resync-pluggy-transacoes-institution.mjs",
     "deploy:cloud-run": "node scripts/deploy-cloud-run.mjs",
     "deploy:promo-agent-all": "node scripts/deploy-promo-agent-all.mjs",
     "promo:scheduler:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-promo-scheduler.ps1",
