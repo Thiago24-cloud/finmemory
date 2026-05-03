@@ -34,9 +34,13 @@ www/robots.txt
 www/simulador-mocks/
 www/install-guide/
 
-# Android signing material (nunca versionar)
+# Android signing material e bundles Play (nunca versionar no Git)
 *.jks
 *.keystore
+*.aab
+
+# Chaves/export renomeadas de forma estranha (ex.: arquivo.jks texto extra)
+android/app/*jks*
 
 # Vercel / Netlify / Firebase
 .vercel/
@@ -52,10 +56,16 @@ www/install-guide/
 scripts/dia-stores-promo-page-url.sql
 # Nota: .env.production contém apenas variáveis PÚBLICAS (NEXT_PUBLIC_*) e pode ir para o repo
 
+# Cursor / Claude (sessões locais)
+.claude/
+
 # OS / Editor
 .DS_Store
 Thumbs.db
 *.swp
+
+# Planilhas locais / export Excel (modelos devem ficar no Drive, não no repo)
+*.xlsx
 
 # IDEs
 .vscode/
@@ -97,7 +107,8 @@ Testes do FinMemory.mp4
 finmemory-service-account.json
 android/keystore
 android/keystore.properties
-android/app/google-services.json
+# Firebase em android/app — inclui cópias (ex.: google-services (4).json)
+android/app/google-services*.json
 supabase/.temp/
 print mambo .png
 _smart-receipt-scanner/
