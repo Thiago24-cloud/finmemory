@@ -1,5 +1,8 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import { FINMEMORY_CREDENTIAL_ERROR } from '../lib/finmemoryLoginErrorCodes';
+
+const ELogin = FINMEMORY_CREDENTIAL_ERROR;
 
 // Mapeamento de erros OAuth do Google para mensagens amigáveis
 const ERROR_MESSAGES = {
@@ -76,7 +79,48 @@ const ERROR_MESSAGES = {
     message: 'Você recusou as permissões solicitadas pelo aplicativo.',
     suggestion: 'Para usar o FinMemory, é necessário conceder acesso ao seu Gmail.'
   },
-  
+
+  /** NextAuth credentials (fluxo não-json ou redirect manual). */
+  CredentialsSignin: {
+    title: 'Não foi possível entrar',
+    message: 'Verifique email e senha. Se sua conta usa 2FA, confira o código de 6 dígitos.',
+    suggestion: 'Use Esqueci a senha ou Reenviar confirmação conforme sua situação.',
+  },
+
+  AccessDenied: {
+    title: 'Acesso restrito nesta fase',
+    message:
+      'Seu email ainda não está liberado para entrar nesta configuração do FinMemory.',
+    suggestion: 'Se acredita que é um erro, contacte suporte ou aguarde a liberação geral.',
+  },
+
+  [ELogin.VERIFY_EMAIL]: {
+    title: 'Email não confirmado',
+    message:
+      'Sua conta precisa do email confirmado antes do primeiro login com senha.',
+    suggestion: 'Abra o link enviado na caixa de entrada ou use Reenviar confirmação na página de entrar.',
+  },
+
+  [ELogin.ACCOUNT_LOCKED]: {
+    title: 'Conta temporariamente bloqueada',
+    message: 'Houve várias tentativas de login incorretas ou o bloqueio de segurança está ativo.',
+    suggestion: 'Aguarde cerca de 15 minutos e tente novamente com a senha certa.',
+  },
+
+  [ELogin.REQUIRES_OTP]: {
+    title: '2FA necessário',
+    message:
+      'Esta conta está protegida com autenticação em duas etapas (app autenticador).',
+    suggestion: 'Na página Entrar, toque em "Conta com 2FA?", informe o código de 6 dígitos e envie novamente.',
+  },
+
+  [ELogin.INVALID_OTP]: {
+    title: 'Código 2FA incorreto',
+    message:
+      'O código de 6 dígitos não foi aceito. Pode ter expirado ou estar incorreto.',
+    suggestion: 'Gere um código novo no app autenticador e confira o relógio do telefone.',
+  },
+
   // Erro padrão
   default: {
     title: 'Erro de Autenticação',

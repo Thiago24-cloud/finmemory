@@ -6,6 +6,7 @@ import { verifyTotpCode } from '../../../lib/tokens';
 import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { normalizeEmail } from '../../../lib/securityPolicy';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
+import { FINMEMORY_CREDENTIAL_ERROR, credentialLoginRejected } from '../../../lib/finmemoryLoginErrorCodes';
 
 const DEFAULT_GOOGLE_PLAY_REVIEWER_EMAILS = ['thiagochimzie4@gmail.com', 'thiagochimezie44@gmail.com'];
 
@@ -128,7 +129,7 @@ export const authOptions = {
         const lockoutUntilTs = localAuth.lockout_until ? Date.parse(localAuth.lockout_until) : 0;
         if (lockoutUntilTs && lockoutUntilTs > Date.now()) {
           console.warn('[auth][login] reject', { code: 'account_locked', email, ip, lockout_until: localAuth.lockout_until });
-          return null;
+          credentialLoginRejected(FINMEMORY_CREDENTIAL_ERROR.ACCOUNT_LOCKED);
         }
 
         if (!verifyPassword(password, localAuth.password_hash)) {
@@ -148,14 +149,18 @@ export const authOptions = {
 
         if (!localAuth.email_verified_at && !isReviewer) {
           console.warn('[auth][login] email_not_verified', { email, ip });
-          return null;
+          credentialLoginRejected(FINMEMORY_CREDENTIAL_ERROR.VERIFY_EMAIL);
         }
 
         if (!isReviewer && localAuth.totp_enabled_at && localAuth.totp_secret) {
+          if (!otp) {
+            console.warn('[auth][login] missing_otp', { email, ip });
+            credentialLoginRejected(FINMEMORY_CREDENTIAL_ERROR.REQUIRES_OTP);
+          }
           const validOtp = verifyTotpCode({ secret: localAuth.totp_secret, code: otp, window: 1 });
           if (!validOtp) {
             console.warn('[auth][login] invalid_otp', { email, ip });
-            return null;
+            credentialLoginRejected(FINMEMORY_CREDENTIAL_ERROR.INVALID_OTP);
           }
         }
 

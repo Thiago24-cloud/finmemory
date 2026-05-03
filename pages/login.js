@@ -4,6 +4,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { validatePasswordStrength } from '../lib/securityPolicy';
+import { FINMEMORY_CREDENTIAL_ERROR } from '../lib/finmemoryLoginErrorCodes';
+import { messageForCredentialLogin } from '../lib/loginErrorMessages';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,11 +37,20 @@ export default function LoginPage() {
     });
     setBusy(false);
     if (!res || res.error) {
-      setMsg(
-        show2fa
-          ? 'Nao foi possivel entrar. Verifique email, senha e codigo 2FA.'
-          : 'Nao foi possivel entrar. Verifique email e senha.'
-      );
+      let code = res?.error ?? null;
+      if (!code && typeof res?.url === 'string') {
+        try {
+          code = new URL(res.url).searchParams.get('error');
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      const revealOtpForMessage =
+        show2fa || code === FINMEMORY_CREDENTIAL_ERROR.REQUIRES_OTP;
+      if (code === FINMEMORY_CREDENTIAL_ERROR.REQUIRES_OTP) {
+        setShow2fa(true);
+      }
+      setMsg(messageForCredentialLogin(code, { otpFieldVisible: revealOtpForMessage }));
       return;
     }
     router.push(res.url || callbackUrl);
