@@ -348,7 +348,7 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
     if (!mapInstance || !index) return;
     const b = mapInstance.getBounds();
     const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
-    const zoom = Math.floor(mapInstance.getZoom());
+    const zoom = Math.min(18, Math.max(0, Math.round(mapInstance.getZoom())));
     const clusters = index.getClusters(bbox, zoom);
 
     markersRef.current.forEach((m) => m.remove());
@@ -397,7 +397,12 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
     if (!mapInstance) return;
     const data = Array.isArray(points) && points.length > 0 ? points : FALLBACK_MARKERS;
     const features = pointsToGeoJSON(data);
-    const index = new Supercluster({ radius: 60, maxZoom: 18 });
+    const index = new Supercluster({
+      radius: 72,
+      maxZoom: 16,
+      minZoom: 0,
+      minPoints: 2,
+    });
     index.load(features);
     clusterIndexRef.current = index;
     updateClusterMarkers(mapInstance, index);
@@ -503,6 +508,16 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
     setMapError(null);
     let channel;
     let supabase;
+    let clusterRaf = null;
+    const scheduleClusterRefresh = () => {
+      if (clusterRaf != null) return;
+      clusterRaf = requestAnimationFrame(() => {
+        clusterRaf = null;
+        if (clusterIndexRef.current && map.current) {
+          updateClusterMarkers(map.current, clusterIndexRef.current);
+        }
+      });
+    };
     try {
       if (typeof mapboxgl !== 'undefined') mapboxgl.accessToken = token;
       map.current = new mapboxgl.Map({
@@ -527,11 +542,8 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
         }
       });
 
-      map.current.on('moveend', () => {
-        if (clusterIndexRef.current && map.current) {
-          updateClusterMarkers(map.current, clusterIndexRef.current);
-        }
-      });
+      map.current.on('moveend', scheduleClusterRefresh);
+      map.current.on('zoomend', scheduleClusterRefresh);
 
       map.current.on('error', (e) => {
         console.warn('Mapbox error:', e);
@@ -564,6 +576,13 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
     }
 
     return () => {
+      if (clusterRaf != null) cancelAnimationFrame(clusterRaf);
+      if (map.current) {
+        try {
+          map.current.off('moveend', scheduleClusterRefresh);
+          map.current.off('zoomend', scheduleClusterRefresh);
+        } catch (_) {}
+      }
       if (channel && supabase) supabase.removeChannel(channel);
       clearMarkers();
       if (map.current) {

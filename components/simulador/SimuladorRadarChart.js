@@ -63,6 +63,7 @@ export function SimuladorRadarChart({
         height={innerH}
         fill="url(#simGapGrad)"
         opacity={0.4}
+        style={{ pointerEvents: 'none' }}
       />
     );
   });
@@ -79,6 +80,34 @@ export function SimuladorRadarChart({
         height={innerH}
         fill={`rgba(251,146,60,${intensity})`}
         rx={2}
+        style={{ pointerEvents: 'none' }}
+      />
+    );
+  });
+
+  const dayHitZones = points.map((p, i) => {
+    const n = points.length;
+    let left;
+    let right;
+    if (n <= 1) {
+      left = padL;
+      right = padL + innerW;
+    } else {
+      const cx = xFor(i);
+      left = i === 0 ? padL : (xFor(i - 1) + cx) / 2;
+      right = i === n - 1 ? padL + innerW : (cx + xFor(i + 1)) / 2;
+    }
+    return (
+      <rect
+        key={`day-hit-${p.day}-${i}`}
+        x={left}
+        y={padT}
+        width={Math.max(2, right - left)}
+        height={innerH}
+        fill="transparent"
+        className="cursor-pointer touch-manipulation"
+        onClick={() => onDayFocus?.(p.day)}
+        aria-hidden
       />
     );
   });
@@ -135,10 +164,11 @@ export function SimuladorRadarChart({
             stroke="rgba(161,161,170,0.8)"
             strokeDasharray="4 4"
             strokeWidth={1.2}
+            style={{ pointerEvents: 'none' }}
           />
         )}
 
-        <path d={pathArea} fill="url(#simAreaGrad)" stroke="none" />
+        <path d={pathArea} fill="url(#simAreaGrad)" stroke="none" style={{ pointerEvents: 'none' }} />
         <path
           d={pathLine}
           fill="none"
@@ -147,8 +177,10 @@ export function SimuladorRadarChart({
           strokeLinejoin="round"
           strokeLinecap="round"
           filter="url(#simGlow)"
-          style={{ transition: 'd 280ms ease, stroke 180ms ease' }}
+          style={{ transition: 'd 280ms ease, stroke 180ms ease', pointerEvents: 'none' }}
         />
+
+        {onDayFocus ? dayHitZones : null}
 
         {markerDays.map((m) => {
           const p = points[m.i];
@@ -172,27 +204,46 @@ export function SimuladorRadarChart({
         })}
 
         {labelIdx.map((i) => (
-          <text key={`lb-${i}`} x={xFor(i)} y={h - 6} textAnchor="middle" className="fill-zinc-500 text-[9px] font-medium">
+          <text
+            key={`lb-${i}`}
+            x={xFor(i)}
+            y={h - 6}
+            textAnchor="middle"
+            className="fill-zinc-500 text-[9px] font-medium"
+            style={{ pointerEvents: 'none' }}
+          >
             dia {points[i]?.day}
           </text>
         ))}
 
-        <text x={padL} y={14} className="fill-zinc-400 text-[9px]">
+        <text x={padL} y={14} className="fill-zinc-400 text-[9px]" style={{ pointerEvents: 'none' }}>
           {stressMode ? 'Cenário: sem entradas incertas' : 'Saldo previsto'}
         </text>
         {baselineY != null && (
-          <text x={padL + innerW} y={Math.max(10, baselineY - 4)} textAnchor="end" className="fill-zinc-500 text-[9px]">
+          <text
+            x={padL + innerW}
+            y={Math.max(10, baselineY - 4)}
+            textAnchor="end"
+            className="fill-zinc-500 text-[9px]"
+            style={{ pointerEvents: 'none' }}
+          >
             Baseline 3m: {formatBrl(baselineMonthlyExpense)}
           </text>
         )}
         {firstNegativeDay != null ? (
-          <text x={padL + 2} y={h - 16} className="fill-red-300 text-[9px] font-medium">
+          <text
+            x={padL + 2}
+            y={h - 16}
+            className="fill-red-300 text-[9px] font-medium"
+            style={{ pointerEvents: 'none' }}
+          >
             Burn rate: caixa negativo no dia {firstNegativeDay}
           </text>
         ) : null}
       </svg>
       <p className="text-center text-[10px] text-zinc-500 mt-1">
         Mínimo no mês: {formatBrl(Math.min(...vals))}
+        {onDayFocus ? <span className="block mt-0.5 text-zinc-600">Toque na linha ou na área do gráfico para ver o dia</span> : null}
       </p>
     </div>
   );

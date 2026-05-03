@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { animate, motion, useMotionValue } from 'framer-motion';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Drawer } from 'vaul';
 import { CheckCircle2, Instagram, Loader2, Search, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { differenceInMinutes } from 'date-fns';
@@ -36,7 +36,45 @@ export type EstablishmentSheetPromotion = {
   club_price?: number | string | null;
 };
 
+/** Snaps internos — três alturas estilo Google Maps (vaul). */
 type SheetSnap = 'collapsed' | 'mid' | 'full';
+
+const Z_OVERLAY = 1099;
+const Z_SHEET = 1100;
+
+/** Frações da viewport visível (0–1), alinhadas ao uso em `MapMobileBottomSheet`. */
+const SNAP_COLLAPSED = 0.2;
+const SNAP_MID = 0.52;
+const SNAP_FULL = 0.94;
+
+const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_MID, SNAP_FULL] as const;
+
+function fractionForSnap(s: SheetSnap): number {
+  if (s === 'full') return SNAP_FULL;
+  if (s === 'mid') return SNAP_MID;
+  return SNAP_COLLAPSED;
+}
+
+function nearestSnapFromFraction(f: number): SheetSnap {
+  let best: SheetSnap = 'mid';
+  let bestD = Infinity;
+  for (const s of ['collapsed', 'mid', 'full'] as const) {
+    const v = fractionForSnap(s);
+    const d = Math.abs(f - v);
+    if (d < bestD) {
+      bestD = d;
+      best = s;
+    }
+  }
+  return best;
+}
+
+/** Nomes esperados por `MapaPrecosLeaflet` / padding do mapa. */
+function mapSnapForParent(s: SheetSnap): string {
+  if (s === 'full') return 'full';
+  if (s === 'mid') return 'half';
+  return 'peek';
+}
 
 type NormalizedProduct = {
   key: string;
@@ -250,115 +288,100 @@ export default function EstablishmentDetailSheet({
   onToggleCart,
   isCartSelected,
 }: EstablishmentDetailSheetProps) {
-  const [vh, setVh] = useState(640);
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('all');
   const [snap, setSnap] = useState<SheetSnap>('mid');
   const [confirmed, setConfirmed] = useState(() => new Set<string>());
   const [busyId, setBusyId] = useState<string | null>(null);
-  const y = useMotionValue(400);
-  const draggingRef = useRef(false);
-  const snapRef = useRef<SheetSnap>('mid');
-  const dragBase = useRef(0);
 
-  useEffect(() => {
-    const r = () => setVh(typeof window !== 'undefined' ? window.innerHeight : 640);
-    r();
-    window.addEventListener('resize', r);
-    return () => window.removeEventListener('resize', r);
+  const snapRef = useRef<SheetSnap>('mid');
+  snapRef.current = snap;
+
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const overlayFullRef = useRef(0.52);
+  overlayFullRef.current = 0.52;
+
+  const setOverlayBg = useCallback((opacity: number) => {
+    const el = overlayRef.current;
+    if (el) el.style.backgroundColor = `rgba(0,0,0,${Math.max(0, Math.min(1, opacity))})`;
   }, []);
 
-  const collapsedY = useMemo(() => Math.max(0, vh - 120), [vh]);
-  const midY = useMemo(() => Math.max(0, vh - Math.round(vh * 0.6)), [vh]);
-  const fullY = 0;
-
-  const yForSnap = useCallback(
+  const reportMetricsForSnap = useCallback(
     (s: SheetSnap) => {
-      if (s === 'full') return fullY;
-      if (s === 'mid') return midY;
-      return collapsedY;
-    },
-    [collapsedY, midY]
-  );
-
-  const reportMetrics = useCallback(
-    (yy: number, dragging: boolean) => {
-      const bottomInsetPx = Math.max(0, Math.round(vh - yy));
+      const fraction = fractionForSnap(s);
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+      const bottomInsetPx = vh > 0 ? Math.round(fraction * vh) : 0;
       onVisualMetrics?.({
         bottomInsetPx,
-        snap: snapRef.current,
-        isDragging: dragging,
-        translatePct: vh > 0 ? (yy / vh) * 100 : 0,
+        snap: mapSnapForParent(s),
+        isDragging: false,
+        translatePct: vh > 0 ? ((vh - bottomInsetPx) / vh) * 100 : 0,
       });
     },
-    [onVisualMetrics, vh]
+    [onVisualMetrics]
   );
 
-  /** Evita setState + invalidateSize no Leaflet a cada frame do spring (quebra _leaflet_pos). */
-  const metricsRafRef = useRef<number | null>(null);
-  const lastReportedBottomRef = useRef<number | null>(null);
-
-  const scheduleMetricsFromY = useCallback(() => {
-    if (metricsRafRef.current != null) return;
-    metricsRafRef.current = requestAnimationFrame(() => {
-      metricsRafRef.current = null;
-      const latest = y.get();
-      const bottomInsetPx = Math.max(0, Math.round(vh - latest));
-      const prev = lastReportedBottomRef.current;
-      if (prev != null && Math.abs(bottomInsetPx - prev) < 12 && !draggingRef.current) {
+  const handleSetActiveSnapPoint = useCallback(
+    (fraction: number | null) => {
+      if (fraction === null || fraction === undefined) {
+        setOverlayBg(0);
+        onClose();
         return;
       }
-      lastReportedBottomRef.current = bottomInsetPx;
-      reportMetrics(latest, draggingRef.current);
-    });
-  }, [vh, y, reportMetrics]);
+      const next = nearestSnapFromFraction(fraction);
+      snapRef.current = next;
+      setSnap(next);
+      setOverlayBg(next === 'full' ? overlayFullRef.current : next === 'mid' ? 0.22 : 0.12);
+      reportMetricsForSnap(next);
+    },
+    [onClose, setOverlayBg, reportMetricsForSnap]
+  );
 
-  useLayoutEffect(() => {
-    if (!open) return;
-    snapRef.current = snap;
-    const target = yForSnap(snap);
-    y.set(target);
-    reportMetrics(target, false);
-  }, [open, snap, yForSnap, y, reportMetrics]);
+  const onDrag = useCallback(
+    (_e: unknown, percentageDragged: number) => {
+      setOverlayBg(percentageDragged * overlayFullRef.current);
+    },
+    [setOverlayBg]
+  );
 
-  const lastStoreIdRef = useRef<string | null>(null);
+  const onRelease = useCallback(
+    (_e: unknown, releasedOpen: boolean) => {
+      if (!releasedOpen) setOverlayBg(0);
+    },
+    [setOverlayBg]
+  );
 
   useEffect(() => {
     if (!open) {
-      lastStoreIdRef.current = null;
-      lastReportedBottomRef.current = null;
       setSearch('');
       setCat('all');
       setSnap('mid');
       snapRef.current = 'mid';
+      setOverlayBg(0);
       onVisualMetrics?.({ bottomInsetPx: 0, snap: 'closed', isDragging: false });
     }
-  }, [open, onVisualMetrics]);
+  }, [open, onVisualMetrics, setOverlayBg]);
 
   useEffect(() => {
-    if (!open) return undefined;
-    const target = yForSnap(snap);
-    const c = animate(y, target, {
-      type: 'spring',
-      stiffness: 300,
-      damping: 32,
-      onComplete: () => {
-        lastReportedBottomRef.current = null;
-        reportMetrics(y.get(), false);
-      },
-    });
-    return () => c.stop();
-  }, [open, snap, y, yForSnap, reportMetrics]);
+    if (!open) return;
+    if (snap === 'full') setOverlayBg(overlayFullRef.current);
+    else if (snap === 'mid') setOverlayBg(0.22);
+    else setOverlayBg(0.12);
+  }, [open, snap, setOverlayBg]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    if (open) reportMetricsForSnap(snap);
+  }, [open, snap, reportMetricsForSnap]);
+
+  const lastStoreIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
     if (!open || !store?.id) return;
     if (lastStoreIdRef.current === store.id) return;
     lastStoreIdRef.current = store.id;
-    const t = yForSnap('mid');
-    y.set(t);
     snapRef.current = 'mid';
     setSnap('mid');
-  }, [open, store?.id, yForSnap, y]);
+  }, [open, store?.id]);
 
   const storeNameHint = String(store?.name || '');
   const normalized = useMemo(
@@ -385,39 +408,6 @@ export default function EstablishmentDetailSheet({
   );
 
   const promoCount = normalized.length;
-
-  const onPanStart = useCallback(() => {
-    draggingRef.current = true;
-    dragBase.current = y.get();
-  }, [y]);
-
-  const onPan = useCallback((_: unknown, info: { offset: { y: number } }) => {
-    const next = Math.min(collapsedY, Math.max(fullY, dragBase.current + info.offset.y));
-    y.set(next);
-    scheduleMetricsFromY();
-  }, [collapsedY, fullY, y, scheduleMetricsFromY]);
-
-  const onPanEnd = useCallback(() => {
-    draggingRef.current = false;
-    const cur = y.get();
-    const snaps = [
-      { s: 'full' as const, v: fullY },
-      { s: 'mid' as const, v: midY },
-      { s: 'collapsed' as const, v: collapsedY },
-    ];
-    const nearest = snaps.reduce((a, b) => (Math.abs(b.v - cur) < Math.abs(a.v - cur) ? b : a));
-    snapRef.current = nearest.s;
-    setSnap(nearest.s);
-    animate(y, nearest.v, {
-      type: 'spring',
-      stiffness: 300,
-      damping: 32,
-      onComplete: () => {
-        lastReportedBottomRef.current = null;
-        reportMetrics(y.get(), false);
-      },
-    });
-  }, [fullY, midY, collapsedY, y, reportMetrics]);
 
   const handleConfirm = async (p: NormalizedProduct) => {
     if (!store?.id || !canConfirmPrice) {
@@ -466,38 +456,69 @@ export default function EstablishmentDetailSheet({
   if (!open || !store) return null;
 
   const logo = store.photo_url?.trim() || '';
+  const activeSnapPoint = fractionForSnap(snap);
+
+  const sheetSurface = [
+    'rounded-t-[24px]',
+    'border-t border-zinc-800/50',
+    'bg-zinc-950/98',
+    'shadow-[0_-12px_48px_rgba(0,0,0,0.45)]',
+    'supports-[backdrop-filter]:backdrop-blur-xl',
+    'outline-none focus:outline-none',
+  ].join(' ');
 
   return (
-    <>
-      {snap === 'full' ? (
-        <button
-          type="button"
-          aria-label="Fechar"
-          className="fixed inset-0 z-[1099] border-0 bg-black/60 p-0"
-          onClick={() => setSnap('mid')}
+    <Drawer.Root
+      open={open}
+      onClose={() => {
+        setOverlayBg(0);
+        onClose();
+      }}
+      snapPoints={[...SNAP_POINTS]}
+      activeSnapPoint={activeSnapPoint}
+      setActiveSnapPoint={handleSetActiveSnapPoint}
+      dismissible
+      modal={false}
+      onDrag={onDrag}
+      onRelease={onRelease}
+    >
+      <Drawer.Portal>
+        <Drawer.Overlay
+          ref={overlayRef}
+          className="fixed inset-0"
+          style={{
+            zIndex: Z_OVERLAY,
+            backgroundColor: 'rgba(0,0,0,0)',
+            pointerEvents: snap === 'full' ? 'auto' : 'none',
+          }}
+          onClick={() => {
+            if (snap === 'full') {
+              snapRef.current = 'mid';
+              setSnap('mid');
+            }
+          }}
         />
-      ) : null}
 
-      <motion.div
-        role="dialog"
-        aria-modal={snap === 'full'}
-        className="fixed inset-x-0 bottom-0 z-[1100] flex max-h-none flex-col rounded-t-2xl border border-zinc-800/50 bg-zinc-950/95 shadow-[0_-12px_48px_rgba(0,0,0,0.45)] supports-[backdrop-filter]:backdrop-blur-xl"
-        style={{
-          height: '100dvh',
-          maxHeight: '100dvh',
-          y,
-          touchAction: snap === 'full' ? 'pan-y' : 'none',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        }}
-      >
-        <motion.div
-          className="flex shrink-0 flex-col pt-2"
-          onPanStart={onPanStart}
-          onPan={onPan}
-          onPanEnd={onPanEnd}
+        <Drawer.Content
+          className={`fixed inset-x-0 bottom-0 flex flex-col overflow-hidden pb-[max(0px,env(safe-area-inset-bottom))] ${sheetSurface}`}
+          style={{ zIndex: Z_SHEET, height: '100dvh' }}
+          aria-label="Detalhes do estabelecimento"
         >
-          <div className="mx-auto mb-2 h-1 w-10 shrink-0 rounded-full bg-zinc-600" />
-          <div className="flex items-start gap-3 px-4 pb-2">
+          <div
+            className="flex shrink-0 cursor-grab flex-col items-center justify-center gap-1 border-b border-zinc-800/40 px-4 pb-2 pt-3 active:cursor-grabbing select-none"
+            style={{ touchAction: 'none' }}
+          >
+            <div className="h-1 w-11 shrink-0 rounded-full bg-zinc-600" aria-hidden />
+            <span className="text-center text-[10px] font-medium leading-tight text-zinc-500">
+              {snap === 'collapsed'
+                ? 'Arraste para cima para ver produtos'
+                : snap === 'mid'
+                  ? 'Arraste para expandir ou recolher'
+                  : 'Arraste para baixo para ver o mapa'}
+            </span>
+          </div>
+
+          <div className="flex shrink-0 items-start gap-3 border-b border-zinc-800/40 px-4 pb-3 pt-2">
             <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-zinc-800 bg-zinc-900">
               {logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -524,7 +545,9 @@ export default function EstablishmentDetailSheet({
               <button
                 type="button"
                 className="mt-1 inline-flex items-center gap-1 text-left text-xs font-medium text-orange-400 hover:text-orange-300"
-                onClick={() => setSnap((s) => (s === 'collapsed' ? 'mid' : 'collapsed'))}
+                onClick={() =>
+                  setSnap((s) => (s === 'collapsed' ? 'mid' : s === 'mid' ? 'collapsed' : 'mid'))
+                }
               >
                 {promoCount} promoç{promoCount === 1 ? 'ão' : 'ões'} em destaque
                 <span className="text-zinc-500" aria-hidden>
@@ -533,144 +556,130 @@ export default function EstablishmentDetailSheet({
               </button>
             </div>
           </div>
-        </motion.div>
 
-        <div
-          className="finmemory-waze-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-6"
-          data-sheet-no-drag
-          style={{ touchAction: 'pan-y' }}
-        >
-          <div className="sticky top-0 z-10 -mx-1 bg-zinc-950/95 px-1 pb-2 pt-1 supports-[backdrop-filter]:backdrop-blur-md">
-            <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2">
-              <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar produtos neste local..."
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
-                data-sheet-no-drag
+          <div
+            className="finmemory-waze-scroll flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 pb-6"
+            style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+          >
+            <div className="sticky top-0 z-10 -mx-1 bg-zinc-950/95 px-1 pb-2 pt-1 supports-[backdrop-filter]:backdrop-blur-md">
+              <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2">
+                <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar produtos neste local..."
+                  className="min-w-0 flex-1 border-0 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+                />
+              </div>
+              <FilterChips
+                chips={filterChipItems}
+                activeChipId={cat}
+                onChange={setCat}
+                className="finmemory-waze-scroll mt-2"
+                ariaLabel="Filtros por categoria"
               />
             </div>
-            <FilterChips
-              chips={filterChipItems}
-              activeChipId={cat}
-              onChange={setCat}
-              className="finmemory-waze-scroll mt-2"
-              ariaLabel="Filtros por categoria"
-            />
-          </div>
 
-          <div className="pt-1">
-            {loading ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
-              </div>
-            ) : error ? (
-              <p className="px-2 py-6 text-center text-sm text-red-400">{error}</p>
-            ) : filtered.length === 0 ? (
-              <p className="px-2 py-8 text-center text-sm text-zinc-500">Nenhum produto com estes filtros.</p>
-            ) : (
-              <motion.div
-                className="grid grid-cols-2 gap-2 px-1"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: {},
-                  visible: { transition: { staggerChildren: 0.04 } },
-                }}
-              >
-                {filtered.map((p) => {
-                  const badge = getRecencyBadge(p.lastSeenAt);
-                  const locked = Boolean(appUserId && isConfirmLocked(appUserId, p.confirmId));
-                  const done = confirmed.has(p.key) || locked;
-                  const busy = busyId === p.key;
-                  const inCart = Boolean(isCartSelected?.(p));
-                  return (
-                    <motion.article
-                      key={p.key}
-                      variants={{
-                        hidden: { opacity: 0, y: 16 },
-                        visible: { opacity: 1, y: 0 },
-                      }}
-                      className="relative flex flex-col overflow-hidden rounded-xl border border-zinc-800/60 bg-zinc-900/80"
-                    >
-                      <span
-                        className={`absolute right-1.5 top-1.5 z-[1] max-w-[56%] truncate rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.className}`}
+            <div className="pt-1">
+              {loading ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+                </div>
+              ) : error ? (
+                <p className="px-2 py-6 text-center text-sm text-red-400">{error}</p>
+              ) : filtered.length === 0 ? (
+                <p className="px-2 py-8 text-center text-sm text-zinc-500">Nenhum produto com estes filtros.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 px-1">
+                  {filtered.map((p) => {
+                    const badge = getRecencyBadge(p.lastSeenAt);
+                    const locked = Boolean(appUserId && isConfirmLocked(appUserId, p.confirmId));
+                    const done = confirmed.has(p.key) || locked;
+                    const busy = busyId === p.key;
+                    const inCart = Boolean(isCartSelected?.(p));
+                    return (
+                      <article
+                        key={p.key}
+                        className="relative flex flex-col overflow-hidden rounded-xl border border-zinc-800/60 bg-zinc-900/80"
                       >
-                        {badge.label}
-                      </span>
-                      <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-zinc-800">
-                        <ProductCardThumb categoryRaw={p.categoryRaw} imageUrl={p.imageUrl} />
-                      </div>
-                      <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
-                        <p className="line-clamp-2 text-sm font-medium leading-snug text-zinc-200">{p.name}</p>
-                        {p.originalPrice != null && p.originalPrice > p.price ? (
-                          <p className="text-xs text-zinc-500 line-through">De {formatBrl(p.originalPrice)}</p>
-                        ) : null}
-                        <p className="text-lg font-bold leading-tight text-orange-400">
-                          {formatBrl(p.price)}
-                          {p.unit ? (
-                            <span className="text-xs font-normal text-zinc-400"> /{p.unit}</span>
-                          ) : null}
-                        </p>
-                        {p.clubPrice != null && Number.isFinite(p.clubPrice) && p.clubPrice > 0 ? (
-                          <p className="text-[10px] text-zinc-500">Clube {formatBrl(p.clubPrice)}</p>
-                        ) : null}
-                        <button
-                          type="button"
-                          disabled={!canConfirmPrice || busy || done}
-                          onClick={() => handleConfirm(p)}
-                          className={`mt-auto flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
-                            done
-                              ? 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400'
-                              : 'border-transparent bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                          }`}
+                        <span
+                          className={`absolute right-1.5 top-1.5 z-[1] max-w-[56%] truncate rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.className}`}
                         >
-                          {busy ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-4 w-4 shrink-0 opacity-80" />
-                          )}
-                          {done ? 'Confirmado ✓' : 'Confirmar preço'}
-                        </button>
-                        {onToggleCart ? (
+                          {badge.label}
+                        </span>
+                        <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-zinc-800">
+                          <ProductCardThumb categoryRaw={p.categoryRaw} imageUrl={p.imageUrl} />
+                        </div>
+                        <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
+                          <p className="line-clamp-2 text-sm font-medium leading-snug text-zinc-200">{p.name}</p>
+                          {p.originalPrice != null && p.originalPrice > p.price ? (
+                            <p className="text-xs text-zinc-500 line-through">De {formatBrl(p.originalPrice)}</p>
+                          ) : null}
+                          <p className="text-lg font-bold leading-tight text-orange-400">
+                            {formatBrl(p.price)}
+                            {p.unit ? (
+                              <span className="text-xs font-normal text-zinc-400"> /{p.unit}</span>
+                            ) : null}
+                          </p>
+                          {p.clubPrice != null && Number.isFinite(p.clubPrice) && p.clubPrice > 0 ? (
+                            <p className="text-[10px] text-zinc-500">Clube {formatBrl(p.clubPrice)}</p>
+                          ) : null}
                           <button
                             type="button"
-                            onClick={() => onToggleCart(p)}
-                            className={`mt-1 flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
-                              inCart
-                                ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300'
-                                : 'border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-emerald-500/50 hover:text-emerald-300'
+                            disabled={!canConfirmPrice || busy || done}
+                            onClick={() => handleConfirm(p)}
+                            className={`mt-auto flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                              done
+                                ? 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400'
+                                : 'border-transparent bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                             }`}
                           >
-                            {inCart ? '✓ Na cesta' : '+ Cesta'}
+                            {busy ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 shrink-0 opacity-80" />
+                            )}
+                            {done ? 'Confirmado ✓' : 'Confirmar preço'}
                           </button>
-                        ) : null}
-                      </div>
-                    </motion.article>
-                  );
-                })}
-              </motion.div>
-            )}
+                          {onToggleCart ? (
+                            <button
+                              type="button"
+                              onClick={() => onToggleCart(p)}
+                              className={`mt-1 flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                                inCart
+                                  ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300'
+                                  : 'border-zinc-700 bg-zinc-900 text-zinc-200 hover:border-emerald-500/50 hover:text-emerald-300'
+                              }`}
+                            >
+                              {inCart ? '✓ Na cesta' : '+ Cesta'}
+                            </button>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
 
-            <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-              <p className="text-xs text-zinc-500">Seu impacto na comunidade</p>
-              <p className="mt-1 text-sm text-zinc-400">
-                Confirmações contam para o ranking semanal e XP (máx. 1 por oferta/dia).
-              </p>
-              <a
-                href="https://instagram.com/finmemory.oficial"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-orange-400"
-              >
-                <Instagram className="h-3.5 w-3.5" />
-                Ver novidades no Instagram
-              </a>
+              <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+                <p className="text-xs text-zinc-500">Seu impacto na comunidade</p>
+                <p className="mt-1 text-sm text-zinc-400">
+                  Confirmações contam para o ranking semanal e XP (máx. 1 por oferta/dia).
+                </p>
+                <a
+                  href="https://instagram.com/finmemory.oficial"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-orange-400"
+                >
+                  <Instagram className="h-3.5 w-3.5" />
+                  Ver novidades no Instagram
+                </a>
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
-    </>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }

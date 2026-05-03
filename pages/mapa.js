@@ -15,6 +15,7 @@ import {
   Zap,
   Camera,
   Route,
+  Map,
   Wallet,
   Sparkles,
   ShoppingCart,
@@ -99,6 +100,8 @@ export default function MapaPage() {
   const wazeUi = router.isReady && router.query.waze === '1';
   const mapPaddingTopPx = MAP_MAP_PADDING_TOP_PX;
   const mapOverlayTopPx = session ? MAP_OVERLAY_TOP_LOGGED_PX : MAP_OVERLAY_TOP_GUEST_PX;
+  /** Onboarding em tela cheia: mapa não monta até o utilizador escolher (evita mapa “por baixo”). */
+  const showMapLanding = Boolean(session && mapLandingOpen && !wazeUi);
 
   /** Lista vinda de /shopping-list (?lista=manga,pera) — preenche o planejador de compras. */
   const listaParamAppliedRef = useRef(null);
@@ -215,72 +218,98 @@ export default function MapaPage() {
       <Head>
         <title>FinMemory – Onde está mais barato? | App de compras e análise de custos</title>
       </Head>
-      <div className="fixed inset-0 z-40 w-full h-full bg-[#e8e4de]">
-        <div className="absolute inset-0 w-full h-full">
-          <MapaPrecos
-            mapThemeId={mapThemeId}
-            searchQuery={debouncedSearch}
-            promoOnly={promoOnly}
-            wazeUi={wazeUi}
-            planningMode={planningMode}
-            planningItems={parsedPlanningItems}
-            onPlanningSummaryChange={setPlanningSummary}
-            planningActionRequest={planningActionRequest}
-            headerOffsetPx={mapPaddingTopPx}
-            overlayTopPx={mapOverlayTopPx}
-            onDetailOpenChange={handleDetailOpenChange}
-            onDetailExpandedChange={handleDetailExpandedChange}
-          />
-        </div>
+      <div
+        className={`fixed inset-0 z-40 w-full h-full ${showMapLanding ? 'bg-[#0f0f0f]' : 'bg-[#e8e4de]'}`}
+      >
+        {!showMapLanding ? (
+          <div className="absolute inset-0 w-full h-full">
+            <MapaPrecos
+              mapThemeId={mapThemeId}
+              searchQuery={debouncedSearch}
+              promoOnly={promoOnly}
+              wazeUi={wazeUi}
+              planningMode={planningMode}
+              planningItems={parsedPlanningItems}
+              onPlanningSummaryChange={setPlanningSummary}
+              planningActionRequest={planningActionRequest}
+              headerOffsetPx={mapPaddingTopPx}
+              overlayTopPx={mapOverlayTopPx}
+              onDetailOpenChange={handleDetailOpenChange}
+              onDetailExpandedChange={handleDetailExpandedChange}
+            />
+          </div>
+        ) : null}
 
-        {session && mapLandingOpen && !wazeUi ? (
+        {showMapLanding ? (
           <div
-            className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-black/50 px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]"
+            className="absolute inset-0 z-[60] flex flex-col bg-[#0f0f0f] px-5 pb-[max(28px,env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="map-landing-title"
           >
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-black/10">
-              <p className="text-center text-xs font-semibold uppercase tracking-wide text-[#2ECC49]">
+            <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center">
+              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-[#39FF14]">
                 FinMemory
               </p>
-              <h2 id="map-landing-title" className="mt-1 text-center text-xl font-bold text-gray-900">
+              <h2
+                id="map-landing-title"
+                className="mt-3 text-center text-[1.75rem] font-bold leading-tight tracking-tight text-white"
+              >
                 Como quer começar?
               </h2>
-              <p className="mt-2 text-center text-sm leading-relaxed text-gray-600">
-                Isto fica por cima do mapa só para escolher o fluxo. O mapa de preços continua atrás.
+              <p className="mt-3 text-center text-sm leading-relaxed text-zinc-500">
+                Escolha por onde começar — pode mudar depois pelo menu ou pelo mapa.
               </p>
-              <div className="mt-6 flex flex-col gap-3">
+
+              <div className="mt-10 flex flex-col gap-4">
                 <Link
                   href="/add-receipt"
                   onClick={dismissMapLanding}
-                  className="flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-emerald-200 bg-[#eefbf1] px-4 py-3 no-underline transition-colors hover:bg-[#e3f7e9]"
+                  className="group flex min-h-[5.25rem] items-center gap-4 rounded-2xl border border-[#2ECC49]/35 bg-[#141414] px-5 py-4 no-underline shadow-[0_0_0_1px_rgba(46,204,73,0.12)] transition-colors hover:border-[#2ECC49]/55 hover:bg-[#181818]"
                 >
-                  <Camera className="h-6 w-6 shrink-0 text-[#106b2a]" aria-hidden />
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#2ECC49]/12 ring-1 ring-[#2ECC49]/25">
+                    <Camera className="h-6 w-6 text-[#39FF14]" aria-hidden />
+                  </span>
                   <div className="min-w-0 text-left">
-                    <p className="text-sm font-bold text-[#106b2a]">Escanear nota fiscal</p>
-                    <p className="text-xs text-[#357a46]">Já comprei — organizar gastos e histórico.</p>
+                    <p className="text-base font-bold text-white">Escanear nota fiscal</p>
+                    <p className="mt-1 text-xs leading-snug text-zinc-500 group-hover:text-zinc-400">
+                      Organizar gastos e histórico a partir do código da nota.
+                    </p>
                   </div>
                 </Link>
+
                 <Link
                   href="/shopping-list"
                   onClick={dismissMapLanding}
-                  className="flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-sky-200 bg-[#eef4ff] px-4 py-3 no-underline transition-colors hover:bg-[#e4edff]"
+                  className="group flex min-h-[5.25rem] items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#141414] px-5 py-4 no-underline transition-colors hover:border-[#2ECC49]/30 hover:bg-[#181818]"
                 >
-                  <ShoppingCart className="h-6 w-6 shrink-0 text-[#0f3e9c]" aria-hidden />
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] ring-1 ring-white/[0.08]">
+                    <ShoppingCart className="h-6 w-6 text-[#2ECC49]" aria-hidden />
+                  </span>
                   <div className="min-w-0 text-left">
-                    <p className="text-sm font-bold text-[#0f3e9c]">Lista de compras</p>
-                    <p className="text-xs text-[#37517f]">Montar o que falta — fotos do catálogo e depois ver no mapa.</p>
+                    <p className="text-base font-bold text-white">Lista de compras</p>
+                    <p className="mt-1 text-xs leading-snug text-zinc-500 group-hover:text-zinc-400">
+                      Monte a lista e depois veja ofertas no mapa com um toque.
+                    </p>
                   </div>
                 </Link>
+
+                <button
+                  type="button"
+                  onClick={dismissMapLanding}
+                  className="group flex min-h-[5.25rem] w-full items-center gap-4 rounded-2xl border border-white/[0.08] bg-[#141414] px-5 py-4 text-left transition-colors hover:border-[#2ECC49]/30 hover:bg-[#181818]"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#2ECC49]/10 ring-1 ring-[#2ECC49]/20">
+                    <Map className="h-6 w-6 text-[#39FF14]" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-base font-bold text-white">Ver o mapa de preços</p>
+                    <p className="mt-1 text-xs leading-snug text-zinc-500 group-hover:text-zinc-400">
+                      Explorar ofertas e mercados perto de si — direto no radar.
+                    </p>
+                  </div>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={dismissMapLanding}
-                className="mt-5 w-full rounded-xl border border-gray-200 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-              >
-                Só quero ver o mapa de preços
-              </button>
             </div>
           </div>
         ) : null}
@@ -294,7 +323,7 @@ export default function MapaPage() {
           </div>
         )}
 
-        {session ? (
+        {session && !showMapLanding ? (
           <div
             className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch pt-[max(8px,env(safe-area-inset-top))] px-3"
             aria-label="Controles do mapa"
@@ -456,7 +485,7 @@ export default function MapaPage() {
               ) : null}
             </div>
           </div>
-        ) : (
+        ) : !session ? (
           <header
             className={`pointer-events-auto absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 rounded-b-2xl shadow-[0_2px_12px_rgba(0,0,0,0.08)] ${
               wazeUi
@@ -482,9 +511,9 @@ export default function MapaPage() {
               Gastos
             </Link>
           </header>
-        )}
+        ) : null}
 
-        <Sheet open={showMenuSheet} onOpenChange={setShowMenuSheet}>
+        <Sheet open={showMenuSheet && !showMapLanding} onOpenChange={setShowMenuSheet}>
           <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
             <SheetHeader className="mb-4">
               <SheetTitle className="text-xl font-bold text-center text-gray-900">FinMemory no mapa</SheetTitle>
@@ -553,7 +582,7 @@ export default function MapaPage() {
           </SheetContent>
         </Sheet>
 
-        {session && planningMode && !isDetailExpanded ? (
+        {session && !showMapLanding && planningMode && !isDetailExpanded ? (
           <div
             className="pointer-events-none absolute inset-x-0 z-[18] px-3 pb-[calc(68px+env(safe-area-inset-bottom))]"
             style={{ bottom: 0 }}

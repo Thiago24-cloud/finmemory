@@ -2,7 +2,7 @@
 
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from 'react-leaflet';
 import { displayPromoProductName, promoCategoryBadgeLabel, promoShelfLabel } from '../lib/mapOfferDisplay';
-import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useSession } from 'next-auth/react';
@@ -33,6 +33,7 @@ import {
   mixWithWhite,
   readableAccentOnLightChip,
 } from '../lib/mapPinVisual';
+import Supercluster from 'supercluster';
 
 /** Vista inicial: Estado de São Paulo (zoom out); o utilizador aproxima para bairro/cidade. */
 const DEFAULT_MAP_CENTER = Object.freeze([...SAO_PAULO_STATE_CENTER]);
@@ -45,18 +46,35 @@ const MAP_ZOOM_SINGLE_STORE_FOCUS = 17;
 const MAP_ZOOM_MULTI_STORE_FOCUS = 16;
 const MAP_ZOOM_REGION_OVERVIEW = 15;
 
+/**
+ * Zoom sincronizado com o repaint (no máx. ~1 setState por frame durante pinch/scroll),
+ * em vez de disparar um re-render por cada evento `zoom` do Leaflet (causava engasgos).
+ */
 function useMapZoom() {
   const map = useMap();
   const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
   useEffect(() => {
     if (!map) return undefined;
-    const update = () => setZoom(map.getZoom());
-    update();
-    map.on('zoomend', update);
-    map.on('zoom', update);
+    let rafId = 0;
+    const flush = () => {
+      rafId = 0;
+      setZoom(map.getZoom());
+    };
+    const scheduleFlush = () => {
+      if (!rafId) rafId = requestAnimationFrame(flush);
+    };
+    const flushNow = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = 0;
+      setZoom(map.getZoom());
+    };
+    flushNow();
+    map.on('zoomend', flushNow);
+    map.on('zoom', scheduleFlush);
     return () => {
-      map.off('zoomend', update);
-      map.off('zoom', update);
+      map.off('zoomend', flushNow);
+      map.off('zoom', scheduleFlush);
+      if (rafId) cancelAnimationFrame(rafId);
     };
   }, [map]);
   return zoom;
@@ -68,13 +86,26 @@ function useMapAndZoom() {
   const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
   useEffect(() => {
     if (!map) return undefined;
-    const update = () => setZoom(map.getZoom());
-    update();
-    map.on('zoomend', update);
-    map.on('zoom', update);
+    let rafId = 0;
+    const flush = () => {
+      rafId = 0;
+      setZoom(map.getZoom());
+    };
+    const scheduleFlush = () => {
+      if (!rafId) rafId = requestAnimationFrame(flush);
+    };
+    const flushNow = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = 0;
+      setZoom(map.getZoom());
+    };
+    flushNow();
+    map.on('zoomend', flushNow);
+    map.on('zoom', scheduleFlush);
     return () => {
-      map.off('zoomend', update);
-      map.off('zoom', update);
+      map.off('zoomend', flushNow);
+      map.off('zoom', scheduleFlush);
+      if (rafId) cancelAnimationFrame(rafId);
     };
   }, [map]);
   return { map, zoom };
@@ -1163,9 +1194,16 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => load(), 400);
     };
+    const onMoveStart = () => {
+      clearTimeout(debounceRef.current);
+    };
+    map.on('movestart', onMoveStart);
     map.on('moveend', onMoveEnd);
+    map.on('zoomend', onMoveEnd);
     return () => {
+      map.off('movestart', onMoveStart);
       map.off('moveend', onMoveEnd);
+      map.off('zoomend', onMoveEnd);
       clearTimeout(debounceRef.current);
     };
   }, [map, productMode, load]);
@@ -2620,26 +2658,14 @@ function MapsStyleOfferPopup({ group, accentHex, cartOfferIdSet, onMapPointCartT
   );
 }
 
-/** Pins de preço: rótulos só com zoom alto ou durante busca — mapa menos carregado. */
-function PriceMarkersLayer({ groups, searchQuery, cartOfferIdSet, onMapPointCartToggle, userOrigin = null }) {
-  return (
-    <>
-      {groups.map((group) => (
-        <PriceGroupMarker
-          key={`pg-${group.groupKey}`}
-          group={group}
-          searchQuery={searchQuery}
-          cartOfferIdSet={cartOfferIdSet}
-          onMapPointCartToggle={onMapPointCartToggle}
-          userOrigin={userOrigin}
-        />
-      ))}
-    </>
-  );
-}
-
 /** Ícone memoizado + key estável — evita setIcon() e fechamento do popup ao atualizar pontos. */
-function PriceGroupMarker({ group, searchQuery, cartOfferIdSet, onMapPointCartToggle, userOrigin = null }) {
+const PriceGroupMarker = memo(function PriceGroupMarker({
+  group,
+  searchQuery,
+  cartOfferIdSet,
+  onMapPointCartToggle,
+  userOrigin = null,
+}) {
   const zoom = useMapZoom();
   const searchActive = searchQuery.trim().length >= 2;
   const showPinLabels = zoom >= MAP_LABEL_MIN_ZOOM || searchActive;
@@ -2714,6 +2740,173 @@ function PriceGroupMarker({ group, searchQuery, cartOfferIdSet, onMapPointCartTo
         />
       </Popup>
     </Marker>
+  );
+});
+
+/** Mesmos defaults que `PriceMap.js` (Mapbox) para transição previsível entre zooms. */
+const PRICE_SUPERCLUSTER_OPTIONS = {
+  radius: 72,
+  maxZoom: 16,
+  minZoom: 0,
+  minPoints: 2,
+};
+
+function priceGroupsToGeoJSONFeatures(groups) {
+  if (!Array.isArray(groups)) return [];
+  const out = [];
+  for (const g of groups) {
+    const lat = Number(g.lat);
+    const lng = Number(g.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    out.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [lng, lat] },
+      properties: {
+        groupKey: g.groupKey,
+        points: g.points,
+        nome: g.nome,
+        lat: g.lat,
+        lng: g.lng,
+      },
+    });
+  }
+  return out;
+}
+
+/** Marcador circular com contagem — clique aproxima (equivalente ao cluster Mapbox). */
+function PriceClusterMarker({ count, lat, lng }) {
+  const map = useMap();
+  const icon = useMemo(() => {
+    const safeCount = Math.max(1, Number(count) || 1);
+    const green = '#2ECC49';
+    const white = '#FFFFFF';
+    return L.divIcon({
+      className: 'finmemory-leaflet-cluster-root',
+      html: `<div style="width:44px;height:44px;background:${green};border:3px solid ${white};border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;color:${white};font-family:system-ui,sans-serif;cursor:pointer;">${safeCount}</div>`,
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+    });
+  }, [count]);
+
+  const eventHandlers = useMemo(
+    () => ({
+      click: (e) => {
+        if (e?.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+        try {
+          map.flyTo([lat, lng], Math.min(map.getZoom() + 2, 18), { duration: 0.38 });
+        } catch (_) {}
+      },
+    }),
+    [map, lat, lng]
+  );
+
+  return (
+    <Marker position={[lat, lng]} icon={icon} zIndexOffset={2480} eventHandlers={eventHandlers} />
+  );
+}
+
+/**
+ * Agrupa pins órfãos (após merge com lojas) com Supercluster + bbox/zoom —
+ * só instâncias visíveis na viewport entram no DOM.
+ */
+function SuperclusterPriceMarkersLayer({
+  groups,
+  searchQuery,
+  cartOfferIdSet,
+  onMapPointCartToggle,
+  userOrigin = null,
+}) {
+  const map = useMap();
+  const [mapTick, setMapTick] = useState(0);
+
+  useEffect(() => {
+    if (!map) return undefined;
+    let moveTimer = 0;
+    const bump = () => setMapTick((t) => t + 1);
+    const onMoveThrottled = () => {
+      if (moveTimer) return;
+      moveTimer = window.setTimeout(() => {
+        moveTimer = 0;
+        bump();
+      }, 100);
+    };
+    const onEnd = () => {
+      if (moveTimer) {
+        clearTimeout(moveTimer);
+        moveTimer = 0;
+      }
+      bump();
+    };
+    bump();
+    map.on('moveend', onEnd);
+    map.on('zoomend', onEnd);
+    map.on('move', onMoveThrottled);
+    return () => {
+      map.off('moveend', onEnd);
+      map.off('zoomend', onEnd);
+      map.off('move', onMoveThrottled);
+      if (moveTimer) clearTimeout(moveTimer);
+    };
+  }, [map]);
+
+  const clusterIndex = useMemo(() => {
+    const features = priceGroupsToGeoJSONFeatures(groups);
+    if (features.length === 0) return null;
+    const idx = new Supercluster(PRICE_SUPERCLUSTER_OPTIONS);
+    idx.load(features);
+    return idx;
+  }, [groups]);
+
+  const clusterFeatures = useMemo(() => {
+    if (!clusterIndex || !map) return [];
+    let b;
+    try {
+      b = map.getBounds();
+    } catch {
+      return [];
+    }
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    const z = Math.min(18, Math.max(0, Math.round(map.getZoom())));
+    return clusterIndex.getClusters(bbox, z);
+  }, [clusterIndex, map, mapTick]);
+
+  if (!groups?.length || !clusterIndex) return null;
+
+  return (
+    <>
+      {clusterFeatures.map((feature) => {
+        const [flng, flat] = feature.geometry.coordinates;
+        const p = feature.properties || {};
+        const isCluster = p.cluster === true && p.cluster_id != null;
+        if (isCluster) {
+          return (
+            <PriceClusterMarker
+              key={`sc-${p.cluster_id}-${flng.toFixed(4)}-${flat.toFixed(4)}`}
+              count={p.point_count}
+              lat={flat}
+              lng={flng}
+            />
+          );
+        }
+        const group = {
+          groupKey: p.groupKey,
+          lat: p.lat,
+          lng: p.lng,
+          points: p.points,
+          nome: p.nome,
+        };
+        return (
+          <PriceGroupMarker
+            key={`pg-${p.groupKey}`}
+            group={group}
+            searchQuery={searchQuery}
+            cartOfferIdSet={cartOfferIdSet}
+            onMapPointCartToggle={onMapPointCartToggle}
+            userOrigin={userOrigin}
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -2886,7 +3079,7 @@ export default function MapaPrecosLeaflet({
   const handleShopSheetVisualMetrics = useCallback((m) => {
     setMobileShopSheetMapBottomPadPx(Math.max(0, Math.round(Number(m?.bottomInsetPx) || 0)));
     if (typeof m?.snap === 'string') {
-      // EstablishmentDetailSheet não usa onSnapChange externo; capturamos o snap por métricas.
+      // EstablishmentDetailSheet (vaul): snap via métricas — peek | half | full.
       setShopSheetSnap(m.snap);
     }
   }, []);
@@ -4096,7 +4289,7 @@ export default function MapaPrecosLeaflet({
   }, []);
 
   const mapBlockInteraction =
-    isMobileMapSheet && shopOpen && shopSheetSnap === 'expanded';
+    isMobileMapSheet && shopOpen && shopSheetSnap === 'full';
 
   return (
     <div
@@ -4136,7 +4329,7 @@ export default function MapaPrecosLeaflet({
           reloadRef={reloadPointsRef}
         />
         {/* Preços primeiro; lojas depois + z-index maior — evita círculos de promo cobrirem estabelecimentos */}
-        <PriceMarkersLayer
+        <SuperclusterPriceMarkersLayer
           groups={priceGroupsForMarkers}
           searchQuery={searchQuery}
           cartOfferIdSet={cartOfferIdSet}
@@ -4185,7 +4378,7 @@ export default function MapaPrecosLeaflet({
           reloadRef={storeReloadRef}
         />
         <MapShopSheetDragLock
-          locked={isMobileMapSheet && shopOpen && shopSheetSnap === 'expanded'}
+          locked={isMobileMapSheet && shopOpen && shopSheetSnap === 'full'}
         />
         <MapBottomPaddingSync paddingPx={mapOverlayBottomPadPx} paddingLeftPx={desktopShopSidebarWidthPx} />
         <MapUsefulAreaPan

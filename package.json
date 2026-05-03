@@ -10,7 +10,7 @@
     "build": "next build",
     "postbuild": "node scripts/verify-build.mjs",
     "start": "next start",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint pages components lib",
     "validate-env": "node scripts/validate-env.mjs",
     "verify-build": "node scripts/verify-build.mjs",
     "diagnose:sacolao": "node -r dotenv/config scripts/diagnose-sacolao-store-promos.mjs",

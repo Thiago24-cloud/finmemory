@@ -3,27 +3,142 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { ChevronLeft, ChevronRight, Cloud, HelpCircle, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Cloud,
+  HelpCircle,
+  Home,
+  Loader2,
+  Palmtree,
+  Plus,
+  RefreshCw,
+  Trash2,
+  TrendingUp,
+} from 'lucide-react';
+import { Drawer } from 'vaul';
 import { cn } from '../../lib/utils';
 import {
   buildHeavyBillScheduledOutflows,
   projectSimuladorMonth,
   reliabilityLabel,
 } from '../../lib/simuladorProjection';
+import { SimuladorMonthCalendar } from './SimuladorMonthCalendar';
+import { NEED, SimuladorNecessityPie } from './SimuladorNecessityPie';
 import { SimuladorRadarChart } from './SimuladorRadarChart';
 
 const STORAGE_KEY = 'finmemory-simulador-v1';
+
+function newExtraRowId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `extra-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function clampDayOfMonth(day, dim) {
+  const d = Number(day) || 1;
+  return Math.min(dim, Math.max(1, d));
+}
+
+function monthKeyNow() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function normalizeNecessity(v) {
+  return v === 'leisure' || v === 'investment' ? v : 'essential';
+}
+
+function normalizeSimuladorState(parsed) {
+  const dim = daysInCurrentMonth();
+  const parsedRows = parsed && Array.isArray(parsed.extraRows) ? parsed.extraRows : [];
+  const hasLegacyExtraFields =
+    parsed &&
+    parsedRows.length === 0 &&
+    (parsed.extraLabel !== undefined ||
+      parsed.extraAmount !== undefined ||
+      parsed.extraDay !== undefined ||
+      parsed.extraReliabilityPct !== undefined ||
+      parsed.extraCommitted !== undefined);
+
+  const merged = { ...defaultState(), ...parsed };
+
+  if (hasLegacyExtraFields) {
+    merged.extraRows = [
+      {
+        id: newExtraRowId(),
+        label: typeof merged.extraLabel === 'string' ? merged.extraLabel : '',
+        amount:
+          merged.extraAmount !== undefined && merged.extraAmount !== ''
+            ? Number(merged.extraAmount)
+            : 500,
+        day: clampDayOfMonth(merged.extraDay ?? 18, dim),
+        reliabilityPct:
+          Number(merged.extraReliabilityPct) >= 0 && Number(merged.extraReliabilityPct) <= 100
+            ? Number(merged.extraReliabilityPct)
+            : 75,
+        committed: Boolean(merged.extraCommitted),
+        necessity: 'essential',
+        receivedConfirmed: false,
+      },
+    ];
+  } else if (!Array.isArray(merged.extraRows) || merged.extraRows.length === 0) {
+    merged.extraRows = [
+      {
+        id: newExtraRowId(),
+        label: '',
+        amount: 500,
+        day: clampDayOfMonth(18, dim),
+        reliabilityPct: 75,
+        committed: false,
+        necessity: 'essential',
+        receivedConfirmed: false,
+      },
+    ];
+  } else {
+    merged.extraRows = merged.extraRows.map((r, i) => ({
+      id: r.id || `extra-${i}-${Date.now()}`,
+      label: typeof r.label === 'string' ? r.label : '',
+      amount: Math.max(0, Number(r.amount) || 0),
+      day: clampDayOfMonth(r.day ?? 1, dim),
+      reliabilityPct: Math.min(100, Math.max(0, Number(r.reliabilityPct) ?? 75)),
+      committed: Boolean(r.committed),
+      necessity: normalizeNecessity(r.necessity),
+      receivedConfirmed: Boolean(r.receivedConfirmed),
+    }));
+  }
+
+  const mk = monthKeyNow();
+  if (merged.simuladorMonthKey != null && merged.simuladorMonthKey !== mk) {
+    merged.extraRows = (merged.extraRows || []).map((r) => ({
+      ...r,
+      receivedConfirmed: false,
+    }));
+  }
+  merged.simuladorMonthKey = mk;
+
+  return merged;
+}
 
 const defaultState = () => ({
   step: 1,
   hasSupport: false,
   contacts: [],
   extraEnabled: true,
-  extraLabel: '',
-  extraAmount: 500,
-  extraDay: 18,
-  extraReliabilityPct: 75,
-  extraCommitted: false,
+  simuladorMonthKey: monthKeyNow(),
+  extraRows: [
+    {
+      id: newExtraRowId(),
+      label: '',
+      amount: 500,
+      day: clampDayOfMonth(18, daysInCurrentMonth()),
+      reliabilityPct: 75,
+      committed: false,
+      necessity: 'essential',
+      receivedConfirmed: false,
+    },
+  ],
   creditDueDay: 10,
   bestPurchaseDay: 25,
   reliefPct: 40,
@@ -43,7 +158,7 @@ function loadState() {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    return normalizeSimuladorState(parsed);
   } catch {
     return defaultState();
   }
@@ -119,7 +234,7 @@ export function SimuladorFlow() {
         if (hintsJson?.ok) setHints(hintsJson);
 
         if (stateJson?.state && typeof stateJson.state === 'object') {
-          const merged = { ...defaultState(), ...stateJson.state };
+          const merged = normalizeSimuladorState(stateJson.state);
           setState(merged);
           lastSentRef.current = JSON.stringify(merged);
           setSaveStatus('saved');
@@ -205,6 +320,10 @@ export function SimuladorFlow() {
   }, [status, fetchHints]);
 
   useEffect(() => {
+    if (state.step !== 4) setFocusedDay(null);
+  }, [state.step]);
+
+  useEffect(() => {
     if (!hints) return;
     setState((s) => {
       if (!s.dailyBurnAuto) return s;
@@ -257,10 +376,13 @@ export function SimuladorFlow() {
 
   const dim = useMemo(() => daysInCurrentMonth(), []);
   const todayDay = useMemo(() => new Date().getDate(), []);
-  const committedExtraValue = useMemo(
-    () => (state.extraEnabled && state.extraCommitted ? Math.max(0, Number(state.extraAmount) || 0) : 0),
-    [state.extraEnabled, state.extraCommitted, state.extraAmount]
-  );
+  const committedExtraValue = useMemo(() => {
+    if (!state.extraEnabled) return 0;
+    return (state.extraRows || []).reduce((acc, r) => {
+      if (!r.committed) return acc;
+      return acc + Math.max(0, Number(r.amount) || 0);
+    }, 0);
+  }, [state.extraEnabled, state.extraRows]);
   const adjustedStartingBalance = useMemo(
     () => Math.max(0, (Number(state.startingBalance) || 0) - committedExtraValue),
     [state.startingBalance, committedExtraValue]
@@ -279,15 +401,16 @@ export function SimuladorFlow() {
       : [];
 
     const extraInflows =
-      debouncedState.extraEnabled && Number(debouncedState.extraAmount) > 0
-        ? [
-            {
-              label: debouncedState.extraLabel?.trim() || 'Entrada extra',
-              day: Number(debouncedState.extraDay) || 1,
-              amount: Number(debouncedState.extraAmount) || 0,
-              reliability: (Number(debouncedState.extraReliabilityPct) || 0) / 100,
-            },
-          ]
+      debouncedState.extraEnabled
+        ? (debouncedState.extraRows || [])
+            .filter((r) => !r.committed && Number(r.amount) > 0)
+            .map((r) => ({
+              label: r.label?.trim() || 'Entrada extra',
+              day: clampDayOfMonth(r.day, dim),
+              amount: Number(r.amount) || 0,
+              reliability: (Number(r.reliabilityPct) || 0) / 100,
+              necessity: normalizeNecessity(r.necessity),
+            }))
         : [];
 
     const scheduledOutflows = buildHeavyBillScheduledOutflows({
@@ -304,7 +427,7 @@ export function SimuladorFlow() {
       salaryDay: Number(debouncedState.salaryDay) > 0 ? Number(debouncedState.salaryDay) : null,
       salaryAmount: Number(debouncedState.salaryAmount) || 0,
       supportInflows,
-      extraInflows: debouncedState.extraCommitted ? [] : extraInflows,
+      extraInflows,
       scheduledOutflows,
       stressMode: debouncedState.stressMode,
       variableIncomeShockPct: debouncedState.stressMode ? 30 : 0,
@@ -322,16 +445,56 @@ export function SimuladorFlow() {
         });
       }
     }
-    if (debouncedState.extraEnabled && Number(debouncedState.extraAmount) > 0 && !debouncedState.extraCommitted) {
-      const rel = (Number(debouncedState.extraReliabilityPct) || 0) / 100;
-      bands.push({
-        day: Number(debouncedState.extraDay) || 1,
-        opacity: rel >= 0.9 ? 0.12 : rel >= 0.6 ? 0.26 : 0.44,
-      });
+    if (debouncedState.extraEnabled) {
+      for (const r of debouncedState.extraRows || []) {
+        if (r.committed || !(Number(r.amount) > 0)) continue;
+        const rel = (Number(r.reliabilityPct) || 0) / 100;
+        bands.push({
+          day: clampDayOfMonth(r.day, dim),
+          opacity: rel >= 0.9 ? 0.12 : rel >= 0.6 ? 0.26 : 0.44,
+        });
+      }
     }
     return bands;
-  }, [debouncedState]);
+  }, [debouncedState, dim]);
   const baselineMonthlyExpense = useMemo(() => Number(hints?.baseline?.avgExpenseLast3Months) || 0, [hints]);
+
+  const necessityBuckets = useMemo(() => {
+    if (!state.extraEnabled) return { essential: 0, leisure: 0, investment: 0 };
+    return (state.extraRows || []).reduce(
+      (acc, r) => {
+        if (r.committed || !(Number(r.amount) > 0)) return acc;
+        acc[normalizeNecessity(r.necessity)] += Number(r.amount) || 0;
+        return acc;
+      },
+      { essential: 0, leisure: 0, investment: 0 }
+    );
+  }, [state.extraEnabled, state.extraRows]);
+
+  const pendingExtraRows = useMemo(() => {
+    if (!state.extraEnabled) return [];
+    const dim = projection.daysInMonth;
+    return (state.extraRows || []).filter((r) => {
+      if (r.committed || !(Number(r.amount) > 0) || r.receivedConfirmed) return false;
+      const d = clampDayOfMonth(r.day, dim);
+      return todayDay > d;
+    });
+  }, [state.extraEnabled, state.extraRows, projection.daysInMonth, todayDay]);
+
+  const pendingConfirmDays = useMemo(() => {
+    const set = new Set();
+    const dim = projection.daysInMonth;
+    for (const r of pendingExtraRows) {
+      set.add(clampDayOfMonth(r.day, dim));
+    }
+    return set;
+  }, [pendingExtraRows, projection.daysInMonth]);
+
+  const focusedDayPendingExtras = useMemo(() => {
+    if (focusedDay == null) return [];
+    const dim = projection.daysInMonth;
+    return pendingExtraRows.filter((r) => clampDayOfMonth(r.day, dim) === focusedDay);
+  }, [focusedDay, pendingExtraRows, projection.daysInMonth]);
 
   const salaryProjection = useMemo(() => {
     const salaryDay = Math.min(31, Math.max(1, Number(state.salaryDay) || 1));
@@ -360,10 +523,12 @@ export function SimuladorFlow() {
           return acc + amount * rel;
         }, 0)
       : 0;
-    const extra =
-      state.extraEnabled && !state.extraCommitted && Number(state.extraAmount) > 0 && Number(state.extraReliabilityPct) >= 85
-        ? Number(state.extraAmount) * (Number(state.extraReliabilityPct) / 100)
-        : 0;
+    const extra = state.extraEnabled
+      ? (state.extraRows || []).reduce((acc, r) => {
+          if (r.committed || Number(r.amount) <= 0 || Number(r.reliabilityPct) < 85) return acc;
+          return acc + Number(r.amount) * (Number(r.reliabilityPct) / 100);
+        }, 0)
+      : 0;
     return Math.round((salary + support + extra) * 100) / 100;
   }, [state]);
 
@@ -404,6 +569,57 @@ export function SimuladorFlow() {
       return { ...s, contacts: next };
     });
   };
+
+  const addExtraRow = () => {
+    setState((s) => ({
+      ...s,
+      extraRows: [
+        ...(s.extraRows || []),
+        {
+          id: newExtraRowId(),
+          label: '',
+          amount: 0,
+          day: clampDayOfMonth(18, dim),
+          reliabilityPct: 75,
+          committed: false,
+          necessity: 'essential',
+          receivedConfirmed: false,
+        },
+      ],
+    }));
+  };
+
+  const updateExtraRow = (id, patch) => {
+    setState((s) => ({
+      ...s,
+      extraRows: (s.extraRows || []).map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  };
+
+  const removeExtraRow = (id) => {
+    setState((s) => {
+      const next = (s.extraRows || []).filter((r) => r.id !== id);
+      return {
+        ...s,
+        extraRows:
+          next.length > 0
+            ? next
+            : [
+                {
+                  id: newExtraRowId(),
+                  label: '',
+                  amount: 0,
+                  day: clampDayOfMonth(18, dim),
+                  reliabilityPct: 75,
+                  committed: false,
+                  necessity: 'essential',
+                  receivedConfirmed: false,
+                },
+              ],
+      };
+    });
+  };
+
   const setReliabilityByConfidence = useCallback((id, confidence) => {
     const map = {
       certo: 0.95,
@@ -781,64 +997,126 @@ export function SimuladorFlow() {
               Entrada extra neste mês
               </label>
               {state.extraEnabled && (
-                <div className="space-y-3">
-                  <div>
-                    <label className={labelClass}>Fonte</label>
-                    <input
-                      className={fieldClass}
-                      placeholder="Ex.: freela designer"
-                      value={state.extraLabel}
-                      onChange={(e) => set({ extraLabel: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className={labelClass}>Valor (R$)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        className={fieldClass}
-                        value={state.extraAmount}
-                        onChange={(e) => set({ extraAmount: Number(e.target.value) })}
-                      />
+                <div className="space-y-4">
+                  {(state.extraRows || []).map((row, idx) => (
+                    <div
+                      key={row.id}
+                      className="rounded-xl border border-zinc-800/90 bg-zinc-950/40 p-3 space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-zinc-500">Entrada {idx + 1}</span>
+                        {(state.extraRows || []).length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => removeExtraRow(row.id)}
+                            className="inline-flex items-center justify-center rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition-colors"
+                            aria-label="Remover entrada"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                      <div>
+                        <label className={labelClass}>Fonte</label>
+                        <input
+                          className={fieldClass}
+                          placeholder="Ex.: freela designer"
+                          value={row.label}
+                          onChange={(e) => updateExtraRow(row.id, { label: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={labelClass}>Valor (R$)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            className={fieldClass}
+                            value={row.amount}
+                            onChange={(e) => updateExtraRow(row.id, { amount: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Dia provável</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={dim}
+                          className={fieldClass}
+                          value={row.day}
+                          onChange={(e) =>
+                            updateExtraRow(row.id, {
+                              day: clampDayOfMonth(Number(e.target.value), dim),
+                              receivedConfirmed: false,
+                            })
+                          }
+                        />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-zinc-500 mb-1">
+                          <span>Confiabilidade</span>
+                          <span className="text-purple-300">
+                            {row.reliabilityPct}% · {reliabilityLabel(row.reliabilityPct)}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={row.reliabilityPct}
+                          onChange={(e) =>
+                            updateExtraRow(row.id, { reliabilityPct: Number(e.target.value) })
+                          }
+                          className="w-full accent-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Nível de necessidade</label>
+                        <div className="flex gap-1.5">
+                          {(
+                            [
+                              ['essential', Home, NEED.essential.label],
+                              ['leisure', Palmtree, NEED.leisure.label],
+                              ['investment', TrendingUp, NEED.investment.label],
+                            ]
+                          ).map(([key, Icon, lbl]) => (
+                            <button
+                              type="button"
+                              key={key}
+                              onClick={() => updateExtraRow(row.id, { necessity: key })}
+                              className={cn(
+                                'flex flex-1 flex-col items-center gap-1 rounded-xl border py-2 text-[10px] font-medium transition-colors',
+                                normalizeNecessity(row.necessity) === key
+                                  ? 'border-purple-500/70 bg-purple-950/40 text-purple-200'
+                                  : 'border-zinc-800 bg-zinc-950/60 text-zinc-500 hover:border-zinc-600'
+                              )}
+                            >
+                              <Icon className="h-4 w-4" aria-hidden />
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <label className="flex items-start gap-2 text-xs text-zinc-400 leading-snug">
+                        <input
+                          type="checkbox"
+                          className="accent-purple-500 mt-0.5"
+                          checked={row.committed}
+                          onChange={(e) => updateExtraRow(row.id, { committed: e.target.checked })}
+                        />
+                        Já comprometi esse valor (cartão, parcela, compra) — tratar como se não fosse entrar
+                      </label>
                     </div>
-                    <div>
-                      <label className={labelClass}>Dia provável</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={31}
-                        className={fieldClass}
-                        value={state.extraDay}
-                        onChange={(e) => set({ extraDay: Number(e.target.value) })}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs text-zinc-500 mb-1">
-                      <span>Confiabilidade</span>
-                      <span className="text-purple-300">
-                        {state.extraReliabilityPct}% · {reliabilityLabel(state.extraReliabilityPct)}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={state.extraReliabilityPct}
-                      onChange={(e) => set({ extraReliabilityPct: Number(e.target.value) })}
-                      className="w-full accent-purple-500"
-                    />
-                  </div>
-                  <label className="flex items-start gap-2 text-xs text-zinc-400 leading-snug">
-                    <input
-                      type="checkbox"
-                      className="accent-purple-500 mt-0.5"
-                      checked={state.extraCommitted}
-                      onChange={(e) => set({ extraCommitted: e.target.checked })}
-                    />
-                    Já comprometi esse valor (cartão, parcela, compra) — tratar como se não fosse entrar
-                  </label>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addExtraRow}
+                    className="w-full py-2.5 rounded-xl border border-dashed border-zinc-700 text-sm text-zinc-400 hover:border-purple-500/50 hover:text-purple-200 transition-colors inline-flex items-center justify-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Adicionar entrada
+                  </button>
                 </div>
               )}
             </Card>
@@ -934,6 +1212,20 @@ export function SimuladorFlow() {
 
         {state.step === 4 && (
           <>
+            {pendingExtraRows.length > 0 ? (
+              <div className="flex gap-2 rounded-2xl border border-red-500/40 bg-red-950/30 p-3 text-sm text-red-100">
+                <AlertCircle className="h-5 w-5 shrink-0 text-red-400" aria-hidden />
+                <div>
+                  <p className="font-medium">Confirme entradas extras atrasadas</p>
+                  <p className="mt-1 text-xs leading-snug text-red-200/85">
+                    {pendingExtraRows.length === 1
+                      ? `O previsto para “${pendingExtraRows[0].label?.trim() || 'Entrada extra'}” já passou — toque no dia no calendário (badge vermelho) e confirme se caiu.`
+                      : `${pendingExtraRows.length} entradas com data prevista já passada — use o calendário e o painel do dia para confirmar recebimento (simulação).`}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-950/40 to-zinc-950 p-4">
               <p className="text-xs uppercase tracking-widest text-purple-300/90">Saldo final previsto</p>
               <p className="text-2xl font-semibold text-white mt-1">
@@ -944,6 +1236,32 @@ export function SimuladorFlow() {
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(projection.minBalance)}
               </p>
             </div>
+
+            {state.extraEnabled && (necessityBuckets.essential + necessityBuckets.leisure + necessityBuckets.investment) > 0 ? (
+              <Card className="border-zinc-800/80">
+                <p className="text-sm font-semibold text-zinc-200">Composição das entradas extras (planejado)</p>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Soma dos valores que você cadastrou, por necessidade — útil para ver se a renda extra vira lazer demais.
+                </p>
+                <div className="mt-4">
+                  <SimuladorNecessityPie buckets={necessityBuckets} />
+                </div>
+              </Card>
+            ) : null}
+
+            <Card className="border-zinc-800/80">
+              <SimuladorMonthCalendar
+                year={projection.year}
+                month={projection.month}
+                daysInMonth={projection.daysInMonth}
+                points={projection.points}
+                uncertaintyBands={uncertaintyBands}
+                focusedDay={focusedDay}
+                todayDay={todayDay}
+                onSelectDay={setFocusedDay}
+                pendingConfirmDays={pendingConfirmDays}
+              />
+            </Card>
 
             <Card className="border-purple-500/20">
               <div className="flex items-center justify-between gap-3 mb-2">
@@ -972,21 +1290,124 @@ export function SimuladorFlow() {
               />
             </Card>
 
-            {focusedDay != null && (
-              <Card className="border-zinc-700">
-                <span className="text-xs text-zinc-500">Dia {focusedDay}</span>
-                <ul className="mt-2 space-y-1 text-sm text-zinc-300">
-                  {(projection.points.find((p) => p.day === focusedDay)?.events || []).map((ev, i) => (
-                    <li key={i} className="flex justify-between gap-2">
-                      <span className="text-zinc-400 truncate">{ev.label}</span>
-                      <span className={ev.value < 0 ? 'text-red-300' : 'text-emerald-300'}>
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(ev.value)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            )}
+            <Drawer.Root
+              open={focusedDay != null}
+              onOpenChange={(open) => {
+                if (!open) setFocusedDay(null);
+              }}
+            >
+              <Drawer.Portal>
+                <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-[2px]" />
+                <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[101] mx-auto flex max-h-[88vh] max-w-md flex-col rounded-t-2xl border border-zinc-800 bg-zinc-950 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2 outline-none">
+                  <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-zinc-600" aria-hidden />
+                  <Drawer.Title className="sr-only">
+                    Detalhes do dia {focusedDay} no simulador de caixa
+                  </Drawer.Title>
+                  <Drawer.Description className="sr-only">
+                    Saldo projetado e lançamentos simulados para o dia selecionado.
+                  </Drawer.Description>
+                  {focusedDay != null ? (
+                    <>
+                      <div className="mb-3 shrink-0 border-b border-zinc-800/80 pb-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                          Dia {focusedDay}
+                          {uncertaintyBands.some((u) => Number(u.day) === focusedDay && Number(u.opacity) >= 0.26) ? (
+                            <span className="ml-2 rounded-md border border-dashed border-orange-400/50 px-1.5 py-0.5 text-[10px] font-normal normal-case text-orange-200/90">
+                              Entrada incerta
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="mt-1 text-[11px] text-zinc-500">Saldo projetado ao fim deste dia</p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                            projection.points.find((p) => p.day === focusedDay)?.balance ?? 0
+                          )}
+                        </p>
+                        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+                          Meta diária sugerida (até o salário):{' '}
+                          <span className="text-purple-300">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                              metaDiariaSugerida
+                            )}
+                          </span>
+                          /dia
+                        </p>
+                      </div>
+
+                      {focusedDayPendingExtras.length > 0 ? (
+                        <div className="mb-3 shrink-0 rounded-xl border border-red-500/35 bg-red-950/25 px-3 py-2.5">
+                          <p className="text-xs font-semibold text-red-200">Confirmar recebimento</p>
+                          <p className="mt-1 text-[11px] leading-snug text-red-200/85">
+                            A data prevista já passou — confirme se esse valor entrou (alerta neste simulador).
+                          </p>
+                          <ul className="mt-2 space-y-2">
+                            {focusedDayPendingExtras.map((r) => (
+                              <li key={r.id} className="flex items-center justify-between gap-2">
+                                <span className="min-w-0 truncate text-sm text-zinc-200">
+                                  {r.label?.trim() || 'Entrada extra'}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="shrink-0 rounded-lg bg-emerald-600/90 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-500"
+                                  onClick={() => updateExtraRow(r.id, { receivedConfirmed: true })}
+                                >
+                                  Confirmei o recebimento
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                        <p className="mb-2 text-xs font-medium text-zinc-400">Neste dia</p>
+                        <ul className="space-y-2 pb-2">
+                          {(projection.points.find((p) => p.day === focusedDay)?.events || []).map((ev, i) => {
+                            const need = ev.necessity;
+                            const NeedIcon =
+                              need === 'leisure' ? Palmtree : need === 'investment' ? TrendingUp : need === 'essential' ? Home : null;
+                            const showNeedIcon = NeedIcon && Number(ev.value) > 0;
+                            return (
+                              <li
+                                key={i}
+                                className="flex items-start justify-between gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5"
+                              >
+                                <div className="flex min-w-0 flex-1 items-start gap-2">
+                                  {showNeedIcon ? (
+                                    <NeedIcon className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                                  ) : null}
+                                  <div className="min-w-0">
+                                    <span className="text-sm text-zinc-300">{ev.label}</span>
+                                    {ev.reliabilityPct != null ? (
+                                      <p className="mt-0.5 text-[10px] text-zinc-500">
+                                        Confiabilidade na simulação: {ev.reliabilityPct}% ·{' '}
+                                        {reliabilityLabel(ev.reliabilityPct)}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <span
+                                  className={cn(
+                                    'shrink-0 text-sm font-medium tabular-nums',
+                                    ev.value < 0 ? 'text-red-400' : 'text-emerald-400'
+                                  )}
+                                >
+                                  {ev.value < 0 ? '−' : '+'}
+                                  {new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL',
+                                  }).format(Math.abs(ev.value))}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    </>
+                  ) : null}
+                </Drawer.Content>
+              </Drawer.Portal>
+            </Drawer.Root>
 
             <p className="text-[11px] text-zinc-500 leading-relaxed px-1">
               Isso é uma simulação educativa: não substitui extrato nem acordo com banco. Use para decidir se vale postergar,
