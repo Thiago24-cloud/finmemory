@@ -1268,6 +1268,7 @@ export default function Dashboard() {
               <UnifiedHistoryList
                 openFinanceTransactions={searchFilteredOpenFinance}
                 finMemoryTransactions={searchFilteredTransactions}
+                openFinanceAccounts={openFinance.data?.accounts || []}
                 openFinanceLoading={openFinance.loading}
                 finMemoryLoading={loading}
                 userId={userId}

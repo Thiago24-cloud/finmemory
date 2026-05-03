@@ -3,32 +3,9 @@
 import { useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  Building2,
-  Car,
-  Coffee,
-  Fuel,
-  Home,
-  Info,
-  Pencil,
-  Pill,
-  Receipt,
-  Search,
-  Shirt,
-  ShoppingBag,
-  Smartphone,
-  Trash2,
-  Utensils,
-  Wrench,
-  Check,
-  Plus,
-  Minus,
-} from 'lucide-react';
+import { Info, Pencil, Receipt, Search, Trash2, Check, Plus, Minus } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/Sheet';
 import { cn } from '../../lib/utils';
-import { getCategoryColor } from '../../lib/colors';
 import { buildUnifiedHistoryGroups } from '../../lib/mergeHistoryTimeline';
 import { buildReceiptShareText, whatsAppShareUrl } from '../../lib/buildReceiptShareText';
 import {
@@ -39,45 +16,8 @@ import { pickOpenFinanceEssentialFields } from '../../lib/openFinanceTransaction
 import { useCalculatorDockOptional } from './CalculatorDockContext';
 import { CALC_DRAG_MIME } from '../../lib/calcDragMime';
 import { normalizePluggyMoney } from '../../lib/pluggyMoney';
-
-function categoryIconOpenFinance(category) {
-  const c = (category || '').toLowerCase();
-  if (c.includes('restaurant') || c.includes('aliment')) return Utensils;
-  if (c.includes('combust') || c.includes('fuel') || c.includes('posto')) return Fuel;
-  if (c.includes('mercado') || c.includes('grocery') || c.includes('supermercado')) return ShoppingBag;
-  if (c.includes('moradia') || c.includes('home') || c.includes('aluguel')) return Home;
-  if (c.includes('telecom') || c.includes('internet') || c.includes('mobile')) return Smartphone;
-  if (c.includes('cafe') || c.includes('coffee')) return Coffee;
-  if (c.includes('banco') || c.includes('transfer')) return Building2;
-  return null;
-}
-
-const fmCategoryIcons = {
-  transporte: Car,
-  uber: Car,
-  supermercado: ShoppingBag,
-  mercado: ShoppingBag,
-  restaurante: Utensils,
-  lanchonete: Utensils,
-  alimentação: Utensils,
-  combustível: Fuel,
-  posto: Fuel,
-  farmácia: Pill,
-  eletrônicos: Smartphone,
-  vestuário: Shirt,
-  roupas: Shirt,
-  serviços: Wrench,
-  padaria: Receipt,
-};
-
-function getFinMemoryCategoryIcon(category, merchant) {
-  const lowerCategory = (category || '').toLowerCase();
-  const lowerMerchant = (merchant || '').toLowerCase();
-  for (const [key, Icon] of Object.entries(fmCategoryIcons)) {
-    if (lowerCategory.includes(key) || lowerMerchant.includes(key)) return Icon;
-  }
-  return Receipt;
-}
+import { resolveInstitutionAsset } from '../../lib/resolveInstitutionAsset.js';
+import { InstitutionAvatar } from '../InstitutionAvatar';
 
 function formatDateLabel(isoDate) {
   if (!isoDate) return '';
@@ -146,6 +86,7 @@ function isTransactionNew(transaction) {
 export function UnifiedHistoryList({
   openFinanceTransactions,
   finMemoryTransactions,
+  openFinanceAccounts = [],
   openFinanceLoading,
   finMemoryLoading,
   userId,
@@ -295,7 +236,7 @@ export function UnifiedHistoryList({
       <div className={cn('space-y-4', className)} aria-busy="true" aria-live="polite">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex items-center gap-3 py-3">
-            <div className="h-10 w-10 rounded-full bg-[#e5e7eb] animate-pulse shrink-0" />
+            <div className="h-10 w-10 rounded-md bg-[#e5e7eb] animate-pulse shrink-0" />
             <div className="flex-1 space-y-2 min-w-0">
               <div className="h-4 w-[75%] max-w-[240px] bg-[#e5e7eb] rounded animate-pulse" />
               <div className="h-3 w-[50%] max-w-[160px] bg-[#e5e7eb] rounded animate-pulse" />
@@ -384,17 +325,27 @@ export function UnifiedHistoryList({
             {items.map(({ kind, data: t }) => {
               if (kind === 'openfinance') {
                 const isCredit = t.type === 'CREDIT';
-                const Icon =
-                  categoryIconOpenFinance(t.category) || (isCredit ? ArrowDownLeft : ArrowUpRight);
                 const colorClass = isCredit ? 'text-emerald-600' : 'text-red-600';
-                const bgClass = isCredit ? 'bg-emerald-50' : 'bg-red-50';
                 const ofAmount = Math.abs(Number(t.amount));
+                const bankAccount = Array.isArray(openFinanceAccounts)
+                  ? openFinanceAccounts.find((a) => a.id === t.bank_account_id)
+                  : null;
+                const formaOf = isCredit ? 'Open Finance (entrada)' : 'Open Finance';
+                const ofAsset = resolveInstitutionAsset({
+                  institution_name: bankAccount?.connector_name ?? null,
+                  institution_logo_url: bankAccount?.connector_image_url ?? null,
+                  institution_connector_id: bankAccount?.connector_id ?? null,
+                  forma_pagamento: formaOf,
+                  source: 'openfinance',
+                });
                 return (
                   <li key={`of-${t.id}`} className="bg-white">
                     <div className="flex items-center gap-2.5 px-2.5 py-2.5">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${bgClass}`}>
-                        <Icon className={`h-4 w-4 ${colorClass}`} aria-hidden />
-                      </div>
+                      <InstitutionAvatar
+                        asset={ofAsset}
+                        size={40}
+                        label={bankAccount?.connector_name}
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-[#111] text-[14px] leading-snug truncate">
                           {t.description || 'Sem descrição'}
@@ -521,9 +472,7 @@ export function UnifiedHistoryList({
               const isDeleting = deletingId === transaction.id;
               const isEditing = editingId === transaction.id;
               const isNew = isTransactionNew(transaction);
-              const IconFm = getFinMemoryCategoryIcon(transaction.categoria, transaction.estabelecimento);
-              const iconBg = getCategoryColor(transaction.categoria, transaction.estabelecimento).main;
-
+              const fmAsset = resolveInstitutionAsset(transaction);
               return (
                 <li key={`fm-${transaction.id}`} className="bg-white">
                   <div
@@ -540,12 +489,11 @@ export function UnifiedHistoryList({
                       isNew && !isEditing && 'shadow-[inset_0_0_0_2px_rgba(46,204,73,0.35)]'
                     )}
                   >
-                    <div
-                      className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-white"
-                      style={{ backgroundColor: iconBg }}
-                    >
-                      <IconFm className="h-4 w-4" aria-hidden />
-                    </div>
+                    <InstitutionAvatar
+                      asset={fmAsset}
+                      size={40}
+                      label={transaction.institution_name}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         {isEditing ? (

@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { createPluggyServerClient } from '../../../lib/pluggySyncTransactions';
+import { pickConnectorMeta } from '../../../lib/pluggyConnectorMeta';
 
 /** Mês civil em America/Sao_Paulo (YYYY-MM-DD início e fim). */
 function brazilCurrentMonthRange() {
@@ -20,35 +21,6 @@ function brazilCurrentMonthRange() {
   const start = `${y}-${m}-01`;
   const end = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
   return { start, end };
-}
-
-function cleanHexColor(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  const normalized = raw.startsWith('#') ? raw : `#${raw}`;
-  if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(normalized)) return null;
-  return normalized.toUpperCase();
-}
-
-function pickConnectorMeta(item) {
-  const connector = item?.connector || item?.institution || null;
-  const id = connector?.id != null ? String(connector.id) : null;
-  const name =
-    connector?.name != null
-      ? String(connector.name).trim() || null
-      : connector?.institutionName != null
-        ? String(connector.institutionName).trim() || null
-        : null;
-  const imageUrl =
-    connector?.imageUrl != null
-      ? String(connector.imageUrl).trim() || null
-      : connector?.logoUrl != null
-        ? String(connector.logoUrl).trim() || null
-        : null;
-  const primaryColor = cleanHexColor(
-    connector?.primaryColor || connector?.color || connector?.brandColor || null
-  );
-  return { id, name, imageUrl, primaryColor };
 }
 
 /**

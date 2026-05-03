@@ -212,12 +212,19 @@ export type Database = {
           categoria: string | null
           cnpj: string | null
           created_at: string
+          credit_institution_logo_url: string | null
+          credit_institution_name: string | null
+          custom_icon_url: string | null
           data: string | null
           estabelecimento: string
           forma_pagamento: string | null
           hora: string | null
           id: string
+          institution_connector_id: string | null
+          institution_logo_url: string | null
+          institution_name: string | null
           items: Json | null
+          pluggy_account_id: string | null
           receipt_image_url: string | null
           source: string | null
           total: number
@@ -228,12 +235,19 @@ export type Database = {
           categoria?: string | null
           cnpj?: string | null
           created_at?: string
+          credit_institution_logo_url?: string | null
+          credit_institution_name?: string | null
+          custom_icon_url?: string | null
           data?: string | null
           estabelecimento: string
           forma_pagamento?: string | null
           hora?: string | null
           id?: string
+          institution_connector_id?: string | null
+          institution_logo_url?: string | null
+          institution_name?: string | null
           items?: Json | null
+          pluggy_account_id?: string | null
           receipt_image_url?: string | null
           source?: string | null
           total?: number
@@ -244,12 +258,19 @@ export type Database = {
           categoria?: string | null
           cnpj?: string | null
           created_at?: string
+          credit_institution_logo_url?: string | null
+          credit_institution_name?: string | null
+          custom_icon_url?: string | null
           data?: string | null
           estabelecimento?: string
           forma_pagamento?: string | null
           hora?: string | null
           id?: string
+          institution_connector_id?: string | null
+          institution_logo_url?: string | null
+          institution_name?: string | null
           items?: Json | null
+          pluggy_account_id?: string | null
           receipt_image_url?: string | null
           source?: string | null
           total?: number

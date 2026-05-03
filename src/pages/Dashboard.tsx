@@ -33,6 +33,12 @@ interface Transaction {
   items: TransactionItem[];
   source?: string | null;
   hora?: string | null;
+  institution_name?: string | null;
+  institution_logo_url?: string | null;
+  institution_connector_id?: string | null;
+  credit_institution_name?: string | null;
+  credit_institution_logo_url?: string | null;
+  custom_icon_url?: string | null;
 }
 
 const dedupePluggyTransactions = (rows: Transaction[]): Transaction[] => {
@@ -118,6 +124,12 @@ const Dashboard = () => {
           items: Array.isArray(t.items) ? t.items : [],
           source: t.source || null,
           hora: t.hora || null,
+          institution_name: t.institution_name ?? null,
+          institution_logo_url: t.institution_logo_url ?? null,
+          institution_connector_id: t.institution_connector_id ?? null,
+          credit_institution_name: t.credit_institution_name ?? null,
+          credit_institution_logo_url: t.credit_institution_logo_url ?? null,
+          custom_icon_url: t.custom_icon_url ?? null,
         }));
       setTransactions(dedupePluggyTransactions(mapped));
     }
@@ -321,7 +333,7 @@ const Dashboard = () => {
             <div className="bg-card rounded-2xl card-shadow p-4">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center gap-4 py-4">
-                  <div className="h-10 w-10 rounded-full bg-muted animate-pulse shrink-0" />
+                  <div className="h-10 w-10 rounded-md bg-muted animate-pulse shrink-0" />
                   <div className="flex-1 space-y-2 min-w-0">
                     <div className="h-4 max-w-[75%] bg-muted rounded animate-pulse" />
                     <div className="h-3 max-w-[50%] bg-muted rounded animate-pulse" />
