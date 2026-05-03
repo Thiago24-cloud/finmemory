@@ -471,43 +471,46 @@ export function SimuladorFlow() {
     );
   }, [state.extraEnabled, state.extraRows]);
 
-  const pendingExtraRows = useMemo(() => {
-    if (!state.extraEnabled) return [];
-    const dim = projection.daysInMonth;
-    return (state.extraRows || []).filter((r) => {
+  /** Um único memo evita cadeia projection → pending → confirm e ambiguidade do minifier perto de `projection`. */
+  const { pendingExtraRows, pendingConfirmDays, focusedDayPendingExtras } = useMemo(() => {
+    const monthDim = projection.daysInMonth;
+    if (!state.extraEnabled) {
+      return {
+        pendingExtraRows: [],
+        pendingConfirmDays: new Set(),
+        focusedDayPendingExtras: [],
+      };
+    }
+    const rows = (state.extraRows || []).filter((r) => {
       if (r.committed || !(Number(r.amount) > 0) || r.receivedConfirmed) return false;
-      const d = clampDayOfMonth(r.day, dim);
+      const d = clampDayOfMonth(r.day, monthDim);
       return todayDay > d;
     });
-  }, [state.extraEnabled, state.extraRows, projection.daysInMonth, todayDay]);
-
-  const pendingConfirmDays = useMemo(() => {
-    const set = new Set();
-    const dim = projection.daysInMonth;
-    for (const r of pendingExtraRows) {
-      set.add(clampDayOfMonth(r.day, dim));
+    const pendingDays = new Set();
+    for (const r of rows) {
+      pendingDays.add(clampDayOfMonth(r.day, monthDim));
     }
-    return set;
-  }, [pendingExtraRows, projection.daysInMonth]);
-
-  const focusedDayPendingExtras = useMemo(() => {
-    if (focusedDay == null) return [];
-    const dim = projection.daysInMonth;
-    return pendingExtraRows.filter((r) => clampDayOfMonth(r.day, dim) === focusedDay);
-  }, [focusedDay, pendingExtraRows, projection.daysInMonth]);
+    const focusedPending =
+      focusedDay == null ? [] : rows.filter((r) => clampDayOfMonth(r.day, monthDim) === focusedDay);
+    return {
+      pendingExtraRows: rows,
+      pendingConfirmDays: pendingDays,
+      focusedDayPendingExtras: focusedPending,
+    };
+  }, [state.extraEnabled, state.extraRows, projection, todayDay, focusedDay]);
 
   const salaryProjection = useMemo(() => {
     const salaryDay = Math.min(31, Math.max(1, Number(state.salaryDay) || 1));
     const currentDay = Math.min(31, Math.max(1, todayDay || 1));
     const daysRemaining = salaryDay >= currentDay ? salaryDay - currentDay : 31 - currentDay + salaryDay;
     const burn = Math.max(0, Number(state.dailyBurn) || 0);
-    const projectionOut = daysRemaining * burn;
+    const burnUntilSalary = daysRemaining * burn;
     const salary = Math.max(0, Number(state.salaryAmount) || 0);
-    const saldoFinalEsperado = adjustedStartingBalance - projectionOut + salary;
+    const saldoFinalEsperado = adjustedStartingBalance - burnUntilSalary + salary;
     return {
       daysRemaining,
       burn,
-      projectionOut,
+      projectionOut: burnUntilSalary,
       saldoFinalEsperado: Math.round(saldoFinalEsperado * 100) / 100,
       salaryDay,
     };

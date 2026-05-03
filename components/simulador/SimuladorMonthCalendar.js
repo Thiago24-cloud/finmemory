@@ -87,7 +87,7 @@ export function SimuladorMonthCalendar({
         </div>
         <button
           type="button"
-          onClick={() => setExpanded((e) => !e)}
+          onClick={() => setExpanded((prev) => !prev)}
           className="flex shrink-0 items-center gap-1 rounded-lg border border-zinc-700 bg-zinc-900/80 px-2 py-1 text-[11px] font-medium text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
           aria-expanded={expanded}
         >
