@@ -17,6 +17,17 @@
 -- Diagnóstico típico: a tabela cresce porque acumula linhas já vencidas
 -- (expira_em < agora) ou inativas (ativo = false) com texto longo (imagem_url).
 -- O app filtra ativo = true e expira_em > now(); o resto pode ser apagado.
+--
+-- Este script NÃO apaga nem toca em:
+--   • Histórico financeiro do utilizador (ex.: transacoes / movimentações)
+--   • Contas / perfil (users, auth_local_users, …)
+--   • Banco de imagens do catálogo: products, product_images (nem ficheiros no
+--     Storage do bucket product-images — isso é separado)
+--   • price_points (preços comunitários no mapa) — outra tabela
+--   • listas de compras, notificações, etc.
+--
+-- Só remove linhas em public.promocoes_supermercados com expira_em no passado
+-- (ofertas de encarte / agente que já expiraram; são dados com TTL de negócio).
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
