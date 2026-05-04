@@ -73,9 +73,9 @@ Se qualquer verificação falhar, o build do Docker será interrompido.
 
 ### Erro: "Diretório .next/standalone não encontrado"
 
-**Causa**: O `next.config.js` não tem `output: 'standalone'` configurado.
+**Causa**: O `next.config.ts` não tem `output: 'standalone'` configurado.
 
-**Solução**: Adicione ao `next.config.js`:
+**Solução**: Adicione ao `next.config.ts`:
 ```javascript
 const nextConfig = {
   output: 'standalone',

@@ -606,8 +606,10 @@ function StoreMarkers({
 
 /**
  * Ícone Leaflet estável: recriar divIcon a cada render faz setIcon() e o popup fecha sozinho.
+ * memo com comparador granular — evita re-render quando só a referência do objeto `store` muda
+ * (ex.: quando mapPriceCountByStoreId é recalculado para lojas sem badge).
  */
-function StoreMarkerItem({
+const StoreMarkerItem = memo(function StoreMarkerItem({
   store,
   showPinLabels,
   onRequestStoreShop,
@@ -665,18 +667,21 @@ function StoreMarkerItem({
   );
   const labelOpenAirStyle = useMemo(() => getMapPinOpenAirLabelStyle(pinColor), [pinColor]);
 
+  const storeRef = useRef(store);
+  useEffect(() => { storeRef.current = store; });
+
   const markerEventHandlers = useMemo(
     () => ({
       click: (e) => {
         L.DomEvent.stop(e);
         if (isMobileMapSheet && typeof onMobileStorePinOpen === 'function') {
-          onMobileStorePinOpen(store);
+          onMobileStorePinOpen(storeRef.current);
         } else if (!isMobileMapSheet && typeof onRequestStoreShop === 'function') {
-          onRequestStoreShop(store);
+          onRequestStoreShop(storeRef.current);
         }
       },
     }),
-    [isMobileMapSheet, onMobileStorePinOpen, onRequestStoreShop, store]
+    [isMobileMapSheet, onMobileStorePinOpen, onRequestStoreShop]
   );
 
   const markerRef = useRef(null);
@@ -729,7 +734,24 @@ function StoreMarkerItem({
       )}
     </Marker>
   );
-}
+}, (prev, next) =>
+  prev.store.id === next.store.id &&
+  prev.store.lat === next.store.lat &&
+  prev.store.lng === next.store.lng &&
+  prev.store.name === next.store.name &&
+  prev.store.type === next.store.type &&
+  prev.store.tem_oferta_hoje === next.store.tem_oferta_hoje &&
+  prev.store.pin_logo_url === next.store.pin_logo_url &&
+  prev.store.pin_headline_price === next.store.pin_headline_price &&
+  prev.store.offer_preview?.[0]?.price === next.store.offer_preview?.[0]?.price &&
+  prev.mapPriceBundleCount === next.mapPriceBundleCount &&
+  prev.showPinLabels === next.showPinLabels &&
+  prev.pulseHighlight === next.pulseHighlight &&
+  prev.isMobileMapSheet === next.isMobileMapSheet &&
+  prev.onRequestStoreShop === next.onRequestStoreShop &&
+  prev.onMobileStorePinOpen === next.onMobileStorePinOpen &&
+  prev.userOrigin === next.userOrigin
+);
 
 /**
  * Localização no mapa: só pede ao utilizador depois de um toque no botão.
@@ -1139,9 +1161,13 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
     if (!map) return;
     if (searchIntent.type === 'region') return;
     const gen = ++loadGenerationRef.current;
-    setCarregando(true);
+    // Só aciona o spinner se a resposta demorar mais de 220ms — evita flash para cache/LAN.
+    const loadingTimer = setTimeout(() => {
+      if (gen === loadGenerationRef.current) setCarregando(true);
+    }, 220);
     try {
       const points = await fetchMapPoints(map, searchIntent);
+      clearTimeout(loadingTimer);
       if (gen !== loadGenerationRef.current) return;
       const raw = points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
       const wasProduct = searchIntent.type === 'product';
@@ -1168,8 +1194,10 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
       locaisSnapshotRef.current = next;
       setLocais(next);
     } catch (error) {
+      clearTimeout(loadingTimer);
       console.error('Erro ao buscar locais:', error);
     } finally {
+      clearTimeout(loadingTimer);
       if (gen === loadGenerationRef.current) {
         setCarregando(false);
       }

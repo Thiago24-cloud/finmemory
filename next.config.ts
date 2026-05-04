@@ -1,22 +1,40 @@
-const path = require('path');
+import type { NextConfig } from 'next';
+import path from 'path';
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+/** Upstream PostHog (ingest + assets) conforme `NEXT_PUBLIC_POSTHOG_HOST` no build. */
+function posthogUpstream() {
+  const host = (process.env.NEXT_PUBLIC_POSTHOG_HOST || '').toLowerCase();
+  if (host.includes('eu.i.posthog.com') || host.includes('eu.posthog.com')) {
+    return {
+      ingest: 'https://eu.i.posthog.com/:path*',
+      assets: 'https://eu-assets.i.posthog.com/static/:path*',
+    };
+  }
+  return {
+    ingest: 'https://us.i.posthog.com/:path*',
+    assets: 'https://us-assets.i.posthog.com/static/:path*',
+  };
+}
+
+const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone', // Necessário para Docker/Cloud Run
   trailingSlash: false,
   // Cloud Build / ESLint 9+: evita falha do build por opções legadas do next lint
   eslint: {
-    ignoreDuringBuilds: true
+    ignoreDuringBuilds: true,
   },
   // Evitar que Next.js infira workspace root (ex.: pasta Downloads) e coloque standalone em subpasta
   outputFileTracingRoot: path.join(__dirname),
-  // iOS/Safari pedem esses paths; redirecionar para o logo para evitar 404
+  // iOS/Safari + reverse proxy PostHog (mesmo origin → menos bloqueios)
   async rewrites() {
+    const ph = posthogUpstream();
     return [
       { source: '/apple-touch-icon.png', destination: '/logo.png' },
       { source: '/apple-touch-icon-precomposed.png', destination: '/logo.png' },
-    ]
+      { source: '/ingest/static/:path*', destination: ph.assets },
+      { source: '/ingest/:path*', destination: ph.ingest },
+    ];
   },
   /** Reduz HTML/JSON cacheado com buildId antigo após deploy (Cloud Run). */
   async headers() {
@@ -49,6 +67,6 @@ const nextConfig = {
       { source: '/transaction/:path*', headers: noStore },
     ];
   },
-}
+};
 
-module.exports = nextConfig
+export default nextConfig;

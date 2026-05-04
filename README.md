@@ -104,7 +104,7 @@ finmemory/
 ├── public/                  # Arquivos estáticos
 ├── .env.example            # Exemplo de variáveis
 ├── package.json
-├── next.config.js
+├── next.config.ts
 ├── Dockerfile              # Imagem Cloud Run (Next standalone)
 ├── cloudbuild.yaml         # Build + push + deploy no Run
 ├── CONFIGURAR-VERCEL.md    # Referência de variáveis (legado)

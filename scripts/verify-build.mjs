@@ -34,7 +34,7 @@ if (!existsSync(nextDir)) {
 // 2. Verificar se .next/standalone existe
 const standaloneDir = join(nextDir, 'standalone');
 if (!existsSync(standaloneDir)) {
-  errors.push('❌ Diretório .next/standalone não encontrado. Certifique-se de que output: "standalone" está configurado no next.config.js');
+  errors.push('❌ Diretório .next/standalone não encontrado. Certifique-se de que output: "standalone" está configurado no next.config.ts');
 } else {
   console.log('✅ Diretório .next/standalone encontrado');
   

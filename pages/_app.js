@@ -1,7 +1,10 @@
-import { Component } from 'react';
+import { Component, useEffect } from 'react';
 import { SessionProvider } from 'next-auth/react';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { Toaster } from 'sonner';
+import { useRouter } from 'next/router';
+import posthog from 'posthog-js';
+import { PostHogProvider } from 'posthog-js/react';
 import AnalyticsProvider from '../components/AnalyticsProvider';
 import ClientOnly from '../components/ClientOnly';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -12,6 +15,16 @@ import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 import { MapCartProvider } from '../components/map/MapCartContext';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import '../styles/globals.css';
+
+if (typeof window !== 'undefined') {
+  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+    // Tráfego via reverse proxy em `next.config.ts` (`/ingest` → PostHog Cloud).
+    api_host: `${window.location.origin}/ingest`,
+    defaults: '2025-05-24',
+    capture_pageview: false,
+    capture_pageleave: true,
+  });
+}
 
 /**
  * Só carrega o script do GA em hosts permitidos (produção),
@@ -39,7 +52,16 @@ class SafeGoogleAnalytics extends Component {
 }
 
 export default function App({ Component, pageProps: { session, ...pageProps } }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleRouteChange = () => posthog.capture('$pageview');
+    router.events.on('routeChangeComplete', handleRouteChange);
+    return () => router.events.off('routeChangeComplete', handleRouteChange);
+  }, [router.events]);
+
   return (
+    <PostHogProvider client={posthog}>
     <ErrorBoundary>
       <SessionProvider session={session}>
         <AppSplashGate>
@@ -59,5 +81,6 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
         </ClientOnly>
       </SessionProvider>
     </ErrorBoundary>
+    </PostHogProvider>
   );
 }
