@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import {
   AlertCircle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Cloud,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Drawer } from 'vaul';
 import { cn } from '../../lib/utils';
+import { getSupabase } from '../../lib/supabase';
 import {
   buildHeavyBillScheduledOutflows,
   projectSimuladorMonth,
@@ -183,12 +185,13 @@ function Card({ className, children }) {
 }
 
 export function SimuladorFlow() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [state, setState] = useState(defaultState);
   const [mounted, setMounted] = useState(false);
   const [focusedDay, setFocusedDay] = useState(null);
   const [hints, setHints] = useState(null);
   const [hintsLoading, setHintsLoading] = useState(false);
+  const [burnAuditOpen, setBurnAuditOpen] = useState(false);
   const [remoteReady, setRemoteReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
   const lastSentRef = useRef('');
@@ -311,13 +314,45 @@ export function SimuladorFlow() {
     document.addEventListener('visibilitychange', onVisible);
     const id = window.setInterval(() => {
       if (document.visibilityState === 'visible') fetchHints();
-    }, 60000);
+    }, 15000);
     return () => {
       window.removeEventListener('focus', fetchHints);
       document.removeEventListener('visibilitychange', onVisible);
       window.clearInterval(id);
     };
   }, [status, fetchHints]);
+
+  /** Realtime (quando ativo no projeto Supabase) + polling 15s — hints alinham após nova despesa. */
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user?.supabaseId) return undefined;
+    const sb = getSupabase();
+    if (!sb) return undefined;
+    const uid = session.user.supabaseId;
+    const ch = sb
+      .channel(`finmem-simulador-hints-${uid}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bank_transactions', filter: `user_id=eq.${uid}` },
+        () => {
+          fetchHints();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transacoes', filter: `user_id=eq.${uid}` },
+        () => {
+          fetchHints();
+        }
+      )
+      .subscribe();
+    return () => {
+      try {
+        sb.removeChannel(ch);
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [status, session?.user?.supabaseId, fetchHints]);
 
   useEffect(() => {
     if (state.step !== 4) setFocusedDay(null);
@@ -384,7 +419,7 @@ export function SimuladorFlow() {
     }, 0);
   }, [state.extraEnabled, state.extraRows]);
   const adjustedStartingBalance = useMemo(
-    () => Math.max(0, (Number(state.startingBalance) || 0) - committedExtraValue),
+    () => (Number(state.startingBalance) || 0) - committedExtraValue,
     [state.startingBalance, committedExtraValue]
   );
 
@@ -658,10 +693,9 @@ export function SimuladorFlow() {
     <>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={labelClass}>Saldo hoje (conta)</label>
+          <label className={labelClass}>Saldo hoje (poder de compra sugerido)</label>
           <input
             type="number"
-            min={0}
             className={fieldClass}
             value={state.startingBalance}
             onChange={(e) => set({ startingBalance: Number(e.target.value) })}
@@ -696,11 +730,53 @@ export function SimuladorFlow() {
                   dailyBurnAuto: true,
                 })
               }
-              className="text-[10px] font-medium text-purple-300 underline underline-offset-2"
+              className="text-[10px] font-medium text-[#39FF14] underline underline-offset-2 hover:text-[#5cff3d]"
             >
               usar cálculo real
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setBurnAuditOpen((o) => !o)}
+            className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-700/90 bg-zinc-950/60 px-2.5 py-1.5 text-left text-[10px] font-semibold text-zinc-300 hover:border-[#39FF14]/40 hover:bg-zinc-900/80"
+          >
+            <span className="text-[#39FF14]">Modo auditoria — gasto médio (28 dias)</span>
+            <ChevronDown
+              className={cn('h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform', burnAuditOpen && 'rotate-180')}
+              aria-hidden
+            />
+          </button>
+          {burnAuditOpen && hints?.dailyBurnAudit ? (
+            <div className="mt-1.5 max-h-48 overflow-y-auto rounded-lg border border-zinc-800 bg-black/40 px-2 py-2 text-[10px] text-zinc-400">
+              <p className="mb-1.5 font-mono text-[#39FF14] leading-snug">
+                {hints.dailyBurnAudit.formula}:{' '}
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                  hints.dailyBurnAudit.numeratorTotal || 0
+                )}{' '}
+                ÷ {hints.dailyBurnAudit.divisor} ={' '}
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                  hints.dailyBurnReal28d || 0
+                )}
+                /dia
+              </p>
+              <p className="mb-1 text-zinc-500">
+                Open Finance {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(hints.dailyBurnAudit.openFinanceDebits28d || 0)} + OCR/manual{' '}
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(hints.dailyBurnAudit.ocrManualDebits28d || 0)}
+              </p>
+              <ul className="space-y-1 border-t border-zinc-800/80 pt-1.5">
+                {(hints.dailyBurnAudit.lines || []).slice(0, 40).map((line, idx) => (
+                  <li key={`${line.date}-${idx}`} className="flex justify-between gap-2 border-b border-zinc-800/40 pb-1 last:border-0">
+                    <span className="min-w-0 flex-1 truncate text-zinc-300" title={line.description}>
+                      <span className="text-zinc-600">{line.date}</span> · {line.description}
+                    </span>
+                    <span className="shrink-0 font-medium text-zinc-200">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(line.amount || 0)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 mt-3">
@@ -813,12 +889,52 @@ export function SimuladorFlow() {
           {hints?.hasOpenFinance && (
             <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-2">
               <p className="text-[11px] text-zinc-500 leading-snug">
-                Soma das contas conectadas:{' '}
+                <span className="text-[#39FF14] font-semibold">Poder de compra sugerido</span>
+                {' '}(Σ contas à vista + Σ crédito disponível; limite do cartão manual alinha por ordem A→Z com
+                contas de crédito Open Finance):{' '}
                 <strong className="text-zinc-200">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                     hints.accountBalanceTotal || 0
                   )}
                 </strong>
+                {hints?.startingBalanceBreakdown ? (
+                  <>
+                    {' '}
+                    <span className="text-zinc-600">
+                      · À vista:{' '}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                        hints.startingBalanceBreakdown.debitAccountsSum || 0
+                      )}
+                    </span>
+                    <span className="text-zinc-600">
+                      {' '}
+                      · Crédito disponível (estimado):{' '}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                        hints.startingBalanceBreakdown.creditAvailableSum || 0
+                      )}
+                    </span>
+                    {(hints.startingBalanceBreakdown.conservativeNet || 0) !==
+                    (hints.startingBalanceBreakdown.purchasingPower || 0) ? (
+                      <span className="text-zinc-600">
+                        {' '}
+                        · Só à vista − dívida no cartão (referência):{' '}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          hints.startingBalanceBreakdown.conservativeNet || 0
+                        )}
+                      </span>
+                    ) : null}
+                    {(hints.startingBalanceBreakdown.naiveSumAllAccounts || 0) !==
+                    (hints.accountBalanceTotal || 0) ? (
+                      <span className="text-zinc-600">
+                        {' '}
+                        · Soma bruta Pluggy (referência):{' '}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          hints.startingBalanceBreakdown.naiveSumAllAccounts || 0
+                        )}
+                      </span>
+                    ) : null}
+                  </>
+                ) : null}
                 . Burn rate real (28d):{' '}
                 <strong className="text-zinc-200">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(

@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
+import { computePurchasingPowerHint, isCreditLikeAccount } from '../../../lib/simuladorHintsBalance';
 
 /** Mês civil em America/Sao_Paulo (YYYY-MM-DD início e fim). */
 function brazilCurrentMonthRange() {
@@ -74,7 +75,7 @@ export default async function handler(req, res) {
 
   const { data: accountsRaw, error: aErr } = await supabase
     .from('bank_accounts')
-    .select('id, item_id, name, balance, currency_code')
+    .select('id, item_id, name, balance, currency_code, account_type')
     .eq('user_id', userId)
     .order('name', { ascending: true });
 
@@ -91,15 +92,64 @@ export default async function handler(req, res) {
     accounts = accounts.filter((a) => activeItemIds.has(a.item_id));
   }
 
-  let accountBalanceTotal = 0;
+  const { data: cardsEarly, error: cardEarlyErr } = await supabase
+    .from('manual_credit_cards')
+    .select('id, label, due_day, closing_day, credit_limit')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(8);
+
+  if (cardEarlyErr) {
+    console.warn('[simulador/hints] manual_credit_cards (early):', cardEarlyErr.message);
+  }
+
+  const manualCards = (cardsEarly || []).map((c) => ({
+    id: c.id,
+    label: c.label,
+    due_day: c.due_day,
+    closing_day: c.closing_day,
+    credit_limit: c.credit_limit != null ? Number(c.credit_limit) : null,
+  }));
+
+  const accountsForHint = accounts.map((a) => ({
+    balance: a.balance,
+    account_type: a.account_type,
+    name: a.name,
+  }));
+
+  const creditSorted = [...accountsForHint]
+    .filter((a) => isCreditLikeAccount(a.account_type, a.name))
+    .sort((a, b) =>
+      String(a.name || '')
+        .trim()
+        .toLowerCase()
+        .localeCompare(String(b.name || '').trim().toLowerCase(), 'pt-BR')
+    );
+  /** Mesma ordem A→Z que contas de crédito OF — n-ésimo limite ↔ n-ésimo cartão manual. */
+  const manualCardsForPairing = [...manualCards].sort((a, b) =>
+    String(a.label || a.id || '')
+      .trim()
+      .toLowerCase()
+      .localeCompare(String(b.label || b.id || '').trim().toLowerCase(), 'pt-BR')
+  );
+  const manualLimitsOrdered = creditSorted.map((_, i) =>
+    manualCardsForPairing[i]?.credit_limit != null ? Number(manualCardsForPairing[i].credit_limit) : null
+  );
+
+  const balanceHints = computePurchasingPowerHint(accountsForHint, manualLimitsOrdered);
+  /** Poder de compra: Σ(débito) + Σ(crédito disponível); crédito com limite manual usa limite − fatura implícita no saldo. */
+  const accountBalanceTotal = balanceHints.purchasingPower;
+
   const accountsOut = accounts.map((a) => {
     const bal = Number(a.balance) || 0;
-    accountBalanceTotal += bal;
+    const credit = isCreditLikeAccount(a.account_type, a.name);
     return {
       id: a.id,
       name: (a.name || 'Conta').trim() || 'Conta',
       balance: Math.round(bal * 100) / 100,
       currency_code: a.currency_code || 'BRL',
+      account_type: a.account_type || null,
+      kind: credit ? 'credit' : 'checking_like',
     };
   });
 
@@ -178,11 +228,14 @@ export default async function handler(req, res) {
 
   const { data: bankTx28d, error: bankTxErr } = await supabase
     .from('bank_transactions')
-    .select('amount, type, date')
+    .select('amount, type, date, description, category')
     .eq('user_id', userId)
     .gte('date', since28)
     .order('date', { ascending: false })
     .limit(1200);
+
+  /** @type {Array<{ date: string, amount: number, description: string, source: string }>} */
+  const auditOpenFinanceLines = [];
 
   if (bankTxErr) {
     console.warn('[simulador/hints] bank_transactions 28d:', bankTxErr.message);
@@ -193,30 +246,69 @@ export default async function handler(req, res) {
       const isDebitByType = type === 'DEBIT' || type === 'EXPENSE';
       const isDebitBySignal = !Number.isNaN(amount) && amount < 0;
       if (isDebitByType || isDebitBySignal) {
-        openFinanceDebits28d += safeAbsNumber(amount);
+        const absAmt = safeAbsNumber(amount);
+        openFinanceDebits28d += absAmt;
+        if (auditOpenFinanceLines.length < 90) {
+          const d = String(row?.date || '').slice(0, 10);
+          const desc = String(row?.description || row?.category || 'Movimento Open Finance').trim().slice(0, 120);
+          auditOpenFinanceLines.push({
+            date: d || since28,
+            amount: Math.round(absAmt * 100) / 100,
+            description: desc || 'Movimento Open Finance',
+            source: 'open_finance',
+          });
+        }
       }
     }
   }
 
   const { data: localTx28d, error: localTxErr } = await supabase
     .from('transacoes')
-    .select('total, source, data, created_at')
+    .select('total, source, data, created_at, estabelecimento')
     .eq('user_id', userId)
     .in('source', ['receipt_ocr', 'manual'])
     .gte('data', since28)
     .order('data', { ascending: false })
     .limit(1200);
 
+  /** @type {Array<{ date: string, amount: number, description: string, source: string }>} */
+  const auditOcrLines = [];
+
   if (localTxErr) {
     console.warn('[simulador/hints] transacoes 28d:', localTxErr.message);
   } else if (Array.isArray(localTx28d)) {
     for (const row of localTx28d) {
-      ocrManualDebits28d += safeAbsNumber(row?.total);
+      const absAmt = safeAbsNumber(row?.total);
+      ocrManualDebits28d += absAmt;
+      if (auditOcrLines.length < 60) {
+        const d = String(row?.data || '').slice(0, 10);
+        const desc = String(row?.estabelecimento || 'Nota / manual').trim().slice(0, 120);
+        auditOcrLines.push({
+          date: d || since28,
+          amount: Math.round(absAmt * 100) / 100,
+          description: desc || 'Nota / manual',
+          source: 'ocr_manual',
+        });
+      }
     }
   }
 
   const totalDebits28d = openFinanceDebits28d + ocrManualDebits28d;
   const dailyBurnReal28d = Math.round((totalDebits28d / 28) * 100) / 100;
+
+  const auditMerged = [...auditOpenFinanceLines, ...auditOcrLines]
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 55);
+
+  const dailyBurnAudit = {
+    windowDays: 28,
+    numeratorTotal: Math.round(totalDebits28d * 100) / 100,
+    divisor: 28,
+    formula: 'Σ gastos elegíveis (últimos 28 dias) ÷ 28',
+    openFinanceDebits28d: Math.round(openFinanceDebits28d * 100) / 100,
+    ocrManualDebits28d: Math.round(ocrManualDebits28d * 100) / 100,
+    lines: auditMerged,
+  };
 
   const since90 = isoDateDaysAgo(95);
   const { data: bankTx90d, error: bank90Err } = await supabase
@@ -248,28 +340,17 @@ export default async function handler(req, res) {
   const avgExpenseLast3Months =
     last3.length > 0 ? Math.round((last3.reduce((acc, x) => acc + x.total, 0) / last3.length) * 100) / 100 : 0;
 
-  const { data: cards, error: cardErr } = await supabase
-    .from('manual_credit_cards')
-    .select('id, label, due_day, closing_day, credit_limit')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false })
-    .limit(8);
-
-  if (cardErr) {
-    console.warn('[simulador/hints] manual_credit_cards:', cardErr.message);
-  }
-
-  const manualCards = (cards || []).map((c) => ({
-    id: c.id,
-    label: c.label,
-    due_day: c.due_day,
-    closing_day: c.closing_day,
-    credit_limit: c.credit_limit != null ? Number(c.credit_limit) : null,
-  }));
-
   return res.status(200).json({
     ok: true,
     accountBalanceTotal: Math.round(accountBalanceTotal * 100) / 100,
+    startingBalanceBreakdown: {
+      naiveSumAllAccounts: balanceHints.naiveSumAllAccounts,
+      debitAccountsSum: balanceHints.debitAccountsSum,
+      creditAvailableSum: balanceHints.creditAvailableSum,
+      purchasingPower: balanceHints.purchasingPower,
+      conservativeNet: balanceHints.conservativeNet,
+      perAccount: balanceHints.perAccount,
+    },
     accounts: accountsOut,
     month: {
       start: monthStart,
@@ -280,6 +361,7 @@ export default async function handler(req, res) {
     salaryDayHint,
     dailyBurnHint,
     dailyBurnReal28d,
+    dailyBurnAudit,
     burnRateBreakdown: {
       windowDays: 28,
       totalDebits: Math.round(totalDebits28d * 100) / 100,

@@ -65,6 +65,13 @@ export default function AdminHomePage() {
       ready: true,
       badge: 'Novo',
     },
+    {
+      href: '/admin/financeiro',
+      title: 'Financeiro',
+      desc: 'Cruzar na BD quem tem cliente Stripe com plano, status da subscrição e flags ativas (só leitura).',
+      ready: true,
+      badge: 'Novo',
+    },
   ];
 
   return (

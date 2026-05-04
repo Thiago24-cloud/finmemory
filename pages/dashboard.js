@@ -3,7 +3,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
-import { Loader2, Mail, X, Trash2, RotateCcw, Search, Calculator } from 'lucide-react';
+import { Loader2, Mail, X, Trash2, RotateCcw, Search } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BottomNav } from '../components/BottomNav';
@@ -14,8 +14,6 @@ import { UnifiedHistoryList } from '../components/dashboard/UnifiedHistoryList';
 import { OpenFinanceBankCarousel } from '../components/dashboard/OpenFinanceBankCarousel';
 import { FeaturedScanReceiptCTA } from '../components/dashboard/FeaturedScanReceiptCTA';
 import { CalculatorDockProvider, useCalculatorDock } from '../components/dashboard/CalculatorDockContext';
-import { FinancePlansInline } from '../components/FinancePlansInline';
-import PlanGuard from '../components/PlanGuard';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
@@ -28,6 +26,7 @@ import {
   setDashboardOnboardingDoneLocal,
 } from '../lib/dashboardOnboardingStorage';
 import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
+import { usePlan } from '../hooks/usePlan';
 import { normalizePluggyMoney } from '../lib/pluggyMoney';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
@@ -211,7 +210,8 @@ export default function Dashboard() {
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
-  const [openFinancePromoDismissed, setOpenFinancePromoDismissed] = useState(false);
+  const { can: canPlanFeature, loading: planLoading } = usePlan();
+  const canOpenFinance = !planLoading && canPlanFeature('open_finance');
 
   // Após retorno do Stripe Checkout: atualiza sessão para refletir novo plano sem re-login
   useEffect(() => {
@@ -772,9 +772,6 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return;
     if (!localStorage.getItem('finmemory_tip_gmail')) setTipGmailDismissed(false);
     if (!localStorage.getItem('finmemory_tip_map')) setTipMapDismissed(false);
-    if (localStorage.getItem('finmemory_open_finance_promo_dismissed') === '1') {
-      setOpenFinancePromoDismissed(true);
-    }
   }, []);
 
   // Check URL params for first sync (só no browser)
@@ -1077,114 +1074,77 @@ export default function Dashboard() {
             />
             <FeaturedScanReceiptCTA />
 
-            {!openFinancePromoDismissed && (
-              <div className="mb-2 -mt-1 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenFinancePromoDismissed(true);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('finmemory_open_finance_promo_dismissed', '1');
-                    }
-                  }}
-                  className="text-[11px] font-semibold text-[#64748b] hover:text-[#334155] underline-offset-2 hover:underline"
-                >
-                  Ocultar card Pro
-                </button>
-              </div>
-            )}
-            {!openFinancePromoDismissed && (
-              <PlanGuard
-                feature="open_finance"
-                title="Open Finance no Plano Pro"
-                body="Conecte seus bancos com automação total no Pro. Para orçamento compartilhado da casa, use o plano Família."
-                className="mb-6"
-              >
+            {canOpenFinance ? (
               <section
-                className="rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
+                className="mb-6 rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
                 aria-label="Open Finance"
               >
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-[#333] m-0">Open Finance</h2>
-                  <p className="text-xs text-[#666] mt-0.5 m-0">Contas e movimentos do banco (Pluggy).</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => openFinance.refresh()}
-                    disabled={openFinance.loading}
-                    className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline disabled:opacity-50 disabled:pointer-events-none"
-                  >
-                    Atualizar extrato
-                  </button>
-                  <Link
-                    href="/settings"
-                    className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline"
-                  >
-                    Configurar
-                  </Link>
-                </div>
-              </div>
-              {openFinance.error && (
-                <p className="text-xs text-red-600 mb-3">
-                  {openFinance.error?.message || 'Erro ao carregar Open Finance.'}
-                </p>
-              )}
-              {openFinance.data?.syncing && (
-                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-3">
-                  A sincronizar dados com a instituição… os valores podem atualizar em instantes.
-                </p>
-              )}
-              {openFinanceAccountId && (openFinance.data?.accounts || []).length > 0 && (
-                <p className="text-xs font-medium text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl px-3 py-2 mb-3 m-0">
-                  A mostrar só:{' '}
-                  {(openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.display_name ||
-                    (openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.name ||
-                    'esta conta'}
-                </p>
-              )}
-              {!openFinance.loading && openFinance.data?.month && (
-                <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
-                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
-                    <p className="text-emerald-800 font-medium m-0 mb-0.5">Receitas (mês)</p>
-                    <p className="text-emerald-900 font-semibold m-0">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                        openFinance.data.month.incomeTotal || 0
-                      )}
-                    </p>
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-[#333] m-0">Open Finance</h2>
+                    <p className="text-xs text-[#666] mt-0.5 m-0">Contas e movimentos do banco (Pluggy).</p>
                   </div>
-                  <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2">
-                    <p className="text-red-800 font-medium m-0 mb-0.5">Despesas (mês)</p>
-                    <p className="text-red-900 font-semibold m-0">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                        openFinance.data.month.expenseTotal || 0
-                      )}
-                    </p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openFinance.refresh()}
+                      disabled={openFinance.loading}
+                      className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      Atualizar extrato
+                    </button>
+                    <Link
+                      href="/settings"
+                      className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline"
+                    >
+                      Configurar
+                    </Link>
                   </div>
                 </div>
-              )}
-              <p className="text-xs text-[#666] m-0">
-                Movimentos do banco e das notas aparecem juntos em <strong className="text-[#333]">Histórico</strong>{' '}
-                abaixo; linhas duplicadas somem quando a nota corresponde ao extrato.
-              </p>
-              <FinancePlansInline
-                className="mt-2 text-[11px] text-[#4b5563] m-0"
-                emphasize
-                showLink
-                linkClassName="font-semibold text-[#2ECC49] hover:underline"
-              />
+                {openFinance.error && (
+                  <p className="text-xs text-red-600 mb-3">
+                    {openFinance.error?.message || 'Erro ao carregar Open Finance.'}
+                  </p>
+                )}
+                {openFinance.data?.syncing && (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-3">
+                    A sincronizar dados com a instituição… os valores podem atualizar em instantes.
+                  </p>
+                )}
+                {openFinanceAccountId && (openFinance.data?.accounts || []).length > 0 && (
+                  <p className="text-xs font-medium text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl px-3 py-2 mb-3 m-0">
+                    A mostrar só:{' '}
+                    {(openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.display_name ||
+                      (openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.name ||
+                      'esta conta'}
+                  </p>
+                )}
+                {!openFinance.loading && openFinance.data?.month && (
+                  <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+                      <p className="text-emerald-800 font-medium m-0 mb-0.5">Receitas (mês)</p>
+                      <p className="text-emerald-900 font-semibold m-0">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          openFinance.data.month.incomeTotal || 0
+                        )}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2">
+                      <p className="text-red-800 font-medium m-0 mb-0.5">Despesas (mês)</p>
+                      <p className="text-red-900 font-semibold m-0">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          openFinance.data.month.expenseTotal || 0
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-[#666] m-0">
+                  Movimentos do banco e das notas aparecem juntos em <strong className="text-[#333]">Histórico</strong>{' '}
+                  abaixo; linhas duplicadas somem quando a nota corresponde ao extrato.
+                </p>
               </section>
-              </PlanGuard>
-            )}
-
-            <Link
-              href="/calculadora"
-              className="flex items-center justify-center gap-2 w-full py-2.5 mb-4 rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] text-[#334155] font-medium text-xs hover:bg-[#f1f5f9] transition-colors"
-            >
-              <Calculator className="h-4 w-4 text-[#2ECC49]" aria-hidden />
-              Calculadora de economia (tela completa)
-            </Link>
+            ) : null}
 
             {/* Cobranças do mês */}
             <CobrancasDoMes

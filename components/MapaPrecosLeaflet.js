@@ -362,10 +362,8 @@ function createStoreIcon(
   const badgeFill = mixWithWhite(promoHue, 0.72);
   const badgeInk = readableAccentOnLightChip(promoHue);
   const badgeLabel = n > 99 ? '99+' : String(n);
-  const bundleBadge =
-    n > 1
-      ? `<div aria-hidden="true" style="position:absolute;right:-4px;bottom:10px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:${badgeFill};border:2px solid #fff;box-shadow:0 1px 5px rgba(15,23,42,0.28);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${badgeInk};line-height:1;z-index:2;">${badgeLabel}</div>`
-      : '';
+  // Badge sempre presente no DOM para atualização direta sem setIcon().
+  const bundleBadge = `<div aria-hidden="true" class="finmemory-pin-badge" style="position:absolute;right:-4px;bottom:10px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:${badgeFill};border:2px solid #fff;box-shadow:0 1px 5px rgba(15,23,42,0.28);display:${n > 1 ? 'flex' : 'none'};align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${badgeInk};line-height:1;z-index:2;">${n > 1 ? badgeLabel : ''}</div>`;
   const headlineBlock = storePinHeadlinePillHtml(pinHeadlinePrice);
   const hasHeadline = Boolean(headlineBlock);
   const html = `<div class="finmemory-store-pin-wrap" style="line-height:0;position:relative;display:inline-flex;flex-direction:column;align-items:center;">
@@ -408,10 +406,8 @@ function createStoreIconWithLogo(
   const badgeFill = mixWithWhite(promoHue, 0.72);
   const badgeInk = readableAccentOnLightChip(promoHue);
   const badgeLabel = n > 99 ? '99+' : String(n);
-  const bundleBadge =
-    n > 1
-      ? `<div aria-hidden="true" style="position:absolute;right:-5px;bottom:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:${badgeFill};border:2px solid #fff;box-shadow:0 1px 5px rgba(15,23,42,0.28);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${badgeInk};line-height:1;z-index:2;">${badgeLabel}</div>`
-      : '';
+  // Badge sempre presente no DOM para atualização direta sem setIcon().
+  const bundleBadge = `<div aria-hidden=”true” class=”finmemory-pin-badge” style=”position:absolute;right:-5px;bottom:-3px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:${badgeFill};border:2px solid #fff;box-shadow:0 1px 5px rgba(15,23,42,0.28);display:${n > 1 ? 'flex' : 'none'};align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${badgeInk};line-height:1;z-index:2;”>${n > 1 ? badgeLabel : ''}</div>`;
   /* Sem bolinha âmbar: confundia com “Clique e Retire” / ruído; o badge N + painel bastam. */
   const promoDot = '';
   const safeSrc = String(logoUrl || '')
@@ -637,12 +633,17 @@ const StoreMarkerItem = memo(function StoreMarkerItem({
     const p0 = Array.isArray(store.offer_preview) ? store.offer_preview[0] : null;
     return parsePriceToNumber(p0?.price);
   }, [store.pin_headline_price, store.offer_preview]);
+  // badgeCountRef garante que o ícone recriado usa sempre o count atual,
+  // sem colocar mapPriceBundleCount como dep (evita setIcon() → glitch de posição).
+  const badgeCountRef = useRef(mapPriceBundleCount);
+  badgeCountRef.current = mapPriceBundleCount;
+
   const icon = useMemo(
     () =>
       logoUrl
         ? createStoreIconWithLogo(
             logoUrl,
-            mapPriceBundleCount,
+            badgeCountRef.current,
             store.name,
             !!store.tem_oferta_hoje,
             pinHeadlinePrice
@@ -651,21 +652,26 @@ const StoreMarkerItem = memo(function StoreMarkerItem({
             store.type,
             !!store.tem_oferta_hoje,
             store.id,
-            mapPriceBundleCount,
+            badgeCountRef.current,
             store.name,
             pinHeadlinePrice
           ),
-    [
-      logoUrl,
-      store.type,
-      store.tem_oferta_hoje,
-      store.id,
-      mapPriceBundleCount,
-      store.name,
-      pinHeadlinePrice,
-    ]
+    // mapPriceBundleCount fora dos deps — atualizado via DOM mutation abaixo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [logoUrl, store.type, store.tem_oferta_hoje, store.id, store.name, pinHeadlinePrice]
   );
   const labelOpenAirStyle = useMemo(() => getMapPinOpenAirLabelStyle(pinColor), [pinColor]);
+
+  // Atualiza badge diretamente no DOM — sem recriar o ícone → sem setIcon() → sem glitch.
+  useEffect(() => {
+    const el = markerRef.current?.getElement?.();
+    if (!el) return;
+    const badge = el.querySelector('.finmemory-pin-badge');
+    if (!badge) return;
+    const n = Math.max(0, Number(mapPriceBundleCount) || 0);
+    badge.textContent = n > 1 ? (n > 99 ? '99+' : String(n)) : '';
+    badge.style.display = n > 1 ? 'flex' : 'none';
+  }, [mapPriceBundleCount, icon]);
 
   const storeRef = useRef(store);
   useEffect(() => { storeRef.current = store; });
@@ -1240,9 +1246,10 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
 }
 
 /**
- * Agrupa pontos pelo mesmo local (lat/lng arredondados) para evitar marcadores empilhados.
- * Posição do pin = média dos pontos do grupo — se usássemos só o 1.º ponto, cada refresh da API
- * (ordem diferente) fazia o pin “correr” dentro do mesmo bucket.
+ * Agrupa pontos pelo mesmo local (lat/lng arredondados a 5 decimais ≈ 1.1 m).
+ * Posição do pin = coordenadas do bucket (parseadas do groupKey), não a média dos pontos.
+ * A média flutuava quando mergeViewportPricePoints adicionava/removia pontos do bucket,
+ * fazendo o pin “andar” entre renders mesmo sem dados novos.
  */
 function groupPointsByLocation(points) {
   const groups = new Map();
@@ -1257,21 +1264,13 @@ function groupPointsByLocation(points) {
     if (!g.nome && p.nome) g.nome = p.nome;
   });
   return Array.from(groups.entries()).map(([groupKey, g]) => {
-    let sumLat = 0;
-    let sumLng = 0;
-    const n = g.points.length;
-    for (let i = 0; i < n; i++) {
-      sumLat += Number(g.points[i].lat);
-      sumLng += Number(g.points[i].lng);
-    }
-    const lat = sumLat / n;
-    const lng = sumLng / n;
+    const sep = groupKey.lastIndexOf('_');
     return {
       groupKey,
-      lat: Math.round(lat * 1e6) / 1e6,
-      lng: Math.round(lng * 1e6) / 1e6,
+      lat: parseFloat(groupKey.slice(0, sep)),
+      lng: parseFloat(groupKey.slice(sep + 1)),
       points: g.points,
-      nome: g.nome
+      nome: g.nome,
     };
   });
 }
@@ -2801,31 +2800,45 @@ function priceGroupsToGeoJSONFeatures(groups) {
   return out;
 }
 
-/** Marcador circular com contagem — clique aproxima (equivalente ao cluster Mapbox). */
-function PriceClusterMarker({ count, lat, lng }) {
+/** Marcador de cluster: contagem + menor preço do grupo. Clique faz zoom-to-fit no grupo. */
+function PriceClusterMarker({ count, lat, lng, minPrice, clusterId, clusterIndex }) {
   const map = useMap();
   const icon = useMemo(() => {
     const safeCount = Math.max(1, Number(count) || 1);
     const green = '#2ECC49';
     const white = '#FFFFFF';
+    const showPrice = minPrice != null && Number.isFinite(minPrice) && minPrice > 0;
+    const size = 52;
+    const half = size / 2;
+    const priceStr = showPrice
+      ? minPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : null;
     return L.divIcon({
       className: 'finmemory-leaflet-cluster-root',
-      html: `<div style="width:44px;height:44px;background:${green};border:3px solid ${white};border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;color:${white};font-family:system-ui,sans-serif;cursor:pointer;">${safeCount}</div>`,
-      iconSize: [44, 44],
-      iconAnchor: [22, 22],
+      html: `<div style="width:${size}px;height:${size}px;background:${green};border:3px solid ${white};border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,0.25);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:${white};cursor:pointer;gap:1px;"><span style="font-weight:800;font-size:${safeCount > 99 ? '0.8rem' : '1rem'};line-height:1;">${safeCount > 99 ? '99+' : safeCount}</span>${showPrice ? `<span style="font-size:9px;font-weight:700;opacity:0.92;line-height:1.1;">R$${priceStr}</span>` : ''}</div>`,
+      iconSize: [size, size],
+      iconAnchor: [half, half],
     });
-  }, [count]);
+  }, [count, minPrice]);
 
   const eventHandlers = useMemo(
     () => ({
       click: (e) => {
         if (e?.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
         try {
+          if (clusterIndex != null && clusterId != null) {
+            const leaves = clusterIndex.getLeaves(clusterId, Infinity);
+            if (leaves.length > 0) {
+              const coords = leaves.map((l) => [l.geometry.coordinates[1], l.geometry.coordinates[0]]);
+              map.fitBounds(L.latLngBounds(coords), { padding: [60, 60], maxZoom: 17, animate: true, duration: 0.45 });
+              return;
+            }
+          }
           map.flyTo([lat, lng], Math.min(map.getZoom() + 2, 18), { duration: 0.38 });
         } catch (_) {}
       },
     }),
-    [map, lat, lng]
+    [map, lat, lng, clusterIndex, clusterId]
   );
 
   return (
@@ -2843,37 +2856,45 @@ function SuperclusterPriceMarkersLayer({
   cartOfferIdSet,
   onMapPointCartToggle,
   userOrigin = null,
+  loading = false,
 }) {
   const map = useMap();
   const [mapTick, setMapTick] = useState(0);
 
+  // Injeta CSS de loading uma única vez — a classe no container controla a opacidade.
+  useEffect(() => {
+    const styleId = 'finmemory-price-loading-style';
+    if (!document.getElementById(styleId)) {
+      const s = document.createElement('style');
+      s.id = styleId;
+      s.textContent =
+        '.finmemory-prices-loading .custom-pin-price,' +
+        '.finmemory-prices-loading .custom-pin-price--brand,' +
+        '.finmemory-prices-loading .finmemory-leaflet-cluster-root > div' +
+        '{opacity:0.5;transition:opacity 0.2s;}';
+      document.head.appendChild(s);
+    }
+  }, []);
+
+  // Adiciona/remove classe no container do mapa sem desmontar os markers.
+  useEffect(() => {
+    const container = map.getContainer();
+    if (loading) container.classList.add('finmemory-prices-loading');
+    else container.classList.remove('finmemory-prices-loading');
+    return () => container.classList.remove('finmemory-prices-loading');
+  }, [map, loading]);
+
+  // Atualiza viewport só em moveend/zoomend — durante pan o Leaflet move os markers
+  // via CSS transform sem re-render React, evitando sumiço de pins no meio do gesto.
   useEffect(() => {
     if (!map) return undefined;
-    let moveTimer = 0;
     const bump = () => setMapTick((t) => t + 1);
-    const onMoveThrottled = () => {
-      if (moveTimer) return;
-      moveTimer = window.setTimeout(() => {
-        moveTimer = 0;
-        bump();
-      }, 100);
-    };
-    const onEnd = () => {
-      if (moveTimer) {
-        clearTimeout(moveTimer);
-        moveTimer = 0;
-      }
-      bump();
-    };
     bump();
-    map.on('moveend', onEnd);
-    map.on('zoomend', onEnd);
-    map.on('move', onMoveThrottled);
+    map.on('moveend', bump);
+    map.on('zoomend', bump);
     return () => {
-      map.off('moveend', onEnd);
-      map.off('zoomend', onEnd);
-      map.off('move', onMoveThrottled);
-      if (moveTimer) clearTimeout(moveTimer);
+      map.off('moveend', bump);
+      map.off('zoomend', bump);
     };
   }, [map]);
 
@@ -2889,7 +2910,8 @@ function SuperclusterPriceMarkersLayer({
     if (!clusterIndex || !map) return [];
     let b;
     try {
-      b = map.getBounds();
+      // Padding 35% → pins visíveis além da borda durante pan, sem precisar do listener de 'move'.
+      b = map.getBounds().pad(0.35);
     } catch {
       return [];
     }
@@ -2907,12 +2929,30 @@ function SuperclusterPriceMarkersLayer({
         const p = feature.properties || {};
         const isCluster = p.cluster === true && p.cluster_id != null;
         if (isCluster) {
+          // Menor preço entre todos os price points do cluster.
+          let minPrice = null;
+          try {
+            const leaves = clusterIndex.getLeaves(p.cluster_id, Infinity);
+            for (const leaf of leaves) {
+              const pts = leaf.properties?.points;
+              if (!Array.isArray(pts)) continue;
+              for (const pt of pts) {
+                const n = parsePriceToNumber(pt.preco);
+                if (n != null && Number.isFinite(n) && n > 0 && (minPrice === null || n < minPrice)) {
+                  minPrice = n;
+                }
+              }
+            }
+          } catch (_) {}
           return (
             <PriceClusterMarker
               key={`sc-${p.cluster_id}-${flng.toFixed(4)}-${flat.toFixed(4)}`}
               count={p.point_count}
               lat={flat}
               lng={flng}
+              minPrice={minPrice}
+              clusterId={p.cluster_id}
+              clusterIndex={clusterIndex}
             />
           );
         }
@@ -4371,6 +4411,7 @@ export default function MapaPrecosLeaflet({
           cartOfferIdSet={cartOfferIdSet}
           onMapPointCartToggle={toggleCartFromMapPoint}
           userOrigin={userMapPosition}
+          loading={carregando}
         />
         {missionRoute.points.length >= 2 ? (
           <>
