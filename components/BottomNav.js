@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Map, BarChart3, User, ScanLine, Sparkles } from 'lucide-react';
+import { Map, BarChart3, User, ScanLine, Swords } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BOTTOM_NAV } from '../lib/appMicrocopy';
 import { useMapCart } from './map/MapCartContext';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
+import { useEffect, useState } from 'react';
 
 export function BottomNav() {
   const router = useRouter();
@@ -17,6 +18,19 @@ export function BottomNav() {
   const bagCount = Number(shoppingBagTotals?.itemsCount || 0);
   const restrictedFeaturesAllowed = canUseRestrictedFeatures(session?.user?.email);
   const mapHref = restrictedFeaturesAllowed ? '/mapa' : '/em-breve';
+  const [missionsAlert, setMissionsAlert] = useState(false);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch('/api/missions/today')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d) return;
+        const hasIncomplete = (d.missions || []).some((m) => !m.completed);
+        setMissionsAlert(hasIncomplete);
+      })
+      .catch(() => {});
+  }, [session?.user]);
 
   const tabBtn = (active) =>
     cn(
@@ -64,14 +78,19 @@ export function BottomNav() {
         <div className="flex flex-1 justify-end items-end gap-0.5 sm:gap-1 pr-0.5">
           <button
             type="button"
-            onClick={() => router.push('/simulador')}
-            className={tabBtn(pathname === '/simulador')}
+            onClick={() => router.push('/missoes')}
+            className={tabBtn(pathname === '/missoes')}
           >
-            <Sparkles className={cn('h-5 w-5 transition-transform', pathname === '/simulador' && 'scale-110')} />
-            <span className={cn('text-[9px] sm:text-[10px] leading-tight', pathname === '/simulador' ? 'font-bold' : 'font-medium')}>
-              {BOTTOM_NAV.simulador}
+            <div className="relative">
+              <Swords className={cn('h-5 w-5 transition-transform', pathname === '/missoes' && 'scale-110')} />
+              {missionsAlert && pathname !== '/missoes' && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              )}
+            </div>
+            <span className={cn('text-[10px]', pathname === '/missoes' ? 'font-bold' : 'font-medium')}>
+              Missões
             </span>
-            {pathname === '/simulador' && (
+            {pathname === '/missoes' && (
               <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
             )}
           </button>

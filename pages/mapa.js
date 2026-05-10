@@ -27,6 +27,7 @@ import { MAP_THEMES, MAP_THEME_STORAGE_KEY } from '../lib/colors';
 import { useMatchMedia } from '../lib/useMatchMedia';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { MapOverlayCategoryChips } from '../components/map/MapOverlayCategoryChips';
+import { StatesUnlockPanel } from '../components/map/StatesUnlockPanel';
 import { FinancePlansInline } from '../components/FinancePlansInline';
 import { BRAND } from '../lib/brandTokens';
 import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
@@ -77,6 +78,7 @@ export default function MapaPage() {
   const { data: session } = useSession();
   const [showSharedBanner, setShowSharedBanner] = useState(false);
   const [showMenuSheet, setShowMenuSheet] = useState(false);
+  const [showStatesPanel, setShowStatesPanel] = useState(false);
   const [mapThemeId, setMapThemeId] = useState('verde');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -749,6 +751,22 @@ export default function MapaPage() {
             </div>
           </div>
         ) : null}
+
+        {/* Botão flutuante: estados bloqueados */}
+        {session && !showMapLanding && (
+          <button
+            type="button"
+            onClick={() => setShowStatesPanel(true)}
+            className="absolute bottom-[5.5rem] right-3 z-30 flex items-center gap-1.5 rounded-full bg-white/95 border border-gray-200 shadow-md px-3 py-2 text-[12px] font-bold text-gray-700 hover:bg-white transition-colors pointer-events-auto"
+            aria-label="Ver estados desbloqueados"
+          >
+            <span>🗺️</span>
+            <span>Estados</span>
+            <span className="text-[10px] font-black text-amber-500">SP ✅</span>
+          </button>
+        )}
+
+        <StatesUnlockPanel open={showStatesPanel} onClose={() => setShowStatesPanel(false)} />
 
         <BottomNav />
       </div>

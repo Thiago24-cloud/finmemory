@@ -83,6 +83,21 @@ export function AppSplashGate({ children }) {
             <p className="mt-7 text-[12px] font-bold uppercase tracking-[0.16em] text-[#1A1A1A]">
               FinMemory
             </p>
+            <p className="fm-splash-tagline mt-2 text-[13px] text-[#2ECC49] font-semibold tracking-wide">
+              O jogo da vida real
+            </p>
+            <div className="fm-splash-dots flex gap-1.5 mt-5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{
+                    background: i === 0 ? '#2ECC49' : '#D1D5DB',
+                    animation: `fm-dot-fade 0.5s ease ${0.9 + i * 0.25}s both`,
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}

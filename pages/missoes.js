@@ -1,0 +1,199 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
+import { getServerSession } from 'next-auth/next';
+import Head from 'next/head';
+import { BottomNav } from '../components/BottomNav';
+import { authOptions } from './api/auth/[...nextauth]';
+import { canAccess } from '../lib/access-server';
+import { cn } from '../lib/utils';
+
+export async function getServerSideProps(ctx) {
+  try {
+    const session = await getServerSession(ctx.req, ctx.res, authOptions);
+    if (!session?.user?.email) {
+      return { redirect: { destination: '/login?callbackUrl=/missoes', permanent: false } };
+    }
+    const allowed = await canAccess(session.user.email);
+    if (!allowed) {
+      return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    return { props: {} };
+  } catch {
+    return { redirect: { destination: '/login?callbackUrl=/missoes', permanent: false } };
+  }
+}
+
+function useCountdown(secondsUntilReset) {
+  const [seconds, setSeconds] = useState(secondsUntilReset);
+  useEffect(() => {
+    setSeconds(secondsUntilReset);
+    if (!secondsUntilReset) return;
+    const interval = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(interval);
+  }, [secondsUntilReset]);
+
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}min ${String(s).padStart(2, '0')}s`;
+}
+
+function MissionCard({ mission, onComplete }) {
+  const pct = mission.total_steps > 1 ? Math.round((mission.steps_done / mission.total_steps) * 100) : 0;
+  const [completing, setCompleting] = useState(false);
+
+  const handleComplete = async () => {
+    if (mission.completed || completing) return;
+    setCompleting(true);
+    await onComplete(mission.id);
+    setCompleting(false);
+  };
+
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border p-4 transition-all',
+        mission.completed ? 'border-[#2ECC49]/30 bg-[#f0fdf4] opacity-80' : 'border-gray-100 bg-white shadow-sm'
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-3xl flex-shrink-0">{mission.icon}</span>
+
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-[14px] leading-tight">{mission.title}</p>
+          <p className="text-[12px] text-amber-600 font-semibold mt-0.5">+{mission.xp_reward} XP</p>
+
+          {!mission.completed && mission.total_steps > 1 && (
+            <div className="mt-2">
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#2ECC49] rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {mission.steps_done}/{mission.total_steps}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {mission.completed ? (
+          <div className="w-8 h-8 rounded-full bg-[#2ECC49] flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-black text-[15px]">✓</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleComplete}
+            disabled={completing}
+            className="flex-shrink-0 px-3 py-2 rounded-xl bg-gradient-to-br from-[#2ECC49] to-[#16a34a] text-white font-bold text-[12px] shadow-sm active:scale-95 transition-transform disabled:opacity-50"
+          >
+            {completing ? '...' : 'Fazer'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function MissoesPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [missions, setMissions] = useState([]);
+  const [secondsUntilReset, setSecondsUntilReset] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [reward, setReward] = useState(null);
+
+  const countdown = useCountdown(secondsUntilReset);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') router.push('/login');
+  }, [status, router]);
+
+  const fetchMissions = useCallback(async () => {
+    try {
+      const r = await fetch('/api/missions/today');
+      if (!r.ok) return;
+      const d = await r.json();
+      setMissions(d.missions || []);
+      setSecondsUntilReset(d.seconds_until_reset || 0);
+    } catch (_) {}
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchMissions(); }, [fetchMissions]);
+
+  const handleComplete = async (missionId) => {
+    const r = await fetch('/api/missions/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mission_id: missionId }),
+    });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.completed && d.xp_awarded > 0) {
+      setReward(d.xp_awarded);
+      setTimeout(() => setReward(null), 2500);
+    }
+    await fetchMissions();
+  };
+
+  const totalXP = missions.reduce((s, m) => s + m.xp_reward, 0);
+  const completedCount = missions.filter((m) => m.completed).length;
+
+  return (
+    <>
+      <Head>
+        <title>Missões Diárias – FinMemory</title>
+      </Head>
+
+      <div className="min-h-screen bg-background pb-24">
+        {/* Header */}
+        <div className="bg-white border-b border-border/50 px-5 pt-5 pb-4 sticky top-0 z-10">
+          <h1 className="font-black text-[20px] tracking-tight">Missões Diárias</h1>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            Resetam em {countdown}
+          </p>
+        </div>
+
+        <div className="max-w-lg mx-auto px-5 py-5 flex flex-col gap-4">
+          {/* XP disponível */}
+          <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 p-4">
+            <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">XP disponível hoje</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className="font-black text-[28px] text-amber-600">+{totalXP} XP</p>
+              <p className="text-[12px] text-muted-foreground">{completedCount} de {missions.length} completa{completedCount !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+
+          {/* Missões */}
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-6 h-6 border-2 border-[#2ECC49] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : missions.length === 0 ? (
+            <p className="text-center text-muted-foreground py-10">Nenhuma missão disponível hoje.</p>
+          ) : (
+            missions.map((m) => (
+              <MissionCard key={m.id} mission={m} onComplete={handleComplete} />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Reward overlay */}
+      {reward && (
+        <div className="fm-xp-overlay">
+          <div className="bg-gradient-to-br from-amber-400 to-yellow-500 text-black font-black text-[24px] px-7 py-5 rounded-3xl shadow-2xl text-center">
+            +{reward} XP ✨
+            <div className="text-[13px] font-bold mt-1">Missão completa!</div>
+          </div>
+        </div>
+      )}
+
+      <BottomNav />
+    </>
+  );
+}

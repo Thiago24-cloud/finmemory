@@ -145,6 +145,7 @@ export default function AddReceipt() {
   const [userId, setUserId] = useState(null);
   const [extractedData, setExtractedData] = useState(null);
   const [remainingRequests, setRemainingRequests] = useState(null);
+  const [showXPOverlay, setShowXPOverlay] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -200,6 +201,20 @@ export default function AddReceipt() {
     const t = router.query.tab;
     if (t === 'nfce' || t === 'qr') setScanTab('nfce');
   }, [router.isReady, router.query.tab]);
+
+  // Gamificação: overlay +XP e bump de streak ao salvar com sucesso
+  useEffect(() => {
+    if (step !== STEPS.SUCCESS) return;
+    setShowXPOverlay(true);
+    fetch('/api/gamification/streak', { method: 'POST' }).catch(() => {});
+    fetch('/api/missions/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mission_id: 'log_expense' }),
+    }).catch(() => {});
+    const t = setTimeout(() => setShowXPOverlay(false), 2200);
+    return () => clearTimeout(t);
+  }, [step]);
 
   useEffect(() => {
     // Se o utilizador já veio escanear a nota, cancelamos o lembrete da missão.
@@ -1040,6 +1055,16 @@ export default function AddReceipt() {
         </div>
         <BottomNav />
       </div>
+
+      {/* Overlay +XP ao salvar com sucesso */}
+      {showXPOverlay && (
+        <div className="fm-xp-overlay">
+          <div className="bg-gradient-to-br from-amber-400 to-yellow-500 text-black font-black text-[24px] px-7 py-5 rounded-3xl shadow-2xl text-center">
+            +25 XP ✨
+            <div className="text-[13px] font-bold mt-1">Nota registrada!</div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
