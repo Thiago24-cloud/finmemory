@@ -114,10 +114,10 @@ export function BottomNav() {
           className={cn(
             'absolute left-1/2 -translate-x-1/2 bottom-[1.1rem] pointer-events-auto',
             'w-[3.65rem] h-[3.65rem] rounded-full flex items-center justify-center',
-            'bg-gradient-to-br from-[#34d399] via-[#22c55e] to-[#16a34a] text-white',
-            'shadow-[0_10px_28px_rgba(34,197,94,0.45)] ring-4 ring-white',
-            'border border-emerald-500/40 hover:brightness-[1.03] active:scale-[0.97] transition-transform',
-            scanActive && 'ring-[#bbf7d0] ring-offset-2 ring-offset-white'
+            'bg-gradient-to-br from-[#34d399] via-[#22c55e] to-[#16a34a] text-[#0A0E1A]',
+            'shadow-[0_10px_28px_rgba(0,230,118,0.4)] ring-4 ring-[#0d1219]',
+            'border border-emerald-500/30 hover:brightness-[1.05] active:scale-[0.97] transition-transform',
+            scanActive && 'ring-[#00E676]/40 ring-offset-2 ring-offset-[#0d1219]'
           )}
           aria-label={BOTTOM_NAV.scanAria}
         >

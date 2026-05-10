@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import Image from 'next/image';
 import Head from 'next/head';
 import { getServerSession } from 'next-auth/next';
 import { BottomNav } from '../components/BottomNav';
@@ -102,8 +101,8 @@ export default function ScanProductPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-primary p-5 font-sans">
-        <div className="text-white text-center py-10">Carregando...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -115,76 +114,64 @@ export default function ScanProductPage() {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-primary font-sans pb-24">
-        <div className="sticky top-0 z-20 flex items-center gap-3 p-5 pb-4 bg-gradient-primary">
-          <Link
-            href="/dashboard"
-            className="min-h-[44px] inline-flex items-center gap-2 bg-white/20 text-white py-2.5 px-4 rounded-xl text-sm font-medium hover:bg-white/30 no-underline"
-          >
-            <span aria-hidden>←</span> Voltar
+      <div className="min-h-screen bg-background text-foreground font-sans pb-28">
+        {/* Header */}
+        <div className="sticky top-0 z-20 flex items-center gap-3 px-5 py-4 bg-card border-b border-[#1E2A3A]">
+          <Link href="/dashboard"
+            className="min-h-[44px] inline-flex items-center gap-2 bg-card border border-[#1E2A3A] text-foreground py-2 px-4 rounded-xl text-sm font-medium hover:bg-[#1E2A3A] transition-colors no-underline">
+            ← Voltar
           </Link>
-          <Image src="/logo.png" alt="" width={36} height={36} className="object-contain shrink-0 rounded-lg" />
-          <h1 className="text-white text-xl sm:text-2xl m-0 flex-1">Produto</h1>
+          <h1 className="text-foreground text-[18px] font-black m-0 flex-1">Escanear Produto</h1>
         </div>
 
-        <div className="px-5 pb-8 max-w-lg mx-auto">
+        <div className="px-5 pt-5 pb-8 max-w-lg mx-auto space-y-4">
           {phase === 'intro' && (
-            <div className="bg-white rounded-[24px] p-6 shadow-lg space-y-4">
-              <p className="text-[#444] text-sm leading-relaxed m-0">
-                Leia o <strong>código de barras</strong> do produto. O app identifica o item (base aberta) e, se você já
-                registrou NFC-e com código no item, mostra o que <strong>você já pagou</strong> antes.
+            <div className="bg-card border border-[#1E2A3A] rounded-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-2xl">
+                  📦
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Identificar produto</p>
+                  <p className="text-xs text-muted-foreground">Leia o código de barras EAN/UPC</p>
+                </div>
+              </div>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                O app identifica o item pela base aberta e, se você já registrou NFC-e com este código, mostra o que{' '}
+                <strong className="text-foreground">você já pagou</strong> antes.
               </p>
-              <p className="text-xs text-[#6b7280] m-0">
-                O preço na gôndola continua no sistema da loja. Com parceria, a mesma leitura pode mostrar o{' '}
-                <strong>preço oficial da loja</strong> aqui — e reduzir fila nos funcionários.
-              </p>
-              <button
-                type="button"
-                onClick={() => setPhase('scan')}
-                className="w-full py-4 px-6 bg-[#1a7f37] text-white rounded-xl text-base font-semibold border-none cursor-pointer hover:bg-[#166534]"
-              >
-                Abrir câmera e ler código
+              <button type="button" onClick={() => setPhase('scan')}
+                className="w-full py-4 px-6 bg-primary text-[#0A0E1A] rounded-xl text-base font-black hover:bg-primary/90 active:scale-[0.98] transition-all">
+                📷 Abrir câmera
               </button>
 
-              <div className="relative py-2 text-center text-xs text-[#9ca3af]">
-                <span className="bg-white px-2 relative z-[1]">ou</span>
-                <span className="absolute left-0 right-0 top-1/2 h-px bg-[#e5e7eb] z-0" aria-hidden />
+              <div className="relative py-2 text-center text-xs text-muted-foreground">
+                <span className="bg-card px-2 relative z-[1]">ou digite o código</span>
+                <span className="absolute left-0 right-0 top-1/2 h-px bg-[#1E2A3A] z-0" aria-hidden />
               </div>
 
-              <label className="block text-xs font-semibold text-[#374151] mb-1.5">Digitar código (EAN / UPC)</label>
               <input
                 type="text"
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder="ex.: 7891234567890"
                 value={manualCode}
-                onChange={(e) => {
-                  setManualCode(e.target.value);
-                  setManualErr(null);
-                }}
-                className="w-full px-4 py-3 rounded-xl border border-[#e5e7eb] text-[#111] font-mono text-base mb-2"
+                onChange={(e) => { setManualCode(e.target.value); setManualErr(null); }}
+                className="w-full px-4 py-3 rounded-xl border border-[#1E2A3A] bg-background text-foreground font-mono text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
-              {manualErr && <p className="text-red-600 text-xs mb-2 m-0">{manualErr}</p>}
-              <button
-                type="button"
-                onClick={submitManualCode}
-                className="w-full py-3 px-4 bg-[#f3f4f6] text-[#111] rounded-xl font-semibold border border-[#e5e7eb] hover:bg-[#e5e7eb]"
-              >
+              {manualErr && <p className="text-red-400 text-xs">{manualErr}</p>}
+              <button type="button" onClick={submitManualCode}
+                className="w-full py-3 px-4 bg-card text-foreground rounded-xl font-semibold border border-[#1E2A3A] hover:bg-[#1E2A3A] transition-colors">
                 Buscar pelo número
               </button>
             </div>
           )}
 
           {phase === 'scan' && (
-            <div className="bg-white rounded-[24px] p-6 shadow-lg space-y-5">
-              <ProductBarcodeScanner
-                onScan={onBarcode}
-                onClose={() => {
-                  reset();
-                }}
-              />
-              <div className="pt-2 border-t border-[#eee]">
-                <p className="text-xs font-semibold text-[#374151] m-0 mb-2">Digitar código (EAN / UPC)</p>
+            <div className="bg-card border border-[#1E2A3A] rounded-2xl p-5 space-y-4">
+              <ProductBarcodeScanner onScan={onBarcode} onClose={() => reset()} />
+              <div className="pt-3 border-t border-[#1E2A3A]">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">Ou digitar código (EAN / UPC)</p>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -192,98 +179,78 @@ export default function ScanProductPage() {
                     autoComplete="off"
                     placeholder="EAN / UPC"
                     value={manualCode}
-                    onChange={(e) => {
-                      setManualCode(e.target.value);
-                      setManualErr(null);
-                    }}
-                    className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-[#e5e7eb] font-mono text-sm"
+                    onChange={(e) => { setManualCode(e.target.value); setManualErr(null); }}
+                    className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-[#1E2A3A] bg-background text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
-                  <button
-                    type="button"
-                    onClick={submitManualCode}
-                    className="shrink-0 py-2.5 px-4 rounded-xl bg-[#1a7f37] text-white font-semibold text-sm"
-                  >
+                  <button type="button" onClick={submitManualCode}
+                    className="shrink-0 py-2.5 px-4 rounded-xl bg-primary text-[#0A0E1A] font-bold text-sm">
                     Buscar
                   </button>
                 </div>
-                {manualErr && <p className="text-red-600 text-xs mt-1.5 m-0">{manualErr}</p>}
+                {manualErr && <p className="text-red-400 text-xs mt-1.5">{manualErr}</p>}
               </div>
             </div>
           )}
 
           {phase === 'loading' && (
-            <div className="bg-white rounded-[24px] p-8 shadow-lg text-center text-[#444]">
-              Consultando código…
+            <div className="bg-card border border-[#1E2A3A] rounded-2xl p-10 flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-muted-foreground text-sm">Consultando código…</p>
             </div>
           )}
 
           {phase === 'result' && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-[24px] p-6 shadow-lg space-y-4">
+            <>
+              <div className="bg-card border border-[#1E2A3A] rounded-2xl p-5 space-y-4">
                 {displayGtin && (
-                  <p className="text-xs text-[#6b7280] m-0">
-                    Código: <span className="font-mono">{displayGtin}</span>
+                  <p className="text-xs text-muted-foreground">
+                    Código: <span className="font-mono text-foreground">{displayGtin}</span>
                   </p>
                 )}
-                {err && (
-                  <p className="text-red-600 text-sm m-0">{err}</p>
-                )}
-                {!err && (
+                {err ? (
+                  <p className="text-red-400 text-sm">{err}</p>
+                ) : (
                   <>
                     <div className="flex gap-4 items-start">
                       {imgSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={imgSrc}
-                          alt=""
-                          className="w-20 h-20 object-contain rounded-xl bg-[#f3f4f6] shrink-0"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
+                        <img src={imgSrc} alt="" className="w-20 h-20 object-contain rounded-xl bg-background border border-[#1E2A3A] shrink-0"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                       ) : (
-                        <div className="w-20 h-20 rounded-xl bg-[#f3f4f6] shrink-0" />
+                        <div className="w-20 h-20 rounded-xl bg-background border border-[#1E2A3A] shrink-0 flex items-center justify-center text-2xl">📦</div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <h2 className="text-lg font-bold text-[#111] m-0 leading-snug">
-                          {off?.name || 'Produto identificado pelo código'}
+                        <h2 className="text-[17px] font-black text-foreground leading-snug">
+                          {off?.name || 'Produto identificado'}
                         </h2>
-                        {off?.brands && (
-                          <p className="text-sm text-[#666] mt-1 m-0">{off.brands}</p>
-                        )}
-                        {off?.source === 'cosmos' && (
-                          <p className="text-xs text-[#9ca3af] mt-1.5 m-0">Fonte: Cosmos Bluesoft</p>
-                        )}
+                        {off?.brands && <p className="text-sm text-muted-foreground mt-1">{off.brands}</p>}
+                        {off?.source === 'cosmos' && <p className="text-xs text-muted-foreground mt-1">Fonte: Cosmos Bluesoft</p>}
                         {!off?.name && (
-                          <p className="text-sm text-[#666] mt-2 m-0">
-                            Nome não encontrado na base aberta. Ainda assim o código é válido para parceiros e para o
-                            histórico de notas.
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Nome não encontrado na base aberta. O código é válido para o histórico de notas.
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="border-t border-[#eee] pt-4">
-                      <h3 className="text-sm font-bold text-[#111] m-0 mb-2">Suas compras com este código</h3>
+                    <div className="border-t border-[#1E2A3A] pt-4">
+                      <h3 className="text-sm font-bold text-foreground mb-2">Suas compras com este código</h3>
                       {payload?.yourPurchases?.length ? (
                         <ul className="list-none m-0 p-0 space-y-2">
                           {payload.yourPurchases.map((p, i) => (
-                            <li
-                              key={`${p.data}-${p.estabelecimento}-${i}`}
-                              className="text-sm text-[#444] flex justify-between gap-2 border-b border-[#f3f4f6] pb-2 last:border-0"
-                            >
+                            <li key={`${p.data}-${p.estabelecimento}-${i}`}
+                              className="flex justify-between gap-2 border-b border-[#1E2A3A] pb-2 last:border-0">
                               <span className="min-w-0">
-                                <span className="font-medium block truncate">{p.estabelecimento || 'Loja'}</span>
-                                <span className="text-xs text-[#888]">{p.data}</span>
+                                <span className="font-medium text-foreground text-sm block truncate">{p.estabelecimento || 'Loja'}</span>
+                                <span className="text-xs text-muted-foreground">{p.data}</span>
                               </span>
-                              <span className="font-semibold text-[#1a7f37] shrink-0">{formatBRL(p.price)}</span>
+                              <span className="font-bold text-primary shrink-0">{formatBRL(p.price)}</span>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-[#666] m-0">
-                          Nenhuma nota sua com este código ainda. Quando a NFC-e trouxer o código no item (XML), ele
-                          aparece aqui automaticamente.
+                        <p className="text-sm text-muted-foreground">
+                          Nenhuma nota com este código ainda. Quando a NFC-e trouxer o código no item (XML), aparece aqui automaticamente.
                         </p>
                       )}
                     </div>
@@ -291,36 +258,25 @@ export default function ScanProductPage() {
                 )}
               </div>
 
-              <div
-                className={cn(
-                  'rounded-[24px] p-5 border border-[#bae6fd] bg-[#f0f9ff]',
-                  'text-sm text-[#0c4a6e] leading-relaxed'
-                )}
-              >
-                <p className="font-bold m-0 mb-2">Para redes e lojas (demo)</p>
-                <p className="m-0">
-                  Hoje o usuário vê o produto e o histórico das próprias notas. Com os <strong>preços e ofertas</strong>{' '}
-                  que vocês enviarem ao FinMemory, a mesma leitura vira consulta de preço no corredor — sem custo de
-                  hardware extra e com menos interrupção na equipe.
+              <div className="rounded-2xl p-5 border border-blue-500/20 bg-blue-500/5 text-sm text-blue-400 leading-relaxed">
+                <p className="font-bold mb-2 text-blue-300">Para redes e lojas (demo)</p>
+                <p>
+                  Com <strong className="text-blue-300">preços e ofertas</strong> enviados ao FinMemory, a mesma leitura vira
+                  consulta de preço no corredor — sem custo de hardware extra.
                 </p>
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={reset}
-                  className="flex-1 py-3 px-4 bg-white text-[#1a7f37] rounded-xl font-semibold border-2 border-[#1a7f37]"
-                >
-                  Ler outro código
+              <div className="flex gap-3">
+                <button type="button" onClick={reset}
+                  className="flex-1 py-3 px-4 bg-card text-primary rounded-xl font-bold border border-primary/40 hover:bg-primary/10 transition-colors">
+                  Ler outro
                 </button>
-                <Link
-                  href="/partnership"
-                  className="flex-1 py-3 px-4 bg-[#1a7f37] text-white rounded-xl font-semibold text-center no-underline inline-flex items-center justify-center"
-                >
+                <Link href="/partnership"
+                  className="flex-1 py-3 px-4 bg-primary text-[#0A0E1A] rounded-xl font-bold text-center no-underline inline-flex items-center justify-center">
                   Parceria
                 </Link>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>

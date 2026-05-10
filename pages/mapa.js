@@ -325,10 +325,10 @@ export default function MapaPage() {
               <button
                 type="button"
                 onClick={() => setShowMenuSheet(true)}
-                className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-[0_2px_6px_rgba(60,64,67,0.28)] transition-colors md:inline-flex ${
+                className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.4)] transition-colors md:inline-flex ${
                   wazeUi
                     ? 'bg-[#303134] text-[#e5e5e5] shadow-black/40 hover:bg-[#3c4043]'
-                    : 'border border-[#dadce0] bg-white text-gray-800 hover:bg-gray-50'
+                    : 'border border-[#1E2A3A] bg-[#111827] text-[#F0F4FF] hover:bg-[#1E2A3A]'
                 }`}
                 aria-label={wazeUi ? MAP_ARIA.plannerMenuWaze : MAP_ARIA.plannerMenu}
                 title={wazeUi ? 'Waze dos preços' : undefined}
@@ -341,7 +341,7 @@ export default function MapaPage() {
                   className={`flex w-full items-stretch overflow-hidden rounded-2xl ${
                     wazeUi
                       ? 'bg-[#303134] shadow-[0_2px_8px_rgba(0,0,0,0.45)] focus-within:ring-2 focus-within:ring-[#2ecc71]/35'
-                      : 'border border-[#dadce0] bg-white shadow-[0_2px_8px_rgba(60,64,67,0.12)] focus-within:ring-2 focus-within:ring-[#1a73e8]/20'
+                      : 'border border-[#1E2A3A] bg-[#111827] shadow-[0_2px_8px_rgba(0,0,0,0.4)] focus-within:ring-2 focus-within:ring-[#00E676]/30'
                   }`}
                 >
                   <button
@@ -350,7 +350,7 @@ export default function MapaPage() {
                     className={`inline-flex h-12 w-12 shrink-0 items-center justify-center border-r transition-colors md:hidden ${
                       wazeUi
                         ? 'border-[#5f6368]/55 bg-[#303134] text-[#e8eaed] hover:bg-[#3c4043]'
-                        : 'border-gray-200/90 bg-white text-gray-800 hover:bg-gray-50'
+                        : 'border-[#1E2A3A] bg-[#111827] text-[#F0F4FF] hover:bg-[#1E2A3A]'
                     }`}
                     aria-label={wazeUi ? MAP_ARIA.menuMobileWaze : 'Menu'}
                   >
@@ -373,26 +373,26 @@ export default function MapaPage() {
                       setMapChipSelection('custom');
                     }}
                     className={`min-w-0 flex-1 border-0 bg-transparent py-3 pl-3 pr-1 text-[15px] leading-snug focus:outline-none md:py-2.5 md:pl-3.5 md:text-sm ${
-                      wazeUi ? 'text-[#e8eaed] placeholder-[#9aa0a6]' : 'text-[#202124] placeholder-[#5f6368]'
+                      wazeUi ? 'text-[#e8eaed] placeholder-[#9aa0a6]' : 'text-[#F0F4FF] placeholder-[#8899AA]'
                     }`}
                     aria-label={MAP_ARIA.searchMap}
                   />
                   <div
                     className={`flex shrink-0 items-center pr-1.5 pl-0 ${
-                      wazeUi ? 'border-l border-[#5f6368]/50' : 'border-l border-gray-200'
+                      wazeUi ? 'border-l border-[#5f6368]/50' : 'border-l border-[#1E2A3A]'
                     }`}
                   >
                     <button
                       type="button"
                       onClick={() => searchInputRef.current?.focus()}
                       className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors md:h-9 md:w-9 ${
-                        wazeUi ? 'text-[#9aa0a6] hover:bg-[#3c4043]' : 'text-[#5f6368] hover:bg-gray-100'
+                        wazeUi ? 'text-[#9aa0a6] hover:bg-[#3c4043]' : 'text-[#8899AA] hover:bg-[#1E2A3A]'
                       }`}
                       aria-label="Buscar"
                     >
                       <Search className="h-[19px] w-[19px] md:h-[18px] md:w-[18px]" strokeWidth={2} />
                     </button>
-                    <div className={`h-4 w-px shrink-0 ${wazeUi ? 'bg-[#5f6368]' : 'bg-gray-300'}`} aria-hidden />
+                    <div className={`h-4 w-px shrink-0 ${wazeUi ? 'bg-[#5f6368]' : 'bg-[#1E2A3A]'}`} aria-hidden />
                     <button
                       type="button"
                       onClick={() => {
@@ -401,7 +401,7 @@ export default function MapaPage() {
                         }
                       }}
                       className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors md:h-9 md:w-9 ${
-                        wazeUi ? 'text-[#8ab4f8] hover:bg-[#3c4043]' : 'text-[#1a73e8] hover:bg-[#f1f3f4]'
+                        wazeUi ? 'text-[#8ab4f8] hover:bg-[#3c4043]' : 'text-[#00E676] hover:bg-[#1E2A3A]'
                       }`}
                       aria-label={MAP_ARIA.locateMe}
                       title={MAP_ARIA.locateMe}
@@ -474,96 +474,68 @@ export default function MapaPage() {
             </div>
           </div>
         ) : !session ? (
-          <header
-            className={`pointer-events-auto absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 rounded-b-2xl shadow-[0_2px_12px_rgba(0,0,0,0.08)] ${
-              wazeUi
-                ? 'border-b border-[#1e2130] bg-[#13161f]/92 backdrop-blur-md'
-                : 'border-b border-gray-200/80 bg-white/92 backdrop-blur-md'
-            }`}
-          >
-            <Link href="/" className="flex items-center gap-2 shrink-0 no-underline text-[#333]">
+          <header className="pointer-events-auto absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 rounded-b-2xl border-b border-[#1E2A3A] bg-[#111827]/95 backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
+            <Link href="/" className="flex items-center gap-2 shrink-0 no-underline">
               <Image src="/logo.png" alt="FinMemory" width={36} height={36} className="object-contain rounded-lg" />
-              <span className="font-bold text-lg">FinMemory</span>
+              <span className="font-bold text-lg text-[#F0F4FF]">FinMemory</span>
             </Link>
-            <span className="flex-1 text-xs text-gray-500 hidden sm:block">Planejador de compras em tempo real</span>
-            <Link
-              href="/login?callbackUrl=/mapa"
-              className="min-h-[40px] py-2 px-4 rounded-full bg-[#2ECC49] text-white font-semibold text-sm hover:bg-[#22a83a] transition-colors no-underline"
-            >
+            <span className="flex-1 text-xs text-[#8899AA] hidden sm:block">Planejador de compras em tempo real</span>
+            <Link href="/login?callbackUrl=/mapa"
+              className="min-h-[40px] py-2 px-4 rounded-full bg-primary text-[#0A0E1A] font-bold text-sm hover:bg-primary/90 transition-colors no-underline">
               Entrar
             </Link>
-            <Link
-              href="/dashboard"
-              className="min-h-[40px] py-2 px-3 rounded-full border border-gray-300 bg-white/80 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
-            >
+            <Link href="/dashboard"
+              className="min-h-[40px] py-2 px-3 rounded-full border border-[#1E2A3A] bg-card text-[#F0F4FF] font-medium text-sm hover:bg-[#1E2A3A] transition-colors no-underline">
               Gastos
             </Link>
           </header>
         ) : null}
 
         <Sheet open={showMenuSheet && !showMapLanding} onOpenChange={setShowMenuSheet}>
-          <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
+          <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto bg-card border-[#1E2A3A] text-foreground">
             <SheetHeader className="mb-4">
-              <SheetTitle className="text-xl font-bold text-center text-gray-900">FinMemory no mapa</SheetTitle>
-              <p className="text-sm text-gray-600 text-center">
+              <SheetTitle className="text-xl font-bold text-center text-foreground">FinMemory no mapa</SheetTitle>
+              <p className="text-sm text-muted-foreground text-center">
                 Compras e preços em tempo real — atalhos e aparência do mapa.
               </p>
             </SheetHeader>
             <div className="flex flex-col gap-2 mb-6">
-              <Link
-                href="/dashboard"
-                onClick={() => setShowMenuSheet(false)}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-100 no-underline"
-              >
-                <ListChecks className="h-5 w-5 text-[#2ECC49]" />
+              <Link href="/dashboard" onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-[#1E2A3A] bg-background px-4 py-3 text-sm font-semibold text-foreground hover:bg-[#1E2A3A] no-underline transition-colors">
+                <ListChecks className="h-5 w-5 text-primary" />
                 Gastos e análise
               </Link>
-              <Link
-                href="/mapa-quick-add"
-                onClick={() => setShowMenuSheet(false)}
-                className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50/80 px-4 py-3 text-sm font-semibold text-sky-900 hover:bg-sky-100/80 no-underline"
-              >
-                <Zap className="h-5 w-5 text-sky-600" />
+              <Link href="/mapa-quick-add" onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm font-semibold text-sky-400 hover:bg-sky-500/10 no-underline transition-colors">
+                <Zap className="h-5 w-5 text-sky-400" />
                 Curadoria rápida (progresso ao vivo)
               </Link>
-              <Link
-                href="/admin/quick-add"
-                onClick={() => setShowMenuSheet(false)}
-                className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50/80 px-4 py-3 text-sm font-semibold text-violet-900 hover:bg-violet-100/80 no-underline"
-              >
-                <Zap className="h-5 w-5 text-violet-600" />
+              <Link href="/admin/quick-add" onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-violet-500/30 bg-violet-500/5 px-4 py-3 text-sm font-semibold text-violet-400 hover:bg-violet-500/10 no-underline transition-colors">
+                <Zap className="h-5 w-5 text-violet-400" />
                 Quick Add (pipeline escuro)
               </Link>
-              <Link
-                href="/listas"
-                onClick={() => setShowMenuSheet(false)}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 no-underline"
-              >
+              <Link href="/listas" onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-[#1E2A3A] bg-background px-4 py-3 text-sm font-semibold text-foreground hover:bg-[#1E2A3A] no-underline transition-colors">
                 Listas salvas
               </Link>
-              <Link
-                href="/shopping-list"
-                onClick={() => setShowMenuSheet(false)}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 no-underline"
-              >
+              <Link href="/shopping-list" onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-[#1E2A3A] bg-background px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-[#1E2A3A] no-underline transition-colors">
                 Lista de compras compartilhada
               </Link>
             </div>
-            <p className="text-sm font-semibold text-gray-800 mb-3">Tema do mapa</p>
+            <p className="text-sm font-semibold text-foreground mb-3">Tema do mapa</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {MAP_THEMES.map((theme) => (
-                <button
-                  key={theme.id}
-                  type="button"
-                  onClick={() => handleSelectMapTheme(theme.id)}
+                <button key={theme.id} type="button" onClick={() => handleSelectMapTheme(theme.id)}
                   className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-left ${
                     mapThemeId === theme.id
-                      ? 'border-[#2ECC49] bg-[#E8F5E9] text-gray-900 ring-2 ring-[#2ECC49]/30'
-                      : 'border-gray-200 bg-white hover:border-[#2ECC49]/50 hover:bg-[#f0fdf4]'
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                      : 'border-[#1E2A3A] bg-card hover:border-primary/40'
                   }`}
                 >
                   <div className="w-full h-14 rounded-xl shadow-inner" style={{ backgroundColor: theme.preview }} />
-                  <span className="font-semibold text-sm text-gray-900">{theme.name}</span>
+                  <span className="font-semibold text-sm text-foreground">{theme.name}</span>
                 </button>
               ))}
             </div>

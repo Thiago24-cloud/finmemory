@@ -68,7 +68,7 @@ function MissionCard({ mission, onComplete }) {
 
           {!mission.completed && mission.total_steps > 1 && (
             <div className="mt-2">
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-gray-100 dark:bg-[#1E2A3A] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#2ECC49] rounded-full transition-all duration-500"
                   style={{ width: `${pct}%` }}
