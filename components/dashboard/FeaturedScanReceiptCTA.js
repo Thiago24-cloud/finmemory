@@ -35,8 +35,39 @@ function NotaFiscalHeroIcon({ className }) {
 
 /**
  * CTA principal: escanear nota fiscal (destaque no dashboard).
+ * @param {{ className?: string; variant?: 'hero' | 'compact' }}=} props
  */
-export function FeaturedScanReceiptCTA({ className }) {
+export function FeaturedScanReceiptCTA({ className, variant = 'hero' }) {
+  if (variant === 'compact') {
+    return (
+      <Link
+        href="/add-receipt"
+        className={cn(
+          'group flex items-center gap-3 no-underline rounded-2xl px-3 py-2.5 mb-3 relative overflow-hidden',
+          'border border-[#2ECC49]/50 dark:border-[#2ECC49]/40',
+          'bg-gradient-to-r from-emerald-950/40 via-emerald-950/25 to-transparent',
+          'active:scale-[0.99] transition-transform duration-200',
+          className
+        )}
+      >
+        <div
+          className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/25"
+          aria-hidden
+        >
+          <NotaFiscalHeroIcon className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1 text-left">
+          <p className="text-[11px] font-bold tracking-wide text-emerald-400 uppercase m-0 mb-0.5">
+            Escanear nota fiscal
+          </p>
+          <p className="text-xs text-foreground/90 m-0 leading-snug font-medium">
+            Foto → produtos e preços automáticos
+          </p>
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href="/add-receipt"

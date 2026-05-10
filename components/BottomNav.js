@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
 import { BOTTOM_NAV } from '../lib/appMicrocopy';
 import { useMapCart } from './map/MapCartContext';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
-import { useEffect, useState } from 'react';
+import { useMissionsToday } from './missions/MissionsTodayContext';
 
 export function BottomNav() {
   const router = useRouter();
@@ -18,19 +18,7 @@ export function BottomNav() {
   const bagCount = Number(shoppingBagTotals?.itemsCount || 0);
   const restrictedFeaturesAllowed = canUseRestrictedFeatures(session?.user?.email);
   const mapHref = restrictedFeaturesAllowed ? '/mapa' : '/em-breve';
-  const [missionsAlert, setMissionsAlert] = useState(false);
-
-  useEffect(() => {
-    if (!session?.user) return;
-    fetch('/api/missions/today')
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => {
-        if (!d) return;
-        const hasIncomplete = (d.missions || []).some((m) => !m.completed);
-        setMissionsAlert(hasIncomplete);
-      })
-      .catch(() => {});
-  }, [session?.user]);
+  const { hasIncompleteMissions } = useMissionsToday();
 
   const tabBtn = (active) =>
     cn(
@@ -83,7 +71,7 @@ export function BottomNav() {
           >
             <div className="relative">
               <Swords className={cn('h-5 w-5 transition-transform', pathname === '/missoes' && 'scale-110')} />
-              {missionsAlert && pathname !== '/missoes' && (
+              {hasIncompleteMissions && pathname !== '/missoes' && (
                 <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               )}
             </div>
@@ -111,6 +99,7 @@ export function BottomNav() {
 
         <Link
           href="/add-receipt"
+          title={BOTTOM_NAV.scanFabTitle}
           className={cn(
             'absolute left-1/2 -translate-x-1/2 bottom-[1.1rem] pointer-events-auto',
             'w-[3.65rem] h-[3.65rem] rounded-full flex items-center justify-center',

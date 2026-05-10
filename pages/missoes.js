@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth/next';
 import Head from 'next/head';
 import { BottomNav } from '../components/BottomNav';
+import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import { cn } from '../lib/utils';
@@ -101,11 +102,9 @@ function MissionCard({ mission, onComplete }) {
 }
 
 export default function MissoesPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
-  const [missions, setMissions] = useState([]);
-  const [secondsUntilReset, setSecondsUntilReset] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { missions, loading, secondsUntilReset, refresh } = useMissionsToday();
   const [reward, setReward] = useState(null);
 
   const countdown = useCountdown(secondsUntilReset);
@@ -113,19 +112,6 @@ export default function MissoesPage() {
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
   }, [status, router]);
-
-  const fetchMissions = useCallback(async () => {
-    try {
-      const r = await fetch('/api/missions/today');
-      if (!r.ok) return;
-      const d = await r.json();
-      setMissions(d.missions || []);
-      setSecondsUntilReset(d.seconds_until_reset || 0);
-    } catch (_) {}
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchMissions(); }, [fetchMissions]);
 
   const handleComplete = async (missionId) => {
     const r = await fetch('/api/missions/complete', {
@@ -139,7 +125,7 @@ export default function MissoesPage() {
       setReward(d.xp_awarded);
       setTimeout(() => setReward(null), 2500);
     }
-    await fetchMissions();
+    await refresh({ silent: true });
   };
 
   const totalXP = missions.reduce((s, m) => s + m.xp_reward, 0);

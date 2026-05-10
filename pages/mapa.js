@@ -19,6 +19,7 @@ import {
   Wallet,
   Sparkles,
   ShoppingCart,
+  ScanBarcode,
 } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
@@ -522,6 +523,11 @@ export default function MapaPage() {
               <Link href="/shopping-list" onClick={() => setShowMenuSheet(false)}
                 className="flex items-center gap-3 rounded-xl border border-[#1E2A3A] bg-background px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-[#1E2A3A] no-underline transition-colors">
                 Lista de compras compartilhada
+              </Link>
+              <Link href="/scan-product" onClick={() => setShowMenuSheet(false)}
+                className="flex items-center gap-3 rounded-xl border border-red-500/25 bg-red-500/5 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 no-underline transition-colors">
+                <ScanBarcode className="h-5 w-5 shrink-0" aria-hidden />
+                Consultar preço (código de barras)
               </Link>
             </div>
             <p className="text-sm font-semibold text-foreground mb-3">Tema do mapa</p>

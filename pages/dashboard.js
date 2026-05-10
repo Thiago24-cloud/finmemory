@@ -9,7 +9,10 @@ import Image from 'next/image';
 import { BottomNav } from '../components/BottomNav';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
-import { QuickActions } from '../components/dashboard/QuickActions';
+import { DashboardQuickAccess } from '../components/dashboard/DashboardQuickAccess';
+import { DashboardMissionsProgress } from '../components/dashboard/DashboardMissionsStrip';
+import { useMissionsToday } from '../components/missions/MissionsTodayContext';
+import { DashboardMonthCarousel } from '../components/dashboard/DashboardMonthCarousel';
 import { UnifiedHistoryList } from '../components/dashboard/UnifiedHistoryList';
 import { OpenFinanceBankCarousel } from '../components/dashboard/OpenFinanceBankCarousel';
 import { FeaturedScanReceiptCTA } from '../components/dashboard/FeaturedScanReceiptCTA';
@@ -19,7 +22,7 @@ import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
 import { DashboardOnboardingTour } from '../components/onboarding/DashboardOnboardingTour';
-import { MONTH_FILTER, DASHBOARD } from '../lib/appMicrocopy';
+import { DASHBOARD } from '../lib/appMicrocopy';
 import {
   isDashboardOnboardingDoneLocal,
   setDashboardOnboardingDoneLocal,
@@ -943,6 +946,7 @@ export default function Dashboard() {
 
   const isAuthenticated = status === 'authenticated' && session;
   const isLoading = status === 'loading';
+  const { missions: missionsToday } = useMissionsToday();
 
   // Meses únicos das transações apenas do ano mais recente (evita lista com anos antigos)
   const availableMonths = useMemo(() => {
@@ -955,6 +959,17 @@ export default function Dashboard() {
     const latestYear = getLatestYear(allMonths);
     const filtered = latestYear ? allMonths.filter((ym) => ym.startsWith(`${latestYear}-`)) : allMonths;
     return filtered.sort((a, b) => b.localeCompare(a));
+  }, [transactions]);
+
+  /** Total por mês (NF-e / OCR) para chips do carrossel */
+  const monthTotals = useMemo(() => {
+    const map = {};
+    (transactions || []).forEach((t) => {
+      const ym = getYearMonthKey(t.data);
+      if (!ym) return;
+      map[ym] = (map[ym] || 0) + getTransactionTotalForDashboard(t);
+    });
+    return map;
   }, [transactions]);
 
   // UX estilo app bancário: abrir já no mês mais recente (evita mostrar acumulado histórico gigante).
@@ -1012,6 +1027,14 @@ export default function Dashboard() {
   }, [filteredTransactions]);
   const balanceLoading = loading && (transactions || []).length === 0;
 
+  const missionsSlotForCard = useMemo(() => {
+    if (!missionsToday?.length) return null;
+    const completed = missionsToday.filter((m) => m.completed).length;
+    return (
+      <DashboardMissionsProgress completed={completed} total={missionsToday.length} />
+    );
+  }, [missionsToday]);
+
   const transactionCount = (transactions || []).length;
   const userLevel = transactionCount < 10 ? 'Iniciante' : transactionCount < 50 ? 'Regular' : 'Expert';
 
@@ -1049,78 +1072,59 @@ export default function Dashboard() {
             {/* Header */}
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
 
-            {/* Balance Card */}
-            <div className="px-5 mt-4">
+            {/* Saldo + missões do dia + carrossel de meses */}
+            <div className="px-5 mt-4 space-y-2">
               <BalanceCard
+                compact
                 balance={totalBalance}
                 loading={balanceLoading}
                 income={openFinance.data?.month?.incomeTotal || 0}
                 label={selectedMonth ? 'Gastos do Mês' : 'Total de Gastos'}
+                missionsSlot={missionsSlotForCard}
               />
+              {availableMonths.length > 0 && (
+                <DashboardMonthCarousel
+                  months={availableMonths}
+                  selectedMonth={selectedMonth}
+                  onMonthChange={setSelectedMonth}
+                  monthTotals={monthTotals}
+                  loading={loading}
+                />
+              )}
             </div>
 
-            {/* Month Filter */}
-            {availableMonths.length > 0 && (
-              <div className="px-5 mt-3">
-                <select
-                  id="month-filter"
-                  value={selectedMonth || ''}
-                  onChange={(e) => setSelectedMonth(e.target.value || null)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-card border border-[#1E2A3A] text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">{MONTH_FILTER.allMonths}</option>
-                  {availableMonths.map((ym) => {
-                    const [y, m] = ym.split('-');
-                    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1);
-                    const lbl = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                    return <option key={ym} value={ym}>{lbl.charAt(0).toUpperCase() + lbl.slice(1)}</option>;
-                  })}
-                </select>
-              </div>
-            )}
+            {/* Atalhos 4×2 + Parceria/Categorias */}
+            <DashboardQuickAccess
+              className="mt-3"
+              onExtrato={() => historyRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            />
 
-            {/* 2x2 Quick Actions */}
-            <div className="px-5 mt-4 grid grid-cols-2 gap-3">
-              {[
-                { href: '/add-receipt', emoji: '📷', label: 'Escanear', color: '#00E676', bg: 'rgba(0,230,118,0.08)', border: 'rgba(0,230,118,0.2)' },
-                { href: '/mapa', emoji: '🗺️', label: 'Mapa', color: '#60A5FA', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.2)' },
-                { href: null, emoji: '📊', label: 'Extrato', color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)', scroll: true },
-                { href: '/missoes', emoji: '⚔️', label: 'Missões', color: '#FFD700', bg: 'rgba(255,215,0,0.08)', border: 'rgba(255,215,0,0.2)' },
-              ].map(({ href, emoji, label, color, bg, border, scroll }) => {
-                const inner = (
-                  <div
-                    className="flex flex-col items-center gap-2 rounded-2xl p-4 border transition-all active:scale-95 w-full"
-                    style={{ background: bg, borderColor: border }}
-                  >
-                    <span className="text-3xl leading-none">{emoji}</span>
-                    <span className="text-[13px] font-bold" style={{ color }}>{label}</span>
-                  </div>
-                );
-                if (scroll) {
-                  return (
-                    <button key={label} type="button" className="w-full text-left"
-                      onClick={() => historyRef.current?.scrollIntoView({ behavior: 'smooth' })}>
-                      {inner}
-                    </button>
-                  );
-                }
-                return <Link key={href} href={href}>{inner}</Link>;
-              })}
+            <div className="px-5 mt-2">
+              <FeaturedScanReceiptCTA variant="compact" />
             </div>
 
             {/* Map Unlock Banner */}
             {statesData?.next && (
-              <div className="mx-5 mt-4 rounded-2xl bg-amber-950/40 border border-amber-500/30 p-4">
-                <p className="text-[11px] font-bold text-amber-500 uppercase tracking-wider mb-2">🔒 Próximo estado</p>
-                <div className="flex justify-between items-center mb-2">
-                  <p className="font-black text-[15px] text-foreground">{statesData.next.name}</p>
-                  <p className="text-[12px] font-bold text-amber-400">{statesData.total} / {statesData.next.needed}</p>
+              <div className="mx-5 mt-3 rounded-xl bg-amber-950/40 border border-amber-500/30 p-3">
+                <div className="flex justify-between items-center gap-2 mb-1.5">
+                  <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider m-0">🔒 Próximo estado</p>
+                  <p className="text-[11px] font-bold text-amber-400 tabular-nums m-0 shrink-0">
+                    {statesData.total} / {statesData.next.needed}
+                  </p>
                 </div>
-                <div className="h-1.5 bg-amber-950/60 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${statesData.next.progress_pct}%`, background: 'linear-gradient(90deg, #f59e0b, #d97706)' }} />
+                <p className="font-black text-sm text-foreground m-0 mb-1.5">{statesData.next.name}</p>
+                <div className="h-1 bg-amber-950/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${statesData.next.progress_pct}%`,
+                      background: 'linear-gradient(90deg, #f59e0b, #d97706)',
+                    }}
+                  />
                 </div>
-                <p className="text-[11px] text-amber-600/80 mt-2">Convide amigos para desbloquear {statesData.next.name}!</p>
+                <p className="text-[10px] text-amber-600/80 mt-1.5 m-0 leading-snug">
+                  Convide amigos para desbloquear {statesData.next.name}.
+                </p>
               </div>
             )}
 
@@ -1157,10 +1161,6 @@ export default function Dashboard() {
                 selectedAccountId={openFinanceAccountId}
                 onSelectAccount={setOpenFinanceAccountId}
               />
-            </div>
-
-            <div className="px-5">
-              <FeaturedScanReceiptCTA />
             </div>
 
             {/* Open Finance section */}
@@ -1220,12 +1220,6 @@ export default function Dashboard() {
             {/* Cobranças do mês */}
             <div className="px-5 mt-4">
               <CobrancasDoMes userId={userId} selectedMonth={selectedMonth} onAfterPayment={() => loadTransactions(userId)} />
-            </div>
-
-            {/* Mais recursos */}
-            <div className="px-5 mt-4">
-              <p className="mb-3 text-sm font-semibold tracking-tight text-foreground">{DASHBOARD.quickSectionTitle}</p>
-              <QuickActions className="mb-4" />
             </div>
 
             {/* Lixeira */}

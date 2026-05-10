@@ -13,6 +13,7 @@ import { DeployRecovery } from '../components/DeployRecovery';
 import PWAInstallProvider from '../components/PWAInstallProvider';
 import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 import { MapCartProvider } from '../components/map/MapCartContext';
+import { MissionsTodayProvider } from '../components/missions/MissionsTodayContext';
 import { ProfileFirstLoginGate } from '../components/onboarding/ProfileFirstLoginGate';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import '../styles/globals.css';
@@ -71,9 +72,11 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             <ServiceWorkerRegister />
             <DeployRecovery />
             <AnalyticsProvider>
-              <MapCartProvider>
-                <Component {...pageProps} />
-              </MapCartProvider>
+              <MissionsTodayProvider>
+                <MapCartProvider>
+                  <Component {...pageProps} />
+                </MapCartProvider>
+              </MissionsTodayProvider>
               <Toaster richColors position="top-center" />
             </AnalyticsProvider>
           </PWAInstallProvider>

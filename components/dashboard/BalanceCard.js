@@ -5,22 +5,36 @@ import { cn } from '../../lib/utils';
 const fmt = (v) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
-export function BalanceCard({ balance, className, label, loading = false, income }) {
+export function BalanceCard({
+  balance,
+  className,
+  label,
+  loading = false,
+  income,
+  compact = false,
+  missionsSlot = null,
+}) {
   const [isVisible, setIsVisible] = useState(true);
   const absBalance = Math.abs(Number(balance) || 0);
   const incomeVal = Number(income) || 0;
 
   return (
     <div
-      className={cn('relative overflow-hidden rounded-2xl p-5 border border-[#1E2A3A]', className)}
+      className={cn(
+        'relative overflow-hidden border border-[#1E2A3A]',
+        compact ? 'rounded-xl p-3.5' : 'rounded-2xl p-5',
+        className
+      )}
       style={{ background: 'linear-gradient(135deg, #0D2B1A 0%, #0A1E2E 100%)' }}
     >
       <div
         className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none"
         style={{ background: 'radial-gradient(circle, #00E676 0%, transparent 70%)', opacity: 0.08, transform: 'translate(30%, -30%)' }}
       />
-      <div className="flex items-start justify-between mb-3 relative">
-        <p className="text-[#8899AA] text-[13px] font-medium">{label || 'Total de Gastos'}</p>
+      <div className={cn('flex items-start justify-between relative', compact ? 'mb-2' : 'mb-3')}>
+        <p className={cn('text-[#8899AA] font-medium', compact ? 'text-[11px]' : 'text-[13px]')}>
+          {label || 'Total de Gastos'}
+        </p>
         <button
           type="button"
           onClick={() => setIsVisible(!isVisible)}
@@ -35,28 +49,48 @@ export function BalanceCard({ balance, className, label, loading = false, income
         </button>
       </div>
 
-      <div className="text-[2rem] font-black text-[#F0F4FF] leading-tight relative" aria-live="polite">
+      <div
+        className={cn(
+          'font-black text-[#F0F4FF] leading-tight relative',
+          compact ? 'text-[1.5rem]' : 'text-[2rem]'
+        )}
+        aria-live="polite"
+      >
         {loading ? '••••••' : isVisible ? fmt(absBalance) : '••••••'}
       </div>
 
+      {missionsSlot ? (
+        <div className={cn('relative', compact ? 'mt-2.5' : 'mt-3')}>{missionsSlot}</div>
+      ) : null}
+
       {incomeVal > 0 && (
-        <div className="flex gap-3 mt-4">
-          <div className="flex-1 bg-[#00E676]/10 rounded-xl px-3 py-2 border border-[#00E676]/20">
-            <p className="text-[#8899AA] text-[11px] mb-0.5">Entradas</p>
-            <p className="text-[#00E676] text-[14px] font-bold">
+        <div className={cn('flex gap-2 sm:gap-3', compact ? 'mt-2.5' : 'mt-4')}>
+          <div
+            className={cn(
+              'flex-1 bg-[#00E676]/10 rounded-xl border border-[#00E676]/20',
+              compact ? 'px-2 py-1.5' : 'px-3 py-2'
+            )}
+          >
+            <p className={cn('text-[#8899AA] mb-0.5', compact ? 'text-[10px]' : 'text-[11px]')}>Entradas</p>
+            <p className={cn('text-[#00E676] font-bold', compact ? 'text-xs' : 'text-[14px]')}>
               {isVisible ? fmt(incomeVal) : '••••'}
             </p>
           </div>
-          <div className="flex-1 bg-red-500/10 rounded-xl px-3 py-2 border border-red-500/20">
-            <p className="text-[#8899AA] text-[11px] mb-0.5">Saídas</p>
-            <p className="text-red-400 text-[14px] font-bold">
+          <div
+            className={cn(
+              'flex-1 bg-red-500/10 rounded-xl border border-red-500/20',
+              compact ? 'px-2 py-1.5' : 'px-3 py-2'
+            )}
+          >
+            <p className={cn('text-[#8899AA] mb-0.5', compact ? 'text-[10px]' : 'text-[11px]')}>Saídas</p>
+            <p className={cn('text-red-400 font-bold', compact ? 'text-xs' : 'text-[14px]')}>
               {isVisible ? fmt(absBalance) : '••••'}
             </p>
           </div>
         </div>
       )}
 
-      <p className="text-[#8899AA] text-[11px] mt-3 relative">
+      <p className={cn('text-[#8899AA] relative', compact ? 'text-[10px] mt-2' : 'text-[11px] mt-3')}>
         {loading ? 'Atualizando saldos…' : 'Atualizado agora'}
       </p>
     </div>
