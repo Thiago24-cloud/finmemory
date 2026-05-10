@@ -291,8 +291,12 @@ async function captureFrameFromStream(stream, videoEl) {
 /**
  * Leitor EAN/UPC: mobile — file capture + opcional flash (getUserMedia + torch) + ZXing com pré-processamento;
  * desktop — getUserMedia + ZXing no vídeo. Após extrair código, o pai faz lookup (inalterado).
+ *
+ * @param {{ onScan: (digits: string) => void, onClose?: () => void, continuous?: boolean, sessionLayout?: boolean }} props
+ * - `continuous` (desktop vídeo): não chama `stop()` no stream após ler — para sessão de carrinho; o pai deduplica.
+ * - `sessionLayout`: esconde dica longa e botão cancelar (UI controlada pelo pai).
  */
-export function BarcodeScanner({ onScan, onClose }) {
+export function BarcodeScanner({ onScan, onClose, continuous = false, sessionLayout = false }) {
   const [mounted, setMounted] = useState(false);
   const [useDesktopVideo, setUseDesktopVideo] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -311,8 +315,10 @@ export function BarcodeScanner({ onScan, onClose }) {
   const scanControlsRef = useRef(null);
   const readerRef = useRef(null);
   const onScanRef = useRef(onScan);
+  const continuousRef = useRef(continuous);
   const toastTimerRef = useRef(null);
   onScanRef.current = onScan;
+  continuousRef.current = continuous;
 
   useEffect(() => {
     setMounted(true);
@@ -526,10 +532,12 @@ export function BarcodeScanner({ onScan, onClose }) {
               const text = result.getText();
               const digits = extractRetailBarcodeFromScan(text);
               if (digits && onScanRef.current) {
-                try {
-                  ctrl.stop();
-                } catch (_) {
-                  /* */
+                if (!continuousRef.current) {
+                  try {
+                    ctrl.stop();
+                  } catch (_) {
+                    /* */
+                  }
                 }
                 vibrateShort();
                 onScanRef.current(digits);
@@ -564,6 +572,7 @@ export function BarcodeScanner({ onScan, onClose }) {
       setVideoError(null);
     };
   }, [mounted, useDesktopVideo]);
+  /* continuous não entra nas deps: usar continuousRef evita reiniciar getUserMedia/ZXing */
 
   if (!mounted) {
     return (
@@ -620,10 +629,12 @@ export function BarcodeScanner({ onScan, onClose }) {
         </div>
       )}
 
-      <p className="text-sm text-center text-muted-foreground px-2 leading-relaxed">
-        <strong>Dica:</strong> afaste o celular até o código inteiro aparecer na faixa clara; segure firme 1–2 s. Em
-        corredores escuros use <strong>lanterna</strong> ou o botão com flash.
-      </p>
+      {!sessionLayout && (
+        <p className="text-sm text-center text-muted-foreground px-2 leading-relaxed">
+          <strong>Dica:</strong> afaste o celular até o código inteiro aparecer na faixa clara; segure firme 1–2 s. Em
+          corredores escuros use <strong>lanterna</strong> ou o botão com flash.
+        </p>
+      )}
 
       {!useDesktopVideo ? (
         <div className="space-y-4">
@@ -710,13 +721,15 @@ export function BarcodeScanner({ onScan, onClose }) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onClose}
-        className="w-full py-3 px-4 bg-gray-200 text-gray-800 rounded-xl font-medium"
-      >
-        Cancelar
-      </button>
+      {!sessionLayout && onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full py-3 px-4 bg-gray-200 text-gray-800 rounded-xl font-medium"
+        >
+          Cancelar
+        </button>
+      )}
     </div>
   );
 }

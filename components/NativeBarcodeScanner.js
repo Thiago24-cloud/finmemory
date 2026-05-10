@@ -9,8 +9,17 @@ const HTML_CLASS = 'finmemory-native-barcode-scan-html';
 /**
  * Scanner nativo (ML Kit no Android/iOS via @capacitor-mlkit/barcode-scanning).
  * Câmera fica atrás do WebView; o corpo fica transparente e só este overlay permanece visível.
+ *
+ * @param {{ continuous?: boolean, sessionLayout?: boolean }} props
+ * - `continuous`: após ler um código mantém o scan ativo (sessão de carrinho).
  */
-export function NativeBarcodeScanner({ onScan, onClose, onFallbackToWeb }) {
+export function NativeBarcodeScanner({
+  onScan,
+  onClose,
+  onFallbackToWeb,
+  continuous = false,
+  sessionLayout = false,
+}) {
   const [error, setError] = useState(null);
   const [permDenied, setPermDenied] = useState(false);
   const [starting, setStarting] = useState(true);
@@ -18,7 +27,9 @@ export function NativeBarcodeScanner({ onScan, onClose, onFallbackToWeb }) {
   const [torchOn, setTorchOn] = useState(false);
   const handledRef = useRef(false);
   const onScanRef = useRef(onScan);
+  const continuousRef = useRef(continuous);
   onScanRef.current = onScan;
+  continuousRef.current = continuous;
 
   const cleanup = useCallback(async () => {
     try {
@@ -34,11 +45,17 @@ export function NativeBarcodeScanner({ onScan, onClose, onFallbackToWeb }) {
     async (digits) => {
       if (handledRef.current) return;
       handledRef.current = true;
-      await cleanup();
       try {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(40);
       } catch (_) {}
       onScanRef.current(digits);
+      if (!continuousRef.current) {
+        await cleanup();
+      } else {
+        window.setTimeout(() => {
+          handledRef.current = false;
+        }, 450);
+      }
     },
     [cleanup]
   );
@@ -181,24 +198,33 @@ export function NativeBarcodeScanner({ onScan, onClose, onFallbackToWeb }) {
             )}
           </>
         )}
-        <div className="flex gap-2">
-          {torchAvailable && (
-            <button
-              type="button"
-              onClick={toggleTorch}
-              className="flex-1 py-3 rounded-xl bg-amber-400/90 text-amber-950 text-sm font-bold"
-            >
-              {torchOn ? 'Lanterna off' : 'Lanterna'}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={handleClose}
-            className="flex-1 py-3 rounded-xl bg-white text-gray-900 text-sm font-bold"
-          >
-            Cancelar
-          </button>
-        </div>
+        {(torchAvailable || !sessionLayout) && (
+          <div className="flex gap-2">
+            {torchAvailable && (
+              <button
+                type="button"
+                onClick={toggleTorch}
+                className="flex-1 py-3 rounded-xl bg-amber-400/90 text-amber-950 text-sm font-bold"
+              >
+                {torchOn ? 'Lanterna off' : 'Lanterna'}
+              </button>
+            )}
+            {!sessionLayout && (
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 py-3 rounded-xl bg-white text-gray-900 text-sm font-bold"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        )}
+        {sessionLayout && !torchAvailable && (
+          <p className="text-[11px] text-center text-white/70 m-0">
+            Use ← Voltar no topo para encerrar a sessão.
+          </p>
+        )}
         {typeof onFallbackToWeb === 'function' && (
           <button
             type="button"

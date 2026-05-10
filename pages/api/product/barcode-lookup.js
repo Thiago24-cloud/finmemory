@@ -38,6 +38,85 @@ function itemMatchesGtin(item, gtin) {
   return code === gtin;
 }
 
+/** Evita que `%` / `_` quebrem o padrão ILIKE. */
+function sanitizeIlikePattern(s) {
+  return String(s || '')
+    .trim()
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_');
+}
+
+/**
+ * Menor preço no mapa (price_points) cujo nome se pareça com o produto identificado (Cosmos/OFF).
+ */
+async function fetchBestMapPriceHint(supabase, productName) {
+  const raw = String(productName || '').trim();
+  if (raw.length < 3) return null;
+
+  const tryQuery = async (pattern) => {
+    if (pattern.length < 3) return null;
+    const safe = sanitizeIlikePattern(pattern.slice(0, 60));
+    const { data, error } = await supabase
+      .from('price_points')
+      .select('store_name, price, product_name, created_at')
+      .ilike('product_name', `%${safe}%`)
+      .order('price', { ascending: true })
+      .limit(12);
+    if (error) {
+      console.warn('barcode-lookup map hint:', error.message);
+      return null;
+    }
+    if (!data?.length) return null;
+    const row = data[0];
+    const p = Number(row.price);
+    if (!Number.isFinite(p)) return null;
+    return {
+      price: p,
+      store_name: row.store_name || '',
+      product_name: row.product_name || '',
+    };
+  };
+
+  let best = await tryQuery(raw);
+  if (!best && raw.includes(' ')) {
+    const first = raw.split(/\s+/).find((w) => w.length >= 4);
+    if (first) best = await tryQuery(first);
+  }
+  return best;
+}
+
+function buildPriceHints(openFoodFacts, yourPurchases, mapBest) {
+  let referencePrice = null;
+  let referenceStore = null;
+  if (yourPurchases?.length) {
+    const p0 = yourPurchases[0];
+    const raw = p0?.price;
+    const n = typeof raw === 'number' ? raw : parseFloat(raw);
+    referencePrice = Number.isFinite(n) ? n : null;
+    referenceStore = p0?.estabelecimento || null;
+  }
+
+  const bestPrice = mapBest?.price != null ? Number(mapBest.price) : null;
+  const bestStoreName = mapBest?.store_name || null;
+  const bestProductName = mapBest?.product_name || null;
+
+  let economyVsBest = null;
+  if (referencePrice != null && bestPrice != null && bestPrice > 0) {
+    economyVsBest = referencePrice - bestPrice;
+  }
+
+  return {
+    referencePrice,
+    referenceStore,
+    bestPrice: bestPrice != null && Number.isFinite(bestPrice) ? bestPrice : null,
+    bestStoreName,
+    bestProductName,
+    economyVsBest,
+    hasMapData: Boolean(mapBest),
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -64,6 +143,15 @@ export default async function handler(req, res) {
     openFoodFacts = await lookupProductByGtin(gtin, { supabase });
   } catch (e) {
     console.warn('barcode-lookup lookup:', e?.message || e);
+  }
+
+  let mapBest = null;
+  if (openFoodFacts?.name && supabase) {
+    try {
+      mapBest = await fetchBestMapPriceHint(supabase, openFoodFacts.name);
+    } catch (e) {
+      console.warn('barcode-lookup mapBest:', e?.message || e);
+    }
   }
 
   let yourPurchases = [];
@@ -98,9 +186,12 @@ export default async function handler(req, res) {
     }
   }
 
+  const priceHints = buildPriceHints(openFoodFacts, yourPurchases, mapBest);
+
   return res.status(200).json({
     gtin,
     openFoodFacts,
-    yourPurchases
+    yourPurchases,
+    priceHints
   });
 }

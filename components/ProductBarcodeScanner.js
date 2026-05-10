@@ -8,7 +8,12 @@ import { NativeBarcodeScanner } from './NativeBarcodeScanner';
  * No app Capacitor (Android/iOS): ML Kit via @capacitor-mlkit/barcode-scanning.
  * No browser / PWA web: ZXing (BarcodeScanner — captura nativa no mobile, vídeo no desktop).
  */
-export function ProductBarcodeScanner({ onScan, onClose }) {
+export function ProductBarcodeScanner({
+  onScan,
+  onClose,
+  continuous = false,
+  sessionLayout = false,
+}) {
   const [phase, setPhase] = useState('checking'); // checking | native | web
   const [webOverride, setWebOverride] = useState(false);
 
@@ -42,7 +47,14 @@ export function ProductBarcodeScanner({ onScan, onClose }) {
   }, []);
 
   if (webOverride) {
-    return <BarcodeScanner onScan={onScan} onClose={onClose} />;
+    return (
+      <BarcodeScanner
+        onScan={onScan}
+        onClose={onClose}
+        continuous={continuous}
+        sessionLayout={sessionLayout}
+      />
+    );
   }
 
   if (phase === 'checking') {
@@ -59,9 +71,18 @@ export function ProductBarcodeScanner({ onScan, onClose }) {
         onScan={onScan}
         onClose={onClose}
         onFallbackToWeb={handleFallbackToWeb}
+        continuous={continuous}
+        sessionLayout={sessionLayout}
       />
     );
   }
 
-  return <BarcodeScanner onScan={onScan} onClose={onClose} />;
+  return (
+    <BarcodeScanner
+      onScan={onScan}
+      onClose={onClose}
+      continuous={continuous}
+      sessionLayout={sessionLayout}
+    />
+  );
 }
