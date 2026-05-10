@@ -18,7 +18,7 @@ export default class MyDocument extends Document {
     const appleTitle = isAdminPwa ? 'FinMemory Painel' : 'FinMemory';
 
     return (
-      <Html lang="pt-BR">
+      <Html lang="pt-BR" className="dark">
         <Head>
           <link rel="icon" href="/logo.png" type="image/png" />
           <link rel="apple-touch-icon" href="/logo.png" />

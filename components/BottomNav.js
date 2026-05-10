@@ -41,7 +41,7 @@ export function BottomNav() {
   const scanActive = pathname === '/add-receipt';
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-border/50 safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 glass dark:bg-[#0d1219]/95 dark:backdrop-blur-2xl border-t border-border/50 dark:border-border safe-area-bottom">
       <div className="max-w-md mx-auto relative flex items-end justify-between h-[4.5rem] px-2 pb-1">
         <div className="flex flex-1 justify-start items-end gap-0.5 sm:gap-1 pl-0.5">
           <button type="button" onClick={() => router.push(mapHref)} className={tabBtn(pathname === '/mapa')}>

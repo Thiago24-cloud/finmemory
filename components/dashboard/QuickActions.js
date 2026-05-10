@@ -12,8 +12,8 @@ const SECONDARY_ACTIONS = [
     title: QUICK_ACTION_TITLE.simulador,
     Icon: Sparkles,
     wrapClass:
-      'bg-gradient-to-br from-purple-950 to-zinc-900 text-purple-200 border border-purple-500/35 hover:from-purple-900 hover:to-zinc-900',
-    labelClass: 'text-purple-100',
+      'bg-gradient-to-br from-purple-950 to-zinc-900 text-purple-200 border border-purple-500/35 hover:from-purple-900 hover:to-zinc-900 dark:from-purple-950/80 dark:to-[#111827] dark:border-purple-500/25',
+    labelClass: 'text-purple-100 dark:text-purple-300',
   },
   {
     href: '/scan-product',
@@ -22,36 +22,36 @@ const SECONDARY_ACTIONS = [
     wide: true,
     Icon: ScanBarcode,
     wrapClass:
-      'bg-red-50 text-red-600 border-2 border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.15)] hover:bg-red-100',
-    labelClass: 'text-red-700',
+      'bg-red-50 text-red-600 border-2 border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.15)] hover:bg-red-100 dark:bg-red-950/50 dark:border-red-500/60 dark:text-red-400',
+    labelClass: 'text-red-700 dark:text-red-400',
   },
   {
     href: '/partnership',
     label: 'Parceria',
     Icon: Users,
-    wrapClass: 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100',
-    labelClass: 'text-rose-800',
+    wrapClass: 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-500/30 dark:text-rose-400',
+    labelClass: 'text-rose-800 dark:text-rose-400',
   },
   {
     href: '/shopping-list',
     label: 'Lista',
     Icon: List,
-    wrapClass: 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100',
-    labelClass: 'text-emerald-800',
+    wrapClass: 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-500/30 dark:text-emerald-400',
+    labelClass: 'text-emerald-800 dark:text-emerald-400',
   },
   {
     href: '/reports',
     label: 'Relatórios',
     Icon: BarChart3,
-    wrapClass: 'bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100',
-    labelClass: 'text-indigo-800',
+    wrapClass: 'bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-500/30 dark:text-indigo-400',
+    labelClass: 'text-indigo-800 dark:text-indigo-400',
   },
   {
     href: '/categories',
     label: 'Categorias',
     Icon: Tags,
-    wrapClass: 'bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 hover:bg-fuchsia-100',
-    labelClass: 'text-fuchsia-800',
+    wrapClass: 'bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 hover:bg-fuchsia-100 dark:bg-fuchsia-950/40 dark:border-fuchsia-500/30 dark:text-fuchsia-400',
+    labelClass: 'text-fuchsia-800 dark:text-fuchsia-400',
   },
 ];
 

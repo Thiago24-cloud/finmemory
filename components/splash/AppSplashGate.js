@@ -58,7 +58,7 @@ export function AppSplashGate({ children }) {
       {phase !== 'off' && (
         <div
           className={cn(
-            'fm-splash-root fixed inset-0 z-[2147483000] flex flex-col items-center justify-center bg-[#FFFFFF] px-6',
+            'fm-splash-root fixed inset-0 z-[2147483000] flex flex-col items-center justify-center bg-[#0A0E1A] px-6',
             'pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]',
             phase === 'fade' && 'fm-splash-exit'
           )}
@@ -69,7 +69,7 @@ export function AppSplashGate({ children }) {
         >
           <span className="sr-only">A carregar o FinMemory</span>
           <div className="fm-splash-logo-in flex flex-col items-center justify-center">
-            <div className="fm-splash-logo-pulse flex size-[7.5rem] items-center justify-center bg-[#FFFFFF]">
+            <div className="fm-splash-logo-pulse flex size-[7.5rem] items-center justify-center bg-transparent">
               <Image
                 src="/logo.png"
                 alt="FinMemory"
@@ -80,10 +80,10 @@ export function AppSplashGate({ children }) {
                 className="block h-full w-full object-contain bg-transparent"
               />
             </div>
-            <p className="mt-7 text-[12px] font-bold uppercase tracking-[0.16em] text-[#1A1A1A]">
+            <p className="mt-7 text-[12px] font-bold uppercase tracking-[0.16em] text-[#F0F4FF]">
               FinMemory
             </p>
-            <p className="fm-splash-tagline mt-2 text-[13px] text-[#2ECC49] font-semibold tracking-wide">
+            <p className="fm-splash-tagline mt-2 text-[13px] text-[#00E676] font-semibold tracking-wide">
               O jogo da vida real
             </p>
             <div className="fm-splash-dots flex gap-1.5 mt-5">

@@ -37,21 +37,29 @@
   }
 
   .dark {
-    --background: 240 8% 8%;
-    --foreground: 0 0% 96%;
-    --card: 240 6% 12%;
-    --card-foreground: 0 0% 96%;
-    --primary: 132 63% 49%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 132 20% 18%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 240 6% 18%;
-    --muted-foreground: 0 0% 60%;
-    --accent: 132 63% 49%;
-    --accent-foreground: 0 0% 100%;
-    --border: 240 6% 20%;
-    --input: 240 6% 18%;
-    --ring: 132 63% 49%;
+    /* Tema gamificado: fundo escuro profundo + verde neon */
+    --background: 222 40% 7%;       /* #0A0E1A */
+    --foreground: 220 60% 96%;      /* #F0F4FF */
+    --card: 222 30% 11%;            /* #111827 */
+    --card-foreground: 220 60% 96%;
+    --popover: 222 30% 11%;
+    --popover-foreground: 220 60% 96%;
+    --primary: 145 100% 45%;        /* #00E676 neon green */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 213 40% 18%;       /* #1E2A3A */
+    --secondary-foreground: 220 60% 96%;
+    --muted: 213 40% 14%;           /* #111E2A */
+    --muted-foreground: 215 20% 45%; /* #4A5568 */
+    --accent: 145 100% 45%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 213 40% 20%;          /* #1E2A3A */
+    --input: 213 40% 16%;
+    --ring: 145 100% 45%;
+    --gradient-primary: linear-gradient(135deg, #00E676 0%, #00BCD4 100%);
+    --shadow-card: 0 4px 20px -4px rgba(0,230,118,0.12), 0 1px 3px -1px rgba(0,0,0,0.4);
+    --shadow-elevated: 0 12px 40px -8px rgba(0,230,118,0.15), 0 4px 8px -2px rgba(0,0,0,0.5);
   }
 }
 
@@ -123,8 +131,11 @@
 /* Cards – Lovable: 16px radius, shadow 0 4px 6px rgba(0,0,0,0.1) */
 @layer components {
   .card-lovable {
-    @apply rounded-2xl p-5 bg-white;
+    @apply rounded-2xl p-5 bg-white dark:bg-card dark:border dark:border-border;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  .dark .card-lovable {
+    box-shadow: var(--shadow-card);
   }
   .card-nubank {
     @apply rounded-2xl p-5 bg-card;
@@ -135,6 +146,50 @@
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
 }
+
+/* ─── Dark mode: overrides para cores hardcoded (componentes legados) ─── */
+.dark .bg-white { background-color: hsl(var(--card)) !important; }
+.dark .bg-\[\#FFFFFF\] { background-color: hsl(var(--card)) !important; }
+.dark .bg-\[\#f8f9fa\], .dark .bg-\[\#f0f0f0\], .dark .bg-\[\#f5f5f5\] {
+  background-color: hsl(var(--muted)) !important;
+}
+.dark .text-\[\#333\], .dark .text-\[\#1A1A1A\], .dark .text-\[\#111\] {
+  color: hsl(var(--foreground)) !important;
+}
+.dark .text-\[\#666\], .dark .text-\[\#555\] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.dark .border-\[\#dadce0\], .dark .border-gray-200, .dark .border-gray-100 {
+  border-color: hsl(var(--border)) !important;
+}
+/* Glass nav dark */
+.dark .glass {
+  background: hsla(222, 40%, 9%, 0.92) !important;
+  border-color: hsl(var(--border)) !important;
+}
+/* Gradiente primário no dark: verde neon */
+.dark .bg-gradient-primary,
+.dark .bg-gradient-google,
+.dark .bg-gradient-success {
+  background: linear-gradient(135deg, #00E676 0%, #00BCD4 100%) !important;
+}
+/* Sheet / modais dark */
+.dark [data-radix-dialog-content],
+.dark [data-radix-sheet-content] {
+  background-color: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+/* Input dark */
+.dark input, .dark textarea, .dark select {
+  background-color: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+/* shadow-card-lovable dark */
+.dark .shadow-card-lovable {
+  box-shadow: var(--shadow-card) !important;
+}
+/* ───────────────────────────────────────────────────────────────────── */
 
 /* Carousel / scroll horizontal sem barra */
 .scrollbar-hide {
@@ -520,6 +575,10 @@ body.finmemory-native-barcode-scan-active .finmemory-barcode-scanner-ui {
 .fm-splash-root .fm-splash-logo-pulse img {
   background-color: transparent !important;
   box-shadow: none !important;
+}
+/* Glow verde neon no logo da splash */
+.fm-splash-root .fm-splash-logo-pulse {
+  filter: drop-shadow(0 0 24px rgba(0, 230, 118, 0.35));
 }
 
 @keyframes fm-dot-fade {

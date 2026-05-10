@@ -54,7 +54,9 @@ function MissionCard({ mission, onComplete }) {
     <div
       className={cn(
         'rounded-2xl border p-4 transition-all',
-        mission.completed ? 'border-[#2ECC49]/30 bg-[#f0fdf4] opacity-80' : 'border-gray-100 bg-white shadow-sm'
+        mission.completed
+          ? 'border-primary/30 bg-primary/5 opacity-80'
+          : 'border-border bg-card shadow-sm'
       )}
     >
       <div className="flex items-center gap-3">
@@ -151,7 +153,7 @@ export default function MissoesPage() {
 
       <div className="min-h-screen bg-background pb-24">
         {/* Header */}
-        <div className="bg-white border-b border-border/50 px-5 pt-5 pb-4 sticky top-0 z-10">
+        <div className="bg-card border-b border-border px-5 pt-5 pb-4 sticky top-0 z-10">
           <h1 className="font-black text-[20px] tracking-tight">Missões Diárias</h1>
           <p className="text-[12px] text-muted-foreground mt-0.5">
             Resetam em {countdown}
@@ -160,7 +162,7 @@ export default function MissoesPage() {
 
         <div className="max-w-lg mx-auto px-5 py-5 flex flex-col gap-4">
           {/* XP disponível */}
-          <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 p-4">
+          <div className="rounded-2xl bg-gradient-to-br from-amber-950/60 to-yellow-950/40 dark:border-amber-500/20 border border-amber-200 p-4">
             <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">XP disponível hoje</p>
             <div className="flex justify-between items-center mt-1">
               <p className="font-black text-[28px] text-amber-600">+{totalXP} XP</p>

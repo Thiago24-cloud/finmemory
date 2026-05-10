@@ -413,6 +413,10 @@ export default function SettingsPage() {
         ) : null}
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <Link href="/mapa?landing=1" className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-200 text-gray-900">
+            <span className="h-5 w-5 flex items-center justify-center text-base">🗺️</span>
+            <span className="font-medium">Como quer começar? (guia do mapa)</span>
+          </Link>
           <Link href="/privacidade" className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-200 text-gray-900">
             <Shield className="h-5 w-5 text-gray-500" />
             <span className="font-medium">Política de Privacidade</span>

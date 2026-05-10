@@ -131,30 +131,17 @@ export default function MapaPage() {
     if (parts.length) setSearchQuery(parts.join(', '));
   }, [router.isReady, router.query.lista]);
 
+  // "Como quer começar?" é opt-in: só abre se vier via ?landing=1 (ex: link do perfil/settings).
+  // Não é mais a entrada obrigatória do fluxo principal.
   useEffect(() => {
-    if (!session || wazeUi) {
-      setMapLandingOpen(false);
-      return;
-    }
+    if (!session || wazeUi) { setMapLandingOpen(false); return; }
     if (!router.isReady) return;
-    if (router.query.lista) {
+    if (router.query.landing === '1') {
+      setMapLandingOpen(true);
+    } else {
       setMapLandingOpen(false);
-      return;
     }
-    try {
-      if (sessionStorage.getItem('finmemory_map_landing_dismissed') === '1') {
-        setMapLandingOpen(false);
-        return;
-      }
-    } catch {
-      /* ignore */
-    }
-    if (searchQuery.trim().length > 0 || planningMode) {
-      setMapLandingOpen(false);
-      return;
-    }
-    setMapLandingOpen(true);
-  }, [session, wazeUi, router.isReady, router.query.lista, searchQuery, planningMode]);
+  }, [session, wazeUi, router.isReady, router.query.landing]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
@@ -757,7 +744,7 @@ export default function MapaPage() {
           <button
             type="button"
             onClick={() => setShowStatesPanel(true)}
-            className="absolute bottom-[5.5rem] right-3 z-30 flex items-center gap-1.5 rounded-full bg-white/95 border border-gray-200 shadow-md px-3 py-2 text-[12px] font-bold text-gray-700 hover:bg-white transition-colors pointer-events-auto"
+            className="absolute bottom-[5.5rem] right-3 z-30 flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-[#111827]/95 border border-gray-200 dark:border-[#1E2A3A] shadow-md px-3 py-2 text-[12px] font-bold text-gray-700 dark:text-[#F0F4FF] hover:bg-white dark:hover:bg-[#1E2A3A] transition-colors pointer-events-auto"
             aria-label="Ver estados desbloqueados"
           >
             <span>🗺️</span>

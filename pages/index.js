@@ -40,7 +40,7 @@ export default function HomePage() {
   // (evita loop: mapa -> /?msg=nao-cadastrado -> index -> mapa; e /admin -> sem-acesso-admin -> não empurrar para mapa)
   useEffect(() => {
     if (status === 'authenticated' && !skipMapaRedirect) {
-      router.push('/mapa');
+      router.push('/dashboard');
     }
   }, [status, router, router.query.msg, skipMapaRedirect]);
 

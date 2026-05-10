@@ -37,7 +37,7 @@ export function StatesUnlockPanel({ open, onClose }) {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-3xl px-5 pb-8">
+      <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-3xl px-5 pb-8 bg-card border-border text-foreground">
         <SheetHeader className="mb-4">
           <SheetTitle className="text-[17px] font-black tracking-tight">Mapa de Estados</SheetTitle>
           <p className="text-sm text-muted-foreground -mt-1">
@@ -53,7 +53,7 @@ export function StatesUnlockPanel({ open, onClose }) {
           <>
             {/* Banner próximo desbloqueio */}
             {nextLocked && (
-              <div className="mb-4 rounded-2xl bg-amber-50 border border-amber-200 p-4">
+              <div className="mb-4 rounded-2xl bg-amber-950/40 border border-amber-500/30 p-4">
                 <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider mb-1">
                   Próximo desbloqueio
                 </p>
@@ -75,8 +75,8 @@ export function StatesUnlockPanel({ open, onClose }) {
                   className={cn(
                     'rounded-2xl border p-4 transition-all',
                     s.unlocked
-                      ? 'border-[#2ECC49]/30 bg-[#f0fdf4]'
-                      : 'border-gray-100 bg-white'
+                      ? 'border-primary/30 bg-primary/5'
+                      : 'border-border bg-card'
                   )}
                 >
                   <div className="flex items-center justify-between mb-2">
