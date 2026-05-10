@@ -29,7 +29,7 @@ export function XPBar({ xp = 0, level = 1, streak = 0, className }) {
           <span className="text-[11px] font-bold text-[#2ECC49]">{xp} XP</span>
           <span className="text-[10px] text-muted-foreground">nível {level + 1} em {(level * XP_PER_LEVEL)} XP</span>
         </div>
-        <div className="h-1.5 bg-[#e8f5e9] rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[#e8f5e9] dark:bg-[#1E2A3A] rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-700"
             style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #2ECC49, #16a34a)', boxShadow: '0 0 6px rgba(46,204,73,0.5)' }}

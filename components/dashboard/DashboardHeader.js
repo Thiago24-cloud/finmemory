@@ -1,27 +1,28 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { LogOut, Bell } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { XPBar } from '../gamification/XPBar';
 import { useGamification } from '../../hooks/useGamification';
 
-/**
- * Header do dashboard – logo, avatar, nome do usuário, XP bar + streak, notificações e sair.
- */
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
 export function DashboardHeader({ user, onSignOut, className }) {
   const userName = user?.name || 'Usuário';
+  const firstName = userName.split(' ')[0];
   const avatarUrl = user?.image;
   const initials = userName.slice(0, 2).toUpperCase();
   const { xp_points, level, streak_current, loading } = useGamification();
 
   return (
-    <header className={cn('bg-white dark:bg-card rounded-b-2xl px-5 pt-5 pb-4 shadow-card-lovable dark:border-b dark:border-border', className)}>
+    <header className={cn('bg-card border-b border-border px-5 pt-5 pb-4', className)}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/mapa" className="shrink-0" aria-label="FinMemory - Mapa">
-            <Image src="/logo.png" alt="" width={40} height={40} className="object-contain rounded-lg" />
-          </Link>
-          <div className="h-12 w-12 rounded-full border-2 border-primary overflow-hidden bg-muted flex items-center justify-center text-foreground text-sm flex-shrink-0">
+          <div className="h-11 w-11 rounded-full border-2 border-primary overflow-hidden bg-muted flex items-center justify-center text-foreground text-sm flex-shrink-0">
             {avatarUrl ? (
               <img src={avatarUrl} alt={userName} className="h-full w-full object-cover" />
             ) : (
@@ -29,8 +30,8 @@ export function DashboardHeader({ user, onSignOut, className }) {
             )}
           </div>
           <div>
-            <p className="text-muted-foreground text-sm">Olá,</p>
-            <p className="text-foreground font-bold text-lg">{userName}</p>
+            <p className="text-muted-foreground text-[11px] uppercase tracking-wider font-semibold">{getGreeting()},</p>
+            <p className="text-foreground font-black text-[18px] leading-tight">{firstName}</p>
           </div>
         </div>
 

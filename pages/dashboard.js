@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth/next';
@@ -19,7 +19,6 @@ import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
 import { DashboardOnboardingTour } from '../components/onboarding/DashboardOnboardingTour';
-import { BRAND } from '../lib/brandTokens';
 import { MONTH_FILTER, DASHBOARD } from '../lib/appMicrocopy';
 import {
   isDashboardOnboardingDoneLocal,
@@ -212,6 +211,9 @@ export default function Dashboard() {
   const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
   const { can: canPlanFeature, loading: planLoading } = usePlan();
   const canOpenFinance = !planLoading && canPlanFeature('open_finance');
+  const [recentPrices, setRecentPrices] = useState([]);
+  const [statesData, setStatesData] = useState(null);
+  const historyRef = useRef(null);
 
   // Após retorno do Stripe Checkout: atualiza sessão para refletir novo plano sem re-login
   useEffect(() => {
@@ -905,6 +907,40 @@ export default function Dashboard() {
     if (typeof window !== 'undefined') alert(`🔍 Diagnóstico concluído!\n\nTestes passados: ${successCount}/${totalTests}\n\nVerifique o console para mais detalhes.`);
   };
 
+  // Fetch states progress for map unlock banner
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    let cancelled = false;
+    fetch('/api/map/states-progress')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (cancelled || !d) return;
+        const next = (d.states || []).find((s) => !s.unlocked);
+        if (next) setStatesData({ next, total: d.total_users });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [status]);
+
+  // Fetch recent price_points for "Economize agora"
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('price_points')
+          .select('id, nome_produto, preco, estabelecimento, created_at')
+          .order('created_at', { ascending: false })
+          .limit(4);
+        if (!cancelled && Array.isArray(data)) setRecentPrices(data);
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, [status]);
+
   const isAuthenticated = status === 'authenticated' && session;
   const isLoading = status === 'loading';
 
@@ -985,242 +1021,238 @@ export default function Dashboard() {
       {isAuthenticated ? (
         <CalculatorDockProvider>
           <DashboardCalculadoraLayout>
-            <div className="max-w-md mx-auto px-5 pt-5 pb-[calc(10.5rem+env(safe-area-inset-bottom))] lg:pb-32">
+            <div className="max-w-md mx-auto pb-[calc(10.5rem+env(safe-area-inset-bottom))] lg:pb-32">
               <BottomNav />
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                  <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
-                  <p className="text-[#666]">Carregando sessão...</p>
+                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Carregando sessão...</p>
                 </div>
               ) : (
                 <>
+            {/* Stripe Success Banner */}
             {stripeSuccessBanner && (
-              <div
-                className="mb-4 flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
-                style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg, color: BRAND.primaryText }}
-              >
+              <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm bg-primary/10 border border-primary/30 text-primary">
                 <span>
                   {stripeSyncState.loading
-                    ? 'Confirmando seu pagamento e ativando o plano...'
+                    ? 'Confirmando pagamento...'
                     : stripeSyncState.active
-                      ? `Plano ${String(stripeSyncState.plan || '').toUpperCase()} ativo! Recursos premium liberados.`
-                      : stripeSyncState.error || 'Pagamento confirmado. Estamos atualizando seu plano agora.'}
+                      ? `Plano ${String(stripeSyncState.plan || '').toUpperCase()} ativo!`
+                      : stripeSyncState.error || 'Pagamento confirmado.'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setStripeSuccessBanner(false)}
-                  className="shrink-0 rounded p-0.5"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = BRAND.primarySoftHover;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                  aria-label="Fechar"
-                >
+                <button type="button" onClick={() => setStripeSuccessBanner(false)} className="shrink-0 rounded p-0.5" aria-label="Fechar">
                   <X className="h-4 w-4" />
                 </button>
               </div>
             )}
+
+            {/* Header */}
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
-            {transactionCount >= 0 && (
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-[#666]">
-                  {transactionCount} transação{transactionCount !== 1 ? 'ões' : ''}
-                </span>
-                <span
-                  className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#2ECC49]/15 text-[#2ECC49]"
-                  title="Quanto mais você sincroniza, mais sobe de nível"
-                >
-                  Nível {userLevel}
-                </span>
-              </div>
-            )}
-            {/* Dicas contextuais (onboarding) – aparecem uma vez */}
-            {!tipGmailDismissed && (
-              <div className="mb-4 p-4 rounded-xl bg-[#e8f5e9] border border-[#c8e6c9] text-[#2e7d32] text-sm relative">
-                <button type="button" onClick={() => { localStorage.setItem('finmemory_tip_gmail', '1'); setTipGmailDismissed(true); }} className="absolute top-2 right-2 p-1 rounded-full hover:bg-[#c8e6c9] text-[#2e7d32]" aria-label="Fechar">
-                  <X className="h-4 w-4" />
-                </button>
-                <p className="font-medium mb-1">Conecte o Gmail</p>
-                <p className="text-xs opacity-90">Sincronize suas notas fiscais automaticamente pelos e-mails. Seus dados ficam seguros.</p>
-                <button type="button" onClick={() => { localStorage.setItem('finmemory_tip_gmail', '1'); setTipGmailDismissed(true); }} className="mt-2 text-xs font-semibold underline">Entendi</button>
-              </div>
-            )}
-            {!tipMapDismissed && (
-              <div className="mb-4 p-4 rounded-xl bg-[#e3f2fd] border border-[#bbdefb] text-[#1565c0] text-sm relative">
-                <button type="button" onClick={() => { localStorage.setItem('finmemory_tip_map', '1'); setTipMapDismissed(true); }} className="absolute top-2 right-2 p-1 rounded-full hover:bg-[#bbdefb] text-[#1565c0]" aria-label="Fechar">
-                  <X className="h-4 w-4" />
-                </button>
-                <p className="font-medium mb-1">Mapa de preços</p>
-                <p className="text-xs opacity-90">Veja onde está mais barato e pergunte à comunidade em tempo real.</p>
-                <Link href="/mapa" onClick={() => { localStorage.setItem('finmemory_tip_map', '1'); setTipMapDismissed(true); }} className="inline-block mt-2 text-xs font-semibold underline">Ver mapa</Link>
-              </div>
-            )}
-            <div className="mb-4">
+
+            {/* Balance Card */}
+            <div className="px-5 mt-4">
               <BalanceCard
                 balance={totalBalance}
                 loading={balanceLoading}
-                className="mb-0"
-                label={selectedMonth ? 'Gasto do mês' : undefined}
+                income={openFinance.data?.month?.incomeTotal || 0}
+                label={selectedMonth ? 'Gastos do Mês' : 'Total de Gastos'}
               />
             </div>
 
-            <OpenFinanceBankCarousel
-              accounts={openFinance.data?.accounts}
-              loading={openFinance.loading}
-              selectedAccountId={openFinanceAccountId}
-              onSelectAccount={setOpenFinanceAccountId}
-            />
-            <FeaturedScanReceiptCTA />
+            {/* Month Filter */}
+            {availableMonths.length > 0 && (
+              <div className="px-5 mt-3">
+                <select
+                  id="month-filter"
+                  value={selectedMonth || ''}
+                  onChange={(e) => setSelectedMonth(e.target.value || null)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-card border border-[#1E2A3A] text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">{MONTH_FILTER.allMonths}</option>
+                  {availableMonths.map((ym) => {
+                    const [y, m] = ym.split('-');
+                    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1);
+                    const lbl = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                    return <option key={ym} value={ym}>{lbl.charAt(0).toUpperCase() + lbl.slice(1)}</option>;
+                  })}
+                </select>
+              </div>
+            )}
 
-            {canOpenFinance ? (
-              <section
-                className="mb-6 rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
-                aria-label="Open Finance"
-              >
+            {/* 2x2 Quick Actions */}
+            <div className="px-5 mt-4 grid grid-cols-2 gap-3">
+              {[
+                { href: '/add-receipt', emoji: '📷', label: 'Escanear', color: '#00E676', bg: 'rgba(0,230,118,0.08)', border: 'rgba(0,230,118,0.2)' },
+                { href: '/mapa', emoji: '🗺️', label: 'Mapa', color: '#60A5FA', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.2)' },
+                { href: null, emoji: '📊', label: 'Extrato', color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)', scroll: true },
+                { href: '/missoes', emoji: '⚔️', label: 'Missões', color: '#FFD700', bg: 'rgba(255,215,0,0.08)', border: 'rgba(255,215,0,0.2)' },
+              ].map(({ href, emoji, label, color, bg, border, scroll }) => {
+                const inner = (
+                  <div
+                    className="flex flex-col items-center gap-2 rounded-2xl p-4 border transition-all active:scale-95 w-full"
+                    style={{ background: bg, borderColor: border }}
+                  >
+                    <span className="text-3xl leading-none">{emoji}</span>
+                    <span className="text-[13px] font-bold" style={{ color }}>{label}</span>
+                  </div>
+                );
+                if (scroll) {
+                  return (
+                    <button key={label} type="button" className="w-full text-left"
+                      onClick={() => historyRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+                      {inner}
+                    </button>
+                  );
+                }
+                return <Link key={href} href={href}>{inner}</Link>;
+              })}
+            </div>
+
+            {/* Map Unlock Banner */}
+            {statesData?.next && (
+              <div className="mx-5 mt-4 rounded-2xl bg-amber-950/40 border border-amber-500/30 p-4">
+                <p className="text-[11px] font-bold text-amber-500 uppercase tracking-wider mb-2">🔒 Próximo estado</p>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="font-black text-[15px] text-foreground">{statesData.next.name}</p>
+                  <p className="text-[12px] font-bold text-amber-400">{statesData.total} / {statesData.next.needed}</p>
+                </div>
+                <div className="h-1.5 bg-amber-950/60 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${statesData.next.progress_pct}%`, background: 'linear-gradient(90deg, #f59e0b, #d97706)' }} />
+                </div>
+                <p className="text-[11px] text-amber-600/80 mt-2">Convide amigos para desbloquear {statesData.next.name}!</p>
+              </div>
+            )}
+
+            {/* Economize Agora */}
+            {recentPrices.length > 0 && (
+              <div className="px-5 mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-[15px] font-black text-foreground">Economize agora 💸</h2>
+                  <Link href="/mapa" className="text-[12px] text-primary font-semibold">Ver mapa →</Link>
+                </div>
+                <div className="space-y-2">
+                  {recentPrices.slice(0, 3).map((p) => (
+                    <div key={p.id} className="flex items-center justify-between bg-card border border-[#1E2A3A] rounded-xl px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-foreground truncate">{p.nome_produto || 'Produto'}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{p.estabelecimento}</p>
+                      </div>
+                      {p.preco != null && (
+                        <p className="text-primary font-black text-[15px] ml-4 shrink-0">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.preco)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Open Finance bank carousel */}
+            <div className="px-5 mt-4">
+              <OpenFinanceBankCarousel
+                accounts={openFinance.data?.accounts}
+                loading={openFinance.loading}
+                selectedAccountId={openFinanceAccountId}
+                onSelectAccount={setOpenFinanceAccountId}
+              />
+            </div>
+
+            <div className="px-5">
+              <FeaturedScanReceiptCTA />
+            </div>
+
+            {/* Open Finance section */}
+            {canOpenFinance && (
+              <section className="mx-5 mt-4 mb-2 rounded-2xl border border-[#1E2A3A] bg-card p-4" aria-label="Open Finance">
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div>
-                    <h2 className="text-sm font-semibold text-[#333] m-0">Open Finance</h2>
-                    <p className="text-xs text-[#666] mt-0.5 m-0">Contas e movimentos do banco (Pluggy).</p>
+                    <h2 className="text-sm font-semibold text-foreground">Open Finance</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Contas e movimentos do banco.</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openFinance.refresh()}
-                      disabled={openFinance.loading}
-                      className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline disabled:opacity-50 disabled:pointer-events-none"
-                    >
-                      Atualizar extrato
+                    <button type="button" onClick={() => openFinance.refresh()} disabled={openFinance.loading}
+                      className="text-xs font-semibold text-primary whitespace-nowrap hover:underline disabled:opacity-50">
+                      Atualizar
                     </button>
-                    <Link
-                      href="/settings"
-                      className="text-xs font-semibold text-[#2ECC49] whitespace-nowrap hover:underline"
-                    >
+                    <Link href="/settings" className="text-xs font-semibold text-primary whitespace-nowrap hover:underline">
                       Configurar
                     </Link>
                   </div>
                 </div>
-                {openFinance.error && (
-                  <p className="text-xs text-red-600 mb-3">
-                    {openFinance.error?.message || 'Erro ao carregar Open Finance.'}
-                  </p>
-                )}
+                {openFinance.error && <p className="text-xs text-red-400 mb-3">{openFinance.error?.message || 'Erro ao carregar.'}</p>}
                 {openFinance.data?.syncing && (
-                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-3">
-                    A sincronizar dados com a instituição… os valores podem atualizar em instantes.
+                  <p className="text-xs text-amber-400 bg-amber-950/30 border border-amber-500/20 rounded-xl px-3 py-2 mb-3">
+                    Sincronizando com a instituição…
                   </p>
                 )}
                 {openFinanceAccountId && (openFinance.data?.accounts || []).length > 0 && (
-                  <p className="text-xs font-medium text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl px-3 py-2 mb-3 m-0">
-                    A mostrar só:{' '}
+                  <p className="text-xs font-medium text-primary bg-primary/10 border border-primary/20 rounded-xl px-3 py-2 mb-3">
+                    Mostrando:{' '}
                     {(openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.display_name ||
                       (openFinance.data.accounts || []).find((a) => a.id === openFinanceAccountId)?.name ||
                       'esta conta'}
                   </p>
                 )}
                 {!openFinance.loading && openFinance.data?.month && (
-                  <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
-                    <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
-                      <p className="text-emerald-800 font-medium m-0 mb-0.5">Receitas (mês)</p>
-                      <p className="text-emerald-900 font-semibold m-0">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                          openFinance.data.month.incomeTotal || 0
-                        )}
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div className="rounded-xl bg-primary/10 border border-primary/20 px-3 py-2">
+                      <p className="text-muted-foreground mb-0.5">Receitas (mês)</p>
+                      <p className="text-primary font-semibold">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(openFinance.data.month.incomeTotal || 0)}
                       </p>
                     </div>
-                    <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2">
-                      <p className="text-red-800 font-medium m-0 mb-0.5">Despesas (mês)</p>
-                      <p className="text-red-900 font-semibold m-0">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                          openFinance.data.month.expenseTotal || 0
-                        )}
+                    <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2">
+                      <p className="text-muted-foreground mb-0.5">Despesas (mês)</p>
+                      <p className="text-red-400 font-semibold">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(openFinance.data.month.expenseTotal || 0)}
                       </p>
                     </div>
                   </div>
                 )}
-                <p className="text-xs text-[#666] m-0">
-                  Movimentos do banco e das notas aparecem juntos em <strong className="text-[#333]">Histórico</strong>{' '}
-                  abaixo; linhas duplicadas somem quando a nota corresponde ao extrato.
+                <p className="text-xs text-muted-foreground">
+                  Movimentos aparecem juntos em <strong className="text-foreground">Histórico</strong> abaixo.
                 </p>
               </section>
-            ) : null}
+            )}
 
             {/* Cobranças do mês */}
-            <CobrancasDoMes
-              userId={userId}
-              selectedMonth={selectedMonth}
-              onAfterPayment={() => loadTransactions(userId)}
-            />
+            <div className="px-5 mt-4">
+              <CobrancasDoMes userId={userId} selectedMonth={selectedMonth} onAfterPayment={() => loadTransactions(userId)} />
+            </div>
 
-            {/* (removido) Acesso rápido ao mapa: agora foco em Cobranças do mês */}
-            {/* Filtro por mês */}
-            {availableMonths.length > 0 && (
-              <div className="mb-4">
-                <label htmlFor="month-filter" className="mb-2 block text-sm font-medium text-[#333]">
-                  {MONTH_FILTER.label}
-                </label>
-                <select
-                  id="month-filter"
-                  value={selectedMonth || ''}
-                  onChange={(e) => setSelectedMonth(e.target.value || null)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent"
-                >
-                  <option value="">{MONTH_FILTER.allMonths}</option>
-                  {availableMonths.map((ym) => {
-                    const [y, m] = ym.split('-');
-                    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1);
-                    const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                    return (
-                      <option key={ym} value={ym}>
-                        {label.charAt(0).toUpperCase() + label.slice(1)}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
-            <p className="mb-3 text-sm font-semibold tracking-tight text-neutral-800">{DASHBOARD.quickSectionTitle}</p>
-            <QuickActions className="mb-4" />
+            {/* Mais recursos */}
+            <div className="px-5 mt-4">
+              <p className="mb-3 text-sm font-semibold tracking-tight text-foreground">{DASHBOARD.quickSectionTitle}</p>
+              <QuickActions className="mb-4" />
+            </div>
 
-            {/* Lixeira: notas excluídas – restaurar por engano */}
-            <button
-              type="button"
+            {/* Lixeira */}
+            <button type="button"
               onClick={() => { setShowTrashSheet(true); loadDeletedTransactions(userId); }}
-              className="flex items-center gap-3 w-full p-4 rounded-xl bg-white border border-[#e5e7eb] shadow-card-lovable mb-8 hover:bg-[#f8f9fa] transition-colors text-left"
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#fef2f2] flex items-center justify-center text-[#dc2626] shrink-0">
-                <Trash2 className="h-6 w-6" />
+              className="flex items-center gap-3 mx-5 w-[calc(100%-2.5rem)] p-4 rounded-xl bg-card border border-[#1E2A3A] mb-6 hover:bg-[#1E2A3A]/50 transition-colors text-left">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 shrink-0">
+                <Trash2 className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-[#333]">Lixeira</p>
-                <p className="text-xs text-[#666]">{DASHBOARD.trashSubtitle}</p>
+                <p className="font-semibold text-foreground">Lixeira</p>
+                <p className="text-xs text-muted-foreground">{DASHBOARD.trashSubtitle}</p>
               </div>
-              <span className="text-[#666] text-sm shrink-0">Abrir</span>
+              <span className="text-muted-foreground text-sm shrink-0">Abrir</span>
             </button>
 
-            {isAuthenticated && !userId && (
-              <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
-                <p className="font-semibold mb-1">📧 Gmail não consegue sincronizar</p>
-                <p className="mb-2">Sua conta ainda não está vinculada no servidor. Para o app ler o Gmail, configure as variáveis do Supabase no Cloud Run:</p>
-                <ul className="list-disc list-inside text-xs space-y-0.5 mb-2">
-                  <li>NEXT_PUBLIC_SUPABASE_URL</li>
-                  <li>SUPABASE_SERVICE_ROLE_KEY</li>
-                </ul>
-                <p className="text-xs">Cloud Run → finmemory → Editar e implantar nova revisão → Variáveis e segredos. Depois faça logout e login de novo.</p>
-              </div>
-            )}
-
-            <>
+            {/* Histórico */}
+            <div ref={historyRef} className="px-5" id="extrato">
               {showHistorySearch && (
                 <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#999] pointer-events-none" aria-hidden />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden />
                   <input
                     type="search"
                     placeholder={DASHBOARD.historySearchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#e5e7eb] bg-white text-[#333] placeholder:text-[#999] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/50 focus:border-[#2ECC49]"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#1E2A3A] bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                     aria-label={DASHBOARD.historySearchAria}
                   />
                 </div>
@@ -1235,36 +1267,30 @@ export default function Dashboard() {
                 onDeleted={() => loadTransactions(userId)}
                 onRenamed={() => loadTransactions(userId)}
                 emptyState={
-                  searchQuery.trim() &&
-                  searchFilteredTransactions.length === 0 &&
-                  searchFilteredOpenFinance.length === 0
-                    ? 'search'
-                    : 'default'
+                  searchQuery.trim() && searchFilteredTransactions.length === 0 && searchFilteredOpenFinance.length === 0
+                    ? 'search' : 'default'
                 }
               />
-            </>
+            </div>
 
-            {/* Sheet: Lixeira – listar excluídas e restaurar */}
+            {/* Lixeira Sheet */}
             <Sheet open={showTrashSheet} onOpenChange={setShowTrashSheet}>
               <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
                 <SheetHeader className="mb-4">
                   <SheetTitle className="text-lg font-bold text-center flex items-center justify-center gap-2">
-                    <Trash2 className="h-5 w-5 text-[#dc2626]" />
-                    Lixeira
+                    <Trash2 className="h-5 w-5 text-red-400" /> Lixeira
                   </SheetTitle>
-                  <p className="text-sm text-[#666] text-center">
-                    Notas excluídas. Toque em &quot;Restaurar&quot; para voltar ao histórico.
+                  <p className="text-sm text-muted-foreground text-center">
+                    Toque em &quot;Restaurar&quot; para voltar ao histórico.
                   </p>
                 </SheetHeader>
                 {trashLoading ? (
-                  <div className="flex items-center justify-center py-8 gap-2 text-[#666]">
+                  <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     <span>Carregando...</span>
                   </div>
                 ) : deletedTransactions.length === 0 ? (
-                  <div className="text-center py-8 text-[#666] text-sm">
-                    Nenhuma nota na lixeira.
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground text-sm">Nenhuma nota na lixeira.</div>
                 ) : (
                   <div className="space-y-2">
                     {deletedTransactions.map((t) => {
@@ -1273,17 +1299,13 @@ export default function Dashboard() {
                       const dataStr = t.data ? new Date(t.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
                       const isRestoring = restoringId === t.id;
                       return (
-                        <div key={t.id} className="flex items-center justify-between gap-3 p-4 rounded-xl bg-[#f8f9fa] border border-[#e5e7eb]">
+                        <div key={t.id} className="flex items-center justify-between gap-3 p-4 rounded-xl bg-card border border-[#1E2A3A]">
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-[#333] truncate">{t.estabelecimento || 'Sem nome'}</p>
-                            <p className="text-sm text-[#666]">{dataStr} · {displayValue}</p>
+                            <p className="font-semibold text-foreground truncate">{t.estabelecimento || 'Sem nome'}</p>
+                            <p className="text-sm text-muted-foreground">{dataStr} · {displayValue}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRestore(t.id)}
-                            disabled={isRestoring}
-                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#2ECC49] text-white text-sm font-medium hover:bg-[#22a83a] disabled:opacity-50"
-                          >
+                          <button type="button" onClick={() => handleRestore(t.id)} disabled={isRestoring}
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-[#0A0E1A] text-sm font-bold hover:bg-primary/90 disabled:opacity-50">
                             {isRestoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                             Restaurar
                           </button>
@@ -1295,166 +1317,53 @@ export default function Dashboard() {
               </SheetContent>
             </Sheet>
 
+            {/* Sync logs (collapsed by default) */}
             {syncLogs.length > 0 && !showLogs && (
-              <button
-                type="button"
-                onClick={() => setShowLogs(true)}
-                className="mt-4 px-4 py-2 bg-[#f8f9fa] text-[#333] border border-[#e5e7eb] rounded-xl text-sm font-medium"
-              >
+              <button type="button" onClick={() => setShowLogs(true)}
+                className="mx-5 mt-2 px-4 py-2 bg-card border border-[#1E2A3A] text-muted-foreground rounded-xl text-sm">
                 📋 Ver Logs
               </button>
             )}
-            <button
-              type="button"
-              onClick={handleDebugConnection}
-              className="mt-2 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-xl text-sm font-medium"
-              title="Testar conexão com Supabase e diagnóstico"
-            >
-              🔍 Debug
-            </button>
-
-        {/* Debug Info Panel */}
-        {debugInfo && (
-          <div className="card-lovable mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-[#333] m-0">
-                🔍 Diagnóstico de Conexão
-              </h3>
-              <button
-                type="button"
-                onClick={() => setDebugInfo(null)}
-                className="py-2 px-4 bg-[#f8f9fa] hover:bg-[#e5e7eb] text-[#333] rounded-lg text-sm font-semibold transition-colors"
-              >
-                ✕ Fechar
-              </button>
-            </div>
-            <div className="bg-[#f8f9fa] rounded-xl p-4 mb-4 text-sm text-[#333]">
-              <div><strong>User ID:</strong> {debugInfo.userId || 'Não definido'}</div>
-              <div><strong>Supabase Configurado:</strong> {debugInfo.supabaseConfigured ? '✅ Sim' : '❌ Não'}</div>
-              <div><strong>Timestamp:</strong> {new Date(debugInfo.timestamp).toLocaleString('pt-BR')}</div>
-            </div>
-            <div>
-              <h4 className="text-base font-semibold text-[#333] mb-3">
-                Resultados dos Testes:
-              </h4>
-              {debugInfo.tests.map((test, index) => (
-                <div
-                  key={index}
-                  className={`p-3 mb-2 rounded-lg text-sm border-l-4 ${test.success ? 'bg-[#d4edda] border-[#28a745] text-[#333]' : 'bg-[#f8d7da] border-[#dc3545] text-[#333]'}`}
-                >
-                  <div className="font-bold mb-1">
-                    {test.success ? '✅' : '❌'} {test.name}
-                  </div>
-                  {test.error && (
-                    <div className="text-[#666] text-xs mt-1">Erro: {test.error}</div>
-                  )}
-                  {test.found !== undefined && (
-                    <div className="text-xs mt-1">Encontrado: {test.found} registro(s)</div>
-                  )}
-                  {test.sampleUserIds && test.sampleUserIds.length > 0 && (
-                    <div className="text-xs mt-1">User IDs: {test.sampleUserIds.join(', ')}</div>
-                  )}
-                  {test.data && test.data.length > 0 && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs">Ver dados</summary>
-                      <pre className="bg-[#f8f9fa] p-2 rounded text-xs overflow-auto max-h-[200px] mt-2">
-                        {JSON.stringify(test.data, null, 2)}
-                      </pre>
-                    </details>
-                  )}
+            {showLogs && syncLogs.length > 0 && (
+              <div className="mx-5 mt-2 bg-card rounded-2xl p-4 mb-4 border border-[#1E2A3A] max-h-80 overflow-y-auto">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-semibold text-foreground">Logs de Sincronização</span>
+                  <button type="button" onClick={() => setShowLogs(false)} className="text-muted-foreground text-xs hover:text-foreground">✕ Fechar</button>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Sync Logs Panel – Lovable: card branco, bordas #e5e7eb */}
-        {(showLogs && syncLogs.length > 0) && (
-          <div className="bg-white rounded-2xl p-5 mb-6 shadow-card-lovable max-h-[400px] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="m-0 text-xl text-[#333]">
-                📋 Logs da Sincronização
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowLogs(false)}
-                className="bg-[#f0f0f0] border-none rounded-lg py-2 px-4 cursor-pointer text-sm font-bold text-[#666] hover:bg-[#e5e7eb] transition-colors"
-              >
-                ✕ Fechar
-              </button>
-            </div>
-
-            {lastSyncResult && (
-              <div className="bg-[#f8f9fa] rounded-xl p-4 mb-4 border-2 border-[#e9ecef]">
-                <h4 className="m-0 mb-3 text-base text-[#333]">
-                  📊 Resumo da Última Sincronização
-                </h4>
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 text-sm">
-                  <div>
-                    <strong className="text-[#666]">E-mails encontrados:</strong>
-                    <div className="text-lg font-bold text-[#2ECC49]">
-                      {lastSyncResult.total}
-                    </div>
-                  </div>
-                  <div>
-                    <strong className="text-[#666]">Notas processadas:</strong>
-                    <div className={`text-lg font-bold ${lastSyncResult.processed > 0 ? 'text-[#28a745]' : 'text-[#666]'}`}>
-                      {lastSyncResult.processed}
-                    </div>
-                  </div>
-                  {lastSyncResult.skipped > 0 && (
-                    <div>
-                      <strong className="text-[#666]">Ignorados (sem dados):</strong>
-                      <div className="text-lg font-bold text-[#6c757d]">
-                        {lastSyncResult.skipped}
-                      </div>
-                    </div>
-                  )}
-                  {lastSyncResult.errors > 0 && (
-                    <div>
-                      <strong className="text-[#666]">Erros:</strong>
-                      <div className="text-lg font-bold text-[#dc3545]">
-                        {lastSyncResult.errors}
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <strong className="text-[#666]">Total no banco:</strong>
-                    <div className="text-lg font-bold text-[#2ECC49]">
-                      {lastSyncResult.transactionsInDb}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 text-xs text-[#999]">
-                  {lastSyncResult.timestamp.toLocaleString('pt-BR')}
+                <div className="space-y-1 font-mono text-[12px]">
+                  {syncLogs.map((log, i) => (
+                    <div key={i} className={`px-3 py-1.5 rounded border-l-2 ${
+                      log.type === 'success' ? 'bg-primary/10 border-primary text-primary' :
+                      log.type === 'error' ? 'bg-red-500/10 border-red-500 text-red-400' :
+                      log.type === 'warning' ? 'bg-amber-500/10 border-amber-500 text-amber-400' :
+                      'bg-blue-500/10 border-blue-500 text-blue-400'
+                    }`}>{log.message}</div>
+                  ))}
                 </div>
               </div>
             )}
 
-            <div className="font-mono text-[13px] leading-relaxed">
-              {syncLogs.map((log, index) => {
-                const typeStyles = {
-                  info: 'bg-[#e7f3ff] border-l-[#b3d9ff] text-[#0066cc]',
-                  success: 'bg-[#d4edda] border-l-[#c3e6cb] text-[#155724]',
-                  warning: 'bg-[#fff3cd] border-l-[#ffeaa7] text-[#856404]',
-                  error: 'bg-[#f8d7da] border-l-[#f5c6cb] text-[#721c24]'
-                };
-                const style = typeStyles[log.type] || typeStyles.info;
-                return (
-                  <div
-                    key={index}
-                    className={`${style} border-l-4 py-2.5 px-3.5 mb-2 rounded overflow-hidden flex justify-between items-center`}
-                  >
-                    <span>{log.message}</span>
-                    <span className="text-[11px] text-[#999] ml-3">
-                      {log.timestamp.toLocaleTimeString('pt-BR')}
-                    </span>
+            {/* Debug tool (dev only, always visible for diagnostics) */}
+            <div className="mx-5 mt-2 mb-2">
+              <button type="button" onClick={handleDebugConnection}
+                className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+                🔍 diagnóstico
+              </button>
+              {debugInfo && (
+                <div className="mt-2 bg-card rounded-xl p-4 border border-[#1E2A3A] text-xs">
+                  <div className="flex justify-between mb-2">
+                    <span className="font-semibold text-foreground">Diagnóstico</span>
+                    <button type="button" onClick={() => setDebugInfo(null)} className="text-muted-foreground">✕</button>
                   </div>
-                );
-              })}
+                  <div className="text-muted-foreground mb-2">User: {debugInfo.userId || 'N/A'}</div>
+                  {debugInfo.tests.map((test, i) => (
+                    <div key={i} className={`mb-1 ${test.success ? 'text-primary' : 'text-red-400'}`}>
+                      {test.success ? '✅' : '❌'} {test.name}{test.error ? `: ${test.error}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        )}
             </>
               )}
             </div>
@@ -1465,24 +1374,24 @@ export default function Dashboard() {
           <BottomNav />
           {isLoading ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-              <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
-              <p className="text-[#666]">Carregando sessão...</p>
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="text-muted-foreground">Carregando...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6 text-center px-4">
               <Image src="/logo.png" alt="FinMemory" width={80} height={80} className="object-contain" />
-              <div className="w-20 h-20 rounded-full bg-[#e8f5e9] flex items-center justify-center">
-                <Mail className="h-10 w-10 text-[#28a745]" />
+              <div className="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <Mail className="h-10 w-10 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold mb-2 text-[#333]">FinMemory</h1>
-                <p className="text-[#666]">Entre com email e senha para acessar seu painel.</p>
+                <h1 className="text-2xl font-bold mb-2 text-foreground">FinMemory</h1>
+                <p className="text-muted-foreground">Entre com email e senha para acessar seu painel.</p>
               </div>
               <button
                 type="button"
                 onClick={handleConnectGmail}
-                className="px-6 py-3 bg-gradient-google text-white hover:opacity-90 rounded-xl font-semibold inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28a745] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa]"
-                aria-label="Entrar com email e senha"
+                className="px-6 py-3 bg-primary text-[#0A0E1A] rounded-xl font-bold inline-flex items-center gap-2 hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label="Entrar"
               >
                 <Mail className="h-5 w-5" aria-hidden />
                 Entrar
