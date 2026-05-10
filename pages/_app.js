@@ -13,6 +13,7 @@ import { DeployRecovery } from '../components/DeployRecovery';
 import PWAInstallProvider from '../components/PWAInstallProvider';
 import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 import { MapCartProvider } from '../components/map/MapCartContext';
+import { ProfileFirstLoginGate } from '../components/onboarding/ProfileFirstLoginGate';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import '../styles/globals.css';
 
@@ -64,6 +65,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
     <PostHogProvider client={posthog}>
     <ErrorBoundary>
       <SessionProvider session={session}>
+        <ProfileFirstLoginGate>
         <AppSplashGate>
           <PWAInstallProvider>
             <ServiceWorkerRegister />
@@ -76,6 +78,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             </AnalyticsProvider>
           </PWAInstallProvider>
         </AppSplashGate>
+        </ProfileFirstLoginGate>
         <ClientOnly>
           <SafeGoogleAnalytics />
         </ClientOnly>

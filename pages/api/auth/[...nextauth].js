@@ -209,15 +209,19 @@ export const authOptions = {
       }
       return baseUrl;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       const email = user?.email || token.email;
       if (email) token.email = email;
+
+      if (user?.name) token.name = user.name;
+      if (user?.image) token.picture = user.image;
+
       const supabase = getSupabaseAdmin();
       if (email && supabase) {
         try {
           const { data, error } = await supabase
             .from('users')
-            .select('id, created_at, plano, plano_ativo')
+            .select('id, created_at, plano, plano_ativo, name, avatar_url')
             .eq('email', email)
             .maybeSingle();
           if (data?.id) {
@@ -225,12 +229,14 @@ export const authOptions = {
             token.created_at = data.created_at;
             token.plano = data.plano || 'free';
             token.plano_ativo = Boolean(data.plano_ativo);
+            if (data.name) token.name = data.name;
+            if (data.avatar_url) token.picture = data.avatar_url;
           } else if (error) {
             // plano/plano_ativo columns may not exist yet — fallback to basic query
             console.warn('jwt callback: extended query failed, trying fallback:', error?.message);
             const { data: basic } = await supabase
               .from('users')
-              .select('id, created_at')
+              .select('id, created_at, name, avatar_url')
               .eq('email', email)
               .maybeSingle();
             if (basic?.id) {
@@ -238,12 +244,20 @@ export const authOptions = {
               token.created_at = basic.created_at;
               token.plano = 'free';
               token.plano_ativo = false;
+              if (basic.name) token.name = basic.name;
+              if (basic.avatar_url) token.picture = basic.avatar_url;
             }
           }
         } catch (e) {
           console.error('jwt callback users lookup:', e?.message || e);
         }
       }
+
+      if (trigger === 'update' && session) {
+        if (typeof session.name === 'string') token.name = session.name;
+        if (session.image !== undefined) token.picture = session.image;
+      }
+
       return token;
     },
 
@@ -273,6 +287,8 @@ export const authOptions = {
         if (token.sub && !session.user.id) session.user.id = token.sub;
         session.user.plano = token.plano || 'free';
         session.user.plano_ativo = Boolean(token.plano_ativo);
+        if (token.name) session.user.name = token.name;
+        if (token.picture) session.user.image = token.picture;
       }
       if (session?.user?.email && !session.user.supabaseId) {
         try {
@@ -280,7 +296,7 @@ export const authOptions = {
           if (supabase) {
             const { data, error } = await supabase
               .from('users')
-              .select('id, created_at, plano, plano_ativo')
+              .select('id, created_at, plano, plano_ativo, name, avatar_url')
               .eq('email', session.user.email)
               .maybeSingle();
             if (data) {
@@ -288,11 +304,13 @@ export const authOptions = {
               session.user.created_at = data.created_at;
               session.user.plano = data.plano || 'free';
               session.user.plano_ativo = Boolean(data.plano_ativo);
+              if (data.name) session.user.name = data.name;
+              if (data.avatar_url) session.user.image = data.avatar_url;
             } else if (error) {
               console.warn('session callback: extended query failed, trying fallback:', error?.message);
               const { data: basic } = await supabase
                 .from('users')
-                .select('id, created_at')
+                .select('id, created_at, name, avatar_url')
                 .eq('email', session.user.email)
                 .maybeSingle();
               if (basic) {
@@ -300,6 +318,8 @@ export const authOptions = {
                 session.user.created_at = basic.created_at;
                 session.user.plano = 'free';
                 session.user.plano_ativo = false;
+                if (basic.name) session.user.name = basic.name;
+                if (basic.avatar_url) session.user.image = basic.avatar_url;
               }
             }
           }
