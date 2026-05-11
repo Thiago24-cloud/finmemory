@@ -8,6 +8,7 @@ import {
   History,
   Swords,
   Sparkles,
+  ScanBarcode,
   List,
   BarChart3,
   Users,
@@ -34,15 +35,14 @@ function IconTile({ className, children }) {
 }
 
 /**
- * Grelha de atalhos (4 col.) — NF-e no FAB + aqui "Escanear" reforça o fluxo.
- * Código de barras (consulta rápida): mapa / chips do mapa / menu do mapa, não nesta grelha.
- * Mapa / lista / parceria respeitam a mesma allowlist que QuickActions e BottomNav.
+ * Grelha 4×2 — FAB central continua NF-e; aqui "Escanear" + atalhos incl. código de barras (consulta rápida).
+ * Mapa / código / lista / parceria respeitam a mesma allowlist que QuickActions e BottomNav.
  */
 export function DashboardQuickAccess({ className, onExtrato }) {
   const { data: session } = useSession();
   const allowed = canUseRestrictedFeatures(session?.user?.email);
 
-  const LOCKED = ['/mapa', '/shopping-list', '/partnership'];
+  const LOCKED = ['/mapa', '/scan-product', '/shopping-list', '/partnership'];
   const hrefOrLock = (path, realHref) =>
     allowed || !LOCKED.includes(path) ? realHref : '/em-breve';
 
@@ -105,6 +105,15 @@ export function DashboardQuickAccess({ className, onExtrato }) {
       Icon: BarChart3,
       tile: 'bg-gradient-to-br from-indigo-950/80 to-[#0f172a] border-indigo-500/30 text-indigo-300',
       labelClass: 'text-indigo-200/95',
+    },
+    {
+      key: 'barcode',
+      href: hrefOrLock('/scan-product', '/scan-product'),
+      label: 'Código de barras',
+      Icon: ScanBarcode,
+      tile: 'bg-gradient-to-br from-red-950/70 to-[#0f172a] border-red-500/40 text-red-300',
+      labelClass: 'text-red-300',
+      title: QUICK_ACTION_TITLE.barcode,
     },
   ];
 
