@@ -53,6 +53,8 @@ $SUPABASE_URL = ""
 $SUPABASE_ANON = ""
 $MAPBOX_TOKEN = ""
 $STRIPE_PK = ""
+$POSTHOG_KEY = ""
+$POSTHOG_HOST = ""
 foreach ($envFile in @(".env", ".env.local")) {
     if (-not (Test-Path $envFile)) { continue }
     Get-Content $envFile | ForEach-Object {
@@ -68,6 +70,12 @@ foreach ($envFile in @(".env", ".env.local")) {
         }
         if ($line -match '^\s*NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY\s*=\s*(.+)$') {
             $STRIPE_PK = $Matches[1].Trim().Trim('"').Trim("'")
+        }
+        if ($line -match '^\s*NEXT_PUBLIC_POSTHOG_KEY\s*=\s*(.+)$') {
+            $POSTHOG_KEY = $Matches[1].Trim().Trim('"').Trim("'")
+        }
+        if ($line -match '^\s*NEXT_PUBLIC_POSTHOG_HOST\s*=\s*(.+)$') {
+            $POSTHOG_HOST = $Matches[1].Trim().Trim('"').Trim("'")
         }
     }
 }
@@ -94,7 +102,7 @@ Write-Host "`nIniciando build via Cloud Build..." -ForegroundColor Cyan
 Write-Host "   Isso pode levar alguns minutos..." -ForegroundColor Yellow
 
 # Inclui Supabase + Mapbox + Stripe publishable key (baked no bundle pelo Dockerfile)
-$subs = "_COMMIT_SHA=$COMMIT_SHA,_NEXT_PUBLIC_SUPABASE_URL=`"$SUPABASE_URL`",_NEXT_PUBLIC_SUPABASE_ANON_KEY=`"$SUPABASE_ANON`",_MAPBOX_ACCESS_TOKEN=`"$MAPBOX_TOKEN`",_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=`"$STRIPE_PK`""
+$subs = "_COMMIT_SHA=$COMMIT_SHA,_NEXT_PUBLIC_SUPABASE_URL=`"$SUPABASE_URL`",_NEXT_PUBLIC_SUPABASE_ANON_KEY=`"$SUPABASE_ANON`",_MAPBOX_ACCESS_TOKEN=`"$MAPBOX_TOKEN`",_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=`"$STRIPE_PK`",_NEXT_PUBLIC_POSTHOG_KEY=`"$POSTHOG_KEY`",_NEXT_PUBLIC_POSTHOG_HOST=`"$POSTHOG_HOST`""
 Write-Host "`nExecutando: gcloud builds submit --project $PROJECT_ID --config cloudbuild.yaml --substitutions=..." -ForegroundColor Gray
 
 try {

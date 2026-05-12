@@ -56,6 +56,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
   const router = useRouter();
 
   useEffect(() => {
+    // Pageview da página inicial (routeChangeComplete não dispara no primeiro load)
+    posthog.capture('$pageview');
     const handleRouteChange = () => posthog.capture('$pageview');
     router.events.on('routeChangeComplete', handleRouteChange);
     return () => router.events.off('routeChangeComplete', handleRouteChange);
