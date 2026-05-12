@@ -40,15 +40,27 @@ function useCountdown(secondsUntilReset) {
   return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}min ${String(s).padStart(2, '0')}s`;
 }
 
-function MissionCard({ mission, onComplete }) {
-  const pct = mission.total_steps > 1 ? Math.round((mission.steps_done / mission.total_steps) * 100) : 0;
-  const [completing, setCompleting] = useState(false);
+function missionActionHref(id) {
+  switch (id) {
+    case 'scan_3':
+      return '/scan-product';
+    case 'log_expense':
+      return '/add-receipt';
+    case 'find_cheaper':
+      return '/mapa';
+    case 'invite_friend':
+      return '/partnership';
+    default:
+      return '/dashboard';
+  }
+}
 
-  const handleComplete = async () => {
-    if (mission.completed || completing) return;
-    setCompleting(true);
-    await onComplete(mission.id);
-    setCompleting(false);
+function MissionCard({ mission, onNavigate }) {
+  const pct = mission.total_steps > 1 ? Math.round((mission.steps_done / mission.total_steps) * 100) : 0;
+
+  const handleFazer = () => {
+    if (mission.completed) return;
+    onNavigate(missionActionHref(mission.id));
   };
 
   return (
@@ -89,11 +101,10 @@ function MissionCard({ mission, onComplete }) {
         ) : (
           <button
             type="button"
-            onClick={handleComplete}
-            disabled={completing}
-            className="flex-shrink-0 px-3 py-2 rounded-xl bg-gradient-to-br from-[#2ECC49] to-[#16a34a] text-white font-bold text-[12px] shadow-sm active:scale-95 transition-transform disabled:opacity-50"
+            onClick={handleFazer}
+            className="flex-shrink-0 px-3 py-2 rounded-xl bg-gradient-to-br from-[#2ECC49] to-[#16a34a] text-white font-bold text-[12px] shadow-sm active:scale-95 transition-transform"
           >
-            {completing ? '...' : 'Fazer'}
+            Fazer
           </button>
         )}
       </div>
@@ -105,7 +116,6 @@ export default function MissoesPage() {
   const { status } = useSession();
   const router = useRouter();
   const { missions, loading, secondsUntilReset, refresh } = useMissionsToday();
-  const [reward, setReward] = useState(null);
 
   const countdown = useCountdown(secondsUntilReset);
 
@@ -113,19 +123,13 @@ export default function MissoesPage() {
     if (status === 'unauthenticated') router.push('/login');
   }, [status, router]);
 
-  const handleComplete = async (missionId) => {
-    const r = await fetch('/api/missions/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mission_id: missionId }),
-    });
-    if (!r.ok) return;
-    const d = await r.json();
-    if (d.completed && d.xp_awarded > 0) {
-      setReward(d.xp_awarded);
-      setTimeout(() => setReward(null), 2500);
-    }
-    await refresh({ silent: true });
+  /** Ao voltar de scanner / mapa / recibo, atualiza progresso sem depender só do cache do provider. */
+  useEffect(() => {
+    void refresh({ silent: true });
+  }, [refresh]);
+
+  const handleNavigate = (href) => {
+    router.push(href);
   };
 
   const totalXP = missions.reduce((s, m) => s + m.xp_reward, 0);
@@ -165,21 +169,11 @@ export default function MissoesPage() {
             <p className="text-center text-muted-foreground py-10">Nenhuma missão disponível hoje.</p>
           ) : (
             missions.map((m) => (
-              <MissionCard key={m.id} mission={m} onComplete={handleComplete} />
+              <MissionCard key={m.id} mission={m} onNavigate={handleNavigate} />
             ))
           )}
         </div>
       </div>
-
-      {/* Reward overlay */}
-      {reward && (
-        <div className="fm-xp-overlay">
-          <div className="bg-gradient-to-br from-amber-400 to-yellow-500 text-black font-black text-[24px] px-7 py-5 rounded-3xl shadow-2xl text-center">
-            +{reward} XP ✨
-            <div className="text-[13px] font-bold mt-1">Missão completa!</div>
-          </div>
-        </div>
-      )}
 
       <BottomNav />
     </>

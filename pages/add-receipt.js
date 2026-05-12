@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { BottomNav } from '../components/BottomNav';
 import { NFCeScanner } from '../components/NFCeScanner';
+import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -136,6 +137,7 @@ function dataFromConsultarNfce(res) {
 export default function AddReceipt() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { refresh: refreshMissions } = useMissionsToday();
   
   // Estados
   const [step, setStep] = useState(STEPS.CAPTURE);
@@ -207,14 +209,16 @@ export default function AddReceipt() {
     if (step !== STEPS.SUCCESS) return;
     setShowXPOverlay(true);
     fetch('/api/gamification/streak', { method: 'POST' }).catch(() => {});
-    fetch('/api/missions/complete', {
+    void fetch('/api/missions/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mission_id: 'log_expense' }),
-    }).catch(() => {});
+    })
+      .then((r) => (r.ok ? refreshMissions({ silent: true }) : undefined))
+      .catch(() => {});
     const t = setTimeout(() => setShowXPOverlay(false), 2200);
     return () => clearTimeout(t);
-  }, [step]);
+  }, [step, refreshMissions]);
 
   useEffect(() => {
     // Se o utilizador já veio escanear a nota, cancelamos o lembrete da missão.

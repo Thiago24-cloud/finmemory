@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, Loader2, Users, Copy, Check } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
+import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { getSupabase } from '../lib/supabase';
+import { completeDailyMission } from '../lib/completeDailyMission';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
@@ -33,6 +35,7 @@ export async function getServerSideProps(ctx) {
 export default function PartnershipPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const { refresh: refreshMissions } = useMissionsToday();
   const [partnership, setPartnership] = useState(null);
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(true);
@@ -92,6 +95,11 @@ export default function PartnershipPage() {
       if (err) throw err;
       await supabase.from('partnership_members').insert({ partnership_id: data.id, user_id: userId });
       setPartnership(data);
+      void completeDailyMission('invite_friend')
+        .then(async (r) => {
+          if (r.ok) await refreshMissions({ silent: true });
+        })
+        .catch(() => {});
     } catch (e) {
       setError(e.message || 'Erro ao criar parceria.');
     } finally {
@@ -152,6 +160,11 @@ export default function PartnershipPage() {
       navigator.clipboard.writeText(partnership.invite_code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      void completeDailyMission('invite_friend')
+        .then(async (r) => {
+          if (r.ok) await refreshMissions({ silent: true });
+        })
+        .catch(() => {});
     }
   };
 

@@ -271,6 +271,8 @@ export type EstablishmentDetailSheetProps = {
   onOfferSeenUpdated?: (offerId: string, observedAt: string, retiredFromList?: boolean) => void;
   onToggleCart?: (product: NormalizedProduct) => void;
   isCartSelected?: (product: NormalizedProduct) => boolean;
+  /** Chamado após confirmar preço/oferta com sucesso (missão diária «menor preço»). */
+  onAfterOfferConfirmSuccess?: () => void;
 };
 
 export default function EstablishmentDetailSheet({
@@ -287,6 +289,7 @@ export default function EstablishmentDetailSheet({
   onOfferSeenUpdated,
   onToggleCart,
   isCartSelected,
+  onAfterOfferConfirmSuccess,
 }: EstablishmentDetailSheetProps) {
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('all');
@@ -434,6 +437,7 @@ export default function EstablishmentDetailSheet({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Não foi possível confirmar');
+      onAfterOfferConfirmSuccess?.();
       const iso = data.observed_at || new Date().toISOString();
       const retired = Boolean(data.retired_from_list);
       onOfferSeenUpdated?.(p.confirmId, iso, retired);

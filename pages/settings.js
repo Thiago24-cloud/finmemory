@@ -1,18 +1,70 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, memo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone, Instagram, Trash2 } from 'lucide-react';
+import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone, Trash2 } from 'lucide-react';
 import { BottomNav } from '../components/BottomNav';
-import ProximityAlertsSettings from '../components/ProximityAlertsSettings';
 import PlanGuard from '../components/PlanGuard';
-import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
-import { PLAN_LABELS } from '../lib/planAccess';
+import {
+  SettingsAccountTopSkeleton,
+  SettingsRadarSection,
+  SettingsXpImpactCard,
+  SettingsSubscriptionCenterCard,
+} from '../components/settings/SettingsAccountPanels';
 import { BRAND } from '../lib/brandTokens';
 
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
 const UpgradePlan = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
+
+const MIN_ACCOUNT_READY_MS = 300;
+
+const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, userEmail }) {
+  const router = useRouter();
+  if (!supabaseId || !userEmail) return null;
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-semibold text-gray-900">Planos FinMemory</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        Assinatura no Stripe — Pro, Família ou Enterprise. Os preços vêm do Stripe Checkout.
+      </p>
+      <button
+        type="button"
+        onClick={() => router.push('/planos')}
+        className="mt-4 w-full rounded-xl bg-[#2ECC49] py-3 px-4 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#25b340] hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100"
+      >
+        Ver planos disponíveis
+      </button>
+      <div className="mt-4 flex flex-col gap-2">
+        <UpgradePlan
+          plan="pro"
+          userId={supabaseId}
+          userEmail={userEmail}
+          className="w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white"
+        >
+          Assinar Pro — R$ 24,90/mês
+        </UpgradePlan>
+        <UpgradePlan
+          plan="familia"
+          userId={supabaseId}
+          userEmail={userEmail}
+          className="w-full rounded-lg border border-gray-900 bg-white py-2 text-sm font-semibold text-gray-900"
+        >
+          Assinar Família — R$ 99,90/mês
+        </UpgradePlan>
+        <UpgradePlan
+          plan="enterprise"
+          userId={supabaseId}
+          userEmail={userEmail}
+          className="w-full rounded-lg py-2 text-sm font-semibold text-white"
+          style={{ backgroundColor: BRAND.primary }}
+        >
+          Assinar Enterprise — R$ 17,90/mês
+        </UpgradePlan>
+      </div>
+    </div>
+  );
+});
 
 export default function SettingsPage() {
   const { data: session, status, update } = useSession();
@@ -26,6 +78,7 @@ export default function SettingsPage() {
   const [totpCode, setTotpCode] = useState('');
   const [totpMsg, setTotpMsg] = useState('');
   const [xpStats, setXpStats] = useState(null);
+  const [accountUiReady, setAccountUiReady] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
   const [deleteAccountErr, setDeleteAccountErr] = useState('');
@@ -40,78 +93,147 @@ export default function SettingsPage() {
   });
   const [billingPortalBusy, setBillingPortalBusy] = useState(false);
 
+  const handleRefreshSubscription = useCallback(async () => {
+    setSubscriptionStatus((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      await fetch('/api/stripe/sync-plan-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      await update().catch(() => {});
+      const res = await fetch('/api/stripe/subscription-status');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubscriptionStatus((prev) => ({
+          ...prev,
+          loading: false,
+          error: data?.error || 'Falha ao carregar assinatura',
+        }));
+        return;
+      }
+      setSubscriptionStatus({
+        loading: false,
+        plano: String(data.plano || 'free').toLowerCase(),
+        plano_ativo: Boolean(data.plano_ativo),
+        stripe_subscription_status: String(data.stripe_subscription_status || ''),
+        next_billing_at: data.next_billing_at || null,
+        cancel_at_period_end: Boolean(data.cancel_at_period_end),
+        error: '',
+      });
+    } catch (e) {
+      setSubscriptionStatus((prev) => ({
+        ...prev,
+        loading: false,
+        error: e?.message || 'Erro de rede ao carregar assinatura',
+      }));
+    }
+  }, [update]);
+
+  /** XP + Stripe + sessão num único fluxo; skeleton até tudo pronto + delay mínimo (evita flash). */
   useEffect(() => {
-    if (status !== 'authenticated') return undefined;
+    if (status === 'loading') return undefined;
+
+    if (status !== 'authenticated' || !session?.user?.email) {
+      setAccountUiReady(false);
+      setXpStats(null);
+      setSubscriptionStatus({
+        loading: false,
+        plano: 'free',
+        plano_ativo: false,
+        stripe_subscription_status: '',
+        next_billing_at: null,
+        cancel_at_period_end: false,
+        error: '',
+      });
+      return undefined;
+    }
+
     let cancelled = false;
+    const t0 = Date.now();
+
     (async () => {
       try {
-        const resp = await fetch('/api/map/gamification-me');
-        const data = await resp.json().catch(() => ({}));
-        if (cancelled) return;
-        if (resp.ok) {
-          setXpStats({
-            xp_points: Number(data.xp_points) || 0,
-            contributions_count: Number(data.contributions_count) || 0,
-            level: Number(data.level) || 1,
-          });
-        } else {
-          setXpStats({ xp_points: 0, contributions_count: 0, level: 1 });
-        }
-      } catch {
-        if (!cancelled) setXpStats({ xp_points: 0, contributions_count: 0, level: 1 });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [status]);
+        const gPromise = fetch('/api/map/gamification-me').then(async (resp) => {
+          const data = await resp.json().catch(() => ({}));
+          return { ok: resp.ok, data };
+        });
 
-  useEffect(() => {
-    if (status !== 'authenticated') return;
-    let cancelled = false;
-    async function loadSubscriptionStatus() {
-      setSubscriptionStatus((prev) => ({ ...prev, loading: true, error: '' }));
-      try {
         await fetch('/api/stripe/sync-plan-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
         await update().catch(() => {});
-        const res = await fetch('/api/stripe/subscription-status');
-        const data = await res.json().catch(() => ({}));
+
+        const [gWrap, subRes] = await Promise.all([gPromise, fetch('/api/stripe/subscription-status')]);
+        const subData = await subRes.json().catch(() => ({}));
         if (cancelled) return;
-        if (!res.ok) {
-          setSubscriptionStatus((prev) => ({
-            ...prev,
+
+        const xp =
+          gWrap.ok && gWrap.data
+            ? {
+                xp_points: Number(gWrap.data.xp_points) || 0,
+                contributions_count: Number(gWrap.data.contributions_count) || 0,
+                level: Number(gWrap.data.level) || 1,
+              }
+            : { xp_points: 0, contributions_count: 0, level: 1 };
+
+        let nextSub = {
+          loading: false,
+          plano: 'free',
+          plano_ativo: false,
+          stripe_subscription_status: '',
+          next_billing_at: null,
+          cancel_at_period_end: false,
+          error: '',
+        };
+        if (!subRes.ok) {
+          nextSub = {
+            ...nextSub,
+            error: subData?.error || 'Falha ao carregar assinatura',
+          };
+        } else {
+          nextSub = {
             loading: false,
-            error: data?.error || 'Falha ao carregar assinatura',
-          }));
-          return;
+            plano: String(subData.plano || 'free').toLowerCase(),
+            plano_ativo: Boolean(subData.plano_ativo),
+            stripe_subscription_status: String(subData.stripe_subscription_status || ''),
+            next_billing_at: subData.next_billing_at || null,
+            cancel_at_period_end: Boolean(subData.cancel_at_period_end),
+            error: '',
+          };
         }
+
+        const elapsed = Date.now() - t0;
+        await new Promise((r) => setTimeout(r, Math.max(0, MIN_ACCOUNT_READY_MS - elapsed)));
+        if (cancelled) return;
+
+        setXpStats(xp);
+        setSubscriptionStatus(nextSub);
+        setAccountUiReady(true);
+      } catch {
+        if (cancelled) return;
+        const xpFallback = { xp_points: 0, contributions_count: 0, level: 1 };
+        const elapsed = Date.now() - t0;
+        await new Promise((r) => setTimeout(r, Math.max(0, MIN_ACCOUNT_READY_MS - elapsed)));
+        if (cancelled) return;
+        setXpStats(xpFallback);
         setSubscriptionStatus({
           loading: false,
-          plano: String(data.plano || 'free').toLowerCase(),
-          plano_ativo: Boolean(data.plano_ativo),
-          stripe_subscription_status: String(data.stripe_subscription_status || ''),
-          next_billing_at: data.next_billing_at || null,
-          cancel_at_period_end: Boolean(data.cancel_at_period_end),
-          error: '',
+          plano: 'free',
+          plano_ativo: false,
+          stripe_subscription_status: '',
+          next_billing_at: null,
+          cancel_at_period_end: false,
+          error: 'Erro ao carregar dados da conta',
         });
-      } catch (e) {
-        if (!cancelled) {
-          setSubscriptionStatus((prev) => ({
-            ...prev,
-            loading: false,
-            error: e?.message || 'Erro de rede ao carregar assinatura',
-          }));
-        }
+        setAccountUiReady(true);
       }
-    }
-    void loadSubscriptionStatus();
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [status, update]);
+  }, [status, session?.user?.email, update]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/dashboard');
@@ -197,7 +319,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleOpenBillingPortal = async () => {
+  const handleOpenBillingPortal = useCallback(async () => {
     setBillingPortalBusy(true);
     try {
       const res = await fetch('/api/stripe/create-billing-portal', {
@@ -214,7 +336,7 @@ export default function SettingsPage() {
     } finally {
       setBillingPortalBusy(false);
     }
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -233,152 +355,22 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {status === 'authenticated' && userId ? (
-          <PlanGuard
-            feature="radar"
-            title="Radar de Ofertas — Plano Pro"
-            body="Receba alertas quando estiver perto de lojas com promoções da sua lista. Disponível no plano Pro."
-            className="mb-4"
-          >
-            <ProximityAlertsSettings userId={userId} />
-          </PlanGuard>
+        {status === 'loading' || (status === 'authenticated' && !accountUiReady) ? (
+          <SettingsAccountTopSkeleton />
         ) : null}
 
-        {status === 'authenticated' && xpStats ? (
-          <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-4 text-zinc-100 shadow-sm">
-            <p className="mb-1 text-xs text-zinc-500">Seu impacto na comunidade</p>
-            <p className="text-2xl font-bold text-zinc-100">
-              {xpStats.xp_points} <span className="text-orange-400">XP</span>
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              Nível {xpStats.level} · {xpStats.contributions_count} confirmações no mapa
-            </p>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
-                style={{ width: `${xpStats.xp_points % 100}%` }}
-              />
-            </div>
-            <p className="mt-1 text-xs text-zinc-600">
-              Faltam {Math.max(0, 100 - (xpStats.xp_points % 100))} XP para o nível {xpStats.level + 1}
-            </p>
-            <a
-              href="https://instagram.com/finmemory.oficial"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-2 text-xs text-zinc-400 transition-colors hover:text-orange-400"
-            >
-              <Instagram className="h-3.5 w-3.5" />
-              Ver novidades no Instagram
-            </a>
-          </div>
-        ) : null}
-
-        {status === 'authenticated' && session?.user ? (
-          <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold text-gray-900">Planos FinMemory</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Assinatura no Stripe — Pro, Família ou Enterprise. Os preços vêm do Stripe Checkout.
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push('/planos')}
-              className="mt-4 w-full rounded-xl bg-[#2ECC49] py-3 px-4 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#25b340] hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100"
-            >
-              Ver planos disponíveis
-            </button>
-            <div className="mt-4 flex flex-col gap-2">
-              <UpgradePlan
-                plan="pro"
-                userId={session.user.supabaseId}
-                userEmail={session.user.email}
-                className="w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white"
-              >
-                Assinar Pro — R$ 24,90/mês
-              </UpgradePlan>
-              <UpgradePlan
-                plan="familia"
-                userId={session.user.supabaseId}
-                userEmail={session.user.email}
-                className="w-full rounded-lg border border-gray-900 bg-white py-2 text-sm font-semibold text-gray-900"
-              >
-                Assinar Família — R$ 99,90/mês
-              </UpgradePlan>
-              <UpgradePlan
-                plan="enterprise"
-                userId={session.user.supabaseId}
-                userEmail={session.user.email}
-                className="w-full rounded-lg py-2 text-sm font-semibold text-white"
-                style={{ backgroundColor: BRAND.primary }}
-              >
-                Assinar Enterprise — R$ 17,90/mês
-              </UpgradePlan>
-            </div>
-          </div>
-        ) : null}
-
-        {status === 'authenticated' && session?.user ? (
-          <div
-            className="mb-6 overflow-hidden rounded-2xl p-4 shadow-sm"
-            style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg }}
-          >
-            <h2 className="text-base font-semibold text-gray-900">Centro de Assinatura</h2>
-            <p className="mt-1 text-sm text-gray-600">Status do pagamento e ativação do seu plano em tempo real.</p>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div className="rounded-xl bg-white px-3 py-2" style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}>
-                <p className="text-[11px] text-gray-500">Plano atual</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {PLAN_LABELS[String(subscriptionStatus.plano || 'free')] || 'Grátis'}
-                </p>
-              </div>
-              <div className="rounded-xl bg-white px-3 py-2" style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}>
-                <p className="text-[11px] text-gray-500">Situação</p>
-                <p className="text-sm font-semibold" style={{ color: subscriptionStatus.plano_ativo ? BRAND.primaryText : '#111827' }}>
-                  {subscriptionStatus.plano_ativo ? 'Ativo' : 'Inativo'}
-                  {subscriptionStatus.cancel_at_period_end ? ' (encerrando no fim do ciclo)' : ''}
-                </p>
-              </div>
-              <div
-                className="rounded-xl bg-white px-3 py-2 sm:col-span-2"
-                style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}
-              >
-                <p className="text-[11px] text-gray-500">Próxima renovação</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {subscriptionStatus.next_billing_at
-                    ? new Date(subscriptionStatus.next_billing_at).toLocaleDateString('pt-BR')
-                    : 'Sem cobrança futura no momento'}
-                </p>
-              </div>
-            </div>
-            {subscriptionStatus.error ? (
-              <p className="mt-2 text-xs text-red-600">{subscriptionStatus.error}</p>
-            ) : null}
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => router.replace(router.asPath)}
-                disabled={subscriptionStatus.loading}
-                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-              >
-                {subscriptionStatus.loading ? 'Atualizando…' : 'Atualizar status'}
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenBillingPortal}
-                disabled={billingPortalBusy}
-                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                style={{ backgroundColor: BRAND.primary }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = BRAND.primaryHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = BRAND.primary;
-                }}
-              >
-                {billingPortalBusy ? 'Abrindo…' : 'Gerenciar assinatura'}
-              </button>
-            </div>
-          </div>
+        {status === 'authenticated' && accountUiReady && session?.user ? (
+          <>
+            <SettingsRadarSection userId={userId} />
+            <SettingsXpImpactCard xpStats={xpStats} />
+            <SettingsPlanosBlock supabaseId={session.user.supabaseId} userEmail={session.user.email} />
+            <SettingsSubscriptionCenterCard
+              subscriptionStatus={subscriptionStatus}
+              onRefresh={handleRefreshSubscription}
+              onOpenBillingPortal={handleOpenBillingPortal}
+              billingPortalBusy={billingPortalBusy}
+            />
+          </>
         ) : null}
 
         {pwaUi?.installEntryVisible ? (
@@ -397,7 +389,7 @@ export default function SettingsPage() {
           </div>
         ) : null}
 
-        {status === 'authenticated' && session?.user ? (
+        {status === 'authenticated' && session?.user && accountUiReady ? (
           <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <h2 className="text-base font-semibold text-gray-900">Conta</h2>
             <p className="mt-1 text-sm text-gray-500">

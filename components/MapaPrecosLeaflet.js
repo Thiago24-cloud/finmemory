@@ -28,6 +28,8 @@ import FloatingCartBar from './map/FloatingCartBar';
 import { useMapCart } from './map/MapCartContext';
 import { useBagBackgroundMonitoring } from './map/useBagBackgroundMonitoring';
 import { MapBottomPaddingSync } from './map/MapBottomPaddingSync';
+import { useMissionsToday } from './missions/MissionsTodayContext';
+import { completeDailyMission } from '../lib/completeDailyMission';
 import {
   getMapPinOpenAirLabelStyle,
   mixWithWhite,
@@ -3060,6 +3062,15 @@ export default function MapaPrecosLeaflet({
 
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
+  const { refresh: refreshMissions } = useMissionsToday();
+
+  const bumpFindCheaperMission = useCallback(() => {
+    void completeDailyMission('find_cheaper')
+      .then(async (r) => {
+        if (r.ok) await refreshMissions({ silent: true });
+      })
+      .catch(() => {});
+  }, [refreshMissions]);
   const [locais, setLocais] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const reloadPointsRef = useRef(() => {});
@@ -3563,6 +3574,7 @@ export default function MapaPrecosLeaflet({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Não foi possível confirmar');
+        bumpFindCheaperMission();
         const iso = data.observed_at || new Date().toISOString();
         setShopOffers((prev) =>
           prev.map((o) =>
@@ -3590,7 +3602,7 @@ export default function MapaPrecosLeaflet({
         setConfirmOfferBusyId(null);
       }
     },
-    [session?.user?.email, shopStore?.id]
+    [session?.user?.email, shopStore?.id, bumpFindCheaperMission]
   );
 
   const toggleSelectedPromotionItem = useCallback(
@@ -5263,6 +5275,7 @@ export default function MapaPrecosLeaflet({
           appUserId={session?.user?.supabaseId}
           onToggleCart={toggleCartFromDetailSheet}
           isCartSelected={isDetailSheetProductInCart}
+          onAfterOfferConfirmSuccess={bumpFindCheaperMission}
           onOfferSeenUpdated={(offerId, observedAt, retiredFromList) => {
             setShopOffers((prev) =>
               prev.map((o) =>

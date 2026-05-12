@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { getServerSession } from 'next-auth/next';
 import { BottomNav } from '../components/BottomNav';
 import { ProductBarcodeScanner } from '../components/ProductBarcodeScanner';
+import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
@@ -128,6 +129,7 @@ function lineAmountsFromPayload(payload) {
 
 export default function ScanProductPage() {
   const { status } = useSession();
+  const { refresh: refreshMissions } = useMissionsToday();
   const [mode, setMode] = useState('intro');
   const [cart, setCart] = useState([]);
   const [scanFeedback, setScanFeedback] = useState('idle');
@@ -184,6 +186,7 @@ export default function ScanProductPage() {
                   `+${mission.xpAwarded} XP — Missão «Escaneie 3 produtos» concluída!`
                 );
               }
+              void refreshMissions({ silent: true });
             }
           } catch (_) {
             mission = null;
@@ -229,7 +232,7 @@ export default function ScanProductPage() {
         lookupBusyRef.current = false;
       }
     },
-    [showToast]
+    [showToast, refreshMissions]
   );
 
   const onBarcode = useCallback(
