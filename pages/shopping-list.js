@@ -6,17 +6,15 @@ import { getServerSession } from 'next-auth/next';
 import {
   ArrowLeft,
   Loader2,
-  Plus,
   Trash2,
   Check,
   Filter,
   MapPin,
-  StickyNote,
-  Navigation,
   Mic,
   MicOff,
 } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
+import { ShoppingListBottomNav } from '../components/shopping/ShoppingListBottomNav';
+import { ShoppingListWeb3Main } from '../components/shopping/ShoppingListWeb3Main';
 import { getSupabase } from '../lib/supabase';
 import { useMapCart } from '../components/map/MapCartContext';
 import { matchShoppingListProductFromCatalog } from '../lib/shoppingListCatalogMatch';
@@ -330,31 +328,6 @@ export default function ShoppingListPage() {
     });
   };
 
-  const groupedByDay = useMemo(() => {
-    const groups = {};
-    noteItems.forEach((item) => {
-      const d = item.created_at ? new Date(item.created_at) : new Date();
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const yesterdayStart = new Date(todayStart);
-      yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-      let label;
-      if (d >= todayStart) label = 'Hoje';
-      else if (d >= yesterdayStart) label = 'Ontem';
-      else label = d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(item);
-    });
-    const order = ['Hoje', 'Ontem'];
-    const rest = Object.keys(groups).filter((k) => !order.includes(k));
-    rest.sort((a, b) => {
-      const da = groups[a][0]?.created_at || '';
-      const db = groups[b][0]?.created_at || '';
-      return db.localeCompare(da);
-    });
-    return [...order.filter((k) => groups[k]), ...rest].map((label) => ({ label, items: groups[label] }));
-  }, [noteItems]);
-
   const handleAdd = async (e) => {
     e.preventDefault();
     const name = newName.trim();
@@ -665,8 +638,8 @@ export default function ShoppingListPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-[#2ECC49]" />
+      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-[#27C86A]" />
       </div>
     );
   }
@@ -677,32 +650,36 @@ export default function ShoppingListPage() {
   }
 
   const showMapBlock = listBucket === 'now' && mapGroups.length > 0;
-  const hasNotesInTab = noteItems.length > 0;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] p-5 pb-24">
+    <div className="min-h-screen bg-[#0d1117] p-5 pb-28 font-sans antialiased">
       <div className="max-w-md mx-auto">
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-[#666] hover:text-[#333] text-sm mb-3">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-300 text-sm mb-4 transition-colors"
+        >
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
-        <h1 className="text-xl font-bold text-[#333]">Lista</h1>
-        <p className="text-xs text-gray-500 mb-3">
+
+        <p className="text-[11px] text-zinc-500 mb-4 leading-relaxed">
           Mapa com preço + lembretes.{' '}
           {partnership ? (
-            <span className="text-emerald-800">Parceria ativa.</span>
+            <span className="text-[#27C86A]/90">Parceria ativa.</span>
           ) : (
-            <Link href="/partnership" className="text-emerald-700 underline">
+            <Link href="/partnership" className="text-[#27C86A] underline underline-offset-2">
               Parceria (opcional)
             </Link>
           )}
         </p>
 
-        <div className="mb-3 flex rounded-xl border border-gray-200 bg-white p-1">
+        <div className="mb-4 flex rounded-2xl border border-white/[0.08] bg-[#151b24] p-1">
           <button
             type="button"
             onClick={() => setListBucket('now')}
-            className={`flex-1 rounded-lg py-2 text-xs font-bold transition-colors ${
-              listBucket === 'now' ? 'bg-[#2ECC49] text-white' : 'text-gray-600 hover:bg-gray-50'
+            className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-colors ${
+              listBucket === 'now'
+                ? 'bg-gradient-to-r from-[#27C86A] to-[#1ed760] text-[#0a0e14]'
+                : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
             Compra agora
@@ -710,90 +687,59 @@ export default function ShoppingListPage() {
           <button
             type="button"
             onClick={() => setListBucket('later')}
-            className={`flex-1 rounded-lg py-2 text-xs font-bold transition-colors ${
-              listBucket === 'later' ? 'bg-amber-500 text-white' : 'text-gray-600 hover:bg-gray-50'
+            className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-colors ${
+              listBucket === 'later' ? 'bg-amber-500/90 text-[#0a0e14]' : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
             Para depois
           </button>
         </div>
-        <p className="text-[11px] text-gray-500 mb-3">
+        <p className="text-[11px] text-zinc-500 mb-5">
           {listBucket === 'now'
             ? 'O que vai comprar nesta ida à loja.'
             : 'Lista para semana ou mês — sem pressa.'}
         </p>
 
-        <form onSubmit={handleAdd} className="mb-1 flex gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="O que precisa?"
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-[15px] focus:ring-2 focus:ring-[#2ECC49]"
-          />
-          <button
-            type="submit"
-            disabled={adding || !newName.trim()}
-            className="shrink-0 rounded-xl bg-[#2ECC49] p-3 text-white hover:bg-[#22a83a] disabled:opacity-50"
-            aria-label="Adicionar"
-          >
-            <Plus className="h-6 w-6" />
-          </button>
-          <button
-            type="button"
-            onClick={handleVoiceAdd}
-            disabled={!voiceSupported || voiceListening || adding || voiceContinuous}
-            className="shrink-0 rounded-xl border border-gray-300 bg-white p-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            aria-label="Adicionar por voz"
-            title={
-              voiceSupported
-                ? 'Adicionar itens por voz'
-                : 'Reconhecimento de voz não suportado neste navegador'
-            }
-          >
-            {voiceListening ? <MicOff className="h-6 w-6 text-red-600" /> : <Mic className="h-6 w-6" />}
-          </button>
-          <button
-            type="button"
-            onClick={handleToggleContinuousVoice}
-            disabled={!voiceSupported || adding}
-            className={`shrink-0 rounded-xl px-3 text-xs font-bold ${
-              voiceContinuous
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-            } disabled:opacity-50`}
-          >
-            {voiceContinuous ? 'Parar' : '🎤 contínuo'}
-          </button>
-        </form>
         {voicePulse ? (
-          <p className="mb-2 mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-            <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-emerald-600" />
+          <p className="mb-2 inline-flex items-center gap-1 rounded-full border border-[#27C86A]/30 bg-[#27C86A]/10 px-2 py-0.5 text-[10px] font-semibold text-[#7bed9f]">
+            <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-[#27C86A]" />
             microfone ativo
           </p>
         ) : null}
-        <p className="mb-1 text-[10px] text-gray-400">Tentamos achar foto no catálogo.</p>
-        <p className="mb-4 text-[10px] text-gray-400">
-          Dica voz: toque no microfone e diga, por exemplo, "manga, mamão e uva".
+        <p className="mb-1 text-[10px] text-zinc-600">Tentamos achar foto no catálogo.</p>
+        <p className="mb-5 text-[10px] text-zinc-600">
+          Dica voz: toque no microfone e diga, por exemplo, &quot;manga, mamão e uva&quot;. Enter no campo adiciona o
+          item.
         </p>
-        {voiceHint ? <p className="mb-3 text-xs font-medium text-emerald-700">{voiceHint}</p> : null}
 
-        {listBucket === 'now' && pendingNoteNamesForMap.length > 0 ? (
-          <Link
-            href={mapaListaHref}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white no-underline hover:bg-emerald-700"
-          >
-            <Navigation className="h-4 w-4 shrink-0" aria-hidden />
-            Ver no mapa
-          </Link>
-        ) : null}
+        <ShoppingListWeb3Main
+          title="O que você precisa?"
+          newName={newName}
+          setNewName={setNewName}
+          onSubmit={handleAdd}
+          adding={adding}
+          voiceSupported={voiceSupported}
+          voiceListening={voiceListening}
+          voiceContinuous={voiceContinuous}
+          onVoiceClick={handleVoiceAdd}
+          onVoiceContinuousToggle={handleToggleContinuousVoice}
+          noteItems={noteItems}
+          onToggleChecked={toggleChecked}
+          onDelete={handleDelete}
+          mapaListaHref={mapaListaHref}
+          listCount={noteItems.length}
+          voiceHint={voiceHint}
+          placeholder="Digite aqui..."
+        />
+
+        <div className="mt-8 h-px bg-white/[0.06]" aria-hidden />
 
         {shoppingBag.length > 0 ? (
-          <section className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3">
+          <section className="mb-4 rounded-2xl border border-white/[0.08] bg-[#151b24] p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-bold text-emerald-900">Carrinho do mapa</p>
-                <p className="text-xs text-emerald-800">
+                <p className="text-sm font-bold text-white">Carrinho do mapa</p>
+                <p className="text-xs text-zinc-400">
                   {shoppingBagTotals.itemsCount} • {formatMoney(shoppingBagTotals.totalPrice)}
                 </p>
               </div>
@@ -801,23 +747,26 @@ export default function ShoppingListPage() {
                 type="button"
                 onClick={handleSaveMapBag}
                 disabled={savingMapBag}
-                className="rounded-lg bg-[#2ECC49] px-3 py-2 text-xs font-semibold text-white hover:bg-[#22a83a] disabled:opacity-60"
+                className="rounded-xl bg-gradient-to-r from-[#27C86A] to-[#1ed760] px-3 py-2 text-xs font-bold text-[#0a0e14] hover:brightness-110 disabled:opacity-60"
               >
                 {savingMapBag ? '…' : 'Salvar'}
               </button>
             </div>
             <div className="mt-2 max-h-36 space-y-1 overflow-y-auto">
               {shoppingBag.map((item) => (
-                <div key={item.id} className="flex items-start justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-xs">
-                  <span className="line-clamp-1 flex-1 text-gray-700">{item.productName || item.name}</span>
-                  <span className="shrink-0 font-semibold text-emerald-700">
+                <div
+                  key={item.id}
+                  className="flex items-start justify-between gap-2 rounded-xl border border-white/[0.05] bg-[#0d1117]/80 px-2 py-1.5 text-xs"
+                >
+                  <span className="line-clamp-1 flex-1 text-zinc-300">{item.productName || item.name}</span>
+                  <span className="shrink-0 font-semibold text-[#7bed9f]">
                     {typeof item.priceNum === 'number' ? formatMoney(item.priceNum) : item.precoLabel || '—'}
                   </span>
                 </div>
               ))}
             </div>
             {mapBagBanner ? (
-              <p className="mt-2 text-xs font-medium text-emerald-900">{mapBagBanner}</p>
+              <p className="mt-2 text-xs font-medium text-[#7bed9f]/90">{mapBagBanner}</p>
             ) : null}
           </section>
         ) : null}
@@ -826,13 +775,13 @@ export default function ShoppingListPage() {
           <button
             type="button"
             onClick={() => setShowFilters((s) => !s)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#151b24] px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-[#1a222e]"
           >
             <Filter className="h-4 w-4" />
             {SHOPPING_LIST_FILTER_UI.toggleButton}
             {(filterStatus !== 'all' || filterPeriod !== 'all') && (
               <span
-                className="rounded-full bg-[#2ECC49] px-1.5 py-0.5 text-xs font-bold text-white"
+                className="rounded-full bg-[#27C86A] px-1.5 py-0.5 text-[10px] font-bold text-[#0a0e14]"
                 aria-hidden
               >
                 {SHOPPING_LIST_FILTER_UI.filtersOnBadge}
@@ -840,16 +789,20 @@ export default function ShoppingListPage() {
             )}
           </button>
           {showFilters && (
-            <div className="mt-3 p-4 bg-white rounded-xl border border-gray-200 space-y-4">
+            <div className="mt-3 space-y-4 rounded-2xl border border-white/[0.08] bg-[#151b24] p-4">
               <div>
-                <p className="mb-2 text-xs font-medium text-gray-500">{SHOPPING_LIST_FILTER_UI.sectionSituation}</p>
+                <p className="mb-2 text-xs font-medium text-zinc-500">{SHOPPING_LIST_FILTER_UI.sectionSituation}</p>
                 <div className="flex flex-wrap gap-2">
                   {SHOPPING_LIST_FILTER_STATUS.map((f) => (
                     <button
                       key={f.value}
                       type="button"
                       onClick={() => setFilterStatus(f.value)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${filterStatus === f.value ? 'bg-[#2ECC49] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      className={`rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
+                        filterStatus === f.value
+                          ? 'bg-gradient-to-r from-[#27C86A] to-[#1ed760] text-[#0a0e14]'
+                          : 'border border-white/[0.06] bg-[#0d1117] text-zinc-300 hover:border-white/10'
+                      }`}
                     >
                       {f.label}
                     </button>
@@ -857,14 +810,18 @@ export default function ShoppingListPage() {
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-xs font-medium text-gray-500">{SHOPPING_LIST_FILTER_UI.sectionWhen}</p>
+                <p className="mb-2 text-xs font-medium text-zinc-500">{SHOPPING_LIST_FILTER_UI.sectionWhen}</p>
                 <div className="flex flex-wrap gap-2">
                   {SHOPPING_LIST_FILTER_PERIOD.map((f) => (
                     <button
                       key={f.value}
                       type="button"
                       onClick={() => setFilterPeriod(f.value)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${filterPeriod === f.value ? 'bg-[#2ECC49] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      className={`rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
+                        filterPeriod === f.value
+                          ? 'bg-gradient-to-r from-[#27C86A] to-[#1ed760] text-[#0a0e14]'
+                          : 'border border-white/[0.06] bg-[#0d1117] text-zinc-300 hover:border-white/10'
+                      }`}
                     >
                       {f.label}
                     </button>
@@ -875,29 +832,23 @@ export default function ShoppingListPage() {
           )}
         </div>
 
-        {(showMapBlock || hasNotesInTab) && (
-          <>
-            {showMapBlock ? (
-              <section className="mb-8">
-                <div className="mb-2 flex items-center gap-2">
-                  <MapPin className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
-                  <h2 className="text-base font-bold text-[#333]">Do mapa</h2>
-                </div>
-                <div className="space-y-4">
-                  {mapGroups.map(({ groupId, items: gItems, total, created_at }) => (
-                    <div
-                      key={String(groupId)}
-                      className="rounded-xl border border-emerald-100 bg-gradient-to-b from-emerald-50/80 to-white shadow-card-lovable overflow-hidden"
-                    >
-                      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-emerald-100/80 bg-emerald-50/50">
-                        <span className="text-xs font-medium text-emerald-800">
-                          {formatShortWhen(created_at)}
-                        </span>
-                        <span className="text-sm font-bold tabular-nums text-emerald-700">
-                          Total {formatMoney(total)}
-                        </span>
-                      </div>
-                      <ul className="divide-y divide-gray-100">
+        {showMapBlock ? (
+          <section className="mb-8">
+            <div className="mb-2 flex items-center gap-2">
+              <MapPin className="h-5 w-5 shrink-0 text-[#27C86A]" aria-hidden />
+              <h2 className="text-base font-bold text-white">Do mapa</h2>
+            </div>
+            <div className="space-y-4">
+              {mapGroups.map(({ groupId, items: gItems, total, created_at }) => (
+                <div
+                  key={String(groupId)}
+                  className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#151b24] shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] bg-[#0d1117]/60 px-3 py-2.5">
+                    <span className="text-xs font-medium text-zinc-400">{formatShortWhen(created_at)}</span>
+                    <span className="text-sm font-bold tabular-nums text-[#7bed9f]">Total {formatMoney(total)}</span>
+                  </div>
+                  <ul className="divide-y divide-white/[0.06]">
                         {gItems.map((item) => {
                           const priceStr =
                             typeof item.unit_price === 'number' && Number.isFinite(item.unit_price)
@@ -906,48 +857,54 @@ export default function ShoppingListPage() {
                           return (
                             <li
                               key={item.id}
-                              className="flex items-start gap-3 p-3 bg-white/90"
+                              className="flex items-start gap-3 bg-[#0d1117]/40 p-3"
                             >
                               {item.list_thumbnail_url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={item.list_thumbnail_url}
                                   alt=""
-                                  className="mt-0.5 h-11 w-11 shrink-0 rounded-lg border border-gray-100 object-cover bg-gray-50"
+                                  className="mt-0.5 h-11 w-11 shrink-0 rounded-lg border border-white/[0.08] object-cover bg-[#151b24]"
                                 />
                               ) : null}
                               <button
                                 type="button"
                                 onClick={() => toggleChecked(item)}
-                                className={`flex-shrink-0 mt-0.5 w-8 h-8 rounded-full border-2 flex items-center justify-center ${item.checked ? 'bg-[#28a745] border-[#28a745] text-white' : 'border-gray-300'}`}
+                                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${
+                                  item.checked
+                                    ? 'border-[#27C86A] bg-[#27C86A] text-[#0a0e14]'
+                                    : 'border-zinc-600 bg-transparent'
+                                }`}
                                 aria-label={item.checked ? 'Desmarcar' : 'Marcar como comprado'}
                               >
                                 {item.checked ? <Check className="h-4 w-4" /> : null}
                               </button>
-                              <div className="flex-1 min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
                                   <span
-                                    className={`font-medium ${item.checked ? 'line-through text-[#666]' : 'text-[#333]'}`}
+                                    className={`font-medium ${item.checked ? 'text-zinc-500 line-through' : 'text-white'}`}
                                   >
                                     {item.name}
                                   </span>
                                   <span
-                                    className={`shrink-0 text-sm tabular-nums font-semibold ${item.checked ? 'text-gray-400' : 'text-emerald-700'}`}
+                                    className={`shrink-0 text-sm font-semibold tabular-nums ${item.checked ? 'text-zinc-600' : 'text-[#7bed9f]'}`}
                                   >
                                     {priceStr}
                                   </span>
                                 </div>
                                 {item.store_label ? (
-                                  <p className="text-xs text-gray-500 mt-0.5">{item.store_label}</p>
+                                  <p className="mt-0.5 text-xs text-zinc-500">{item.store_label}</p>
                                 ) : null}
                                 {item.shopping_intent === 'saved_deferred' ? (
-                                  <p className="text-[10px] font-medium text-amber-700 mt-0.5">Comprar depois · radar</p>
+                                  <p className="mt-0.5 text-[10px] font-medium text-amber-400/90">
+                                    Comprar depois · radar
+                                  </p>
                                 ) : null}
                               </div>
                               <button
                                 type="button"
                                 onClick={() => handleDelete(item.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg shrink-0"
+                                className="shrink-0 rounded-xl p-2 text-rose-400/90 transition hover:bg-rose-500/10 hover:text-rose-300"
                                 aria-label="Remover item"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -962,79 +919,13 @@ export default function ShoppingListPage() {
               </section>
             ) : null}
 
-            {hasNotesInTab ? (
-              <section className="space-y-6">
-                <div className="mb-2 flex items-center gap-2">
-                  <StickyNote className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-                  <h2 className="text-base font-bold text-[#333]">
-                    {listBucket === 'now' ? 'Esta compra' : 'Mais tarde'}
-                  </h2>
-                </div>
-                {groupedByDay.map(({ label, items: dayItems }) => (
-                  <div key={label}>
-                    <h3 className="mb-2 text-sm font-semibold text-gray-500">{label}</h3>
-                    <ul className="space-y-2">
-                      {dayItems.map((item) => (
-                        <li
-                          key={item.id}
-                          className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white p-3 shadow-card-lovable"
-                        >
-                          {item.list_thumbnail_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={item.list_thumbnail_url}
-                              alt=""
-                              className="h-12 w-12 shrink-0 rounded-lg border border-gray-100 bg-gray-50 object-cover"
-                            />
-                          ) : (
-                            <div className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-gray-200 bg-gray-100" aria-hidden />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => toggleChecked(item)}
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${item.checked ? 'border-[#28a745] bg-[#28a745] text-white' : 'border-gray-300'}`}
-                          >
-                            {item.checked ? <Check className="h-4 w-4" /> : null}
-                          </button>
-                          <span className={`min-w-0 flex-1 ${item.checked ? 'text-[#666] line-through' : 'text-[#333]'}`}>
-                            <span className="font-medium">{item.name}</span>
-                            {item.quantity > 1 && ` (${item.quantity}${item.unit || ''})`}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => void handleMoveItemBucket(item, listBucket === 'now' ? 'later' : 'now')}
-                            className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-50"
-                          >
-                            {listBucket === 'now' ? 'Depois' : 'Agora'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(item.id)}
-                            className="shrink-0 rounded-lg p-2 text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </section>
-            ) : null}
-          </>
-        )}
-
-        {!showMapBlock && !hasNotesInTab ? (
-          <p className="py-8 text-center text-sm text-gray-500">
-            {items.length === 0
-              ? 'Nada ainda.'
-              : listBucket === 'later'
-                ? 'Nada para depois.'
-                : 'Nada neste filtro.'}
+        {items.length > 0 && noteItems.length === 0 && !showMapBlock ? (
+          <p className="py-6 text-center text-sm text-zinc-500">
+            {listBucket === 'later' ? 'Nada para depois neste filtro.' : 'Nada neste filtro.'}
           </p>
         ) : null}
       </div>
-      <BottomNav />
+      <ShoppingListBottomNav mapHref={mapaListaHref} />
     </div>
   );
 }

@@ -15,7 +15,7 @@ const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: fa
 const UpgradePlan = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const pwaUi = usePWAInstallUIOptional();
   const userId =
@@ -72,6 +72,11 @@ export default function SettingsPage() {
     async function loadSubscriptionStatus() {
       setSubscriptionStatus((prev) => ({ ...prev, loading: true, error: '' }));
       try {
+        await fetch('/api/stripe/sync-plan-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        await update().catch(() => {});
         const res = await fetch('/api/stripe/subscription-status');
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -106,7 +111,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, [status, update]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/dashboard');

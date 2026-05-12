@@ -164,21 +164,29 @@ export default async function handler(req, res) {
     return res.status(500).send('Supabase admin em falta');
   }
 
+  async function syncFromCheckoutSession(session) {
+    const userId = session.metadata?.user_id || session.client_reference_id;
+    const subId = session.subscription;
+    const custId = session.customer;
+    if (userId && subId) {
+      const sub = await stripe.subscriptions.retrieve(subId, {
+        expand: ['items.data.price'],
+      });
+      await syncUserFromSubscription(supabase, stripe, sub);
+    } else if (userId && custId && !subId) {
+      await supabase.from('users').update({ stripe_customer_id: custId }).eq('id', userId);
+    }
+  }
+
   try {
+    console.log('[stripe/webhook]', event.type, event.id);
     switch (event.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object;
-        const userId = session.metadata?.user_id || session.client_reference_id;
-        const subId = session.subscription;
-        const custId = session.customer;
-        if (userId && subId) {
-          const sub = await stripe.subscriptions.retrieve(subId, {
-            expand: ['items.data.price'],
-          });
-          await syncUserFromSubscription(supabase, stripe, sub);
-        } else if (userId && custId && !subId) {
-          await supabase.from('users').update({ stripe_customer_id: custId }).eq('id', userId);
-        }
+        await syncFromCheckoutSession(event.data.object);
+        break;
+      }
+      case 'checkout.session.async_payment_succeeded': {
+        await syncFromCheckoutSession(event.data.object);
         break;
       }
       case 'customer.subscription.created':
@@ -201,6 +209,15 @@ export default async function handler(req, res) {
           if (data?.id) {
             console.warn('[stripe/webhook] invoice.payment_failed user', data.id, inv.id);
           }
+        }
+        break;
+      }
+      case 'invoice.payment_succeeded': {
+        const inv = event.data.object;
+        const subRef = inv.subscription;
+        const subId = typeof subRef === 'string' ? subRef : subRef?.id;
+        if (subId) {
+          await syncUserFromSubscription(supabase, stripe, subId);
         }
         break;
       }

@@ -13,6 +13,8 @@ function isPublicApiPath(pathname) {
   if (pathname.startsWith('/api/pluggy/webhook')) return true;
   if (pathname === '/api/webhook') return true;
   if (pathname === '/api/signup') return true;
+  if (pathname.startsWith('/api/scraper/')) return true;
+  if (pathname.startsWith('/api/scrapers/')) return true;
   return false;
 }
 

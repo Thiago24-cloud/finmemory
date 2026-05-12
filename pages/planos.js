@@ -80,7 +80,7 @@ const UPSELL_COPY = {
 };
 
 export default function PlanosPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [upsell, setUpsell] = useState(null);
 
@@ -91,6 +91,27 @@ export default function PlanosPage() {
       router.replace('/login?callbackUrl=/planos');
     }
   }, [status, router]);
+
+  /** Alinha plano na UI com Stripe + Supabase (webhook pode atrasar; JWT pode ficar desatualizado). */
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/stripe/sync-plan-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (cancelled) return;
+        if (res.ok) await update();
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status, update]);
 
   useEffect(() => {
     if (!upsell) return;
