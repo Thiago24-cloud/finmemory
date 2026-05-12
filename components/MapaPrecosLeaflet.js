@@ -3035,14 +3035,6 @@ export default function MapaPrecosLeaflet({
     typeof process !== 'undefined' ? String(process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '').trim() : '';
 
   const { tileUrl, tileAttribution, tileDetectRetina } = useMemo(() => {
-    if (planningMode && !wazeUi) {
-      const dark = MAP_THEMES.find((x) => x.id === 'waze');
-      return {
-        tileUrl: dark?.url || '',
-        tileAttribution: dark?.attribution || '',
-        tileDetectRetina: true,
-      };
-    }
     const t = getMapThemeById(mapThemeId);
     if (t.mapboxStyleId && mapboxToken) {
       return {
@@ -3064,7 +3056,7 @@ export default function MapaPrecosLeaflet({
       tileAttribution: t.attribution || '',
       tileDetectRetina: t.id === 'verde' || t.id === 'waze',
     };
-  }, [mapThemeId, mapboxToken, planningMode, wazeUi]);
+  }, [mapThemeId, mapboxToken]);
 
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
