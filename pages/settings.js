@@ -12,6 +12,7 @@ import {
   SettingsXpImpactCard,
   SettingsSubscriptionCenterCard,
 } from '../components/settings/SettingsAccountPanels';
+import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
 import { BRAND } from '../lib/brandTokens';
 
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
