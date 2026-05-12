@@ -22,7 +22,6 @@ if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
     // Tráfego via reverse proxy em `next.config.ts` (`/ingest` → PostHog Cloud).
     api_host: `${window.location.origin}/ingest`,
-    defaults: '2025-05-24',
     capture_pageview: false,
     capture_pageleave: true,
   });
