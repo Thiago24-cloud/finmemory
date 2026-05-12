@@ -451,8 +451,10 @@ function StoreMarkers({
   onMobileStorePinOpen,
   onVisibleStoresChange,
   mapPriceCountByStoreId = null,
-  /** Desktop sidebar: pin da loja aberta pulsa ao hover nas promoções na lista */
+  /** Desktop sidebar hover — pin pulsa */
   pulseStoreId = null,
+  /** Modo lista: halo forte na loja “melhor opção combinada”. */
+  planningHeroStoreId = null,
   /** Ref para forçar reload externo (ex.: após Quick Add ou realtime event). */
   reloadRef = null,
 }) {
@@ -591,8 +593,9 @@ function StoreMarkers({
           isMobileMapSheet={isMobileMapSheet}
           onMobileStorePinOpen={onMobileStorePinOpen}
           mapPriceBundleCount={Number(mapPriceCountByStoreId?.[String(store.id)]) || 0}
-          pulseHighlight={
-            pulseStoreId != null && String(pulseStoreId) === String(store.id)
+          pulseHighlight={pulseStoreId != null && String(pulseStoreId) === String(store.id)}
+          planningHero={
+            planningHeroStoreId != null && String(planningHeroStoreId) === String(store.id)
           }
         />
       ))}
@@ -616,6 +619,7 @@ const StoreMarkerItem = memo(function StoreMarkerItem({
   onMobileStorePinOpen,
   mapPriceBundleCount = 0,
   pulseHighlight = false,
+  planningHero = false,
 }) {
   const logoUrl = useMemo(() => {
     const pinned = String(store.pin_logo_url || '').trim();
@@ -696,9 +700,17 @@ const StoreMarkerItem = memo(function StoreMarkerItem({
     const el =
       inst && typeof inst.getElement === 'function' ? inst.getElement() : null;
     if (!el) return;
-    if (pulseHighlight) el.classList.add('finmemory-store-pin--hover-pulse');
-    else el.classList.remove('finmemory-store-pin--hover-pulse');
-  }, [pulseHighlight, icon]);
+    if (pulseHighlight) {
+      el.classList.remove('finmemory-store-pin--planning-hero');
+      el.classList.add('finmemory-store-pin--hover-pulse');
+    } else if (planningHero) {
+      el.classList.add('finmemory-store-pin--planning-hero');
+      el.classList.remove('finmemory-store-pin--hover-pulse');
+    } else {
+      el.classList.remove('finmemory-store-pin--planning-hero');
+      el.classList.remove('finmemory-store-pin--hover-pulse');
+    }
+  }, [pulseHighlight, planningHero, icon]);
 
   return (
     /** Acima dos círculos de preço/promo (2500); senão milhares de ofertas DIA tapam os pins de loja. */
@@ -753,6 +765,7 @@ const StoreMarkerItem = memo(function StoreMarkerItem({
   prev.mapPriceBundleCount === next.mapPriceBundleCount &&
   prev.showPinLabels === next.showPinLabels &&
   prev.pulseHighlight === next.pulseHighlight &&
+  prev.planningHero === next.planningHero &&
   prev.isMobileMapSheet === next.isMobileMapSheet &&
   prev.onRequestStoreShop === next.onRequestStoreShop &&
   prev.onMobileStorePinOpen === next.onMobileStorePinOpen &&
@@ -2857,6 +2870,8 @@ function SuperclusterPriceMarkersLayer({
   onMapPointCartToggle,
   userOrigin = null,
   loading = false,
+  /** Modo lista: mapa foca em lojas (pins de preço escondidos para reduzir ruído). */
+  hideForPlanningList = false,
 }) {
   const map = useMap();
   const [mapTick, setMapTick] = useState(0);
@@ -2920,6 +2935,7 @@ function SuperclusterPriceMarkersLayer({
     return clusterIndex.getClusters(bbox, z);
   }, [clusterIndex, map, mapTick]);
 
+  if (hideForPlanningList) return null;
   if (!groups?.length || !clusterIndex) return null;
 
   return (
@@ -3009,6 +3025,8 @@ export default function MapaPrecosLeaflet({
   planningActionRequest,
   headerOffsetPx = 56,
   overlayTopPx,
+  /** Padding inferior extra (px) — painel de lista / inteligência sobre o mapa. */
+  planningBottomPadPx = 0,
   onDetailOpenChange,
   onDetailExpandedChange,
 }) {
@@ -3017,6 +3035,14 @@ export default function MapaPrecosLeaflet({
     typeof process !== 'undefined' ? String(process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '').trim() : '';
 
   const { tileUrl, tileAttribution, tileDetectRetina } = useMemo(() => {
+    if (planningMode && !wazeUi) {
+      const dark = MAP_THEMES.find((x) => x.id === 'waze');
+      return {
+        tileUrl: dark?.url || '',
+        tileAttribution: dark?.attribution || '',
+        tileDetectRetina: true,
+      };
+    }
     const t = getMapThemeById(mapThemeId);
     if (t.mapboxStyleId && mapboxToken) {
       return {
@@ -3038,7 +3064,7 @@ export default function MapaPrecosLeaflet({
       tileAttribution: t.attribution || '',
       tileDetectRetina: t.id === 'verde' || t.id === 'waze',
     };
-  }, [mapThemeId, mapboxToken]);
+  }, [mapThemeId, mapboxToken, planningMode, wazeUi]);
 
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -3635,23 +3661,46 @@ export default function MapaPrecosLeaflet({
   }, [shopOpen, isMobileMapSheet]);
 
   const mapOverlayBottomPadPx = useMemo(() => {
+    let pad = 0;
     if (shopOpen) {
-      return isMobileMapSheet ? mobileShopSheetMapBottomPadPx : 0;
+      pad = isMobileMapSheet ? mobileShopSheetMapBottomPadPx : 0;
+    } else if (mobileStorePreview && isMobileMapSheet) {
+      pad = previewSheetMapBottomPadPx;
     }
-    if (mobileStorePreview && isMobileMapSheet) return previewSheetMapBottomPadPx;
-    return 0;
+    const extra = Math.max(0, Math.round(Number(planningBottomPadPx) || 0));
+    return pad + extra;
   }, [
     isMobileMapSheet,
     shopOpen,
     mobileStorePreview,
     mobileShopSheetMapBottomPadPx,
     previewSheetMapBottomPadPx,
+    planningBottomPadPx,
   ]);
 
   const desktopSidebarPulseStoreId = useMemo(() => {
     if (!shopOpen || isMobileMapSheet || !desktopSidebarHoverPulse || !shopStore?.id) return null;
     return shopStore.id;
   }, [shopOpen, isMobileMapSheet, desktopSidebarHoverPulse, shopStore?.id]);
+
+  const planningBestStorePulseId = useMemo(() => {
+    if (!planningMode || !planningSummary) return null;
+    let targetName = planningSummary?.oneStore?.storeName;
+    if (!targetName && Array.isArray(planningSummary?.cheapest?.picks) && planningSummary.cheapest.picks.length) {
+      const names = new Set(
+        planningSummary.cheapest.picks
+          .map((p) => String(p?.storeName || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      if (names.size === 1) targetName = planningSummary.cheapest.picks[0]?.storeName;
+    }
+    if (!targetName) return null;
+    const t = String(targetName).trim().toLowerCase();
+    const found = (storesVisibleOnMap || []).find((s) => String(s?.name || '').trim().toLowerCase() === t);
+    return found?.id != null ? String(found.id) : null;
+  }, [planningMode, planningSummary, storesVisibleOnMap]);
+
+  const storePulseIdForMap = desktopSidebarPulseStoreId;
 
   const onDesktopPromoHoverEnter = useCallback(() => setDesktopSidebarHoverPulse(true), []);
   const onDesktopPromoHoverLeave = useCallback(() => setDesktopSidebarHoverPulse(false), []);
@@ -4412,6 +4461,7 @@ export default function MapaPrecosLeaflet({
           onMapPointCartToggle={toggleCartFromMapPoint}
           userOrigin={userMapPosition}
           loading={carregando}
+          hideForPlanningList={planningMode && !wazeUi}
         />
         {missionRoute.points.length >= 2 ? (
           <>
@@ -4451,7 +4501,8 @@ export default function MapaPrecosLeaflet({
           onMobileStorePinOpen={handleMobileStorePinOpen}
           onVisibleStoresChange={setStoresVisibleOnMap}
           mapPriceCountByStoreId={mapPriceCountByStoreId}
-          pulseStoreId={desktopSidebarPulseStoreId}
+          pulseStoreId={storePulseIdForMap}
+          planningHeroStoreId={planningBestStorePulseId}
           reloadRef={storeReloadRef}
         />
         <MapShopSheetDragLock

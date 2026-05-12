@@ -247,6 +247,20 @@
   }
 }
 
+.leaflet-marker-icon.finmemory-store-pin--planning-hero {
+  animation: finmemory-map-pin-planning-hero 1.25s ease-in-out infinite;
+}
+
+@keyframes finmemory-map-pin-planning-hero {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(0, 230, 118, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 22px rgba(0, 230, 118, 0.95)) drop-shadow(0 0 8px rgba(0, 188, 212, 0.45));
+  }
+}
+
 .leaflet-marker-icon.finmemory-store-pin--hover-pulse {
   animation: finmemory-map-pin-hover-pulse 1.1s ease-in-out infinite;
 }

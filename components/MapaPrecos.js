@@ -19,6 +19,8 @@ export default function MapaPrecos({
   overlayTopPx,
   onDetailOpenChange,
   onDetailExpandedChange,
+  /** Espaço reservado acima da BottomNav para o painel “inteligência da lista” (mapa.js). */
+  planningBottomPadPx = 0,
 }) {
   return (
     <div className="fixed inset-0 z-0 h-full w-full">
@@ -33,6 +35,7 @@ export default function MapaPrecos({
         planningActionRequest={planningActionRequest}
         headerOffsetPx={headerOffsetPx}
         overlayTopPx={overlayTopPx}
+        planningBottomPadPx={planningBottomPadPx}
         onDetailOpenChange={onDetailOpenChange}
         onDetailExpandedChange={onDetailExpandedChange}
       />
