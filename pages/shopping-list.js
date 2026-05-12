@@ -638,8 +638,8 @@ export default function ShoppingListPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-[#27C86A]" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
@@ -652,34 +652,34 @@ export default function ShoppingListPage() {
   const showMapBlock = listBucket === 'now' && mapGroups.length > 0;
 
   return (
-    <div className="min-h-screen bg-[#0d1117] p-5 pb-28 font-sans antialiased">
-      <div className="max-w-md mx-auto">
+    <div className="min-h-screen bg-background p-5 pb-28 font-sans antialiased text-foreground">
+      <div className="mx-auto max-w-md">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-300 text-sm mb-4 transition-colors"
+          className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
 
-        <p className="text-[11px] text-zinc-500 mb-4 leading-relaxed">
+        <p className="mb-4 text-[11px] leading-relaxed text-muted-foreground">
           Mapa com preço + lembretes.{' '}
           {partnership ? (
-            <span className="text-[#27C86A]/90">Parceria ativa.</span>
+            <span className="text-primary/90">Parceria ativa.</span>
           ) : (
-            <Link href="/partnership" className="text-[#27C86A] underline underline-offset-2">
+            <Link href="/partnership" className="text-primary underline underline-offset-2">
               Parceria (opcional)
             </Link>
           )}
         </p>
 
-        <div className="mb-4 flex rounded-2xl border border-white/[0.08] bg-[#151b24] p-1">
+        <div className="mb-4 flex rounded-2xl border border-border bg-card p-1 ring-1 ring-primary/10">
           <button
             type="button"
             onClick={() => setListBucket('now')}
             className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-colors ${
               listBucket === 'now'
-                ? 'bg-gradient-to-r from-[#27C86A] to-[#1ed760] text-[#0a0e14]'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'gradient-primary text-primary-foreground shadow-[0_0_20px_-6px_hsl(var(--primary)/0.5)]'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Compra agora
@@ -688,26 +688,26 @@ export default function ShoppingListPage() {
             type="button"
             onClick={() => setListBucket('later')}
             className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-colors ${
-              listBucket === 'later' ? 'bg-amber-500/90 text-[#0a0e14]' : 'text-zinc-400 hover:text-zinc-200'
+              listBucket === 'later' ? 'bg-amber-500/90 text-amber-950' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Para depois
           </button>
         </div>
-        <p className="text-[11px] text-zinc-500 mb-5">
+        <p className="mb-5 text-[11px] text-muted-foreground">
           {listBucket === 'now'
             ? 'O que vai comprar nesta ida à loja.'
             : 'Lista para semana ou mês — sem pressa.'}
         </p>
 
         {voicePulse ? (
-          <p className="mb-2 inline-flex items-center gap-1 rounded-full border border-[#27C86A]/30 bg-[#27C86A]/10 px-2 py-0.5 text-[10px] font-semibold text-[#7bed9f]">
-            <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-[#27C86A]" />
+          <p className="mb-2 inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+            <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-primary" />
             microfone ativo
           </p>
         ) : null}
-        <p className="mb-1 text-[10px] text-zinc-600">Tentamos achar foto no catálogo.</p>
-        <p className="mb-5 text-[10px] text-zinc-600">
+        <p className="mb-1 text-[10px] text-muted-foreground">Tentamos achar foto no catálogo.</p>
+        <p className="mb-5 text-[10px] text-muted-foreground">
           Dica voz: toque no microfone e diga, por exemplo, &quot;manga, mamão e uva&quot;. Enter no campo adiciona o
           item.
         </p>
@@ -732,14 +732,14 @@ export default function ShoppingListPage() {
           placeholder="Digite aqui..."
         />
 
-        <div className="mt-8 h-px bg-white/[0.06]" aria-hidden />
+        <div className="mt-8 h-px bg-border" aria-hidden />
 
         {shoppingBag.length > 0 ? (
-          <section className="mb-4 rounded-2xl border border-white/[0.08] bg-[#151b24] p-3">
+          <section className="mb-4 rounded-2xl border border-border bg-card p-3 ring-1 ring-primary/5">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-bold text-white">Carrinho do mapa</p>
-                <p className="text-xs text-zinc-400">
+                <p className="text-sm font-bold text-foreground">Carrinho do mapa</p>
+                <p className="text-xs text-muted-foreground">
                   {shoppingBagTotals.itemsCount} • {formatMoney(shoppingBagTotals.totalPrice)}
                 </p>
               </div>
@@ -747,7 +747,7 @@ export default function ShoppingListPage() {
                 type="button"
                 onClick={handleSaveMapBag}
                 disabled={savingMapBag}
-                className="rounded-xl bg-gradient-to-r from-[#27C86A] to-[#1ed760] px-3 py-2 text-xs font-bold text-[#0a0e14] hover:brightness-110 disabled:opacity-60"
+                className="rounded-xl px-3 py-2 text-xs font-bold text-primary-foreground gradient-primary hover:brightness-110 disabled:opacity-60"
               >
                 {savingMapBag ? '…' : 'Salvar'}
               </button>
@@ -756,17 +756,17 @@ export default function ShoppingListPage() {
               {shoppingBag.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-start justify-between gap-2 rounded-xl border border-white/[0.05] bg-[#0d1117]/80 px-2 py-1.5 text-xs"
+                  className="flex items-start justify-between gap-2 rounded-xl border border-border/60 bg-background/80 px-2 py-1.5 text-xs"
                 >
-                  <span className="line-clamp-1 flex-1 text-zinc-300">{item.productName || item.name}</span>
-                  <span className="shrink-0 font-semibold text-[#7bed9f]">
+                  <span className="line-clamp-1 flex-1 text-muted-foreground">{item.productName || item.name}</span>
+                  <span className="shrink-0 font-semibold text-primary">
                     {typeof item.priceNum === 'number' ? formatMoney(item.priceNum) : item.precoLabel || '—'}
                   </span>
                 </div>
               ))}
             </div>
             {mapBagBanner ? (
-              <p className="mt-2 text-xs font-medium text-[#7bed9f]/90">{mapBagBanner}</p>
+              <p className="mt-2 text-xs font-medium text-primary/90">{mapBagBanner}</p>
             ) : null}
           </section>
         ) : null}
@@ -775,13 +775,13 @@ export default function ShoppingListPage() {
           <button
             type="button"
             onClick={() => setShowFilters((s) => !s)}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#151b24] px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-[#1a222e]"
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <Filter className="h-4 w-4" />
             {SHOPPING_LIST_FILTER_UI.toggleButton}
             {(filterStatus !== 'all' || filterPeriod !== 'all') && (
               <span
-                className="rounded-full bg-[#27C86A] px-1.5 py-0.5 text-[10px] font-bold text-[#0a0e14]"
+                className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground"
                 aria-hidden
               >
                 {SHOPPING_LIST_FILTER_UI.filtersOnBadge}
@@ -789,9 +789,11 @@ export default function ShoppingListPage() {
             )}
           </button>
           {showFilters && (
-            <div className="mt-3 space-y-4 rounded-2xl border border-white/[0.08] bg-[#151b24] p-4">
+            <div className="mt-3 space-y-4 rounded-2xl border border-border bg-card p-4 ring-1 ring-primary/5">
               <div>
-                <p className="mb-2 text-xs font-medium text-zinc-500">{SHOPPING_LIST_FILTER_UI.sectionSituation}</p>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  {SHOPPING_LIST_FILTER_UI.sectionSituation}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {SHOPPING_LIST_FILTER_STATUS.map((f) => (
                     <button
@@ -800,8 +802,8 @@ export default function ShoppingListPage() {
                       onClick={() => setFilterStatus(f.value)}
                       className={`rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
                         filterStatus === f.value
-                          ? 'bg-gradient-to-r from-[#27C86A] to-[#1ed760] text-[#0a0e14]'
-                          : 'border border-white/[0.06] bg-[#0d1117] text-zinc-300 hover:border-white/10'
+                          ? 'gradient-primary text-primary-foreground shadow-[0_0_16px_-6px_hsl(var(--primary)/0.45)]'
+                          : 'border border-border bg-background text-muted-foreground hover:border-primary/20'
                       }`}
                     >
                       {f.label}
@@ -810,7 +812,7 @@ export default function ShoppingListPage() {
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-xs font-medium text-zinc-500">{SHOPPING_LIST_FILTER_UI.sectionWhen}</p>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">{SHOPPING_LIST_FILTER_UI.sectionWhen}</p>
                 <div className="flex flex-wrap gap-2">
                   {SHOPPING_LIST_FILTER_PERIOD.map((f) => (
                     <button
@@ -819,8 +821,8 @@ export default function ShoppingListPage() {
                       onClick={() => setFilterPeriod(f.value)}
                       className={`rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
                         filterPeriod === f.value
-                          ? 'bg-gradient-to-r from-[#27C86A] to-[#1ed760] text-[#0a0e14]'
-                          : 'border border-white/[0.06] bg-[#0d1117] text-zinc-300 hover:border-white/10'
+                          ? 'gradient-primary text-primary-foreground shadow-[0_0_16px_-6px_hsl(var(--primary)/0.45)]'
+                          : 'border border-border bg-background text-muted-foreground hover:border-primary/20'
                       }`}
                     >
                       {f.label}
@@ -835,20 +837,20 @@ export default function ShoppingListPage() {
         {showMapBlock ? (
           <section className="mb-8">
             <div className="mb-2 flex items-center gap-2">
-              <MapPin className="h-5 w-5 shrink-0 text-[#27C86A]" aria-hidden />
-              <h2 className="text-base font-bold text-white">Do mapa</h2>
+              <MapPin className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <h2 className="text-base font-bold text-foreground">Do mapa</h2>
             </div>
             <div className="space-y-4">
               {mapGroups.map(({ groupId, items: gItems, total, created_at }) => (
                 <div
                   key={String(groupId)}
-                  className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#151b24] shadow-sm"
+                  className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm ring-1 ring-primary/5"
                 >
-                  <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] bg-[#0d1117]/60 px-3 py-2.5">
-                    <span className="text-xs font-medium text-zinc-400">{formatShortWhen(created_at)}</span>
-                    <span className="text-sm font-bold tabular-nums text-[#7bed9f]">Total {formatMoney(total)}</span>
+                  <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2.5">
+                    <span className="text-xs font-medium text-muted-foreground">{formatShortWhen(created_at)}</span>
+                    <span className="text-sm font-bold tabular-nums text-primary">Total {formatMoney(total)}</span>
                   </div>
-                  <ul className="divide-y divide-white/[0.06]">
+                  <ul className="divide-y divide-border">
                         {gItems.map((item) => {
                           const priceStr =
                             typeof item.unit_price === 'number' && Number.isFinite(item.unit_price)
@@ -857,14 +859,14 @@ export default function ShoppingListPage() {
                           return (
                             <li
                               key={item.id}
-                              className="flex items-start gap-3 bg-[#0d1117]/40 p-3"
+                              className="flex items-start gap-3 bg-background/40 p-3"
                             >
                               {item.list_thumbnail_url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={item.list_thumbnail_url}
                                   alt=""
-                                  className="mt-0.5 h-11 w-11 shrink-0 rounded-lg border border-white/[0.08] object-cover bg-[#151b24]"
+                                  className="mt-0.5 h-11 w-11 shrink-0 rounded-lg border border-border object-cover bg-card"
                                 />
                               ) : null}
                               <button
@@ -872,8 +874,8 @@ export default function ShoppingListPage() {
                                 onClick={() => toggleChecked(item)}
                                 className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${
                                   item.checked
-                                    ? 'border-[#27C86A] bg-[#27C86A] text-[#0a0e14]'
-                                    : 'border-zinc-600 bg-transparent'
+                                    ? 'border-primary bg-primary text-primary-foreground shadow-[0_0_12px_hsl(var(--primary)/0.45)]'
+                                    : 'border-muted-foreground/50 bg-transparent'
                                 }`}
                                 aria-label={item.checked ? 'Desmarcar' : 'Marcar como comprado'}
                               >
@@ -882,18 +884,18 @@ export default function ShoppingListPage() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
                                   <span
-                                    className={`font-medium ${item.checked ? 'text-zinc-500 line-through' : 'text-white'}`}
+                                    className={`font-medium ${item.checked ? 'text-muted-foreground line-through' : 'text-foreground'}`}
                                   >
                                     {item.name}
                                   </span>
                                   <span
-                                    className={`shrink-0 text-sm font-semibold tabular-nums ${item.checked ? 'text-zinc-600' : 'text-[#7bed9f]'}`}
+                                    className={`shrink-0 text-sm font-semibold tabular-nums ${item.checked ? 'text-muted-foreground' : 'text-primary'}`}
                                   >
                                     {priceStr}
                                   </span>
                                 </div>
                                 {item.store_label ? (
-                                  <p className="mt-0.5 text-xs text-zinc-500">{item.store_label}</p>
+                                  <p className="mt-0.5 text-xs text-muted-foreground">{item.store_label}</p>
                                 ) : null}
                                 {item.shopping_intent === 'saved_deferred' ? (
                                   <p className="mt-0.5 text-[10px] font-medium text-amber-400/90">
@@ -920,7 +922,7 @@ export default function ShoppingListPage() {
             ) : null}
 
         {items.length > 0 && noteItems.length === 0 && !showMapBlock ? (
-          <p className="py-6 text-center text-sm text-zinc-500">
+          <p className="py-6 text-center text-sm text-muted-foreground">
             {listBucket === 'later' ? 'Nada para depois neste filtro.' : 'Nada neste filtro.'}
           </p>
         ) : null}

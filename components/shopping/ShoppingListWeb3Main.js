@@ -2,10 +2,11 @@
 
 import { Mic, MicOff, Trash2, Check, Navigation } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '../../lib/utils';
 import { emojiForShoppingItemName } from '../../lib/shoppingListEmoji';
 
 /**
- * Bloco principal estilo Web 3.0 / Nubank dark — lista de notas + input + CTA mapa.
+ * Lista de compras — tema gamificado FinMemory (dark + primary neon + gradiente do DS).
  */
 export function ShoppingListWeb3Main({
   title = 'O que você precisa?',
@@ -28,29 +29,43 @@ export function ShoppingListWeb3Main({
 }) {
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold tracking-tight text-white">{title}</h1>
+      <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
 
       <form
         onSubmit={onSubmit}
-        className="flex items-stretch gap-2 rounded-2xl border border-white/[0.08] bg-[#151b24] p-2 shadow-inner"
+        className={cn(
+          'flex items-stretch gap-2 rounded-2xl border border-border bg-card p-2 shadow-inner',
+          'ring-1 ring-primary/10 shadow-[0_0_28px_-12px_hsl(var(--primary)/0.45)]'
+        )}
       >
         <input
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-xl border-0 bg-[#0d1117] px-3 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#27C86A]/40"
+          className={cn(
+            'min-w-0 flex-1 rounded-xl border border-border/80 bg-background/80 px-3 py-3 text-sm text-foreground',
+            'placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50'
+          )}
           autoComplete="off"
         />
         <button
           type="button"
           onClick={onVoiceClick}
           disabled={!voiceSupported || voiceListening || adding || voiceContinuous}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#27C86A] to-[#12b34a] text-[#0a0e14] shadow-[0_4px_18px_rgba(39,200,106,0.35)] transition hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100"
+          className={cn(
+            'flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-primary-foreground',
+            'gradient-primary shadow-[0_4px_22px_hsl(var(--primary)/0.45)] transition',
+            'hover:brightness-110 active:scale-[0.97] disabled:opacity-40 disabled:hover:brightness-100 disabled:active:scale-100'
+          )}
           aria-label="Adicionar por voz"
           title={voiceSupported ? 'Voz' : 'Voz indisponível neste navegador'}
         >
-          {voiceListening ? <MicOff className="h-5 w-5" strokeWidth={2.5} /> : <Mic className="h-5 w-5" strokeWidth={2.5} />}
+          {voiceListening ? (
+            <MicOff className="h-5 w-5" strokeWidth={2.5} />
+          ) : (
+            <Mic className="h-5 w-5" strokeWidth={2.5} />
+          )}
         </button>
       </form>
 
@@ -58,7 +73,7 @@ export function ShoppingListWeb3Main({
         <button
           type="button"
           onClick={onVoiceContinuousToggle}
-          className="w-full rounded-xl border border-red-500/40 bg-red-500/10 py-2 text-xs font-bold text-red-300"
+          className="w-full rounded-xl border border-destructive/40 bg-destructive/10 py-2 text-xs font-bold text-red-300"
         >
           Parar escuta contínua
         </button>
@@ -67,46 +82,56 @@ export function ShoppingListWeb3Main({
           type="button"
           onClick={onVoiceContinuousToggle}
           disabled={!voiceSupported || adding}
-          className="w-full rounded-xl border border-[#27C86A]/25 bg-[#27C86A]/10 py-2 text-xs font-semibold text-[#7bed9f] disabled:opacity-40"
+          className={cn(
+            'w-full rounded-xl border border-primary/30 bg-primary/10 py-2 text-xs font-semibold text-primary',
+            'shadow-[0_0_20px_-10px_hsl(var(--primary)/0.35)] disabled:opacity-40'
+          )}
         >
           Modo voz contínua
         </button>
       )}
 
-      {voiceHint ? <p className="text-xs font-medium text-[#7bed9f]/90">{voiceHint}</p> : null}
+      {voiceHint ? <p className="text-xs font-medium text-primary/90">{voiceHint}</p> : null}
 
       <ul className="space-y-3">
-        {noteItems.map((item) => {
+        {noteItems.map((item, index) => {
           const emoji = emojiForShoppingItemName(item.name);
           const label = String(item.name || '').toUpperCase();
           return (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-[#151b24] px-3 py-3 shadow-sm"
+              style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+              className={cn(
+                'flex animate-fade-in items-center gap-3 rounded-2xl border border-border bg-card px-3 py-3',
+                'shadow-sm ring-1 ring-white/[0.03] transition-[box-shadow,border-color,transform] duration-200',
+                'hover:border-primary/25 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.2)]'
+              )}
             >
               <button
                 type="button"
                 onClick={() => onToggleChecked(item)}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
                   item.checked
-                    ? 'border-[#27C86A] bg-[#27C86A] text-[#0a0e14]'
-                    : 'border-zinc-600 bg-transparent text-transparent hover:border-zinc-500'
-                }`}
+                    ? 'border-primary bg-primary text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/0.55)]'
+                    : 'border-muted-foreground/50 bg-transparent text-transparent hover:border-primary/50'
+                )}
                 aria-label={item.checked ? 'Desmarcar' : 'Marcar'}
               >
                 {item.checked ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
               </button>
               <span
-                className={`min-w-0 flex-1 text-left text-sm font-bold uppercase tracking-wide ${
-                  item.checked ? 'text-zinc-500 line-through' : 'text-white'
-                }`}
+                className={cn(
+                  'min-w-0 flex-1 text-left text-sm font-bold uppercase tracking-wide',
+                  item.checked ? 'text-muted-foreground line-through' : 'text-foreground'
+                )}
               >
                 <span className="mr-2" aria-hidden>
                   {emoji}
                 </span>
                 {label}
                 {item.quantity > 1 ? (
-                  <span className="ml-1 text-[11px] font-semibold normal-case text-zinc-400">
+                  <span className="ml-1 text-[11px] font-semibold normal-case text-muted-foreground">
                     ({item.quantity}
                     {item.unit ? ` ${item.unit}` : ''})
                   </span>
@@ -125,15 +150,19 @@ export function ShoppingListWeb3Main({
         })}
       </ul>
 
-      <p className="text-sm font-bold text-white">
+      <p className="text-sm font-bold text-foreground">
         Sua Lista ({listCount} {listCount === 1 ? 'item' : 'itens'})
       </p>
 
       <Link
         href={mapaListaHref}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#27C86A] to-[#1ed760] py-3.5 text-sm font-bold text-[#0a0e14] shadow-[0_10px_32px_rgba(39,200,106,0.28)] transition hover:brightness-105 active:scale-[0.99] no-underline"
+        className={cn(
+          'flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold no-underline',
+          'gradient-primary text-white shadow-[0_10px_36px_-6px_hsl(var(--primary)/0.55)]',
+          'transition hover:brightness-105 active:scale-[0.99]'
+        )}
       >
-        <Navigation className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+        <Navigation className="h-5 w-5 shrink-0 text-white" strokeWidth={2.25} />
         Localizar no Mapa de Preços
       </Link>
     </div>
