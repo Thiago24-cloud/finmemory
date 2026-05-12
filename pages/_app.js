@@ -1,5 +1,5 @@
 import { Component, useEffect } from 'react';
-import { SessionProvider } from 'next-auth/react';
+import { SessionProvider, useSession } from 'next-auth/react';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { Toaster } from 'sonner';
 import { useRouter } from 'next/router';
@@ -52,6 +52,21 @@ class SafeGoogleAnalytics extends Component {
   }
 }
 
+function PostHogIdentify() {
+  const { data: session } = useSession();
+  useEffect(() => {
+    if (session?.user?.id) {
+      posthog.identify(session.user.id, {
+        email: session.user.email ?? undefined,
+        name: session.user.name ?? undefined,
+      });
+    } else {
+      posthog.reset();
+    }
+  }, [session?.user?.id]);
+  return null;
+}
+
 export default function App({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter();
 
@@ -67,6 +82,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
     <PostHogProvider client={posthog}>
     <ErrorBoundary>
       <SessionProvider session={session}>
+        <PostHogIdentify />
         <ProfileFirstLoginGate>
         <AppSplashGate>
           <PWAInstallProvider>
