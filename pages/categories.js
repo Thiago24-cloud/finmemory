@@ -4,10 +4,19 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Tags, Loader2 } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
+import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
+import { displayCategoryForReport } from '../lib/reportCategoryDisplay';
+import { normalizePluggyMoney } from '../lib/pluggyMoney';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+function rowTotalForReport(row) {
+  const raw = Number(row?.total) || 0;
+  if (String(row?.source || '').toLowerCase() === 'pluggy') return normalizePluggyMoney(raw);
+  return raw;
 }
 
 export default function CategoriesPage() {
@@ -37,10 +46,14 @@ export default function CategoriesPage() {
       setLoading(true);
       const { data } = await supabase
         .from('transacoes')
-        .select('id, estabelecimento, total, categoria')
-        .eq('user_id', userId);
+        .select('id, estabelecimento, total, data, hora, categoria, source, pluggy_transaction_id')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .order('data', { ascending: false })
+        .order('hora', { ascending: false });
       if (!cancelled) {
-        setTransactions(Array.isArray(data) ? data : []);
+        const rows = Array.isArray(data) ? data : [];
+        setTransactions(dedupePluggyTransactions(rows));
         setLoading(false);
       }
     }
@@ -51,9 +64,9 @@ export default function CategoriesPage() {
   const byCategory = useMemo(() => {
     const map = {};
     transactions.forEach((t) => {
-      const cat = t.categoria || 'Sem categoria';
+      const cat = displayCategoryForReport(t.categoria);
       if (!map[cat]) map[cat] = { total: 0, count: 0 };
-      map[cat].total += Number(t.total) || 0;
+      map[cat].total += rowTotalForReport(t);
       map[cat].count += 1;
     });
     return Object.entries(map)

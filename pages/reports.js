@@ -6,6 +6,9 @@ import { ArrowLeft, BarChart3, Loader2 } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
 import PlanGuard from '../components/PlanGuard';
 import { MONTH_FILTER } from '../lib/appMicrocopy';
+import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
+import { displayCategoryForReport } from '../lib/reportCategoryDisplay';
+import { normalizePluggyMoney } from '../lib/pluggyMoney';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
@@ -37,6 +40,12 @@ function getLatestYear(monthKeys) {
   return latest;
 }
 
+function rowTotalForReport(row) {
+  const raw = Number(row?.total) || 0;
+  if (String(row?.source || '').toLowerCase() === 'pluggy') return normalizePluggyMoney(raw);
+  return raw;
+}
+
 export default function ReportsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -65,11 +74,14 @@ export default function ReportsPage() {
       setLoading(true);
       const { data } = await supabase
         .from('transacoes')
-        .select('id, estabelecimento, total, data, categoria')
+        .select('id, estabelecimento, total, data, hora, categoria, source, pluggy_transaction_id')
         .eq('user_id', userId)
-        .order('data', { ascending: false });
+        .is('deleted_at', null)
+        .order('data', { ascending: false })
+        .order('hora', { ascending: false });
       if (!cancelled) {
-        setTransactions(Array.isArray(data) ? data : []);
+        const rows = Array.isArray(data) ? data : [];
+        setTransactions(dedupePluggyTransactions(rows));
         setLoading(false);
       }
     }
@@ -100,11 +112,11 @@ export default function ReportsPage() {
 
   const summary = useMemo(() => {
     const list = filteredTransactions;
-    const total = list.reduce((s, t) => s + (Number(t.total) || 0), 0);
+    const total = list.reduce((s, t) => s + rowTotalForReport(t), 0);
     const byCategory = {};
     list.forEach((t) => {
-      const cat = t.categoria || 'Outros';
-      byCategory[cat] = (byCategory[cat] || 0) + (Number(t.total) || 0);
+      const cat = displayCategoryForReport(t.categoria);
+      byCategory[cat] = (byCategory[cat] || 0) + rowTotalForReport(t);
     });
     const categories = Object.entries(byCategory).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     return { total, count: list.length, categories };
