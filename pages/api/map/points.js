@@ -205,7 +205,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
-          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia'])
+          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia', 'scraper_atacadao'])
           .ilike('category', '%promo%')
           .gte('created_at', promoCutoffIso),
         bbox
@@ -222,7 +222,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
-          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia'])
+          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia', 'scraper_atacadao'])
           .is('category', null)
           .gte('created_at', normalCutoffIso),
         bbox
@@ -237,7 +237,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
-          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia'])
+          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia', 'scraper_atacadao'])
           .not('category', 'ilike', '%promo%')
           .gte('created_at', normalCutoffIso),
         bbox
