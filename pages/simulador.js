@@ -1,6 +1,5 @@
 import Head from 'next/head';
 import { getServerSession } from 'next-auth/next';
-import { BottomNav } from '../components/BottomNav';
 import { SimuladorFlow } from '../components/simulador/SimuladorFlow';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
@@ -33,7 +32,6 @@ export default function SimuladorPage() {
         />
       </Head>
       <SimuladorFlow />
-      <BottomNav />
     </>
   );
 }

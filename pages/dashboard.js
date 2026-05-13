@@ -6,7 +6,6 @@ import { createClient } from '@supabase/supabase-js';
 import { Loader2, Mail, X, Trash2, RotateCcw, Search } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { BottomNav } from '../components/BottomNav';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
 import { DashboardQuickAccess } from '../components/dashboard/DashboardQuickAccess';
@@ -1045,7 +1044,6 @@ export default function Dashboard() {
         <CalculatorDockProvider>
           <DashboardCalculadoraLayout>
             <div className="max-w-md mx-auto pb-[calc(10.5rem+env(safe-area-inset-bottom))] lg:pb-32">
-              <BottomNav />
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                   <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -1365,7 +1363,6 @@ export default function Dashboard() {
         </CalculatorDockProvider>
       ) : (
         <div className="max-w-md mx-auto px-5 pt-5 pb-32">
-          <BottomNav />
           {isLoading ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />

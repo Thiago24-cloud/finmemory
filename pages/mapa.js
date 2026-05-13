@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
-import { BottomNav } from '../components/BottomNav';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { getServerSession } from 'next-auth/next';
@@ -893,7 +892,6 @@ export default function MapaPage() {
 
         <StatesUnlockPanel open={showStatesPanel} onClose={() => setShowStatesPanel(false)} />
 
-        <BottomNav />
       </div>
     </>
   );

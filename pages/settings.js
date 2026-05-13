@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState, memo } from 'react';
+import { useCallback, useEffect, useState, useRef, memo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowLeft, Settings, LogOut, FileText, Shield, Smartphone, Trash2 } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import PlanGuard from '../components/PlanGuard';
 import {
   SettingsAccountTopSkeleton,
@@ -18,7 +17,18 @@ import { BRAND } from '../lib/brandTokens';
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
 const UpgradePlan = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
-const MIN_ACCOUNT_READY_MS = 300;
+const MIN_ACCOUNT_READY_MS = 160;
+const ACCOUNT_FETCH_TIMEOUT_MS = 14000;
+
+async function fetchWithTimeout(input, init = {}, ms = ACCOUNT_FETCH_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(tid);
+  }
+}
 
 const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, userEmail }) {
   const router = useRouter();
@@ -71,6 +81,8 @@ export default function SettingsPage() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const pwaUi = usePWAInstallUIOptional();
+  const updateRef = useRef(update);
+  updateRef.current = update;
   const userId =
     session?.user?.supabaseId ||
     (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
@@ -97,12 +109,12 @@ export default function SettingsPage() {
   const handleRefreshSubscription = useCallback(async () => {
     setSubscriptionStatus((prev) => ({ ...prev, loading: true, error: '' }));
     try {
-      await fetch('/api/stripe/sync-plan-status', {
+      await fetchWithTimeout('/api/stripe/sync-plan-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      await update().catch(() => {});
-      const res = await fetch('/api/stripe/subscription-status');
+      await (updateRef.current?.() ?? Promise.resolve()).catch(() => {});
+      const res = await fetchWithTimeout('/api/stripe/subscription-status');
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setSubscriptionStatus((prev) => ({
@@ -128,13 +140,13 @@ export default function SettingsPage() {
         error: e?.message || 'Erro de rede ao carregar assinatura',
       }));
     }
-  }, [update]);
+  }, []);
 
   /** XP + Stripe + sessão num único fluxo; skeleton até tudo pronto + delay mínimo (evita flash). */
   useEffect(() => {
     if (status === 'loading') return undefined;
 
-    if (status !== 'authenticated' || !session?.user?.email) {
+    if (status !== 'authenticated' || !session?.user) {
       setAccountUiReady(false);
       setXpStats(null);
       setSubscriptionStatus({
@@ -154,18 +166,21 @@ export default function SettingsPage() {
 
     (async () => {
       try {
-        const gPromise = fetch('/api/map/gamification-me').then(async (resp) => {
+        const gPromise = fetchWithTimeout('/api/map/gamification-me').then(async (resp) => {
           const data = await resp.json().catch(() => ({}));
           return { ok: resp.ok, data };
         });
 
-        await fetch('/api/stripe/sync-plan-status', {
+        await fetchWithTimeout('/api/stripe/sync-plan-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        await update().catch(() => {});
+        await (updateRef.current?.() ?? Promise.resolve()).catch(() => {});
 
-        const [gWrap, subRes] = await Promise.all([gPromise, fetch('/api/stripe/subscription-status')]);
+        const [gWrap, subRes] = await Promise.all([
+          gPromise,
+          fetchWithTimeout('/api/stripe/subscription-status'),
+        ]);
         const subData = await subRes.json().catch(() => ({}));
         if (cancelled) return;
 
@@ -234,7 +249,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [status, session?.user?.email, update]);
+  }, [status, session?.user?.email, session?.user?.supabaseId]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/dashboard');
@@ -551,8 +566,6 @@ export default function SettingsPage() {
           </div>
         </div>
       ) : null}
-
-      <BottomNav />
     </div>
   );
 }

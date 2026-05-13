@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowLeft, Check, Lock, X } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { PLAN_LABELS } from '../lib/planAccess';
 import { BRAND } from '../lib/brandTokens';
 
@@ -323,7 +322,6 @@ export default function PlanosPage() {
           </div>
         </div>
       </div>
-      <BottomNav />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth/next';
 import Head from 'next/head';
-import { BottomNav } from '../components/BottomNav';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
@@ -175,7 +174,6 @@ export default function MissoesPage() {
         </div>
       </div>
 
-      <BottomNav />
     </>
   );
 }

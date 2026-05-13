@@ -3,7 +3,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, ListOrdered } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { getSupabase } from '../lib/supabase';
 
 function formatListDate(iso) {
@@ -163,7 +162,6 @@ export default function ListasSalvasPage() {
           Abrir lista de compras
         </Link>
       </div>
-      <BottomNav />
     </div>
   );
 }

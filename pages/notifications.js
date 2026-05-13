@@ -2,7 +2,6 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, Bell, Calendar, Target, Receipt } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
 
@@ -71,7 +70,6 @@ export default function NotificationsPage() {
             </p>
           </div>
         </div>
-        <BottomNav />
       </div>
     </>
   );

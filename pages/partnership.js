@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, Loader2, Users, Copy, Check } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { getSupabase } from '../lib/supabase';
 import { completeDailyMission } from '../lib/completeDailyMission';
@@ -263,7 +262,6 @@ export default function PartnershipPage() {
           </>
         )}
       </div>
-      <BottomNav />
     </div>
   );
 }

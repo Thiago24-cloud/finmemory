@@ -5,7 +5,6 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, CreditCard, Loader2, Plus, Trash2, Calculator } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { ExpressionValueField } from '../components/ui/ExpressionValueField';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccess } from '../lib/access-server';
@@ -448,7 +447,6 @@ export default function CartoesPage() {
             manual mantém o mesmo nível de controle no app.
           </p>
         </div>
-        <BottomNav />
       </div>
     </>
   );

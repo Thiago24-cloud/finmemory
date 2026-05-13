@@ -4,7 +4,6 @@ import Link from 'next/link';
 import Head from 'next/head';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getServerSession } from 'next-auth/next';
-import { BottomNav } from '../components/BottomNav';
 import { ProductBarcodeScanner } from '../components/ProductBarcodeScanner';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { authOptions } from './api/auth/[...nextauth]';
@@ -444,7 +443,7 @@ export default function ScanProductPage() {
               </div>
             </div>
 
-            {/* Rodapé economia — acima da BottomNav */}
+            {/* Rodapé economia — acima da barra fixa inferior */}
             <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[45] px-4 pt-2 pb-3 bg-[#0d1219]/95 backdrop-blur-xl border-t border-[#1E2A3A] safe-area-bottom max-w-lg mx-auto rounded-t-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)]">
               <div className="flex justify-between items-start gap-3">
                 <div className="min-w-0">
@@ -491,7 +490,6 @@ export default function ScanProductPage() {
         )}
       </div>
 
-      <BottomNav />
     </>
   );
 }

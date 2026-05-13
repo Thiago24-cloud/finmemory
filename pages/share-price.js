@@ -3,7 +3,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Loader2 } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { ExpressionValueField } from '../components/ui/ExpressionValueField';
 
 const CATEGORIES = [
@@ -224,7 +223,6 @@ export default function SharePricePage() {
           </button>
         </form>
       </div>
-      <BottomNav />
     </div>
   );
 }

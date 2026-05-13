@@ -3,7 +3,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { ExpressionValueField } from '../components/ui/ExpressionValueField';
 import { getSupabase } from '../lib/supabase';
 import { createPricePointsFromTransaction } from '../lib/autoPricePoints';
@@ -176,7 +175,6 @@ export default function ManualEntryPage() {
           </button>
         </form>
       </div>
-      <BottomNav />
     </div>
   );
 }

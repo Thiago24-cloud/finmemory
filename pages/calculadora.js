@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { BottomNav } from '../components/BottomNav';
 import { CalculadoraEconomia } from '../components/CalculadoraEconomia';
 
 export default function CalculadoraPage() {
@@ -16,7 +15,6 @@ export default function CalculadoraPage() {
 
         <CalculadoraEconomia />
       </div>
-      <BottomNav />
     </div>
   );
 }

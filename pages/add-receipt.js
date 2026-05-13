@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { BottomNav } from '../components/BottomNav';
 import { NFCeScanner } from '../components/NFCeScanner';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { createClient } from '@supabase/supabase-js';
@@ -1057,7 +1056,6 @@ export default function AddReceipt() {
           </div>
         )}
         </div>
-        <BottomNav />
       </div>
 
       {/* Overlay +XP ao salvar com sucesso */}

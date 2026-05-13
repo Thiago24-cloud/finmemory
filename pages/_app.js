@@ -15,6 +15,8 @@ import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 import { MapCartProvider } from '../components/map/MapCartContext';
 import { MissionsTodayProvider } from '../components/missions/MissionsTodayContext';
 import { ProfileFirstLoginGate } from '../components/onboarding/ProfileFirstLoginGate';
+import AppMainBottomNav from '../components/AppMainBottomNav';
+import PageTransitionLayout from '../components/PageTransitionLayout';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import '../styles/globals.css';
 
@@ -91,7 +93,10 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             <AnalyticsProvider>
               <MissionsTodayProvider>
                 <MapCartProvider>
-                  <Component {...pageProps} />
+                  <PageTransitionLayout>
+                    <Component {...pageProps} />
+                  </PageTransitionLayout>
+                  <AppMainBottomNav />
                 </MapCartProvider>
               </MissionsTodayProvider>
               <Toaster richColors position="top-center" />
