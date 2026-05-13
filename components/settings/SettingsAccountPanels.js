@@ -6,14 +6,15 @@ import { PLAN_LABELS } from '../../lib/planAccess';
 import { BRAND } from '../../lib/brandTokens';
 import { cn } from '../../lib/utils';
 
-const pulse = 'animate-pulse rounded-lg bg-gray-200/90';
+const pulse =
+  'animate-pulse rounded-lg bg-gray-200/90 dark:bg-zinc-700/80';
 
 /** Alturas alinhadas ao conteúdo real (web): radar, XP, planos, centro de assinatura. */
 export const SettingsAccountTopSkeleton = memo(function SettingsAccountTopSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-live="polite">
       <div
-        className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+        className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/80"
         style={{ minHeight: 178 }}
       >
         <div className={cn('h-4 w-44', pulse)} />
@@ -26,15 +27,15 @@ export const SettingsAccountTopSkeleton = memo(function SettingsAccountTopSkelet
         className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 text-zinc-100 shadow-sm"
         style={{ minHeight: 220 }}
       >
-        <div className={cn('h-3 w-40 bg-zinc-700/80', pulse)} />
-        <div className={cn('mt-4 h-9 w-48 bg-zinc-700/80', pulse)} />
-        <div className={cn('mt-3 h-3 w-64 bg-zinc-700/80', pulse)} />
-        <div className={cn('mt-4 h-1.5 w-full rounded-full bg-zinc-800', pulse)} />
-        <div className={cn('mt-3 h-3 w-52 bg-zinc-700/80', pulse)} />
+        <div className={cn('h-3 w-40 bg-zinc-700/80 dark:bg-zinc-600/90', pulse)} />
+        <div className={cn('mt-4 h-9 w-48 bg-zinc-700/80 dark:bg-zinc-600/90', pulse)} />
+        <div className={cn('mt-3 h-3 w-64 bg-zinc-700/80 dark:bg-zinc-600/90', pulse)} />
+        <div className={cn('mt-4 h-1.5 w-full rounded-full bg-zinc-800 dark:bg-zinc-700', pulse)} />
+        <div className={cn('mt-3 h-3 w-52 bg-zinc-700/80 dark:bg-zinc-600/90', pulse)} />
       </div>
 
       <div
-        className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+        className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/80"
         style={{ minHeight: 340 }}
       >
         <div className={cn('h-5 w-48', pulse)} />

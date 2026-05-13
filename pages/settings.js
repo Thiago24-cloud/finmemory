@@ -13,6 +13,7 @@ import {
 } from '../components/settings/SettingsAccountPanels';
 import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
 import { BRAND } from '../lib/brandTokens';
+import { readSettingsAccountCache, writeSettingsAccountCache } from '../lib/settingsAccountCache';
 
 const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
 const UpgradePlan = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
@@ -124,7 +125,7 @@ export default function SettingsPage() {
         }));
         return;
       }
-      setSubscriptionStatus({
+      const nextSub = {
         loading: false,
         plano: String(data.plano || 'free').toLowerCase(),
         plano_ativo: Boolean(data.plano_ativo),
@@ -132,6 +133,12 @@ export default function SettingsPage() {
         next_billing_at: data.next_billing_at || null,
         cancel_at_period_end: Boolean(data.cancel_at_period_end),
         error: '',
+      };
+      setSubscriptionStatus(nextSub);
+      const key = session?.user?.supabaseId || session?.user?.email || '';
+      setXpStats((currentXp) => {
+        if (currentXp && key) writeSettingsAccountCache(key, currentXp, nextSub);
+        return currentXp;
       });
     } catch (e) {
       setSubscriptionStatus((prev) => ({
@@ -140,9 +147,9 @@ export default function SettingsPage() {
         error: e?.message || 'Erro de rede ao carregar assinatura',
       }));
     }
-  }, []);
+  }, [session?.user?.supabaseId, session?.user?.email]);
 
-  /** XP + Stripe + sessão num único fluxo; skeleton até tudo pronto + delay mínimo (evita flash). */
+  /** XP + assinatura: cache imediato; fetch em paralelo; sync Stripe em background (evita skeleton longo). */
   useEffect(() => {
     if (status === 'loading') return undefined;
 
@@ -161,24 +168,26 @@ export default function SettingsPage() {
       return undefined;
     }
 
+    const userKey = session.user.supabaseId || session.user.email || '';
+    const cached = readSettingsAccountCache(userKey);
+    if (cached) {
+      setXpStats(cached.xp);
+      setSubscriptionStatus(cached.sub);
+      setAccountUiReady(true);
+    } else {
+      setAccountUiReady(false);
+    }
+
     let cancelled = false;
     const t0 = Date.now();
 
     (async () => {
       try {
-        const gPromise = fetchWithTimeout('/api/map/gamification-me').then(async (resp) => {
-          const data = await resp.json().catch(() => ({}));
-          return { ok: resp.ok, data };
-        });
-
-        await fetchWithTimeout('/api/stripe/sync-plan-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        await (updateRef.current?.() ?? Promise.resolve()).catch(() => {});
-
         const [gWrap, subRes] = await Promise.all([
-          gPromise,
+          fetchWithTimeout('/api/map/gamification-me').then(async (resp) => {
+            const data = await resp.json().catch(() => ({}));
+            return { ok: resp.ok, data };
+          }),
           fetchWithTimeout('/api/stripe/subscription-status'),
         ]);
         const subData = await subRes.json().catch(() => ({}));
@@ -219,6 +228,8 @@ export default function SettingsPage() {
           };
         }
 
+        writeSettingsAccountCache(userKey, xp, nextSub);
+
         const elapsed = Date.now() - t0;
         await new Promise((r) => setTimeout(r, Math.max(0, MIN_ACCOUNT_READY_MS - elapsed)));
         if (cancelled) return;
@@ -226,8 +237,48 @@ export default function SettingsPage() {
         setXpStats(xp);
         setSubscriptionStatus(nextSub);
         setAccountUiReady(true);
+
+        void (async () => {
+          try {
+            await fetchWithTimeout(
+              '/api/stripe/sync-plan-status',
+              { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+              15000
+            );
+          } catch {
+            /* ignore */
+          }
+          try {
+            await Promise.race([
+              updateRef.current?.() ?? Promise.resolve(),
+              new Promise((r) => setTimeout(r, 5000)),
+            ]);
+          } catch {
+            /* ignore */
+          }
+          if (cancelled) return;
+          try {
+            const r2 = await fetchWithTimeout('/api/stripe/subscription-status');
+            const d2 = await r2.json().catch(() => ({}));
+            if (cancelled || !r2.ok) return;
+            const refreshed = {
+              loading: false,
+              plano: String(d2.plano || 'free').toLowerCase(),
+              plano_ativo: Boolean(d2.plano_ativo),
+              stripe_subscription_status: String(d2.stripe_subscription_status || ''),
+              next_billing_at: d2.next_billing_at || null,
+              cancel_at_period_end: Boolean(d2.cancel_at_period_end),
+              error: '',
+            };
+            setSubscriptionStatus(refreshed);
+            writeSettingsAccountCache(userKey, xp, refreshed);
+          } catch {
+            /* ignore */
+          }
+        })();
       } catch {
         if (cancelled) return;
+        if (cached) return;
         const xpFallback = { xp_points: 0, contributions_count: 0, level: 1 };
         const elapsed = Date.now() - t0;
         await new Promise((r) => setTimeout(r, Math.max(0, MIN_ACCOUNT_READY_MS - elapsed)));
@@ -356,7 +407,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      <div className="max-w-md mx-auto px-5 py-6 pb-24">
+      <div className="max-w-md mx-auto px-5 py-6 pb-[calc(6.25rem+env(safe-area-inset-bottom))]">
         <Link href="/dashboard" className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 text-sm mb-6">
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
