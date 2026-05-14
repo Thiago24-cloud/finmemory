@@ -397,8 +397,8 @@ export default function MapaPage() {
                 onClick={() => setShowMenuSheet(true)}
                 className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.4)] transition-colors md:inline-flex ${
                   wazeUi
-                    ? 'bg-[#303134] text-[#e5e5e5] shadow-black/40 hover:bg-[#3c4043]'
-                    : 'border border-[#1E2A3A] bg-[#111827] text-[#F0F4FF] hover:bg-[#1E2A3A]'
+                    ? 'bg-[#3a4152] text-[#e5e5e5] shadow-black/35 border border-[#4f5869]/60 hover:bg-[#454d60]'
+                    : 'border border-border bg-secondary text-foreground hover:bg-muted/80'
                 }`}
                 aria-label={wazeUi ? MAP_ARIA.plannerMenuWaze : MAP_ARIA.plannerMenu}
                 title={wazeUi ? 'Waze dos preços' : undefined}
@@ -410,8 +410,8 @@ export default function MapaPage() {
                 <div
                   className={`flex w-full items-stretch overflow-hidden rounded-2xl ${
                     wazeUi
-                      ? 'bg-[#303134] shadow-[0_2px_8px_rgba(0,0,0,0.45)] focus-within:ring-2 focus-within:ring-[#2ecc71]/35'
-                      : 'border border-white/10 bg-[#111827]/50 shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl focus-within:ring-2 focus-within:ring-primary/35'
+                      ? 'bg-[#3a4152] border border-[#4f5869]/55 shadow-[0_2px_10px_rgba(0,0,0,0.35)] focus-within:ring-2 focus-within:ring-[#2ecc71]/35'
+                      : 'border border-white/10 bg-secondary/65 shadow-[0_8px_32px_rgba(0,0,0,0.22)] backdrop-blur-xl focus-within:ring-2 focus-within:ring-primary/35'
                   }`}
                 >
                   <button
@@ -419,7 +419,7 @@ export default function MapaPage() {
                     onClick={() => setShowMenuSheet(true)}
                     className={`inline-flex h-12 w-12 shrink-0 items-center justify-center border-r transition-colors md:hidden ${
                       wazeUi
-                        ? 'border-[#5f6368]/55 bg-[#303134] text-[#e8eaed] hover:bg-[#3c4043]'
+                        ? 'border-[#5f6368]/55 bg-[#3a4152] text-[#e8eaed] hover:bg-[#454d60]'
                         : 'border-white/10 bg-transparent text-[#F0F4FF] hover:bg-white/5'
                     }`}
                     aria-label={wazeUi ? MAP_ARIA.menuMobileWaze : 'Menu'}
@@ -536,7 +536,7 @@ export default function MapaPage() {
             </div>
           </div>
         ) : !session ? (
-          <header className="pointer-events-auto absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 rounded-b-2xl border-b border-[#1E2A3A] bg-[#111827]/95 backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
+          <header className="pointer-events-auto absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 rounded-b-2xl border-b border-border bg-secondary/95 backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.25)]">
             <Link href="/" className="flex items-center gap-2 shrink-0 no-underline">
               <Image src="/logo.png" alt="FinMemory" width={36} height={36} className="object-contain rounded-lg" />
               <span className="font-bold text-lg text-[#F0F4FF]">FinMemory</span>
@@ -879,7 +879,7 @@ export default function MapaPage() {
           <button
             type="button"
             onClick={() => setShowStatesPanel(true)}
-            className={`absolute right-3 z-30 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-2 text-[12px] font-bold text-gray-700 shadow-md transition-colors hover:bg-white dark:border-[#1E2A3A] dark:bg-[#111827]/95 dark:text-[#F0F4FF] dark:hover:bg-[#1E2A3A] pointer-events-auto ${
+            className={`absolute right-3 z-30 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-2 text-[12px] font-bold text-gray-700 shadow-md transition-colors hover:bg-white dark:border-border dark:bg-secondary/95 dark:text-foreground dark:hover:bg-muted pointer-events-auto ${
               planningMode && !isDetailExpanded ? 'bottom-[calc(11.5rem+env(safe-area-inset-bottom))]' : 'bottom-[5.5rem]'
             }`}
             aria-label="Ver estados desbloqueados"

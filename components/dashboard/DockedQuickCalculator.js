@@ -11,6 +11,12 @@ import { CALC_DRAG_MIME } from '../../lib/calcDragMime';
 /** Altura aproximada do BottomNav + safe area (alinha com FloatingCalculatorFab). */
 const MOBILE_DOCK_BOTTOM = 'calc(4.5rem + env(safe-area-inset-bottom, 0px))';
 
+const CALC_KEY =
+  'py-2.5 rounded-xl text-sm font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 active:scale-[0.98] dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90 dark:shadow-none';
+
+const CALC_ACTION =
+  'flex-1 py-2 rounded-xl border border-border text-xs font-semibold bg-secondary/40 text-secondary-foreground hover:bg-secondary/60 active:scale-[0.99] dark:bg-muted/40 dark:text-foreground dark:hover:bg-muted/60';
+
 /**
  * Calculadora rápida acoplada: barra fina no mobile (acima do BottomNav) e painel fixo à direita no desktop.
  */
@@ -71,7 +77,7 @@ export function DockedQuickCalculator() {
         key={k}
         type="button"
         onClick={() => appendChar(k)}
-        className="py-2.5 rounded-xl bg-[#f8fafc] font-semibold text-sm text-[#111] border border-[#e5e7eb] hover:bg-[#f1f5f9] active:scale-[0.98]"
+        className={CALC_KEY}
       >
         {k}
       </button>
@@ -85,7 +91,7 @@ export function DockedQuickCalculator() {
         <p
           key={pulseKey}
           className={cn(
-            'text-lg font-bold text-[#2ECC49] m-0 mt-1.5 tabular-nums',
+            'text-lg font-bold text-primary m-0 mt-1.5 tabular-nums',
             pulseKey > 0 && 'finmemory-calc-pulse'
           )}
         >
@@ -97,33 +103,21 @@ export function DockedQuickCalculator() {
       <div className="grid grid-cols-4 gap-1.5">{keysRow(['1', '2', '3', '-'])}</div>
       <div className="grid grid-cols-4 gap-1.5">
         {keysRow(['0', '.', '(', ')'])}
-        <button
-          type="button"
-          onClick={() => appendChar('+')}
-          className="py-2.5 rounded-xl bg-[#f8fafc] font-semibold text-sm text-[#111] border border-[#e5e7eb] hover:bg-[#f1f5f9]"
-        >
+        <button type="button" onClick={() => appendChar('+')} className={CALC_KEY}>
           +
         </button>
       </div>
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={backspace}
-          className="flex-1 py-2 rounded-xl border border-[#e5e7eb] text-xs font-medium text-[#333] hover:bg-[#f8fafc]"
-        >
+        <button type="button" onClick={backspace} className={CALC_ACTION}>
           Apagar
         </button>
-        <button
-          type="button"
-          onClick={clear}
-          className="flex-1 py-2 rounded-xl border border-[#e5e7eb] text-xs font-medium text-[#333] hover:bg-[#f8fafc]"
-        >
+        <button type="button" onClick={clear} className={CALC_ACTION}>
           Limpar
         </button>
       </div>
       <Link
         href="/calculadora"
-        className="block text-center text-[11px] font-semibold text-[#2ECC49] hover:underline pt-0.5"
+        className="block text-center text-[11px] font-semibold text-primary hover:underline pt-0.5"
       >
         Calculadora de economia (completa)
       </Link>
@@ -148,21 +142,22 @@ export function DockedQuickCalculator() {
         onDrop={handleCalcDrop}
         className={cn(
           'hidden lg:flex flex-col fixed right-0 top-0 bottom-0 z-[42]',
-          'border-l border-[#e5e7eb] bg-white/98 backdrop-blur-md shadow-xl',
+          'border-l border-border bg-white/98 backdrop-blur-md shadow-xl',
+          'dark:bg-card/95 dark:border-border dark:text-foreground',
           'w-[min(300px,28vw)] transition-transform duration-300 ease-out',
           desktopOpen ? 'translate-x-0' : 'translate-x-full'
         )}
         aria-label="Calculadora rápida"
       >
-        <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-[#f0f0f0] shrink-0">
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-[#f0f0f0] dark:border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <Calculator className="h-5 w-5 text-[#2ECC49] shrink-0" aria-hidden />
-            <span className="text-sm font-semibold text-[#333] truncate">Calculadora</span>
+            <Calculator className="h-5 w-5 text-primary shrink-0" aria-hidden />
+            <span className="text-sm font-semibold text-[#333] dark:text-foreground truncate">Calculadora</span>
           </div>
           <button
             type="button"
             onClick={() => setDesktopOpen(false)}
-            className="p-2 rounded-xl hover:bg-[#f3f4f6] text-[#666] shrink-0"
+            className="p-2 rounded-xl hover:bg-[#f3f4f6] dark:hover:bg-muted text-[#666] dark:text-muted-foreground shrink-0"
             title="Ocultar painel (o conteúdo ocupa a largura toda)"
             aria-label="Ocultar calculadora lateral"
           >
@@ -182,7 +177,7 @@ export function DockedQuickCalculator() {
             handleCalcDrop(e);
             setDesktopOpen(true);
           }}
-          className="hidden lg:flex fixed right-3 top-1/2 -translate-y-1/2 z-[42] h-11 w-11 rounded-2xl border border-[#e5e7eb] bg-white shadow-md items-center justify-center text-[#2ECC49] hover:bg-[#f8fafc]"
+          className="hidden lg:flex fixed right-3 top-1/2 -translate-y-1/2 z-[42] h-11 w-11 rounded-2xl border border-border bg-white dark:bg-card dark:border-border shadow-md items-center justify-center text-primary hover:bg-muted dark:hover:bg-secondary"
           aria-label="Mostrar calculadora lateral"
         >
           <PanelRightOpen className="h-5 w-5" />
@@ -195,7 +190,8 @@ export function DockedQuickCalculator() {
         onDrop={handleCalcDrop}
         className={cn(
           'lg:hidden fixed left-0 right-0 z-[43] flex flex-col',
-          'border-t border-[#e5e7eb] bg-white/98 backdrop-blur-md shadow-[0_-8px_24px_rgba(0,0,0,0.08)]',
+          'border-t border-border bg-white/98 backdrop-blur-md shadow-[0_-8px_24px_rgba(0,0,0,0.08)]',
+          'dark:bg-card/95 dark:shadow-[0_-8px_28px_rgba(0,0,0,0.45)]',
           'transition-[max-height] duration-300 ease-out safe-area-pb'
         )}
         style={{
@@ -210,13 +206,13 @@ export function DockedQuickCalculator() {
           aria-expanded={mobileExpanded}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <Calculator className="h-5 w-5 text-[#2ECC49] shrink-0" aria-hidden />
+            <Calculator className="h-5 w-5 text-primary shrink-0" aria-hidden />
             <div className="min-w-0">
-              <p className="text-[10px] text-[#888] m-0 leading-none mb-0.5">Total</p>
-              <p className="text-base font-bold text-[#0f172a] tabular-nums truncate m-0 leading-tight">{resultLabel}</p>
+              <p className="text-[10px] text-muted-foreground m-0 leading-none mb-0.5">Total</p>
+              <p className="text-base font-bold text-foreground tabular-nums truncate m-0 leading-tight">{resultLabel}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0 text-[#666]">
+          <div className="flex items-center gap-1 shrink-0 text-muted-foreground">
             <span className="text-[10px] font-medium uppercase tracking-wide">
               {mobileExpanded ? 'Recolher' : 'Expandir'}
             </span>
@@ -224,12 +220,12 @@ export function DockedQuickCalculator() {
           </div>
         </button>
         {mobileExpanded && (
-          <div className="px-3 pb-2 overflow-y-auto max-h-[min(46vh,380px)] border-t border-[#f3f4f6]">
+          <div className="px-3 pb-2 overflow-y-auto max-h-[min(46vh,380px)] border-t border-[#f3f4f6] dark:border-border">
             <div className="flex justify-end py-1">
               <button
                 type="button"
                 onClick={() => setMobileExpanded(false)}
-                className="p-1.5 rounded-lg text-[#999] hover:bg-[#f3f4f6]"
+                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted"
                 aria-label="Fechar teclado"
               >
                 <X className="h-4 w-4" />

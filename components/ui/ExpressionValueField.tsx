@@ -21,7 +21,7 @@ function KeypadButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'py-3 rounded-xl text-sm font-semibold border border-[#e5e7eb] bg-[#f8fafc] text-[#111] hover:bg-[#f1f5f9] active:scale-[0.98]',
+        'py-3 rounded-xl text-sm font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 active:scale-[0.98] dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90 dark:shadow-none',
         className
       )}
       {...rest}
@@ -179,20 +179,20 @@ export function ExpressionValueField({
         }}
       >
         <div
-          className="mx-auto w-full max-w-md rounded-t-3xl bg-white shadow-2xl border-t border-[#e5e7eb] px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[min(72vh,520px)] flex flex-col gap-2"
+          className="mx-auto w-full max-w-md rounded-t-3xl bg-card text-card-foreground shadow-2xl border-t border-border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[min(72vh,520px)] flex flex-col gap-2"
           role="dialog"
           aria-modal="true"
           aria-labelledby={`${fieldId}-title`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-2 shrink-0">
-            <p id={`${fieldId}-title`} className="text-sm font-semibold text-[#333] m-0 truncate pr-2">
+            <p id={`${fieldId}-title`} className="text-sm font-semibold m-0 truncate pr-2">
               {label || (mode === 'integer' ? 'Número' : 'Valor')}
             </p>
             <button
               type="button"
               onClick={closePad}
-              className="p-2 rounded-xl text-[#666] hover:bg-[#f3f4f6]"
+              className="p-2 rounded-xl text-muted-foreground hover:bg-muted"
               aria-label="Fechar teclado"
             >
               <X className="h-5 w-5" />
@@ -206,7 +206,7 @@ export function ExpressionValueField({
               {applyError}
             </p>
           ) : (
-            <p className="text-[10px] text-[#888] m-0 shrink-0">
+            <p className="text-[10px] text-muted-foreground m-0 shrink-0">
               {mode === 'integer'
                 ? `Entre ${integerMin} e ${integerMax}.`
                 : 'Use + − × ÷ e parênteses; vírgula ou ponto como decimal. “Aplicar” calcula e formata.'}
@@ -217,7 +217,7 @@ export function ExpressionValueField({
             <KeypadButton onClick={clearDraft} className="text-xs">
               Limpar
             </KeypadButton>
-            <KeypadButton onClick={apply} className="bg-[#22c55e] text-white border-emerald-600 hover:bg-[#16a34a]">
+            <KeypadButton onClick={apply} className="bg-primary text-primary-foreground border-primary hover:bg-primary/90">
               Aplicar
             </KeypadButton>
           </div>

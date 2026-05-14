@@ -33,14 +33,14 @@ export function FloatingCalculatorFab({ className }) {
         onClick={() => setOpen(true)}
         className={cn(
           'fixed z-[48] right-4 bottom-[5.5rem] sm:bottom-[5.75rem]',
-          'h-12 w-12 rounded-2xl shadow-lg border border-[#e5e7eb]/80',
-          'bg-white/95 backdrop-blur-md text-[#0f172a] hover:bg-white flex items-center justify-center',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2ECC49] focus-visible:ring-offset-2',
+          'h-12 w-12 rounded-2xl shadow-lg border border-border',
+          'bg-card/95 backdrop-blur-md text-foreground hover:bg-muted flex items-center justify-center',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ring-offset-background',
           className
         )}
         aria-label="Abrir calculadora rápida"
       >
-        <Calculator className="h-6 w-6 text-[#2ECC49]" />
+        <Calculator className="h-6 w-6 text-primary" />
       </button>
 
       {open && (
@@ -51,14 +51,14 @@ export function FloatingCalculatorFab({ className }) {
           aria-label="Calculadora rápida"
         >
           <div
-            className="w-full max-w-sm rounded-3xl bg-white/95 backdrop-blur-xl border border-[#e5e7eb] shadow-2xl p-4 mb-6 sm:mb-0"
+            className="w-full max-w-sm rounded-3xl bg-card/95 backdrop-blur-xl border border-border shadow-2xl p-4 mb-6 sm:mb-0 text-card-foreground"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-[#333]">Calculadora rápida</span>
+              <span className="text-sm font-semibold">Calculadora rápida</span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="p-2 rounded-xl hover:bg-[#f3f4f6] text-[#666]"
+                className="p-2 rounded-xl hover:bg-muted text-muted-foreground"
                 aria-label="Fechar"
               >
                 <X className="h-5 w-5" />
@@ -67,7 +67,7 @@ export function FloatingCalculatorFab({ className }) {
             <div className="rounded-2xl bg-[#0b1220] text-white p-3 mb-3 min-h-[3.5rem] flex flex-col justify-center">
               <p className="text-xs text-white/60 m-0 mb-1">Expressão</p>
               <p className="text-sm font-mono break-all m-0 leading-snug">{expr || '0'}</p>
-              <p className="text-lg font-bold text-[#2ECC49] m-0 mt-2 tabular-nums">{resultLabel}</p>
+              <p className="text-lg font-bold text-primary m-0 mt-2 tabular-nums">{resultLabel}</p>
             </div>
             <div className="grid grid-cols-4 gap-2 mb-3">
               {['7', '8', '9', '/'].map((k) => (
@@ -75,7 +75,7 @@ export function FloatingCalculatorFab({ className }) {
                   key={k}
                   type="button"
                   onClick={() => append(k)}
-                  className="py-3 rounded-xl bg-[#f8fafc] font-semibold text-[#111] border border-[#e5e7eb] hover:bg-[#f1f5f9]"
+                  className="py-3 rounded-xl font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90"
                 >
                   {k}
                 </button>
@@ -85,7 +85,7 @@ export function FloatingCalculatorFab({ className }) {
                   key={k}
                   type="button"
                   onClick={() => append(k)}
-                  className="py-3 rounded-xl bg-[#f8fafc] font-semibold text-[#111] border border-[#e5e7eb] hover:bg-[#f1f5f9]"
+                  className="py-3 rounded-xl font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90"
                 >
                   {k}
                 </button>
@@ -95,7 +95,7 @@ export function FloatingCalculatorFab({ className }) {
                   key={k}
                   type="button"
                   onClick={() => append(k)}
-                  className="py-3 rounded-xl bg-[#f8fafc] font-semibold text-[#111] border border-[#e5e7eb] hover:bg-[#f1f5f9]"
+                  className="py-3 rounded-xl font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90"
                 >
                   {k}
                 </button>
@@ -105,7 +105,7 @@ export function FloatingCalculatorFab({ className }) {
                   key={k}
                   type="button"
                   onClick={() => append(k)}
-                  className="py-3 rounded-xl bg-[#f8fafc] font-semibold text-[#111] border border-[#e5e7eb] hover:bg-[#f1f5f9]"
+                  className="py-3 rounded-xl font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90"
                 >
                   {k}
                 </button>
@@ -113,7 +113,7 @@ export function FloatingCalculatorFab({ className }) {
               <button
                 type="button"
                 onClick={() => append('+')}
-                className="py-3 rounded-xl bg-[#f8fafc] font-semibold text-[#111] border border-[#e5e7eb] hover:bg-[#f1f5f9]"
+                className="py-3 rounded-xl font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90"
               >
                 +
               </button>
@@ -122,14 +122,14 @@ export function FloatingCalculatorFab({ className }) {
               <button
                 type="button"
                 onClick={back}
-                className="flex-1 py-2.5 rounded-xl border border-[#e5e7eb] text-sm font-medium text-[#333] hover:bg-[#f8fafc]"
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold bg-secondary/40 text-secondary-foreground hover:bg-secondary/60 dark:bg-muted/40 dark:text-foreground dark:hover:bg-muted/60"
               >
                 Apagar
               </button>
               <button
                 type="button"
                 onClick={clear}
-                className="flex-1 py-2.5 rounded-xl border border-[#e5e7eb] text-sm font-medium text-[#333] hover:bg-[#f8fafc]"
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold bg-secondary/40 text-secondary-foreground hover:bg-secondary/60 dark:bg-muted/40 dark:text-foreground dark:hover:bg-muted/60"
               >
                 Limpar
               </button>
@@ -137,7 +137,7 @@ export function FloatingCalculatorFab({ className }) {
             <Link
               href="/calculadora"
               onClick={() => setOpen(false)}
-              className="mt-3 block text-center text-xs font-semibold text-[#2ECC49] hover:underline"
+              className="mt-3 block text-center text-xs font-semibold text-primary hover:underline"
             >
               Abrir calculadora completa
             </Link>

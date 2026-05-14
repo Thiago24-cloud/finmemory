@@ -98,19 +98,19 @@ export function MapOverlayCategoryChips({
   const { canScrollLeft, canScrollRight, updateEdges } = useScrollEdges(scrollerRef);
 
   const mapsPill = wazeUi
-    ? 'bg-[#303134] text-[#e8eaed] shadow-[0_2px_6px_rgba(0,0,0,0.45)] border border-[#3c4043]'
+    ? 'bg-[#3a4152] text-[#e8eaed] shadow-[0_2px_8px_rgba(0,0,0,0.32)] border border-[#4f5869]/70'
     : mapsMobileLayout
       ? 'bg-white text-[#202124] shadow-none border border-[#dadce0]'
       : 'bg-white text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)] border border-transparent';
 
   const mapsPillActive = wazeUi
-    ? 'bg-[#1e2a22] ring-2 ring-[#2ecc71] ring-offset-0 border-[#2ecc71]'
+    ? 'bg-[#2a3440] ring-2 ring-[#2ecc71] ring-offset-0 border-[#3ddc84]/80'
     : mapsMobileLayout
       ? 'bg-[#e8f0fe] border-[#1a73e8] ring-0'
       : 'bg-[#e8f0fe] ring-1 ring-[#1a73e8] ring-offset-0';
 
   const arrowBtn = wazeUi
-    ? 'bg-[#303134] text-[#e8eaed] shadow-[0_2px_6px_rgba(0,0,0,0.45)] border border-[#3c4043]'
+    ? 'bg-[#3a4152] text-[#e8eaed] shadow-[0_2px_8px_rgba(0,0,0,0.32)] border border-[#4f5869]/70'
     : 'bg-white text-[#5f6368] shadow-[0_1px_2px_rgba(60,64,67,0.3)] border border-gray-100';
 
   const applyFilterChip = (chip) => {
@@ -132,7 +132,7 @@ export function MapOverlayCategoryChips({
     }
   };
 
-  const fadeFrom = wazeUi ? 'from-[#13161f]/90' : mapsMobileLayout ? 'from-white' : 'from-[#e8e4de]/95';
+  const fadeFrom = wazeUi ? 'from-[#1e2635]/92' : mapsMobileLayout ? 'from-white' : 'from-[#e8e4de]/95';
 
   return (
     <div

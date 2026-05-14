@@ -12,7 +12,7 @@ const SECONDARY_ACTIONS = [
     title: QUICK_ACTION_TITLE.simulador,
     Icon: Sparkles,
     wrapClass:
-      'bg-gradient-to-br from-purple-950 to-zinc-900 text-purple-200 border border-purple-500/35 hover:from-purple-900 hover:to-zinc-900 dark:from-purple-950/80 dark:to-[#111827] dark:border-purple-500/25',
+      'bg-gradient-to-br from-purple-950 to-zinc-900 text-purple-200 border border-purple-500/35 hover:from-purple-900 hover:to-zinc-900 dark:from-purple-950/80 dark:to-[#1E2A3A] dark:border-purple-500/25',
     labelClass: 'text-purple-100 dark:text-purple-300',
   },
   {
