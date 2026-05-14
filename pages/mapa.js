@@ -276,7 +276,7 @@ export default function MapaPage() {
         <title>FinMemory – Onde está mais barato? | App de compras e análise de custos</title>
       </Head>
       <div
-        className={`fixed inset-0 z-40 w-full h-full ${showMapLanding ? 'bg-[#0f0f0f]' : 'bg-[#e8e4de]'}`}
+        className={`finmemory-map-google-chrome fixed inset-0 z-40 w-full h-full ${showMapLanding ? 'bg-[#0f0f0f]' : 'bg-[#e8e4de]'}`}
       >
         {!showMapLanding ? (
           <div className="absolute inset-0 w-full h-full">

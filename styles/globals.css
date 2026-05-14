@@ -219,6 +219,106 @@
 .dark .finmemory-public-light-panel textarea::placeholder {
   color: #6b7280 !important;
 }
+
+/* Mapa (página /mapa): barra de pesquisa, chips e botões flutuantes estilo Google Maps.
+   O tema global `.dark .bg-white` → card escuro quebrava o chrome claro sobre o mapa. */
+.dark .finmemory-map-google-chrome .bg-white {
+  background-color: #ffffff !important;
+}
+.dark .finmemory-map-google-chrome .bg-\[\#f8f9fa\] {
+  background-color: #f8f9fa !important;
+}
+.dark .finmemory-map-google-chrome .bg-\[\#f5f5f5\] {
+  background-color: #f5f5f5 !important;
+}
+.dark .finmemory-map-google-chrome .bg-\[\#f1f3f4\] {
+  background-color: #f1f3f4 !important;
+}
+.dark .finmemory-map-google-chrome .hover\:bg-\[\#f8f9fa\]:hover {
+  background-color: #f8f9fa !important;
+}
+.dark .finmemory-map-google-chrome .hover\:bg-\[\#f5f5f5\]:hover {
+  background-color: #f5f5f5 !important;
+}
+.dark .finmemory-map-google-chrome .hover\:bg-\[\#f1f3f4\]:hover {
+  background-color: #f1f3f4 !important;
+}
+.dark .finmemory-map-google-chrome .hover\:bg-primary\/10:hover {
+  background-color: rgba(46, 204, 73, 0.1) !important;
+}
+.dark .finmemory-map-google-chrome .border-\[\#dadce0\] {
+  border-color: #dadce0 !important;
+}
+.dark .finmemory-map-google-chrome .border-\[\#e0e0e0\] {
+  border-color: #e0e0e0 !important;
+}
+.dark .finmemory-map-google-chrome .border-\[\#1a73e8\] {
+  border-color: #1a73e8 !important;
+}
+.dark .finmemory-map-google-chrome .border-gray-100 {
+  border-color: #f3f4f6 !important;
+}
+.dark .finmemory-map-google-chrome .border-gray-100\/90 {
+  border-color: rgba(243, 244, 246, 0.9) !important;
+}
+.dark .finmemory-map-google-chrome .border-gray-200 {
+  border-color: #e5e7eb !important;
+}
+.dark .finmemory-map-google-chrome .border-gray-200\/90 {
+  border-color: rgba(229, 231, 235, 0.9) !important;
+}
+.dark .finmemory-map-google-chrome .divide-\[\#dadce0\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #dadce0 !important;
+}
+.dark .finmemory-map-google-chrome .bg-\[\#dadce0\] {
+  background-color: #dadce0 !important;
+}
+.dark .finmemory-map-google-chrome .bg-\[\#1a73e8\] {
+  background-color: #1a73e8 !important;
+}
+.dark .finmemory-map-google-chrome .text-\[\#202124\] {
+  color: #202124 !important;
+}
+.dark .finmemory-map-google-chrome .text-\[\#1a1a1a\] {
+  color: #1a1a1a !important;
+}
+.dark .finmemory-map-google-chrome .text-\[\#3c4043\] {
+  color: #3c4043 !important;
+}
+.dark .finmemory-map-google-chrome .text-\[\#5f6368\] {
+  color: #5f6368 !important;
+}
+.dark .finmemory-map-google-chrome input,
+.dark .finmemory-map-google-chrome textarea {
+  background-color: transparent !important;
+  color: #202124 !important;
+  border-color: transparent !important;
+}
+.dark .finmemory-map-google-chrome input::placeholder,
+.dark .finmemory-map-google-chrome textarea::placeholder {
+  color: #70757a !important;
+}
+.dark .finmemory-map-google-chrome .placeholder-\[\#70757a\]::placeholder {
+  color: #70757a !important;
+}
+.dark .finmemory-map-google-chrome .bg-white\/95 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+.dark .finmemory-map-google-chrome .bg-white\/98 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+}
+.dark .finmemory-map-google-chrome .bg-white\/90 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+.dark .finmemory-map-google-chrome .bg-white\/80 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+.dark .finmemory-map-google-chrome .bg-white\/72 {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+}
+.dark .finmemory-map-google-chrome .bg-white\/48 {
+  background-color: rgba(255, 255, 255, 0.48) !important;
+}
 /* ───────────────────────────────────────────────────────────────────── */
 
 /* Carousel / scroll horizontal sem barra */

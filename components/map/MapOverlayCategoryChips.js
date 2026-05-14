@@ -95,15 +95,15 @@ export function MapOverlayCategoryChips({
   const scrollerRef = useRef(null);
   const { canScrollLeft, canScrollRight, updateEdges } = useScrollEdges(scrollerRef);
 
-  /** Sempre estilo Google Maps: fundo branco, texto escuro (tema global .dark não escurece o mapa). */
+  /** Sempre estilo Google Maps: cápsula branca, texto/ícone escuros, sombra suave (ver `finmemory-map-google-chrome` no CSS). */
   const mapsPill =
-    'bg-white text-[#1a1a1a] shadow-[0_1px_4px_rgba(0,0,0,0.2)] border border-[#e0e0e0] hover:bg-[#f5f5f5] active:scale-[0.97]';
+    'bg-white text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.28),0_1px_3px_1px_rgba(60,64,67,0.12)] border border-[#e0e0e0] hover:bg-[#f5f5f5] active:scale-[0.97]';
 
   const mapsPillActive =
-    'bg-[#1a73e8] border-[#1a73e8] text-white shadow-[0_1px_4px_rgba(0,0,0,0.2)] [&_svg]:text-white';
+    'bg-[#1a73e8] border-[#1a73e8] text-white shadow-[0_1px_2px_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)] [&_svg]:text-white';
 
   const arrowBtn =
-    'bg-white text-[#5f6368] shadow-[0_1px_4px_rgba(0,0,0,0.2)] border border-[#e0e0e0] hover:bg-[#f5f5f5]';
+    'bg-white text-[#5f6368] shadow-[0_1px_2px_rgba(60,64,67,0.28),0_1px_3px_1px_rgba(60,64,67,0.12)] border border-[#e0e0e0] hover:bg-[#f5f5f5]';
 
   const applyFilterChip = (chip) => {
     setMapChipSelection(chip.id);
@@ -169,7 +169,7 @@ export function MapOverlayCategoryChips({
 
         <div
           ref={scrollerRef}
-          className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide scroll-smooth py-0.5 pl-1 pr-1"
+          className="flex items-center gap-2 overflow-x-auto scrollbar-hide scroll-smooth py-0.5 pl-1 pr-1"
           role="tablist"
         >
           {FILTER_CHIPS.map((chip) => {
@@ -188,7 +188,14 @@ export function MapOverlayCategoryChips({
                   active && mapsPillActive
                 )}
               >
-                <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px] shrink-0 opacity-90" strokeWidth={2} aria-hidden />
+                <Icon
+                  className={cn(
+                    'h-4 w-4 sm:h-[18px] sm:w-[18px] shrink-0',
+                    active ? 'text-white' : 'text-[#202124]'
+                  )}
+                  strokeWidth={2}
+                  aria-hidden
+                />
                 <span className="whitespace-nowrap">{chip.label}</span>
               </button>
             );
@@ -204,7 +211,11 @@ export function MapOverlayCategoryChips({
                   mapsPill
                 )}
               >
-                <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px] shrink-0 opacity-90" strokeWidth={2} aria-hidden />
+                <Icon
+                  className="h-4 w-4 sm:h-[18px] sm:w-[18px] shrink-0 text-[#202124]"
+                  strokeWidth={2}
+                  aria-hidden
+                />
                 <span className="whitespace-nowrap">{chip.label}</span>
               </Link>
             );
