@@ -154,7 +154,7 @@ export default function LoginPage() {
         <title>FinMemory - Entrar</title>
       </Head>
       <div className="min-h-screen flex items-center justify-center bg-gradient-primary p-5">
-        <form onSubmit={onSubmit} className="bg-white rounded-[20px] p-8 w-full max-w-md shadow-card-lovable">
+        <form onSubmit={onSubmit} className="finmemory-public-light-panel bg-white rounded-[20px] p-8 w-full max-w-md shadow-card-lovable">
           <h1 className="text-2xl font-bold text-[#333] text-center mb-4">FinMemory</h1>
           {verified ? <p className="text-sm text-green-700 mb-3">Email confirmado com sucesso. Agora é só entrar.</p> : null}
           {resetOk ? <p className="text-sm text-green-700 mb-3">Senha redefinida. Faça login com a nova senha.</p> : null}
@@ -167,7 +167,8 @@ export default function LoginPage() {
                 placeholder="Nova senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full mb-2 rounded-lg border border-gray-300 px-3 py-2"
+                autoComplete="new-password"
+                className="w-full mb-2 rounded-lg border border-gray-300 px-3 py-2.5 text-base text-[#111827] placeholder:text-gray-500"
               />
               <button
                 type="button"
@@ -212,7 +213,8 @@ export default function LoginPage() {
               placeholder="Nome (opcional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2"
+              autoComplete="name"
+              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2.5 text-base text-[#111827] placeholder:text-gray-500"
             />
           ) : null}
           <input
@@ -220,14 +222,17 @@ export default function LoginPage() {
             placeholder="Seu email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2"
+            autoComplete="email"
+            inputMode="email"
+            className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2.5 text-base text-[#111827] placeholder:text-gray-500"
           />
           <input
             type="password"
             placeholder="Sua senha"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2"
+            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+            className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2.5 text-base text-[#111827] placeholder:text-gray-500"
           />
           {mode === 'login' ? (
             <div className="mb-3">
@@ -252,7 +257,7 @@ export default function LoginPage() {
                     placeholder="000000"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-center tracking-widest font-mono text-sm"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-center text-base tracking-widest font-mono text-[#111827] placeholder:text-gray-500"
                   />
                   <button
                     type="button"

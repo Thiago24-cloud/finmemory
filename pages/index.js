@@ -101,13 +101,13 @@ export default function HomePage() {
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center p-5 bg-gradient-primary font-sans">
         {showLoading ? (
-          <div className="bg-white rounded-[20px] p-10 text-center shadow-card-lovable max-w-[600px] w-full">
+          <div className="finmemory-public-light-panel bg-white rounded-[20px] p-10 text-center shadow-card-lovable max-w-[600px] w-full">
             <div className="text-4xl mb-4 animate-pulse">⏳</div>
             <p className="text-[#666]">Carregando...</p>
             {legalLinksInCard}
           </div>
         ) : (
-        <div className="bg-white rounded-[20px] p-8 md:p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-[600px] w-full">
+        <div className="finmemory-public-light-panel bg-white rounded-[20px] p-8 md:p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-[600px] w-full">
           {/* Logo FinMemory */}
           <div className="mb-8 flex flex-col items-center justify-center">
             <Image

@@ -189,6 +189,36 @@
 .dark .shadow-card-lovable {
   box-shadow: var(--shadow-card) !important;
 }
+
+/* Home / marketing: cartão branco mesmo com <html class="dark"> (evita .dark .bg-white → card). */
+.dark .finmemory-public-light-panel {
+  background-color: #ffffff !important;
+  color: #1f2937;
+}
+.dark .finmemory-public-light-panel .text-\[\#1f2937\] {
+  color: #111827 !important;
+}
+.dark .finmemory-public-light-panel .text-\[\#666\] {
+  color: #4b5563 !important;
+}
+.dark .finmemory-public-light-panel .text-\[\#333\] {
+  color: #333333 !important;
+}
+.dark .finmemory-public-light-panel .bg-\[\#f8f9fa\] {
+  background-color: #f8f9fa !important;
+}
+/* Inputs no cartão claro: sem isto, .dark input usa fundo escuro + texto claro e pode confundir autofill / contraste */
+.dark .finmemory-public-light-panel input,
+.dark .finmemory-public-light-panel textarea,
+.dark .finmemory-public-light-panel select {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #d1d5db !important;
+}
+.dark .finmemory-public-light-panel input::placeholder,
+.dark .finmemory-public-light-panel textarea::placeholder {
+  color: #6b7280 !important;
+}
 /* ───────────────────────────────────────────────────────────────────── */
 
 /* Carousel / scroll horizontal sem barra */

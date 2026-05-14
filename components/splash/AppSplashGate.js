@@ -52,9 +52,8 @@ export function AppSplashGate({ children }) {
 
   return (
     <>
-      <div aria-hidden={phase !== 'off'} className={phase !== 'off' ? 'pointer-events-none' : undefined}>
-        {children}
-      </div>
+      {/* Não usar aria-hidden no miolo da app: no Safari/WebKit impede foco nos inputs (login) por baixo do splash. */}
+      <div>{children}</div>
       {phase !== 'off' && (
         <div
           className={cn(
