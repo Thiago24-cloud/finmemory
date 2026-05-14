@@ -868,7 +868,7 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
             type="button"
             onClick={requestLocation}
             disabled={locating}
-            className="bg-white border border-gray-300 shadow-md rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 flex items-center gap-1.5"
+            className="flex items-center gap-2 rounded-full border border-[#dadce0] bg-white px-3 py-2.5 text-sm font-medium text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] hover:bg-[#f8f9fa] disabled:opacity-60"
             title="Centrar mapa na minha localização"
           >
             {locating ? <>⏳ A obter...</> : <>📍 Minha localização</>}
@@ -893,15 +893,18 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
             disabled={locating}
             title="Minha localização"
             aria-label="Centrar mapa na minha localização"
-            className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[#1a73e8] shadow-[0_2px_8px_rgba(60,64,67,0.35)] border border-gray-100 hover:bg-gray-50 disabled:opacity-60 active:scale-95 transition-transform"
+            className="pointer-events-auto inline-flex max-w-[min(calc(100vw-1.5rem),280px)] items-center gap-2 whitespace-nowrap rounded-full border border-[#dadce0] bg-white px-3 py-2.5 text-sm font-medium text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] transition-transform hover:bg-[#f8f9fa] disabled:opacity-60 active:scale-[0.99]"
           >
             {locating ? (
-              <span className="text-lg" aria-hidden>
+              <span className="text-lg shrink-0" aria-hidden>
                 ⏳
               </span>
             ) : (
-              <Navigation className="h-6 w-6" strokeWidth={2.25} />
+              <span className="shrink-0 text-base leading-none" aria-hidden>
+                📍
+              </span>
             )}
+            <span className="min-w-0 truncate">{locating ? 'A obter…' : 'Minha localização'}</span>
           </button>
           {error ? (
             <div className="pointer-events-auto max-w-[min(280px,85vw)] bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-900 shadow-md">

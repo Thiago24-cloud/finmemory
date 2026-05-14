@@ -395,11 +395,7 @@ export default function MapaPage() {
               <button
                 type="button"
                 onClick={() => setShowMenuSheet(true)}
-                className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.4)] transition-colors md:inline-flex ${
-                  wazeUi
-                    ? 'bg-[#3a4152] text-[#e5e5e5] shadow-black/35 border border-[#4f5869]/60 hover:bg-[#454d60]'
-                    : 'border border-border bg-secondary text-foreground hover:bg-muted/80'
-                }`}
+                className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#dadce0] bg-white text-[#3c4043] shadow-[0_1px_3px_rgba(60,64,67,0.25)] transition-colors hover:bg-[#f8f9fa] md:inline-flex"
                 aria-label={wazeUi ? MAP_ARIA.plannerMenuWaze : MAP_ARIA.plannerMenu}
                 title={wazeUi ? 'Waze dos preços' : undefined}
               >
@@ -407,21 +403,11 @@ export default function MapaPage() {
               </button>
 
               <div className="min-w-0 w-full flex-1 md:w-auto md:max-w-[min(380px,42vw)]">
-                <div
-                  className={`flex w-full items-stretch overflow-hidden rounded-2xl ${
-                    wazeUi
-                      ? 'bg-[#3a4152] border border-[#4f5869]/55 shadow-[0_2px_10px_rgba(0,0,0,0.35)] focus-within:ring-2 focus-within:ring-[#2ecc71]/35'
-                      : 'border border-white/10 bg-secondary/65 shadow-[0_8px_32px_rgba(0,0,0,0.22)] backdrop-blur-xl focus-within:ring-2 focus-within:ring-primary/35'
-                  }`}
-                >
+                <div className="flex w-full items-stretch overflow-hidden rounded-2xl border border-[#dadce0] bg-white shadow-[0_1px_3px_rgba(60,64,67,0.18)] focus-within:ring-2 focus-within:ring-primary/35">
                   <button
                     type="button"
                     onClick={() => setShowMenuSheet(true)}
-                    className={`inline-flex h-12 w-12 shrink-0 items-center justify-center border-r transition-colors md:hidden ${
-                      wazeUi
-                        ? 'border-[#5f6368]/55 bg-[#3a4152] text-[#e8eaed] hover:bg-[#454d60]'
-                        : 'border-white/10 bg-transparent text-[#F0F4FF] hover:bg-white/5'
-                    }`}
+                    className="inline-flex h-12 w-12 shrink-0 items-center justify-center border-r border-[#dadce0] bg-white text-[#3c4043] transition-colors hover:bg-[#f8f9fa] md:hidden"
                     aria-label={wazeUi ? MAP_ARIA.menuMobileWaze : 'Menu'}
                   >
                     <Menu className="h-5 w-5" />
@@ -442,27 +428,19 @@ export default function MapaPage() {
                       setSearchQuery(e.target.value);
                       setMapChipSelection('custom');
                     }}
-                    className={`min-w-0 flex-1 border-0 bg-transparent py-3 pl-3 pr-1 text-[15px] leading-snug focus:outline-none md:py-2.5 md:pl-3.5 md:text-sm ${
-                      wazeUi ? 'text-[#e8eaed] placeholder-[#9aa0a6]' : 'text-[#F0F4FF] placeholder-[#8899AA]'
-                    }`}
+                    className="min-w-0 flex-1 border-0 bg-transparent py-3 pl-3 pr-1 text-[15px] leading-snug text-[#202124] placeholder-[#70757a] focus:outline-none md:py-2.5 md:pl-3.5 md:text-sm"
                     aria-label={MAP_ARIA.searchMap}
                   />
-                  <div
-                    className={`flex shrink-0 items-center pr-1.5 pl-0 ${
-                      wazeUi ? 'border-l border-[#5f6368]/50' : 'border-l border-white/10'
-                    }`}
-                  >
+                  <div className="flex shrink-0 items-center border-l border-[#dadce0] pr-1.5 pl-0">
                     <button
                       type="button"
                       onClick={() => searchInputRef.current?.focus()}
-                      className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors md:h-9 md:w-9 ${
-                        wazeUi ? 'text-[#9aa0a6] hover:bg-[#3c4043]' : 'text-[#8899AA] hover:bg-white/10'
-                      }`}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-[#f1f3f4] md:h-9 md:w-9"
                       aria-label="Buscar"
                     >
                       <Search className="h-[19px] w-[19px] md:h-[18px] md:w-[18px]" strokeWidth={2} />
                     </button>
-                    <div className={`h-4 w-px shrink-0 ${wazeUi ? 'bg-[#5f6368]' : 'bg-white/15'}`} aria-hidden />
+                    <div className="h-4 w-px shrink-0 bg-[#dadce0]" aria-hidden />
                     <button
                       type="button"
                       onClick={() => {
@@ -470,9 +448,7 @@ export default function MapaPage() {
                           window.dispatchEvent(new CustomEvent('finmemory-map-request-location'));
                         }
                       }}
-                      className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors md:h-9 md:w-9 ${
-                        wazeUi ? 'text-[#8ab4f8] hover:bg-[#3c4043]' : 'text-primary hover:bg-white/10'
-                      }`}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 md:h-9 md:w-9"
                       aria-label={MAP_ARIA.locateMe}
                       title={MAP_ARIA.locateMe}
                     >
@@ -491,8 +467,7 @@ export default function MapaPage() {
                 aria-hidden={chipsShouldHide}
               >
                 <MapOverlayCategoryChips
-                  wazeUi={wazeUi}
-                  mapsMobileLayout={!wazeUi && narrowScreen}
+                  mapsMobileLayout={narrowScreen}
                   promoOnly={promoOnly}
                   setPromoOnly={setPromoOnly}
                   searchQuery={searchQuery}
@@ -507,11 +482,7 @@ export default function MapaPage() {
                   <button
                     type="button"
                     onClick={() => setPlanningListaSheetOpen(true)}
-                    className={`inline-flex min-h-[40px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-bold tracking-tight ${
-                      wazeUi
-                        ? 'border-[#2a2d3a] bg-[#0c0f16]/90 text-emerald-300'
-                        : 'border-white/10 bg-black/50 text-primary backdrop-blur-md'
-                    }`}
+                    className="inline-flex min-h-[40px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-[11px] font-bold tracking-tight text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.12)] transition-colors hover:bg-[#f8f9fa]"
                   >
                     <span className="truncate">
                       [ {parsedPlanningItems.length}{' '}
@@ -521,11 +492,7 @@ export default function MapaPage() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-[10px] font-bold ${
-                      wazeUi
-                        ? 'border-[#2a2d3a] bg-[#222634] text-[#d1d5db]'
-                        : 'border-white/10 bg-white/10 text-foreground backdrop-blur-md'
-                    }`}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-[10px] font-bold text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.12)] transition-colors hover:bg-[#f8f9fa]"
                     title="Limpar lista do mapa"
                   >
                     <X className="h-3.5 w-3.5" aria-hidden />
@@ -879,7 +846,7 @@ export default function MapaPage() {
           <button
             type="button"
             onClick={() => setShowStatesPanel(true)}
-            className={`absolute right-3 z-30 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-2 text-[12px] font-bold text-gray-700 shadow-md transition-colors hover:bg-white dark:border-border dark:bg-secondary/95 dark:text-foreground dark:hover:bg-muted pointer-events-auto ${
+            className={`absolute right-3 z-30 flex items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-[12px] font-bold text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] transition-colors hover:bg-[#f8f9fa] pointer-events-auto ${
               planningMode && !isDetailExpanded ? 'bottom-[calc(11.5rem+env(safe-area-inset-bottom))]' : 'bottom-[5.5rem]'
             }`}
             aria-label="Ver estados desbloqueados"
