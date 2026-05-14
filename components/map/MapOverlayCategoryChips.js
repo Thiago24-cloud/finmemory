@@ -97,13 +97,13 @@ export function MapOverlayCategoryChips({
 
   /** Sempre estilo Google Maps: fundo branco, texto escuro (tema global .dark não escurece o mapa). */
   const mapsPill =
-    'bg-white text-[#202124] shadow-[0_1px_3px_rgba(0,0,0,0.12),_0_1px_2px_rgba(0,0,0,0.24)] border border-[#dadce0] hover:bg-[#f8f9fa] active:scale-[0.97]';
+    'bg-white text-[#1a1a1a] shadow-[0_1px_4px_rgba(0,0,0,0.2)] border border-[#e0e0e0] hover:bg-[#f5f5f5] active:scale-[0.97]';
 
   const mapsPillActive =
-    'bg-[#e8f0fe] border-[#1a73e8] text-[#174ea6] shadow-[0_1px_3px_rgba(0,0,0,0.12),_0_1px_2px_rgba(0,0,0,0.24)] [&_svg]:text-[#1a73e8]';
+    'bg-[#1a73e8] border-[#1a73e8] text-white shadow-[0_1px_4px_rgba(0,0,0,0.2)] [&_svg]:text-white';
 
   const arrowBtn =
-    'bg-white text-[#5f6368] shadow-[0_1px_3px_rgba(0,0,0,0.12),_0_1px_2px_rgba(0,0,0,0.24)] border border-[#dadce0] hover:bg-[#f8f9fa]';
+    'bg-white text-[#5f6368] shadow-[0_1px_4px_rgba(0,0,0,0.2)] border border-[#e0e0e0] hover:bg-[#f5f5f5]';
 
   const applyFilterChip = (chip) => {
     setMapChipSelection(chip.id);
