@@ -8,7 +8,16 @@ import { requireAppUnlockAfterSession } from '../../lib/appUnlockGate';
 
 /** Tempo mínimo desde o arranque até iniciar o fade-out (marca + “carregamento”). */
 const SPLASH_MIN_VISIBLE_MS = 3000;
+/** Tempo máximo absoluto — splash some mesmo se a sessão não resolver (evita bloqueio de inputs). */
+const SPLASH_MAX_TOTAL_MS = 6000;
 const FADE_OUT_MS = 420;
+
+async function doFadeOut(setPhase, cancelledRef) {
+  if (cancelledRef.current) return;
+  setPhase((p) => (p === 'off' ? 'off' : 'fade'));
+  await new Promise((r) => setTimeout(r, FADE_OUT_MS));
+  if (!cancelledRef.current) setPhase('off');
+}
 
 /**
  * Splash de arranque: fundo branco, marca com fade-in + pulso suave, ≥3s visível,
@@ -18,6 +27,17 @@ export function AppSplashGate({ children }) {
   const { status } = useSession();
   const mountedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const [phase, setPhase] = useState('splash'); // splash | fade | off
+  const cancelledRef = useRef(false);
+
+  // Hard cap: nunca fica mais de SPLASH_MAX_TOTAL_MS — garante que inputs nunca ficam bloqueados.
+  useEffect(() => {
+    cancelledRef.current = false;
+    const hard = setTimeout(() => doFadeOut(setPhase, cancelledRef), SPLASH_MAX_TOTAL_MS);
+    return () => {
+      cancelledRef.current = true;
+      clearTimeout(hard);
+    };
+  }, []);
 
   useEffect(() => {
     if (status === 'loading') return undefined;
@@ -29,18 +49,18 @@ export function AppSplashGate({ children }) {
       } catch {
         /* não bloquear o app */
       }
-      if (cancelled) return;
+      if (cancelled || cancelledRef.current) return;
 
       const now =
         typeof performance !== 'undefined' ? performance.now() : Date.now();
       const elapsed = now - mountedAt.current;
       const wait = Math.max(0, SPLASH_MIN_VISIBLE_MS - elapsed);
       await new Promise((r) => setTimeout(r, wait));
-      if (cancelled) return;
+      if (cancelled || cancelledRef.current) return;
 
       setPhase('fade');
       await new Promise((r) => setTimeout(r, FADE_OUT_MS));
-      if (cancelled) return;
+      if (cancelled || cancelledRef.current) return;
       setPhase('off');
     };
 
