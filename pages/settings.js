@@ -19,7 +19,8 @@ const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: fa
 const UpgradePlan = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
 const MIN_ACCOUNT_READY_MS = 160;
-const ACCOUNT_FETCH_TIMEOUT_MS = 14000;
+const ACCOUNT_FETCH_TIMEOUT_MS = 10000;
+const SKELETON_SAFETY_TIMEOUT_MS = 12000;
 
 async function fetchWithTimeout(input, init = {}, ms = ACCOUNT_FETCH_TIMEOUT_MS) {
   const ctrl = new AbortController();
@@ -93,6 +94,7 @@ export default function SettingsPage() {
   const [totpMsg, setTotpMsg] = useState('');
   const [xpStats, setXpStats] = useState(null);
   const [accountUiReady, setAccountUiReady] = useState(false);
+  const [accountDiag, setAccountDiag] = useState(null);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
   const [deleteAccountErr, setDeleteAccountErr] = useState('');
@@ -181,6 +183,22 @@ export default function SettingsPage() {
     let cancelled = false;
     const t0 = Date.now();
 
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setAccountUiReady(true);
+    }, SKELETON_SAFETY_TIMEOUT_MS);
+
+    const diagTimer = setTimeout(() => {
+      if (!cancelled && !accountUiReady) {
+        setAccountDiag({
+          status,
+          email: session?.user?.email || '(sem email)',
+          supabaseId: session?.user?.supabaseId || '(ausente — causa provável do skeleton infinito)',
+          plano: session?.user?.plano || '(ausente)',
+          ts: new Date().toISOString(),
+        });
+      }
+    }, 5000);
+
     (async () => {
       try {
         const [gWrap, subRes] = await Promise.all([
@@ -237,45 +255,6 @@ export default function SettingsPage() {
         setXpStats(xp);
         setSubscriptionStatus(nextSub);
         setAccountUiReady(true);
-
-        void (async () => {
-          try {
-            await fetchWithTimeout(
-              '/api/stripe/sync-plan-status',
-              { method: 'POST', headers: { 'Content-Type': 'application/json' } },
-              15000
-            );
-          } catch {
-            /* ignore */
-          }
-          try {
-            await Promise.race([
-              updateRef.current?.() ?? Promise.resolve(),
-              new Promise((r) => setTimeout(r, 5000)),
-            ]);
-          } catch {
-            /* ignore */
-          }
-          if (cancelled) return;
-          try {
-            const r2 = await fetchWithTimeout('/api/stripe/subscription-status');
-            const d2 = await r2.json().catch(() => ({}));
-            if (cancelled || !r2.ok) return;
-            const refreshed = {
-              loading: false,
-              plano: String(d2.plano || 'free').toLowerCase(),
-              plano_ativo: Boolean(d2.plano_ativo),
-              stripe_subscription_status: String(d2.stripe_subscription_status || ''),
-              next_billing_at: d2.next_billing_at || null,
-              cancel_at_period_end: Boolean(d2.cancel_at_period_end),
-              error: '',
-            };
-            setSubscriptionStatus(refreshed);
-            writeSettingsAccountCache(userKey, xp, refreshed);
-          } catch {
-            /* ignore */
-          }
-        })();
       } catch {
         if (cancelled) return;
         if (cached) return;
@@ -299,6 +278,8 @@ export default function SettingsPage() {
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
+      clearTimeout(diagTimer);
     };
   }, [status, session?.user?.email, session?.user?.supabaseId]);
 
@@ -425,6 +406,17 @@ export default function SettingsPage() {
         {status === 'loading' || (status === 'authenticated' && !accountUiReady) ? (
           <SettingsAccountTopSkeleton />
         ) : null}
+
+        {accountDiag && !accountUiReady && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-mono text-red-800">
+            <p className="font-bold mb-1">⏱ Diagnóstico (5s sem carregar)</p>
+            <p>status: <b>{accountDiag.status}</b></p>
+            <p>email: {accountDiag.email}</p>
+            <p>supabaseId: {accountDiag.supabaseId}</p>
+            <p>plano (sessão): {accountDiag.plano}</p>
+            <p className="mt-1 text-red-600">Se supabaseId aparecer &quot;ausente&quot;, faça logout e login novamente.</p>
+          </div>
+        )}
 
         {status === 'authenticated' && accountUiReady && session?.user ? (
           <>

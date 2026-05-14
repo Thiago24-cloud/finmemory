@@ -22,7 +22,13 @@ export default async function handler(req, res) {
     .select('id,plano,plano_ativo,stripe_customer_id,stripe_subscription_status')
     .eq('id', userId)
     .maybeSingle();
-  if (userErr || !userRow) return res.status(404).json({ error: 'Utilizador não encontrado' });
+  if (userErr) {
+    console.warn('[stripe/subscription-status] DB error:', userErr.message);
+    return res.status(200).json({ ok: true, plano: 'free', plano_ativo: false, stripe_subscription_status: '', next_billing_at: null, cancel_at_period_end: false });
+  }
+  if (!userRow) {
+    return res.status(200).json({ ok: true, plano: 'free', plano_ativo: false, stripe_subscription_status: '', next_billing_at: null, cancel_at_period_end: false });
+  }
 
   const out = {
     plano: String(userRow.plano || 'free').toLowerCase(),
