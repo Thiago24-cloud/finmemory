@@ -97,13 +97,13 @@ export function MapOverlayCategoryChips({
 
   /** Sempre estilo Google Maps: fundo branco, texto escuro (tema global .dark não escurece o mapa). */
   const mapsPill =
-    'bg-white text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.12)] border border-[#dadce0] hover:bg-[#f8f9fa]';
+    'bg-white text-[#202124] shadow-[0_1px_3px_rgba(0,0,0,0.12),_0_1px_2px_rgba(0,0,0,0.24)] border border-[#dadce0] hover:bg-[#f8f9fa] active:scale-[0.97]';
 
   const mapsPillActive =
-    'bg-[#e8f0fe] border-[#1a73e8] text-[#174ea6] ring-0 shadow-sm [&_svg]:text-[#174ea6]';
+    'bg-[#e8f0fe] border-[#1a73e8] text-[#174ea6] shadow-[0_1px_3px_rgba(0,0,0,0.12),_0_1px_2px_rgba(0,0,0,0.24)] [&_svg]:text-[#1a73e8]';
 
   const arrowBtn =
-    'bg-white text-[#5f6368] shadow-[0_1px_2px_rgba(60,64,67,0.2)] border border-[#dadce0] hover:bg-[#f8f9fa]';
+    'bg-white text-[#5f6368] shadow-[0_1px_3px_rgba(0,0,0,0.12),_0_1px_2px_rgba(0,0,0,0.24)] border border-[#dadce0] hover:bg-[#f8f9fa]';
 
   const applyFilterChip = (chip) => {
     setMapChipSelection(chip.id);
@@ -183,7 +183,7 @@ export function MapOverlayCategoryChips({
                 aria-selected={active}
                 onClick={() => applyFilterChip(chip)}
                 className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-full py-1.5 pl-2 pr-2.5 text-[12px] sm:text-[13px] font-medium transition-all',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full py-2 pl-3 pr-3.5 text-[12px] sm:text-[13px] font-medium transition-all duration-150',
                   mapsPill,
                   active && mapsPillActive
                 )}
@@ -200,9 +200,8 @@ export function MapOverlayCategoryChips({
                 key={chip.id}
                 href={chip.href}
                 className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-full py-1.5 pl-2 pr-2.5 text-[12px] sm:text-[13px] font-medium transition-all no-underline',
-                  mapsPill,
-                  'hover:opacity-95 active:scale-[0.98]'
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full py-2 pl-3 pr-3.5 text-[12px] sm:text-[13px] font-medium transition-all duration-150 no-underline',
+                  mapsPill
                 )}
               >
                 <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px] shrink-0 opacity-90" strokeWidth={2} aria-hidden />
