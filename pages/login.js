@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { validatePasswordStrength } from '../lib/securityPolicy';
 import { FINMEMORY_CREDENTIAL_ERROR } from '../lib/finmemoryLoginErrorCodes';
 import { messageForCredentialLogin } from '../lib/loginErrorMessages';
+import { capturePosthog, identifyPosthog } from '../lib/posthogClient';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -53,6 +54,10 @@ export default function LoginPage() {
       setMsg(messageForCredentialLogin(code, { otpFieldVisible: revealOtpForMessage }));
       return;
     }
+    capturePosthog('user_logged_in', {
+      method: 'credentials',
+      has_otp: Boolean(show2fa && otp.trim()),
+    });
     router.push(res.url || callbackUrl);
   };
 
@@ -75,6 +80,18 @@ export default function LoginPage() {
       return;
     }
     setBusy(false);
+    const emailNorm = email.trim().toLowerCase();
+    if (data.userId) {
+      identifyPosthog(String(data.userId), {
+        email: emailNorm,
+        signup_method: 'email',
+        email_verified: false,
+      });
+    }
+    capturePosthog('user_signed_up', {
+      method: 'email',
+      ...(data.userId ? { user_id: String(data.userId) } : {}),
+    });
     setMsg('Conta criada. Confira seu email para confirmar e depois entrar.');
   };
 

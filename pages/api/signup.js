@@ -106,6 +106,7 @@ export default async function handler(req, res) {
     console.info('[auth][signup]', { email: normalized, ip });
     return res.status(201).json({
       success: true,
+      userId: userRow.id,
       message: 'Conta criada. Verifique seu email para liberar o acesso.',
     });
   } catch (e) {

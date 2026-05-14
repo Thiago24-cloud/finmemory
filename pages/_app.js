@@ -1,4 +1,4 @@
-import { Component, useEffect } from 'react';
+import { Component, useEffect, useRef } from 'react';
 import { SessionProvider, useSession } from 'next-auth/react';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { Toaster } from 'sonner';
@@ -18,9 +18,10 @@ import { ProfileFirstLoginGate } from '../components/onboarding/ProfileFirstLogi
 import AppMainBottomNav from '../components/AppMainBottomNav';
 import PageTransitionLayout from '../components/PageTransitionLayout';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
+import { capturePosthog, hasPosthogProjectKey } from '../lib/posthogClient';
 import '../styles/globals.css';
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && hasPosthogProjectKey()) {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
     // Tráfego via reverse proxy em `next.config.ts` (`/ingest` → PostHog Cloud).
     api_host: `${window.location.origin}/ingest`,
@@ -55,17 +56,30 @@ class SafeGoogleAnalytics extends Component {
 }
 
 function PostHogIdentify() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  /** Só fazer reset após logout — reset em qualquer visitante anónimo apagava identify feito no cadastro. */
+  const hadAuthenticatedRef = useRef(false);
+
   useEffect(() => {
-    if (session?.user?.id) {
-      posthog.identify(session.user.id, {
+    const distinctId =
+      session?.user?.supabaseId != null
+        ? String(session.user.supabaseId)
+        : session?.user?.id != null
+          ? String(session.user.id)
+          : null;
+
+    if (distinctId) {
+      posthog.identify(distinctId, {
         email: session.user.email ?? undefined,
         name: session.user.name ?? undefined,
       });
-    } else {
+      hadAuthenticatedRef.current = true;
+    } else if (status !== 'loading' && hadAuthenticatedRef.current) {
       posthog.reset();
+      hadAuthenticatedRef.current = false;
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.supabaseId, session?.user?.id, session?.user?.email, session?.user?.name, status]);
+
   return null;
 }
 
@@ -74,8 +88,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
 
   useEffect(() => {
     // Pageview da página inicial (routeChangeComplete não dispara no primeiro load)
-    posthog.capture('$pageview');
-    const handleRouteChange = () => posthog.capture('$pageview');
+    capturePosthog('$pageview');
+    const handleRouteChange = () => capturePosthog('$pageview');
     router.events.on('routeChangeComplete', handleRouteChange);
     return () => router.events.off('routeChangeComplete', handleRouteChange);
   }, [router.events]);
