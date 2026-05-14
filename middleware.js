@@ -25,6 +25,7 @@ function isPublicPagePath(pathname) {
   if (pathname.startsWith('/em-breve')) return true;
   if (pathname.startsWith('/privacidade')) return true;
   if (pathname.startsWith('/termos')) return true;
+  if (pathname.startsWith('/download')) return true;
   return false;
 }
 
