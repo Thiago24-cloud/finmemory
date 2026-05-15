@@ -3,7 +3,10 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth/next';
 import Head from 'next/head';
+import { toast } from 'sonner';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
+import { completeDailyMission } from '../lib/completeDailyMission';
+import { shareAppInviteLink } from '../lib/shareAppInvite';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
 import { cn } from '../lib/utils';
@@ -54,11 +57,46 @@ function missionActionHref(id) {
   }
 }
 
-function MissionCard({ mission, onNavigate }) {
+function MissionCard({ mission, onNavigate, refreshMissions }) {
   const pct = mission.total_steps > 1 ? Math.round((mission.steps_done / mission.total_steps) * 100) : 0;
+  const [inviteBusy, setInviteBusy] = useState(false);
 
-  const handleFazer = () => {
+  const handleFazer = async () => {
     if (mission.completed) return;
+
+    if (mission.id === 'invite_friend') {
+      setInviteBusy(true);
+      try {
+        const outcome = await shareAppInviteLink();
+        if (outcome === 'cancelled') return;
+
+        const res = await completeDailyMission('invite_friend');
+        let data = {};
+        try {
+          data = await res.json();
+        } catch {
+          /* ignore */
+        }
+        if (!res.ok) {
+          toast.error(data?.error || 'Não foi possível registrar o XP. Tente de novo.');
+          return;
+        }
+        await refreshMissions({ silent: true });
+        if (data.already_completed) {
+          toast.message('Você já concluiu esta missão hoje.');
+          return;
+        }
+        if (data.xp_awarded > 0) {
+          toast.success(`+${data.xp_awarded} XP — obrigado por divulgar o FinMemory!`);
+        }
+      } catch {
+        toast.error('Algo deu errado ao compartilhar.');
+      } finally {
+        setInviteBusy(false);
+      }
+      return;
+    }
+
     onNavigate(missionActionHref(mission.id));
   };
 
@@ -100,10 +138,11 @@ function MissionCard({ mission, onNavigate }) {
         ) : (
           <button
             type="button"
+            disabled={inviteBusy}
             onClick={handleFazer}
-            className="flex-shrink-0 px-3 py-2 rounded-xl bg-gradient-to-br from-[#2ECC49] to-[#16a34a] text-white font-bold text-[12px] shadow-sm active:scale-95 transition-transform"
+            className="flex-shrink-0 px-3 py-2 rounded-xl bg-gradient-to-br from-[#2ECC49] to-[#16a34a] text-white font-bold text-[12px] shadow-sm active:scale-95 transition-transform disabled:opacity-60 disabled:pointer-events-none"
           >
-            Fazer
+            {inviteBusy ? '…' : 'Fazer'}
           </button>
         )}
       </div>
@@ -168,7 +207,7 @@ export default function MissoesPage() {
             <p className="text-center text-muted-foreground py-10">Nenhuma missão disponível hoje.</p>
           ) : (
             missions.map((m) => (
-              <MissionCard key={m.id} mission={m} onNavigate={handleNavigate} />
+              <MissionCard key={m.id} mission={m} onNavigate={handleNavigate} refreshMissions={refresh} />
             ))
           )}
         </div>
