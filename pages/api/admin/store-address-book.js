@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { hasFinmemoryAdminAllowlist, isFinmemoryAdminEmail } from '../../../lib/adminAccess';
-import { canAccess } from '../../../lib/access-server';
+import { canAccessForSession } from '../../../lib/access-server';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import {
   digitsOnlyCnpj,
@@ -16,7 +16,7 @@ async function assertAdmin(session) {
       return { ok: false, status: 403, error: 'Acesso restrito ao painel operacional.' };
     }
   } else {
-    const allowed = await canAccess(session.user.email);
+    const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { ok: false, status: 403, error: 'Sem permissão.' };
     }

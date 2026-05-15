@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { canAccess } from '../../../lib/access-server';
+import { canAccessForSession } from '../../../lib/access-server';
 import { canAccessAdminRoutes } from '../../../lib/adminAccess';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 
@@ -13,7 +13,7 @@ async function checkAdmin(req, res) {
     res.status(401).json({ error: 'Não autenticado' });
     return null;
   }
-  const allowed = await canAccessAdminRoutes(session.user.email, () => canAccess(session.user.email));
+  const allowed = await canAccessAdminRoutes(session.user.email, () => canAccessForSession(session));
   if (!allowed) {
     res.status(403).json({ error: 'Acesso negado' });
     return null;

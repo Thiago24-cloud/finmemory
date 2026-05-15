@@ -2,9 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { cn } from '../../lib/utils';
 import { requireAppUnlockAfterSession } from '../../lib/appUnlockGate';
+
+/** Login/home: sem splash — evita bloquear foco nos inputs (Safari) e confusão “não consigo digitar”. */
+const SPLASH_SKIP_PATHS = new Set([
+  '/',
+  '/login',
+  '/privacidade',
+  '/termos',
+  '/auth-error',
+  '/download',
+  '/em-breve',
+]);
 
 /** Tempo mínimo desde o arranque até iniciar o fade-out (marca + “carregamento”). */
 const SPLASH_MIN_VISIBLE_MS = 3000;
@@ -24,23 +36,34 @@ async function doFadeOut(setPhase, cancelledRef) {
  * fade-out revelando a app já montada por baixo (sem alterar fluxo de navegação).
  */
 export function AppSplashGate({ children }) {
+  const router = useRouter();
   const { status } = useSession();
+  const pathname = router.pathname || '';
+  const skipSplash = SPLASH_SKIP_PATHS.has(pathname);
   const mountedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
-  const [phase, setPhase] = useState('splash'); // splash | fade | off
+  const [phase, setPhase] = useState(skipSplash ? 'off' : 'splash'); // splash | fade | off
   const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    if (skipSplash) {
+      cancelledRef.current = true;
+      setPhase('off');
+    }
+  }, [skipSplash]);
 
   // Hard cap: nunca fica mais de SPLASH_MAX_TOTAL_MS — garante que inputs nunca ficam bloqueados.
   useEffect(() => {
+    if (skipSplash) return undefined;
     cancelledRef.current = false;
     const hard = setTimeout(() => doFadeOut(setPhase, cancelledRef), SPLASH_MAX_TOTAL_MS);
     return () => {
       cancelledRef.current = true;
       clearTimeout(hard);
     };
-  }, []);
+  }, [skipSplash]);
 
   useEffect(() => {
-    if (status === 'loading') return undefined;
+    if (skipSplash || status === 'loading') return undefined;
 
     let cancelled = false;
     const run = async () => {

@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth/next';
 import { ProductBarcodeScanner } from '../components/ProductBarcodeScanner';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { authOptions } from './api/auth/[...nextauth]';
-import { canAccess } from '../lib/access-server';
+import { canAccessForSession } from '../lib/access-server';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 import { getOpenFoodFactsImageUrl } from '../lib/productImageUrl';
 import { digitsOnly, isValidRetailBarcode } from '../lib/validateGtin';
@@ -25,7 +25,7 @@ export async function getServerSideProps(ctx) {
     if (!session?.user?.email) {
       return { redirect: { destination: '/login?callbackUrl=/scan-product', permanent: false } };
     }
-    const allowed = await canAccess(session.user.email);
+    const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
     }

@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './api/auth/[...nextauth]';
-import { canAccess } from '../lib/access-server';
+import { canAccessForSession } from '../lib/access-server';
 
 /**
  * Rota legada: scanner NFC-e unificado em /add-receipt?tab=nfce
@@ -16,7 +16,7 @@ export async function getServerSideProps(ctx) {
         },
       };
     }
-    const allowed = await canAccess(session.user.email);
+    const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
     }

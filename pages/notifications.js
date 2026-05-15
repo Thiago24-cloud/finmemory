@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, Bell, Calendar, Target, Receipt } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
-import { canAccess } from '../lib/access-server';
+import { canAccessForSession } from '../lib/access-server';
 
 export async function getServerSideProps(ctx) {
   try {
@@ -11,7 +11,7 @@ export async function getServerSideProps(ctx) {
     if (!session?.user?.email) {
       return { redirect: { destination: '/login?callbackUrl=/notifications', permanent: false } };
     }
-    const allowed = await canAccess(session.user.email);
+    const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
     }

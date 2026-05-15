@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { canAccess } from '../../../lib/access-server';
+import { canAccessForSession } from '../../../lib/access-server';
 import { canAccessAdminRoutes } from '../../../lib/adminAccess';
 
 function safeFilenameFromUrl(rawUrl, fallback = 'encarte') {
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
   const allowed = await canAccessAdminRoutes(session.user.email, () =>
-    canAccess(session.user.email)
+    canAccessForSession(session)
   );
   if (!allowed) {
     return res.status(403).json({ error: 'Acesso negado' });

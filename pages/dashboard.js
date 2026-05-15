@@ -18,7 +18,7 @@ import { FeaturedScanReceiptCTA } from '../components/dashboard/FeaturedScanRece
 import { CalculatorDockProvider, useCalculatorDock } from '../components/dashboard/CalculatorDockContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { authOptions } from './api/auth/[...nextauth]';
-import { canAccess } from '../lib/access-server';
+import { canAccessForSession } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
 import { DashboardOnboardingTour } from '../components/onboarding/DashboardOnboardingTour';
 import { DASHBOARD } from '../lib/appMicrocopy';
@@ -94,7 +94,7 @@ export async function getServerSideProps(ctx) {
     if (!session?.user?.email) {
       return { redirect: { destination: '/login?callbackUrl=/dashboard', permanent: false } };
     }
-    const allowed = await canAccess(session.user.email);
+    const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
     }

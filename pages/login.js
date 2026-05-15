@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useState, useEffect } from 'react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -10,6 +10,7 @@ import { capturePosthog, identifyPosthog } from '../lib/posthogClient';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +22,13 @@ export default function LoginPage() {
   const [show2fa, setShow2fa] = useState(false);
 
   const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/mapa';
+
+  /** Conta já validada no Supabase: segue para o destino (evita ficar preso na home). */
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user?.supabaseId) return;
+    const dest = callbackUrl.startsWith('/') ? callbackUrl : '/mapa';
+    router.replace(dest);
+  }, [status, session?.user?.supabaseId, callbackUrl, router]);
   const resetToken = typeof router.query?.resetToken === 'string' ? router.query.resetToken : '';
   const resetEmail = typeof router.query?.email === 'string' ? router.query.email : '';
   const verified = router.query?.verified === '1';

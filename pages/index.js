@@ -124,8 +124,21 @@ export default function HomePage() {
           </div>
 
           {isNotRegistered && (
-            <div className="w-full mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm text-center">
-              Acesso restrito. Use uma conta cadastrada ou entre em contato para solicitar acesso.
+            <div className="w-full mb-6 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-900">
+              <p className="font-semibold text-center">Acesso restrito para esta conta</p>
+              <p className="text-amber-800/95 leading-relaxed">
+                O mapa e o app exigem uma conta FinMemory válida. Use o botão abaixo para{' '}
+                <strong>entrar com email e senha</strong> (os campos ficam na página de login).
+              </p>
+              {status === 'authenticated' ? (
+                <button
+                  type="button"
+                  className="w-full rounded-lg border border-amber-300 bg-white py-2.5 font-semibold text-amber-950 hover:bg-amber-100/80"
+                  onClick={() => signOut({ callbackUrl: '/login?callbackUrl=/mapa' })}
+                >
+                  Sair desta conta e entrar com outro email
+                </button>
+              ) : null}
             </div>
           )}
 
@@ -153,7 +166,7 @@ export default function HomePage() {
 
           <div className="flex flex-col gap-4 items-center">
             <Link
-              href="/login"
+              href={isNotRegistered ? '/login?callbackUrl=/mapa' : '/login'}
               className="w-full max-w-[400px] flex items-center justify-center gap-3 py-4 px-6 bg-gradient-google text-white rounded-lg font-bold text-lg shadow-[0_4px_12px_rgba(46,204,73,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-transform no-underline"
               aria-label="Entrar com email e senha"
             >

@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { canAccess } from '../../../lib/access-server';
+import { canAccessForSession } from '../../../lib/access-server';
 import {
   hasFinmemoryAdminAllowlist,
   isFinmemoryAdminEmail,
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Acesso restrito ao painel operacional.' });
       }
     } else {
-      const allowed = await canAccess(session.user.email);
+      const allowed = await canAccessForSession(session);
       if (!allowed) {
         return res.status(403).json({ error: 'Sem permissão.' });
       }

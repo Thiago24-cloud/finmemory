@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { canAccess } from '../../../lib/access-server';
+import { canAccessForSession } from '../../../lib/access-server';
 import { canAccessAdminRoutes } from '../../../lib/adminAccess';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -194,7 +194,7 @@ async function checkAdmin(req, res) {
     return null;
   }
   const allowed = await canAccessAdminRoutes(session.user.email, () =>
-    canAccess(session.user.email)
+    canAccessForSession(session)
   );
   if (!allowed) {
     res.status(403).json({ error: 'Acesso negado' });

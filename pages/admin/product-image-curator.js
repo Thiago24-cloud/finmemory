@@ -2,7 +2,7 @@ import Head from 'next/head';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../api/auth/[...nextauth]';
 import { canAccessAdminRoutes } from '../../lib/adminAccess';
-import { canAccess } from '../../lib/access-server';
+import { canAccessForSession } from '../../lib/access-server';
 import ProductImageCuratorPanel from '../../components/admin/ProductImageCuratorPanel';
 
 export async function getServerSideProps(ctx) {
@@ -13,7 +13,7 @@ export async function getServerSideProps(ctx) {
         redirect: { destination: '/login?callbackUrl=/admin/product-image-curator', permanent: false },
       };
     }
-    const allowed = await canAccessAdminRoutes(session.user.email, () => canAccess(session.user.email));
+    const allowed = await canAccessAdminRoutes(session.user.email, () => canAccessForSession(session));
     if (!allowed) {
       return { redirect: { destination: '/?msg=sem-acesso-admin', permanent: false } };
     }

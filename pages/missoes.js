@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import Head from 'next/head';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
 import { authOptions } from './api/auth/[...nextauth]';
-import { canAccess } from '../lib/access-server';
+import { canAccessForSession } from '../lib/access-server';
 import { cn } from '../lib/utils';
 
 export async function getServerSideProps(ctx) {
@@ -14,7 +14,7 @@ export async function getServerSideProps(ctx) {
     if (!session?.user?.email) {
       return { redirect: { destination: '/login?callbackUrl=/missoes', permanent: false } };
     }
-    const allowed = await canAccess(session.user.email);
+    const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
     }

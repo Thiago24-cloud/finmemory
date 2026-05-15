@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
-import { canAccess } from '../lib/access-server';
+import { canAccessForSession } from '../lib/access-server';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 import { MAP_THEMES, MAP_THEME_STORAGE_KEY } from '../lib/colors';
 import { useMatchMedia } from '../lib/useMatchMedia';
@@ -62,7 +62,7 @@ export async function getServerSideProps(ctx) {
     if (!session?.user?.email) {
       return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };
     }
-    const allowed = await canAccess(session.user.email);
+    const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
     }

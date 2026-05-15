@@ -52,12 +52,18 @@ $required = @(
     "NEXT_PUBLIC_APP_URL",
     # Stripe — server-side runtime (não embutidas no bundle)
     "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
-    "STRIPE_PLUS_PRICE_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_FAMILIA_PRICE_ID"
+    "STRIPE_PLUS_PRICE_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_FAMILIA_PRICE_ID",
+    "FINMEMORY_PUBLIC_ACCESS"
 )
 # Garantir callback Google = NEXTAUTH_URL + /api/auth/callback/google
 $vars["GOOGLE_REDIRECT_URI"] = $vars["NEXTAUTH_URL"].TrimEnd('/') + "/api/auth/callback/google"
 # STRIPE_APP_BASE_URL é exclusivo de dev local (aponta para localhost) — nunca enviar para produção
 $vars.Remove("STRIPE_APP_BASE_URL") | Out-Null
+# App aberto por defeito — evita FINMEMORY_LOCKDOWN_SINGLE_USER bloquear login em produção
+if (-not $vars["FINMEMORY_PUBLIC_ACCESS"]) {
+    $vars["FINMEMORY_PUBLIC_ACCESS"] = "1"
+}
+$vars.Remove("FINMEMORY_LOCKDOWN_SINGLE_USER") | Out-Null
 $pairs = @()
 foreach ($k in $required) {
     if ($vars[$k]) {
