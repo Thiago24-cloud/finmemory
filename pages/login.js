@@ -15,20 +15,27 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [showForgot, setShowForgot] = useState(false);
   const [show2fa, setShow2fa] = useState(false);
+  /** Esqueci o e-mail: telefone OU CPF */
+  const [showForgotEmail, setShowForgotEmail] = useState(false);
+  const [recoveryPhone, setRecoveryPhone] = useState('');
+  const [recoveryDoc, setRecoveryDoc] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryHint, setRecoveryHint] = useState(null); // { maskedEmail, found }
+  const [infoMsg, setInfoMsg] = useState('');
 
   const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/mapa';
 
-  /** Conta já validada no Supabase: segue para o destino (evita ficar preso na home). */
+  /** Conta já validada no Supabase: segue para o destino */
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.supabaseId) return;
     const dest = callbackUrl.startsWith('/') ? callbackUrl : '/mapa';
     router.replace(dest);
   }, [status, session?.user?.supabaseId, callbackUrl, router]);
+
   const resetToken = typeof router.query?.resetToken === 'string' ? router.query.resetToken : '';
   const resetEmail = typeof router.query?.email === 'string' ? router.query.email : '';
   const verified = router.query?.verified === '1';
@@ -37,6 +44,7 @@ export default function LoginPage() {
   const doLogin = async () => {
     setBusy(true);
     setMsg('');
+    setInfoMsg('');
     const res = await signIn('credentials', {
       email: email.trim().toLowerCase(),
       password,
@@ -72,13 +80,14 @@ export default function LoginPage() {
   const doSignup = async () => {
     setBusy(true);
     setMsg('');
+    setInfoMsg('');
+    const emailNorm = email.trim().toLowerCase();
     const resp = await fetch('/api/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: email.trim().toLowerCase(),
+        email: emailNorm,
         password,
-        name: name.trim(),
       }),
     });
     const data = await resp.json().catch(() => ({}));
@@ -87,44 +96,100 @@ export default function LoginPage() {
       setMsg(data.error || 'Erro ao criar conta.');
       return;
     }
-    setBusy(false);
-    const emailNorm = email.trim().toLowerCase();
     if (data.userId) {
       identifyPosthog(String(data.userId), {
         email: emailNorm,
         signup_method: 'email',
-        email_verified: false,
+        email_verified: true,
       });
     }
     capturePosthog('user_signed_up', {
       method: 'email',
       ...(data.userId ? { user_id: String(data.userId) } : {}),
     });
-    setMsg('Conta criada. Confira seu email para confirmar e depois entrar.');
+
+    const loginRes = await signIn('credentials', {
+      email: emailNorm,
+      password,
+      otp: '',
+      redirect: false,
+      callbackUrl,
+    });
+
+    setBusy(false);
+    if (!loginRes || loginRes.error) {
+      let code = loginRes?.error ?? null;
+      setMsg(code ? messageForCredentialLogin(code, {}) : 'Conta criada. Tente entrar com email e senha.');
+      return;
+    }
+    const dest =
+      typeof loginRes.url === 'string' && loginRes.url.startsWith('/') ? loginRes.url : callbackUrl.startsWith('/') ? callbackUrl : '/mapa';
+    router.replace(dest);
   };
 
   const doResendVerification = async () => {
     setBusy(true);
     setMsg('');
+    setInfoMsg('');
     await fetch('/api/auth/resend-verification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     });
     setBusy(false);
-    setMsg('Se o email existir, enviamos um novo link de confirmação.');
+    setInfoMsg('Se o email existir, enviamos um novo link de confirmação.');
   };
 
   const doRequestReset = async () => {
     setBusy(true);
     setMsg('');
+    setInfoMsg('');
     await fetch('/api/auth/request-password-reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     });
     setBusy(false);
-    setMsg('Se o email existir, enviamos um link de redefinição.');
+    setInfoMsg('Se o email existir, enviamos um link de redefinição.');
+  };
+
+  const lookupRecoveryHint = async (requestPasswordReset = false) => {
+    setRecoveryBusy(true);
+    setRecoveryHint(null);
+    setMsg('');
+    setInfoMsg('');
+    try {
+      const res = await fetch('/api/auth/recovery-email-hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: recoveryPhone.trim() || undefined,
+          document: recoveryDoc.trim() || undefined,
+          requestPasswordReset,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setRecoveryBusy(false);
+      if (!res.ok) {
+        setMsg(data.error || 'Não foi possível consultar.');
+        return;
+      }
+      setRecoveryHint({
+        found: Boolean(data.found),
+        maskedEmail: data.maskedEmail || '',
+        resetSent: Boolean(data.resetEmailSent),
+      });
+      if (data.resetEmailSent && data.message) {
+        setInfoMsg(data.message);
+      } else if (data.found && data.message) {
+        setInfoMsg(data.message);
+      } else if (!data.found) {
+        setInfoMsg(data.message || 'Consulta concluída. Se não encontramos, confira o número ou CPF.');
+      }
+    } catch (e) {
+      setRecoveryBusy(false);
+      setMsg(e.message || 'Erro de rede.');
+    }
   };
 
   const doResetPassword = async () => {
@@ -136,6 +201,7 @@ export default function LoginPage() {
     }
     setBusy(true);
     setMsg('');
+    setInfoMsg('');
     const resp = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -181,7 +247,11 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-primary p-5">
         <form onSubmit={onSubmit} className="finmemory-public-light-panel bg-white rounded-[20px] p-8 w-full max-w-md shadow-card-lovable">
           <h1 className="text-2xl font-bold text-[#333] text-center mb-4">FinMemory</h1>
-          {verified ? <p className="text-sm text-green-700 mb-3">Email confirmado com sucesso. Agora é só entrar.</p> : null}
+          {verified ? (
+            <p className="text-sm text-green-700 mb-3">
+              Email confirmado com sucesso. Agora é só entrar.
+            </p>
+          ) : null}
           {resetOk ? <p className="text-sm text-green-700 mb-3">Senha redefinida. Faça login com a nova senha.</p> : null}
           {resetToken && resetEmail ? (
             <div className="mb-4 rounded-lg border border-gray-200 p-3 bg-gray-50">
@@ -213,6 +283,7 @@ export default function LoginPage() {
                 setShow2fa(false);
                 setOtp('');
                 setMsg('');
+                setInfoMsg('');
               }}
               className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === 'login' ? 'bg-[#2ECC49] text-white' : 'bg-gray-100 text-gray-700'}`}
             >
@@ -225,6 +296,7 @@ export default function LoginPage() {
                 setShow2fa(false);
                 setOtp('');
                 setMsg('');
+                setInfoMsg('');
               }}
               className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === 'signup' ? 'bg-[#2ECC49] text-white' : 'bg-gray-100 text-gray-700'}`}
             >
@@ -232,16 +304,12 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {mode === 'signup' ? (
-            <input
-              type="text"
-              placeholder="Nome (opcional)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-              className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2.5 text-base text-[#111827] placeholder:text-gray-500"
-            />
-          ) : null}
+          <p className="text-[11px] text-center text-gray-600 mb-3 leading-relaxed">
+            {mode === 'signup'
+              ? 'Cadastro rápido: só email e senha. Você entra já e completa dados de segurança no onboarding.'
+              : null}
+          </p>
+
           <input
             type="email"
             placeholder="Seu email"
@@ -259,6 +327,7 @@ export default function LoginPage() {
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             className="w-full mb-3 rounded-lg border border-gray-300 px-3 py-2.5 text-base text-[#111827] placeholder:text-gray-500"
           />
+
           {mode === 'login' ? (
             <div className="mb-3">
               {!show2fa ? (
@@ -267,6 +336,7 @@ export default function LoginPage() {
                   onClick={() => {
                     setShow2fa(true);
                     setMsg('');
+                setInfoMsg('');
                   }}
                   className="text-xs text-[#2ECC49] underline underline-offset-2"
                 >
@@ -290,6 +360,7 @@ export default function LoginPage() {
                       setShow2fa(false);
                       setOtp('');
                       setMsg('');
+                setInfoMsg('');
                     }}
                     className="mt-2 text-xs text-gray-500 underline"
                   >
@@ -299,7 +370,16 @@ export default function LoginPage() {
               )}
             </div>
           ) : null}
+
+          {infoMsg ? (
+            <p
+              className={`text-sm mb-3 whitespace-pre-wrap ${infoMsg.includes('Se houver') || infoMsg.includes('confira o número') ? 'text-gray-600' : 'text-green-700'}`}
+            >
+              {infoMsg}
+            </p>
+          ) : null}
           {msg ? <p className="text-sm text-red-600 mb-3 whitespace-pre-wrap">{msg}</p> : null}
+
           <button
             type="submit"
             disabled={busy}
@@ -307,6 +387,7 @@ export default function LoginPage() {
           >
             {busy ? 'Aguarde...' : mode === 'signup' ? 'Criar conta e entrar' : 'Entrar'}
           </button>
+
           <p className="mt-3 text-xs text-center text-gray-500">
             Ao continuar, você concorda com nossos{' '}
             <Link href="/termos" className="text-[#2ECC49] underline">
@@ -318,22 +399,90 @@ export default function LoginPage() {
             </Link>
             .
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={doResendVerification} className="rounded-lg py-2 text-xs border border-gray-300">
-              Reenviar confirmação
+
+          <div className="mt-3 flex flex-wrap gap-2 justify-center">
+            <button type="button" onClick={doResendVerification} className="rounded-lg py-2 px-2 text-xs border border-gray-300">
+              Reenviar confirmação de email
             </button>
-            <button type="button" onClick={() => setShowForgot((v) => !v)} className="rounded-lg py-2 text-xs border border-gray-300">
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgot((v) => !v);
+                setShowForgotEmail(false);
+              }}
+              className="rounded-lg py-2 px-2 text-xs border border-gray-300"
+            >
               Esqueci a senha
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotEmail((v) => !v);
+                setShowForgot(false);
+                setRecoveryHint(null);
+              }}
+              className="rounded-lg py-2 px-2 text-xs border border-gray-300"
+            >
+              Esqueci meu email
+            </button>
           </div>
+
           {showForgot ? (
             <button type="button" onClick={doRequestReset} className="mt-2 w-full rounded-lg py-2 text-xs bg-gray-100">
-              Enviar link de redefinição
+              Enviar link de redefinição para o email acima
             </button>
           ) : null}
 
+          {showForgotEmail ? (
+            <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3 text-left">
+              <p className="text-sm font-semibold text-gray-900 m-0">Recuperar com celular ou CPF</p>
+              <p className="text-xs text-gray-600 m-0">
+                Digite um dos dois cadastrados no app. Mostramos seu email mascarado; você pode também pedir o link para nova senha.
+              </p>
+              <input
+                type="tel"
+                placeholder="Celular (com DDD)"
+                value={recoveryPhone}
+                onChange={(e) => setRecoveryPhone(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-[#111827]"
+              />
+              <input
+                type="text"
+                placeholder="Ou CPF"
+                value={recoveryDoc}
+                onChange={(e) => setRecoveryDoc(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-[#111827]"
+              />
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={recoveryBusy}
+                  onClick={() => lookupRecoveryHint(false)}
+                  className="rounded-lg py-2 bg-[#2ECC49] text-white text-xs font-semibold disabled:opacity-60"
+                >
+                  {recoveryBusy ? 'Consultando…' : 'Mostrar email mascarado'}
+                </button>
+                {recoveryHint?.found ? (
+                  <p className="text-sm text-green-800 m-0 text-center font-mono">{recoveryHint.maskedEmail}</p>
+                ) : null}
+                {recoveryHint?.found ? (
+                  <button
+                    type="button"
+                    disabled={recoveryBusy}
+                    onClick={() => lookupRecoveryHint(true)}
+                    className="rounded-lg py-2 border border-[#2ECC49] text-[#2ECC49] text-xs font-semibold"
+                  >
+                    Enviar link de nova senha
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <p className="text-xs text-center mt-4">
-            <Link href="/" className="text-[#2ECC49] underline">Voltar</Link>
+            <Link href="/" className="text-[#2ECC49] underline">
+              Voltar
+            </Link>
           </p>
         </form>
       </div>

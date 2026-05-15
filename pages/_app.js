@@ -15,6 +15,7 @@ import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 import { MapCartProvider } from '../components/map/MapCartContext';
 import { MissionsTodayProvider } from '../components/missions/MissionsTodayContext';
 import { ProfileFirstLoginGate } from '../components/onboarding/ProfileFirstLoginGate';
+import { RecoveryIdentifierGate } from '../components/onboarding/RecoveryIdentifierGate';
 import AppMainBottomNav from '../components/AppMainBottomNav';
 import PageTransitionLayout from '../components/PageTransitionLayout';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
@@ -100,6 +101,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
       <SessionProvider session={session}>
         <PostHogIdentify />
         <ProfileFirstLoginGate>
+        <RecoveryIdentifierGate>
         <AppSplashGate>
           <PWAInstallProvider>
             <ServiceWorkerRegister />
@@ -117,6 +119,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             </AnalyticsProvider>
           </PWAInstallProvider>
         </AppSplashGate>
+        </RecoveryIdentifierGate>
         </ProfileFirstLoginGate>
         <ClientOnly>
           <SafeGoogleAnalytics />

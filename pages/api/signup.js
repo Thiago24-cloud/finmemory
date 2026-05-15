@@ -1,16 +1,14 @@
 import { hashPassword } from '../../lib/passwordAuth';
 import { getSupabaseAdmin } from '../../lib/supabaseAdmin';
 import { checkRateLimit, getRequestIp } from '../../lib/rateLimit';
-import { generateOpaqueToken } from '../../lib/tokens';
 import { sendSecurityEmail } from '../../lib/securityEmail';
 import { isValidEmail, normalizeEmail, validatePasswordStrength } from '../../lib/securityPolicy';
-import { mergeVerifyTokenHashes } from '../../lib/emailVerifyTokens';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../lib/privateBetaAllowlist';
 
 /**
  * POST /api/signup
  * Body: { email: string, password: string, name?: string }
- * Cria conta local (email/senha) no FinMemory.
+ * Cria conta local (email/senha) já com email considerado verificado — login imediato sem bloqueio.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -48,8 +46,7 @@ export default async function handler(req, res) {
   }
   const safeName = String(name || normalized.split('@')[0] || 'Usuário').slice(0, 120);
   const passwordHash = hashPassword(password);
-  const verifyToken = generateOpaqueToken();
-  const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const nowIso = new Date().toISOString();
 
   try {
     const { data: userRow, error: userErr } = await supabase
@@ -81,11 +78,11 @@ export default async function handler(req, res) {
           email: normalized,
           user_id: userRow.id,
           password_hash: passwordHash,
-          email_verified_at: null,
-          email_verify_token_hash: verifyToken.hash,
-          email_verify_token_hashes: mergeVerifyTokenHashes(null, verifyToken.hash),
-          email_verify_expires_at: verifyExpiresAt,
-          updated_at: new Date().toISOString(),
+          email_verified_at: nowIso,
+          email_verify_token_hash: null,
+          email_verify_expires_at: null,
+          email_verify_token_hashes: [],
+          updated_at: nowIso,
         },
         { onConflict: 'email' }
       );
@@ -95,19 +92,18 @@ export default async function handler(req, res) {
     }
 
     const appUrl = process.env.NEXTAUTH_URL || process.env.APP_BASE_URL || 'https://finmemory.com.br';
-    const verifyUrl = `${appUrl}/api/auth/verify-email?token=${verifyToken.raw}&email=${encodeURIComponent(normalized)}`;
     await sendSecurityEmail({
       to: normalized,
-      subject: 'Confirme seu email no FinMemory',
-      html: `<p>Confirme seu email para liberar o acesso ao app:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>Link valido por 24h.</p>`,
-      fallbackLog: `verification_link=${verifyUrl}`,
+      subject: 'Bem-vindo ao FinMemory',
+      html: `<p>Sua conta está pronta.</p><p>Você já pode entrar no app: <a href="${appUrl}/login">${appUrl}/login</a></p><p>Para sua segurança, adicione celular ou CPF no onboarding.</p>`,
+      fallbackLog: `welcome_signup=${normalized}`,
     });
 
     console.info('[auth][signup]', { email: normalized, ip });
     return res.status(201).json({
       success: true,
       userId: userRow.id,
-      message: 'Conta criada. Verifique seu email para liberar o acesso.',
+      message: 'Conta criada.',
     });
   } catch (e) {
     console.error('Signup exception:', e);
