@@ -1,4 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  deleteTransactionReceiptsFromR2,
+  isHttpReceiptUrl,
+  receiptUrlDbFields,
+} from '../../../lib/receiptComprovanteUrl';
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,7 +30,7 @@ export default async function handler(req, res) {
 
   const { data: existing } = await supabase
     .from('transacoes')
-    .select('id, user_id')
+    .select('id, user_id, receipt_image_url, url_comprovante')
     .eq('id', id)
     .single();
 
@@ -46,11 +51,29 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({ success: true });
     }
+
     const updates = {};
-    if (estabelecimento != null && String(estabelecimento).trim()) updates.estabelecimento = String(estabelecimento).trim();
+    if (estabelecimento != null && String(estabelecimento).trim()) {
+      updates.estabelecimento = String(estabelecimento).trim();
+    }
     if (total != null && !isNaN(parseFloat(total))) updates.total = parseFloat(total);
     if (data != null && String(data).trim()) updates.data = String(data).trim().slice(0, 10);
-    if (receiptImageUrl !== undefined) updates.receipt_image_url = receiptImageUrl === null || receiptImageUrl === '' ? null : receiptImageUrl;
+
+    if (receiptImageUrl !== undefined) {
+      if (receiptImageUrl === null || receiptImageUrl === '') {
+        await deleteTransactionReceiptsFromR2(existing);
+        Object.assign(updates, receiptUrlDbFields(null));
+      } else if (!isHttpReceiptUrl(receiptImageUrl)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Comprovante deve ser uma URL https (sem imagem em base64 no banco).',
+        });
+      } else {
+        const nextUrl = String(receiptImageUrl).trim();
+        await deleteTransactionReceiptsFromR2(existing, { exceptUrls: [nextUrl] });
+        Object.assign(updates, receiptUrlDbFields(nextUrl));
+      }
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, error: 'Nenhum campo para atualizar' });
@@ -71,7 +94,8 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    // Soft delete: marcar como excluído (lixeira) em vez de apagar
+    await deleteTransactionReceiptsFromR2(existing);
+
     const { error } = await supabase
       .from('transacoes')
       .update({ deleted_at: new Date().toISOString() })

@@ -4,6 +4,10 @@
  */
 export async function register() {
   if (typeof process === 'undefined' || typeof process.on !== 'function') return;
+
+  const { assertR2ProductionConfigured } = await import('./lib/r2ProductionGuard.js');
+  assertR2ProductionConfigured();
+
   process.on('unhandledRejection', (reason) => {
     const msg = reason?.message ?? String(reason);
     console.warn('[instrumentation] unhandledRejection:', msg);

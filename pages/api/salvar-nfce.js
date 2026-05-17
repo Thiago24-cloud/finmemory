@@ -9,6 +9,7 @@
 import { getServerSession } from 'next-auth/next';
 import { createClient } from '@supabase/supabase-js';
 import { authOptions } from './auth/[...nextauth]';
+import { isHttpReceiptUrl, receiptUrlDbFields } from '../../lib/receiptComprovanteUrl';
 
 let supabaseInstance = null;
 
@@ -100,7 +101,7 @@ export default async function handler(req, res) {
       categoria: category || null,
       items: Array.isArray(itens) && itens.length > 0 ? itens : null,
       source: 'nfce_scan',
-      receipt_image_url: nfce_url || null
+      ...receiptUrlDbFields(isHttpReceiptUrl(nfce_url) ? nfce_url : null),
     };
 
     const { data: transaction, error: insertError } = await supabase

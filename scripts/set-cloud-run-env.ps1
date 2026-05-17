@@ -86,6 +86,20 @@ foreach ($k in $pluggyOptional) {
     }
 }
 
+# Opcional: Cloudflare R2 (comprovantes OCR) + OpenAI
+$r2Optional = @(
+    "CLOUDFLARE_R2_ENDPOINT", "CLOUDFLARE_R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+    "CLOUDFLARE_R2_BUCKET", "CLOUDFLARE_R2_PUBLIC_BASE_URL",
+    "CLOUDFLARE_R2_BUCKET_NAME", "CLOUDFLARE_R2_PUBLIC_URL",
+    "OPENAI_API_KEY"
+)
+foreach ($k in $r2Optional) {
+    if ($vars[$k]) {
+        $v = $vars[$k] -replace '"', '\"'
+        $pairs += "$k=$v"
+    }
+}
+
 $envVarsStr = $pairs -join ","
 if (-not $envVarsStr) {
     Write-Host "Nenhuma variavel para atualizar." -ForegroundColor Red

@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { ensureR2ForProductionApi, isCloudProduction } from '../../../lib/r2ProductionGuard';
+import {
+  buildReceiptR2Key,
+  deleteFromR2,
+  isR2Configured,
+  uploadToR2,
+} from '../../../lib/uploadToR2';
 
 /**
  * POST /api/ocr/process-receipt
@@ -10,7 +17,7 @@ import OpenAI from 'openai';
  * 
  * Fluxo:
  * 1. Valida imagem (tamanho, formato)
- * 2. Faz upload para Supabase Storage
+ * 2. Faz upload para Cloudflare R2 (se configurado) ou Supabase Storage
  * 3. Envia para GPT-4 Vision extrair dados
  * 4. Retorna dados extraídos + URL da imagem
  */
@@ -135,6 +142,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!ensureR2ForProductionApi(res)) return;
+
   const openai = getOpenAI();
   const supabase = getSupabase();
 
@@ -151,6 +160,10 @@ export default async function handler(req, res) {
       error: 'Configuração do servidor incompleta (Supabase)' 
     });
   }
+
+  let storagePath = null;
+  let useR2 = false;
+  let supabaseForCleanup = null;
 
   try {
     const { imageBase64, userId, fileName } = req.body;
@@ -209,40 +222,82 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1. Upload da imagem para Supabase Storage
+    // 1. Upload da imagem (R2 se configurado, senão Supabase Storage)
     console.log('📤 Fazendo upload da imagem...');
-    
-    const timestamp = Date.now();
-    const fileExtension = 'jpg'; // Assumindo JPG, pode melhorar detecção
-    const storagePath = `${userId}/${timestamp}.${fileExtension}`;
-    
-    // Converter base64 para buffer
-    const imageBuffer = Buffer.from(validation.base64Data, 'base64');
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(storagePath, imageBuffer, {
-        contentType: 'image/jpeg',
-        upsert: false
-      });
 
-    if (uploadError) {
-      console.error('❌ Erro ao fazer upload:', uploadError);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Erro ao salvar imagem',
-        details: uploadError.message 
+    const timestamp = Date.now();
+    const mimeMatch = String(imageBase64).match(/^data:(image\/[\w+.-]+);base64,/i);
+    const contentType = mimeMatch ? mimeMatch[1].toLowerCase() : 'image/jpeg';
+    const fileExtension = contentType.includes('png')
+      ? 'png'
+      : contentType.includes('webp')
+        ? 'webp'
+        : 'jpg';
+
+    const imageBuffer = Buffer.from(validation.base64Data, 'base64');
+
+    supabaseForCleanup = supabase;
+    useR2 = isCloudProduction() || isR2Configured();
+
+    if (isCloudProduction() && !isR2Configured()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Armazenamento R2 obrigatório em produção.',
+        code: 'R2_PRODUCTION_REQUIRED',
       });
     }
 
-    console.log('✅ Upload concluído:', uploadData.path);
+    storagePath = useR2
+      ? buildReceiptR2Key(userId, timestamp, fileExtension)
+      : `${userId}/${timestamp}.${fileExtension}`;
 
-    // Obter URL pública/signed da imagem
-    const { data: urlData } = await supabase.storage
-      .from('receipts')
-      .createSignedUrl(storagePath, 60 * 60 * 24 * 365); // 1 ano
+    let receiptImageUrl = null;
 
-    const receiptImageUrl = urlData?.signedUrl || null;
+    if (useR2) {
+      const r2Upload = await uploadToR2(imageBuffer, storagePath, contentType);
+      if (!r2Upload.success) {
+        console.error('❌ Erro ao fazer upload R2:', r2Upload.error);
+        return res.status(500).json({
+          success: false,
+          error: 'Erro ao salvar imagem',
+          details: r2Upload.error?.message || 'Falha no upload R2',
+        });
+      }
+      receiptImageUrl = r2Upload.url;
+      console.log('✅ Upload R2 concluído:', storagePath);
+    } else {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(storagePath, imageBuffer, {
+          contentType,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('❌ Erro ao fazer upload:', uploadError);
+        return res.status(500).json({
+          success: false,
+          error: 'Erro ao salvar imagem',
+          details: uploadError.message,
+        });
+      }
+
+      console.log('✅ Upload Supabase concluído:', uploadData.path);
+
+      const { data: urlData } = await supabase.storage
+        .from('receipts')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+
+      receiptImageUrl = urlData?.signedUrl || null;
+    }
+
+    async function removeStoredReceipt() {
+      if (useR2) {
+        await deleteFromR2(storagePath);
+      } else {
+        await supabase.storage.from('receipts').remove([storagePath]);
+      }
+    }
 
     // 2. Chamar GPT-4 Vision para OCR
     console.log('🤖 Enviando para GPT-4 Vision...');
@@ -272,8 +327,7 @@ export default async function handler(req, res) {
     } catch (openaiError) {
       console.error('❌ Erro ao chamar OpenAI:', openaiError);
       
-      // Deletar imagem se OCR falhou
-      await supabase.storage.from('receipts').remove([storagePath]);
+      await removeStoredReceipt();
       
       return res.status(500).json({
         success: false,
@@ -305,6 +359,8 @@ export default async function handler(req, res) {
       console.error('❌ Erro ao parsear resposta:', parseError);
       console.error('📄 Resposta bruta:', responseContent);
       
+      await removeStoredReceipt();
+
       return res.status(500).json({
         success: false,
         error: 'Não foi possível extrair dados da imagem. A resposta da IA não está no formato esperado.',
@@ -316,8 +372,7 @@ export default async function handler(req, res) {
     if (!extractedData.is_valid_receipt) {
       console.log('⚠️ Imagem não é uma nota fiscal válida');
       
-      // Deletar imagem se não é nota fiscal
-      await supabase.storage.from('receipts').remove([storagePath]);
+      await removeStoredReceipt();
       
       return res.status(400).json({
         success: false,
@@ -346,15 +401,26 @@ export default async function handler(req, res) {
         category: extractedData.category || null,
         payment_method: extractedData.payment_method || null,
         receipt_image_url: receiptImageUrl,
-        storage_path: storagePath // para referência interna
       },
       remaining_requests: rateCheck.remaining
     });
 
   } catch (error) {
+    if (storagePath) {
+      try {
+        if (useR2) {
+          await deleteFromR2(storagePath);
+        } else if (supabaseForCleanup) {
+          await supabaseForCleanup.storage.from('receipts').remove([storagePath]);
+        }
+      } catch (cleanupErr) {
+        console.warn('⚠️ Falha ao limpar comprovante após erro:', cleanupErr?.message || cleanupErr);
+      }
+    }
+
     console.error('❌ Erro no processamento:', error);
     console.error('   Stack:', error.stack);
-    
+
     return res.status(500).json({
       success: false,
       error: 'Erro interno ao processar nota fiscal',

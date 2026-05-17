@@ -1,5 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { geocodeAddress } from '../../../lib/geocode';
+import { ensureR2ForProductionApi } from '../../../lib/r2ProductionGuard';
+import {
+  isHttpReceiptUrl,
+  receiptUrlDbFields,
+  resolveReceiptComprovanteUrl,
+} from '../../../lib/receiptComprovanteUrl';
 
 /**
  * POST /api/ocr/save-transaction
@@ -15,7 +21,9 @@ import { geocodeAddress } from '../../../lib/geocode';
  *   items: Array<{name, price}>,
  *   category: string | null,
  *   payment_method: string | null,
- *   receipt_image_url: string
+ *   receipt_image_url: string (URL https — já enviada pelo OCR/R2)
+ *   url_comprovante?: string (alias; mesma URL)
+ *   imageBase64?: string (opcional: faz upload R2 no servidor antes do INSERT)
  * }
  */
 
@@ -39,6 +47,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!ensureR2ForProductionApi(res)) return;
+
   const supabase = getSupabase();
   if (!supabase) {
     return res.status(500).json({ 
@@ -58,6 +68,8 @@ export default async function handler(req, res) {
       category,
       payment_method,
       receipt_image_url,
+      url_comprovante,
+      imageBase64,
       shareOnMap,
       lat: userLat,
       lng: userLng,
@@ -104,8 +116,40 @@ export default async function handler(req, res) {
     // data é NOT NULL na tabela transacoes: usa data extraída ou hoje
     const dataTransacao = (date && String(date).trim()) ? date.trim().slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-    // Preparar dados para inserção
-    // Adaptado para a estrutura existente da tabela transacoes
+    let comprovanteUrl = null;
+    try {
+      comprovanteUrl = await resolveReceiptComprovanteUrl({
+        userId,
+        receipt_image_url,
+        url_comprovante,
+        imageBase64,
+      });
+    } catch (urlErr) {
+      console.error('❌ Comprovante:', urlErr);
+      return res.status(400).json({
+        success: false,
+        error: urlErr.message || 'Não foi possível guardar o comprovante',
+      });
+    }
+
+    if (
+      (receipt_image_url || url_comprovante || imageBase64) &&
+      !comprovanteUrl
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Comprovante inválido: envie apenas URL https (após OCR) ou imageBase64 para upload no R2.',
+      });
+    }
+
+    if (comprovanteUrl && !isHttpReceiptUrl(comprovanteUrl)) {
+      return res.status(400).json({
+        success: false,
+        error: 'url_comprovante deve ser uma URL https pública.',
+      });
+    }
+
     const transactionData = {
       user_id: userId,
       estabelecimento: merchant_name.trim(),
@@ -116,7 +160,7 @@ export default async function handler(req, res) {
       categoria: category || null,
       items: items.length > 0 ? items : null,
       source: 'receipt_ocr',
-      receipt_image_url: receipt_image_url || null
+      ...receiptUrlDbFields(comprovanteUrl),
     };
 
     console.log('📝 Dados a salvar:', {
