@@ -6,6 +6,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { getServerSession } from 'next-auth/next';
 import { ProductBarcodeScanner } from '../components/ProductBarcodeScanner';
 import { useMissionsToday } from '../components/missions/MissionsTodayContext';
+import { completeDailyMission } from '../lib/completeDailyMission';
+import { cartRowsToRetailInventoryLines, sumRetailInventoryLines } from '../lib/retailCartItems';
+import { isVarejistaUser } from '../lib/userType';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
@@ -127,12 +130,14 @@ function lineAmountsFromPayload(payload) {
 }
 
 export default function ScanProductPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const { refresh: refreshMissions } = useMissionsToday();
+  const isVarejista = isVarejistaUser(session?.user);
   const [mode, setMode] = useState('intro');
   const [cart, setCart] = useState([]);
   const [scanFeedback, setScanFeedback] = useState('idle');
   const [toast, setToast] = useState(null);
+  const [savingLote, setSavingLote] = useState(false);
 
   const [manualCode, setManualCode] = useState('');
   const [manualErr, setManualErr] = useState(null);
@@ -291,6 +296,77 @@ export default function ScanProductPage() {
     showToast('Sessão salva no aparelho. Você pode comparar no mapa quando quiser.');
   }, [cart, showToast]);
 
+  const saveRetailInventoryBatch = useCallback(async () => {
+    const lines = cartRowsToRetailInventoryLines(cart.filter((row) => row.apiOk));
+    if (lines.length === 0) {
+      showToast('Escaneie ao menos um produto válido antes de salvar.');
+      return;
+    }
+
+    let nomeLote = '';
+    if (typeof window !== 'undefined') {
+      const input = window.prompt('Nome do lote (opcional)', '');
+      if (input === null) return;
+      nomeLote = input.trim();
+    }
+
+    setSavingLote(true);
+    try {
+      const res = await fetch('/api/varejo/inventario/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome_lote: nomeLote || undefined,
+          itens: lines.map((line) => ({
+            ean: line.ean,
+            nome: line.nome,
+            quantidade: line.quantidade,
+            preco: line.preco,
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || 'Não foi possível salvar o lote.');
+        return;
+      }
+
+      let xpMsg = '';
+      try {
+        const mRes = await completeDailyMission('varejo_salvar_lote');
+        if (mRes.ok) {
+          const mJson = await mRes.json();
+          if (mJson.xp_awarded > 0) {
+            xpMsg = ` +${mJson.xp_awarded} XP`;
+          }
+          void refreshMissions({ silent: true });
+        }
+      } catch {
+        /* */
+      }
+
+      setCart([]);
+      setMode('intro');
+      showToast(`Lote salvo no histórico (${lines.length} itens).${xpMsg}`);
+    } catch {
+      showToast('Erro de rede ao salvar o lote.');
+    } finally {
+      setSavingLote(false);
+    }
+  }, [cart, showToast, refreshMissions]);
+
+  const handlePrimarySave = useCallback(() => {
+    if (isVarejista) {
+      void saveRetailInventoryBatch();
+      return;
+    }
+    finalizeSession();
+  }, [isVarejista, saveRetailInventoryBatch, finalizeSession]);
+
+  const retailTotals = isVarejista
+    ? sumRetailInventoryLines(cartRowsToRetailInventoryLines(cart.filter((row) => row.apiOk)))
+    : null;
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -326,8 +402,20 @@ export default function ScanProductPage() {
               ← Voltar
             </Link>
             <h1 className="text-foreground text-[18px] font-black m-0 flex-1">
-              {mode === 'session' ? 'Sessão de carrinho' : 'Escanear produto'}
+              {mode === 'session'
+                ? isVarejista
+                  ? 'Entrada de estoque'
+                  : 'Sessão de carrinho'
+                : 'Escanear produto'}
             </h1>
+            {isVarejista && (
+              <Link
+                href="/historico-inventario-varejo"
+                className="shrink-0 text-[11px] font-bold text-primary no-underline hover:underline"
+              >
+                Histórico
+              </Link>
+            )}
           </div>
 
           {mode === 'session' && (
@@ -445,36 +533,72 @@ export default function ScanProductPage() {
 
             {/* Rodapé economia — acima da barra fixa inferior */}
             <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[45] px-4 pt-2 pb-3 bg-[#0d1219]/95 backdrop-blur-xl border-t border-[#1E2A3A] safe-area-bottom max-w-lg mx-auto rounded-t-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.35)]">
-              <div className="flex justify-between items-start gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold m-0">Total referência</p>
-                  <p className="text-lg font-black text-foreground m-0 tabular-nums">
-                    {footerTotals.countPriced ? formatBRL(footerTotals.sumCurrent) : '—'}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground m-0 mt-0.5">
-                    Menor no mapa:{' '}
-                    <span className="text-primary font-bold tabular-nums">
-                      {footerTotals.countPriced ? formatBRL(footerTotals.sumCheapest) : '—'}
-                    </span>
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[10px] uppercase tracking-wide text-amber-600 font-bold m-0">Economia estimada</p>
-                  <p className="text-lg font-black text-amber-500 m-0 tabular-nums">
-                    {footerTotals.sumDelta > 0 ? formatBRL(footerTotals.sumDelta) : '—'}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground m-0">
-                    +{cart.reduce((s, it) => s + (it.mission?.xpAwarded || 0), 0)} XP (missão scan) nesta sessão
-                  </p>
-                </div>
-              </div>
+              <motion.div className="flex justify-between items-start gap-3">
+                {isVarejista ? (
+                  <>
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold m-0">
+                        Itens no lote
+                      </p>
+                      <p className="text-lg font-black text-foreground m-0 tabular-nums">
+                        {retailTotals?.totalItens ?? 0}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] uppercase tracking-wide text-amber-600 font-bold m-0">
+                        Valor referência
+                      </p>
+                      <p className="text-lg font-black text-amber-500 m-0 tabular-nums">
+                        {retailTotals && retailTotals.pricedCount > 0
+                          ? formatBRL(retailTotals.valorTotal)
+                          : '—'}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground m-0">
+                        +{cart.reduce((s, it) => s + (it.mission?.xpAwarded || 0), 0)} XP (scan) nesta sessão
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold m-0">
+                        Total referência
+                      </p>
+                      <p className="text-lg font-black text-foreground m-0 tabular-nums">
+                        {footerTotals.countPriced ? formatBRL(footerTotals.sumCurrent) : '—'}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground m-0 mt-0.5">
+                        Menor no mapa:{' '}
+                        <span className="text-primary font-bold tabular-nums">
+                          {footerTotals.countPriced ? formatBRL(footerTotals.sumCheapest) : '—'}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] uppercase tracking-wide text-amber-600 font-bold m-0">
+                        Economia estimada
+                      </p>
+                      <p className="text-lg font-black text-amber-500 m-0 tabular-nums">
+                        {footerTotals.sumDelta > 0 ? formatBRL(footerTotals.sumDelta) : '—'}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground m-0">
+                        +{cart.reduce((s, it) => s + (it.mission?.xpAwarded || 0), 0)} XP (missão scan) nesta sessão
+                      </p>
+                    </div>
+                  </>
+                )}
+              </motion.div>
               <button
                 type="button"
-                disabled={cart.length === 0}
-                onClick={finalizeSession}
+                disabled={cart.length === 0 || savingLote}
+                onClick={handlePrimarySave}
                 className="mt-3 w-full py-3.5 rounded-xl bg-primary text-[#0A0E1A] font-black text-sm disabled:opacity-40 disabled:pointer-events-none"
               >
-                Finalizar / salvar compra
+                {savingLote
+                  ? 'Salvando…'
+                  : isVarejista
+                    ? 'Salvar lote de estoque'
+                    : 'Finalizar / salvar compra'}
               </button>
             </div>
           </div>

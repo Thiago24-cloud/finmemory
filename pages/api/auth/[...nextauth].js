@@ -221,7 +221,7 @@ export const authOptions = {
         try {
           const { data, error } = await supabase
             .from('users')
-            .select('id, created_at, plano, plano_ativo, name, avatar_url')
+            .select('id, created_at, plano, plano_ativo, name, avatar_url, account_type')
             .eq('email', email)
             .maybeSingle();
           if (data?.id) {
@@ -231,6 +231,7 @@ export const authOptions = {
             token.plano_ativo = Boolean(data.plano_ativo);
             if (data.name) token.name = data.name;
             if (data.avatar_url) token.picture = data.avatar_url;
+            token.account_type = data.account_type || 'consumidor';
           } else if (error) {
             // plano/plano_ativo columns may not exist yet — fallback to basic query
             console.warn('jwt callback: extended query failed, trying fallback:', error?.message);
@@ -287,6 +288,7 @@ export const authOptions = {
         if (token.sub && !session.user.id) session.user.id = token.sub;
         session.user.plano = token.plano || 'free';
         session.user.plano_ativo = Boolean(token.plano_ativo);
+        session.user.account_type = token.account_type || 'consumidor';
         if (token.name) session.user.name = token.name;
         if (token.picture) session.user.image = token.picture;
       }
@@ -296,7 +298,7 @@ export const authOptions = {
           if (supabase) {
             const { data, error } = await supabase
               .from('users')
-              .select('id, created_at, plano, plano_ativo, name, avatar_url')
+              .select('id, created_at, plano, plano_ativo, name, avatar_url, account_type')
               .eq('email', session.user.email)
               .maybeSingle();
             if (data) {
@@ -306,6 +308,7 @@ export const authOptions = {
               session.user.plano_ativo = Boolean(data.plano_ativo);
               if (data.name) session.user.name = data.name;
               if (data.avatar_url) session.user.image = data.avatar_url;
+              session.user.account_type = data.account_type || 'consumidor';
             } else if (error) {
               console.warn('session callback: extended query failed, trying fallback:', error?.message);
               const { data: basic } = await supabase
