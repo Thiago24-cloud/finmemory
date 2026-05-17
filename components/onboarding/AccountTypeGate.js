@@ -26,5 +26,20 @@ export function AccountTypeGate({ children }) {
     }
   }, [status, loading, needsSelection, router]);
 
+  const path = router.pathname;
+  const blocking =
+    status === 'authenticated' &&
+    loading &&
+    path !== '/escolher-perfil' &&
+    path !== '/login';
+
+  if (blocking) {
+    return (
+      <div className="min-h-screen bg-[#030508] flex items-center justify-center">
+        <p className="text-sm text-muted-foreground m-0">Carregando…</p>
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }

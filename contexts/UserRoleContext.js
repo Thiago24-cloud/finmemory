@@ -52,9 +52,11 @@ export function UserRoleProvider({ children }) {
       if (res.ok) {
         setNeedsSelection(Boolean(data.needsSelection));
         setUserRoleState(data.userRole || USER_ROLE_CONSUMER);
+      } else {
+        setNeedsSelection(true);
       }
     } catch {
-      syncFromSession();
+      setNeedsSelection(true);
     } finally {
       setLoading(false);
     }

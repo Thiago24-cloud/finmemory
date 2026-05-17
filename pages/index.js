@@ -39,10 +39,28 @@ export default function HomePage() {
   // Só redireciona para o mapa se estiver autenticado e NÃO veio de mensagem que deve ficar na home
   // (evita loop: mapa -> /?msg=nao-cadastrado -> index -> mapa; e /admin -> sem-acesso-admin -> não empurrar para mapa)
   useEffect(() => {
-    if (status === 'authenticated' && !skipMapaRedirect) {
-      router.push('/dashboard');
-    }
-  }, [status, router, router.query.msg, skipMapaRedirect]);
+    if (status !== 'authenticated' || skipMapaRedirect) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/user/account-type');
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.needsSelection) {
+          router.push('/escolher-perfil');
+          return;
+        }
+      } catch {
+        /* segue para dashboard */
+      }
+      if (!cancelled) router.push('/dashboard');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, router, skipMapaRedirect]);
 
   const showLoading = status === 'loading' && !loadingTimedOut;
 

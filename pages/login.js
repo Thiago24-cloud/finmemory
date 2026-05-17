@@ -29,11 +29,31 @@ export default function LoginPage() {
 
   const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/mapa';
 
-  /** Conta já validada no Supabase: segue para o destino */
+  /** Conta já validada: escolha de perfil primeiro, depois destino */
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.supabaseId) return;
-    const dest = callbackUrl.startsWith('/') ? callbackUrl : '/mapa';
-    router.replace(dest);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/user/account-type');
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.needsSelection) {
+          router.replace('/escolher-perfil');
+          return;
+        }
+      } catch {
+        /* segue para destino padrão */
+      }
+      if (cancelled) return;
+      const dest = callbackUrl.startsWith('/') ? callbackUrl : '/mapa';
+      router.replace(dest);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [status, session?.user?.supabaseId, callbackUrl, router]);
 
   const resetToken = typeof router.query?.resetToken === 'string' ? router.query.resetToken : '';

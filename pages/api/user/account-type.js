@@ -25,19 +25,45 @@ export default async function handler(req, res) {
   if (!supabase) return res.status(500).json({ error: 'Serviço indisponível' });
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
+    let data = null;
+    let error = null;
+    let legacySchema = false;
+
+    ({ data, error } = await supabase
       .from('users')
-      .select('account_type, account_type_selected_at')
+      .select('account_type, account_type_selected_at, account_type_chosen_explicitly')
       .eq('id', userId)
-      .maybeSingle();
+      .maybeSingle());
+
+    if (error?.message?.includes('account_type_chosen_explicitly')) {
+      legacySchema = true;
+      ({ data, error } = await supabase
+        .from('users')
+        .select('account_type, account_type_selected_at')
+        .eq('id', userId)
+        .maybeSingle());
+    }
 
     if (error) {
       console.warn('[account-type GET]', error.message);
+      // Coluna em falta ou schema antigo: forçar tela de escolha
+      if (error.message?.includes('account_type')) {
+        return res.status(200).json({
+          needsSelection: true,
+          account_type: 'consumidor',
+          userRole: accountTypeToUserRole('consumidor'),
+          selected_at: null,
+        });
+      }
       return res.status(500).json({ error: 'Não foi possível ler o perfil.' });
     }
 
     const accountType = normalizeAccountType(data?.account_type);
-    const needsSelection = !data?.account_type_selected_at;
+    const needsSelection = legacySchema
+      ? true
+      : data?.account_type_chosen_explicitly === true
+        ? false
+        : true;
 
     return res.status(200).json({
       needsSelection,
@@ -69,13 +95,19 @@ export default async function handler(req, res) {
   const patch = {
     account_type: accountType,
     account_type_selected_at: now,
+    account_type_chosen_explicitly: true,
   };
   if (displayName.length >= 2 && displayName.length <= 120) {
     patch.name = displayName;
     patch.profile_first_login_completed_at = now;
   }
 
-  const { error: dbErr } = await supabase.from('users').update(patch).eq('id', userId);
+  let { error: dbErr } = await supabase.from('users').update(patch).eq('id', userId);
+
+  if (dbErr?.message?.includes('account_type_chosen_explicitly')) {
+    const { account_type_chosen_explicitly: _drop, ...legacyPatch } = patch;
+    ({ error: dbErr } = await supabase.from('users').update(legacyPatch).eq('id', userId));
+  }
 
   if (dbErr) {
     console.error('[account-type POST]', dbErr.message);
