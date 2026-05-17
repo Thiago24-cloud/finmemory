@@ -26,6 +26,8 @@ import {
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
+import { useUserRole } from '../contexts/UserRoleContext';
+import { clampShoppingQuantity } from '../lib/shoppingListQuantity';
 
 export async function getServerSideProps(ctx) {
   try {
@@ -119,10 +121,13 @@ function parseVoiceItems(rawTranscript) {
 export default function ShoppingListPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const { userRole, isRetailer } = useUserRole();
   const [partnership, setPartnership] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
+  const [newQuantity, setNewQuantity] = useState(1);
+  const [newUnit, setNewUnit] = useState('un');
   const [adding, setAdding] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPeriod, setFilterPeriod] = useState('all');
@@ -336,22 +341,12 @@ export default function ShoppingListPage() {
     try {
       const supabase = getSupabase();
       if (!supabase) return;
-      const { catalog_product_id, list_thumbnail_url } = await matchShoppingListProductFromCatalog(
-        supabase,
-        name
-      );
-      const row = {
-        partnership_id: partnership?.id ?? null,
-        owner_user_id: userId,
-        name,
-        added_by: userId,
-        source_type: 'note',
-        shopping_intent: listBucket === 'later' ? 'saved_deferred' : 'plan_today',
-      };
-      if (catalog_product_id) row.catalog_product_id = catalog_product_id;
-      if (list_thumbnail_url) row.list_thumbnail_url = list_thumbnail_url;
-      await supabase.from('shopping_list_items').insert(row);
+      const qty = clampShoppingQuantity(newQuantity, isRetailer);
+      const unit = isRetailer && newUnit ? String(newUnit).trim() : null;
+      await addNamedItem(supabase, name, qty, unit);
       setNewName('');
+      setNewQuantity(1);
+      if (isRetailer) setNewUnit('un');
       await fetchPartnershipAndItems();
     } finally {
       setAdding(false);
@@ -713,9 +708,14 @@ export default function ShoppingListPage() {
         </p>
 
         <ShoppingListWeb3Main
-          title="O que você precisa?"
+          title={isRetailer ? 'Reposição de estoque' : 'O que você precisa?'}
+          userRole={userRole}
           newName={newName}
           setNewName={setNewName}
+          newQuantity={newQuantity}
+          setNewQuantity={setNewQuantity}
+          newUnit={newUnit}
+          setNewUnit={setNewUnit}
           onSubmit={handleAdd}
           adding={adding}
           voiceSupported={voiceSupported}

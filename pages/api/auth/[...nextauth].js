@@ -257,6 +257,7 @@ export const authOptions = {
       if (trigger === 'update' && session) {
         if (typeof session.name === 'string') token.name = session.name;
         if (session.image !== undefined) token.picture = session.image;
+        if (typeof session.account_type === 'string') token.account_type = session.account_type;
       }
 
       return token;
