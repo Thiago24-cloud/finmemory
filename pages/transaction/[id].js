@@ -6,6 +6,7 @@ import { ArrowLeft, Store, MapPin, Calendar, Loader2, Receipt, Pencil, Trash2, S
 import { getSupabase } from '../../lib/supabase';
 import { buildReceiptShareText, whatsAppShareUrl } from '../../lib/buildReceiptShareText';
 import { shareReceiptWithNativeSheet } from '../../lib/shareReceiptWhatsApp';
+import { PurchaseShareExport } from '../../components/purchase/PurchaseShareExport';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
@@ -217,12 +218,16 @@ export default function TransactionDetailPage() {
           </div>
 
           <div className="border-t border-border px-6 py-4 bg-muted/20">
+            <PurchaseShareExport purchase={transaction} />
+          </div>
+
+          <div className="border-t border-border px-6 py-4 bg-muted/20">
             <h2 className="text-lg font-semibold text-foreground mb-1 flex items-center gap-2">
               <Share2 className="h-5 w-5 text-accent" />
-              Compartilhar
+              WhatsApp
             </h2>
             <p className="text-sm text-muted-foreground mb-3">
-              Envie o resumo da compra por WhatsApp (prestação de contas, cartão da empresa, etc.). Com foto da nota, use a segunda opção no celular para anexar a imagem.
+              Resumo rápido por mensagem. Com foto da nota, use a segunda opção no celular para anexar a imagem.
             </p>
             {shareHint && (
               <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">

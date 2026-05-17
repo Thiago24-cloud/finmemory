@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 
-const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.finmemory.app';
+import { PLAY_STORE_URL } from '../lib/landingConstants';
 const APP_STORE_URL = 'https://finmemory.com.br';
 
 function detectOS() {

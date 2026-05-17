@@ -16,6 +16,7 @@ import {
   getMissionActiveContext,
 } from '../lib/missionFollowupNotification';
 import { trackBackendEvent, trackEvent } from '../lib/analytics';
+import { PurchaseShareExport } from '../components/purchase/PurchaseShareExport';
 
 /**
  * Página de captura e processamento de nota fiscal via OCR.
@@ -167,6 +168,7 @@ export default function AddReceipt() {
   const [nearbyStoresReceipt, setNearbyStoresReceipt] = useState([]);
   // Feedback após salvar com "Divulgar no mapa"
   const [mapFeedback, setMapFeedback] = useState(null);
+  const [savedPurchase, setSavedPurchase] = useState(null);
 
   /** 'foto' = OCR / foto; 'nfce' = câmera ao vivo no QR da NFC-e */
   const [scanTab, setScanTab] = useState('foto');
@@ -485,6 +487,19 @@ export default function AddReceipt() {
       }
 
       setStep(STEPS.SUCCESS);
+      setSavedPurchase({
+        id: result.transaction?.id,
+        estabelecimento: result.transaction?.estabelecimento || formData.merchant_name,
+        data: result.transaction?.data || formData.date,
+        merchant_name: formData.merchant_name,
+        merchant_cnpj: formData.merchant_cnpj,
+        merchant_address: formData.merchant_address,
+        total: result.transaction?.total ?? parseMoneyInput(formData.total_amount),
+        total_amount: result.transaction?.total ?? parseMoneyInput(formData.total_amount),
+        category: formData.category,
+        payment_method: formData.payment_method,
+        items: formData.items,
+      });
       setMapFeedback(shareOnMap ? { mapPointsAdded: result.mapPointsAdded ?? 0, mapError: result.mapError ?? null } : null);
 
       const missionCtx = getMissionActiveContext();
@@ -498,10 +513,10 @@ export default function AddReceipt() {
         clearMissionActiveContext();
       }
 
-      // Redirecionar após 2 segundos
+      // Redirecionar após tempo para exportar planilha/PDF
       setTimeout(() => {
         router.push('/dashboard');
-      }, 2000);
+      }, 12000);
 
     } catch (err) {
       console.error('Erro ao salvar:', err);
@@ -560,6 +575,7 @@ export default function AddReceipt() {
     });
     setShareOnMap(false);
     setMapFeedback(null);
+    setSavedPurchase(null);
   };
 
   // Loading de sessão
@@ -999,6 +1015,25 @@ export default function AddReceipt() {
               </div>
             </div>
 
+            <div className="mb-6 p-4 rounded-xl border border-[#e5e7eb] bg-[#f9fafb]">
+              <PurchaseShareExport
+                purchase={{
+                  merchant_name: formData.merchant_name,
+                  date: formData.date,
+                  merchant_cnpj: formData.merchant_cnpj,
+                  merchant_address: formData.merchant_address,
+                  total_amount: parseMoneyInput(formData.total_amount),
+                  category: formData.category,
+                  payment_method: formData.payment_method,
+                  items: formData.items,
+                }}
+                compact
+              />
+              <p className="text-xs text-[#6b7280] mt-2 m-0">
+                Você pode exportar antes ou depois de salvar — os valores vêm dos itens da nota acima.
+              </p>
+            </div>
+
             <div className="flex flex-col gap-3">
               <button
                 type="button"
@@ -1050,8 +1085,21 @@ export default function AddReceipt() {
                 ) : null}
               </div>
             )}
-            <p className="text-sm text-[#666] m-0">
-              Redirecionando para o dashboard...
+            {savedPurchase ? (
+              <div className="mt-6 text-left max-w-sm mx-auto">
+                <PurchaseShareExport purchase={savedPurchase} />
+                {savedPurchase.id ? (
+                  <Link
+                    href={`/transaction/${savedPurchase.id}`}
+                    className="block mt-4 text-sm text-[#2ECC49] font-medium text-center"
+                  >
+                    Ver detalhes da transação →
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+            <p className="text-sm text-[#666] m-0 mt-4">
+              Redirecionando para o dashboard em alguns segundos…
             </p>
           </div>
         )}
