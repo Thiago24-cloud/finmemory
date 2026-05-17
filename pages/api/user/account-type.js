@@ -65,13 +65,17 @@ export default async function handler(req, res) {
   }
 
   const now = new Date().toISOString();
-  const { error: dbErr } = await supabase
-    .from('users')
-    .update({
-      account_type: accountType,
-      account_type_selected_at: now,
-    })
-    .eq('id', userId);
+  const displayName = String(body.display_name || '').trim();
+  const patch = {
+    account_type: accountType,
+    account_type_selected_at: now,
+  };
+  if (displayName.length >= 2 && displayName.length <= 120) {
+    patch.name = displayName;
+    patch.profile_first_login_completed_at = now;
+  }
+
+  const { error: dbErr } = await supabase.from('users').update(patch).eq('id', userId);
 
   if (dbErr) {
     console.error('[account-type POST]', dbErr.message);

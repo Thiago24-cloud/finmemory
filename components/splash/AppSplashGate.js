@@ -16,6 +16,7 @@ const SPLASH_SKIP_PATHS = new Set([
   '/auth-error',
   '/download',
   '/em-breve',
+  '/escolher-perfil',
 ]);
 
 /** Tempo mínimo desde o arranque até iniciar o fade-out (marca + “carregamento”). */

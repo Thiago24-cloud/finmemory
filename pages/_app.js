@@ -103,8 +103,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
       <SessionProvider session={session}>
         <PostHogIdentify />
         <UserRoleProvider>
-        <ProfileFirstLoginGate>
         <AccountTypeGate>
+        <ProfileFirstLoginGate>
         <RecoveryIdentifierGate>
         <AppSplashGate>
           <PWAInstallProvider>
@@ -124,8 +124,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
           </PWAInstallProvider>
         </AppSplashGate>
         </RecoveryIdentifierGate>
-        </AccountTypeGate>
         </ProfileFirstLoginGate>
+        </AccountTypeGate>
         </UserRoleProvider>
         <ClientOnly>
           <SafeGoogleAnalytics />

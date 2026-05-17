@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { ProfileFirstLoginModal } from './ProfileFirstLoginModal';
+import { useUserRole } from '../../contexts/UserRoleContext';
 
 /**
  * Abre o questionário de primeiro login uma vez (quando o servidor indica needsOnboarding).
  */
 export function ProfileFirstLoginGate({ children }) {
+  const router = useRouter();
   const { data: session, status, update } = useSession();
+  const { needsSelection } = useUserRole();
   const [checked, setChecked] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [initialName, setInitialName] = useState('');
@@ -62,7 +66,10 @@ export function ProfileFirstLoginGate({ children }) {
   return (
     <>
       {children}
-      {checked && needsOnboarding && (
+      {checked &&
+        needsOnboarding &&
+        !needsSelection &&
+        router.pathname !== '/escolher-perfil' && (
         <ProfileFirstLoginModal
           open
           initialName={initialName}
