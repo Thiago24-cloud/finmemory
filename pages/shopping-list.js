@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ShoppingListBottomNav } from '../components/shopping/ShoppingListBottomNav';
 import { ShoppingListWeb3Main } from '../components/shopping/ShoppingListWeb3Main';
+import { ShoppingListMapMatchesPanel } from '../components/shopping/ShoppingListMapMatchesPanel';
 import { getSupabase } from '../lib/supabase';
 import { useMapCart } from '../components/map/MapCartContext';
 import { matchShoppingListProductFromCatalog } from '../lib/shoppingListCatalogMatch';
@@ -255,18 +256,29 @@ export default function ShoppingListPage() {
   }, [items, filterStatus, filterPeriod]);
 
   /** Nomes da lista “agora” para o mapa (só notas pendentes, não “para depois”). */
+  const pendingNoteItemsForMap = useMemo(() => {
+    const seen = new Set();
+    return items
+      .filter(
+        (i) =>
+          !i.checked &&
+          i.source_type !== 'map' &&
+          i.shopping_intent !== 'saved_deferred'
+      )
+      .filter((i) => {
+        const name = String(i.name || '').trim();
+        if (name.length < 2) return false;
+        const key = name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((i) => ({ id: i.id, name: String(i.name || '').trim() }));
+  }, [items]);
+
   const pendingNoteNamesForMap = useMemo(
-    () =>
-      items
-        .filter(
-          (i) =>
-            !i.checked &&
-            i.source_type !== 'map' &&
-            i.shopping_intent !== 'saved_deferred'
-        )
-        .map((i) => String(i.name || '').trim())
-        .filter(Boolean),
-    [items]
+    () => pendingNoteItemsForMap.map((i) => i.name),
+    [pendingNoteItemsForMap]
   );
 
   const mapaListaHref = useMemo(() => {
@@ -706,6 +718,14 @@ export default function ShoppingListPage() {
           Dica voz: toque no microfone e diga, por exemplo, &quot;manga, mamão e uva&quot;. Enter no campo adiciona o
           item.
         </p>
+
+        {listBucket === 'now' && pendingNoteItemsForMap.length > 0 ? (
+          <ShoppingListMapMatchesPanel
+            listItems={pendingNoteItemsForMap}
+            mapHref={mapaListaHref}
+            isRetailer={isRetailer}
+          />
+        ) : null}
 
         <ShoppingListWeb3Main
           title={isRetailer ? 'Reposição de estoque' : 'O que você precisa?'}

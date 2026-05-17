@@ -14,6 +14,7 @@ import { canAccessForSession } from '../lib/access-server';
 import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 import { getOpenFoodFactsImageUrl } from '../lib/productImageUrl';
 import { digitsOnly, isValidRetailBarcode } from '../lib/validateGtin';
+import { getScannerGeolocation, formatDistanceShortPt } from '../lib/scannerGeolocation';
 
 const SAME_GTIN_DEBOUNCE_MS = 2500;
 const READY_HINT_MS = 1800;
@@ -81,10 +82,9 @@ function PeekScanOverlay({ item }) {
         <div className="text-2xl shrink-0 leading-none">{apiOk ? '✓' : '⚠️'}</div>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-black text-white leading-snug line-clamp-2 m-0">{title}</p>
-          {apiOk && ph?.bestStoreName && (
+          {apiOk && ph?.hasMapData && (
             <p className="text-[10px] text-primary font-bold mt-1 m-0 truncate">
-              Menor no mapa{ph.bestPrice != null ? `: ${formatBRL(ph.bestPrice)}` : ''}
-              {ph.bestStoreName ? ` · ${ph.bestStoreName}` : ''}
+              {mapPriceLabel(ph)}
             </p>
           )}
           {apiOk && delta != null && delta > 0 && (
@@ -106,15 +106,29 @@ function formatBRL(n) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n));
 }
 
+function mapPriceLabel(ph) {
+  if (!ph?.hasMapData || ph.bestPrice == null) return null;
+  const price = formatBRL(ph.bestPrice);
+  const store = ph.bestStoreName ? ` · ${ph.bestStoreName}` : '';
+  if (ph.userAtSaleLocation) {
+    return `No mercado onde você está: ${price}${store}`;
+  }
+  if (ph.locationUsed && ph.distanceM != null) {
+    const dist = formatDistanceShortPt(ph.distanceM);
+    return `Mais perto de você (${dist}): ${price}${store}`;
+  }
+  return `No mapa: ${price}${store}`;
+}
+
 function lineAmountsFromPayload(payload) {
   const ph = payload?.priceHints;
   const ref = ph?.referencePrice != null ? Number(ph.referencePrice) : null;
   const best = ph?.bestPrice != null ? Number(ph.bestPrice) : null;
   const currentDisplay =
-    ref != null && Number.isFinite(ref)
-      ? ref
-      : best != null && Number.isFinite(best)
-        ? best
+    best != null && Number.isFinite(best)
+      ? best
+      : ref != null && Number.isFinite(ref)
+        ? ref
         : null;
   const cheapest = best != null && Number.isFinite(best) ? best : null;
   let delta = null;
@@ -166,7 +180,13 @@ export default function ScanProductPage() {
       setScanFeedback('reading');
 
       try {
-        const res = await fetch(`/api/product/barcode-lookup?gtin=${encodeURIComponent(gtin)}`);
+        const geo = await getScannerGeolocation();
+        const qs = new URLSearchParams({ gtin });
+        if (geo?.lat != null && geo?.lng != null) {
+          qs.set('lat', String(geo.lat));
+          qs.set('lng', String(geo.lng));
+        }
+        const res = await fetch(`/api/product/barcode-lookup?${qs.toString()}`);
         const data = await res.json();
 
         let mission = null;
@@ -461,8 +481,9 @@ export default function ScanProductPage() {
                 </div>
               </div>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                O app identifica o item pela base aberta e cruza com preços do mapa e com o que{' '}
-                <strong className="text-foreground">você já pagou</strong> nas notas.
+                O app identifica o item pelo código de barras e mostra o preço no mapa{' '}
+                <strong className="text-foreground">mais perto de você</strong> (ou no mercado onde você está, se a
+                localização estiver ativa). Também cruza com o que você já pagou nas notas.
               </p>
               <button
                 type="button"
@@ -484,9 +505,9 @@ export default function ScanProductPage() {
             {/* Lista + manual scrollável */}
             <div className="flex-1 overflow-y-auto px-5 pt-4 pb-[11rem] space-y-4">
               <p className="text-xs text-muted-foreground leading-relaxed m-0">
-                Aponte e segure até vibrar (app nativo) ou use a captura abaixo. A mesma barras em sequência é ignorada
-                por {SAME_GTIN_DEBOUNCE_MS / 1000}s. No desktop pode arrastar o card para a esquerda para remover; em
-                qualquer dispositivo use o botão Remover.
+                Aponte e segure até vibrar (app nativo) ou use a captura abaixo. Com localização ativa, cada leitura mostra
+                o preço do produto no mercado mais próximo — ou no local da venda se você estiver no supermercado. A
+                mesma barras em sequência é ignorada por {SAME_GTIN_DEBOUNCE_MS / 1000}s.
               </p>
 
               <div className="rounded-2xl border border-[#1E2A3A] bg-card/80 p-4">
@@ -568,7 +589,7 @@ export default function ScanProductPage() {
                         {footerTotals.countPriced ? formatBRL(footerTotals.sumCurrent) : '—'}
                       </p>
                       <p className="text-[10px] text-muted-foreground m-0 mt-0.5">
-                        Menor no mapa:{' '}
+                        Preço no mapa (perto de você):{' '}
                         <span className="text-primary font-bold tabular-nums">
                           {footerTotals.countPriced ? formatBRL(footerTotals.sumCheapest) : '—'}
                         </span>
@@ -715,14 +736,45 @@ function SessionCartRow({ item, onRemove }) {
                 )}
               </div>
               <div>
-                <p className="text-[10px] text-primary m-0">Menor no mapa</p>
-                <p className="text-base font-black text-primary m-0 tabular-nums">
-                  {cheapest != null ? formatBRL(cheapest) : '—'}
+                <p className="text-[10px] text-muted-foreground m-0">Menor geral no mapa</p>
+                <p className="text-base font-black text-foreground m-0 tabular-nums">
+                  {ph?.cheapestGlobal?.price != null
+                    ? formatBRL(ph.cheapestGlobal.price)
+                    : cheapest != null
+                      ? formatBRL(cheapest)
+                      : '—'}
                 </p>
-                {ph?.bestStoreName && (
-                  <p className="text-[10px] text-muted-foreground truncate m-0">{ph.bestStoreName}</p>
-                )}
               </div>
+            </div>
+
+            <div className="rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-primary m-0">
+                {ph?.userAtSaleLocation ? 'Preço no mercado (você está aqui)' : 'Preço no mapa perto de você'}
+              </p>
+              <p className="text-lg font-black text-primary m-0 tabular-nums">
+                {cheapest != null ? formatBRL(cheapest) : '—'}
+              </p>
+              {ph?.bestStoreName ? (
+                <p className="text-[11px] text-muted-foreground truncate m-0">{ph.bestStoreName}</p>
+              ) : null}
+              {ph?.locationUsed && ph.distanceM != null && !ph.userAtSaleLocation ? (
+                <p className="text-[10px] text-muted-foreground m-0">
+                  a {formatDistanceShortPt(ph.distanceM)} da sua localização
+                </p>
+              ) : null}
+              {ph?.hasMapData && off?.name ? (
+                <Link
+                  href={`/mapa?lista=${encodeURIComponent(String(off.name).trim())}`}
+                  className="inline-block text-[11px] font-bold text-primary mt-1 no-underline hover:underline"
+                >
+                  Ver no mapa de preços →
+                </Link>
+              ) : null}
+              {!ph?.hasMapData && (
+                <p className="text-[10px] text-muted-foreground m-0">
+                  Sem oferta ativa no mapa para este produto agora.
+                </p>
+              )}
             </div>
 
             {delta != null && delta > 0 && (
