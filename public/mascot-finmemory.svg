@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 450" width="100%" height="100%">
+  <defs>
+    <radialGradient id="pele" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#543324" />
+      <stop offset="100%" stop-color="#321B10" />
+    </radialGradient>
+
+    <radialGradient id="bochechas" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF7B7B" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#FF7B7B" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="paletó" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2B7294" />
+      <stop offset="100%" stop-color="#18475E" />
+    </linearGradient>
+
+    <linearGradient id="tablet" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7BE2FF" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#3FA5D8" stop-opacity="0.4" />
+    </linearGradient>
+
+    <radialGradient id="sombra_chao" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <ellipse cx="200" cy="420" rx="90" ry="18" fill="url(#sombra_chao)" />
+
+  <ellipse cx="160" cy="405" rx="16" ry="12" fill="#543324" />
+  <ellipse cx="235" cy="405" rx="16" ry="12" fill="#543324" />
+  <path d="M145,380 Q160,410 175,380 Z" fill="url(#paletó)" />
+  <path d="M220,380 Q235,410 250,380 Z" fill="url(#paletó)" />
+
+  <rect x="110" y="210" width="180" height="180" rx="90" fill="url(#paletó)" />
+  <path d="M160,210 Q200,260 240,210 Z" fill="#EAE6DF" />
+
+  <ellipse cx="200" cy="160" rx="65" ry="60" fill="url(#pele)" />
+
+  <path d="M135,140 Q130,100 160,95 Q175,85 200,95 Q225,85 240,95 Q270,100 265,140 Z" fill="#1A110B" />
+  <circle cx="150" cy="110" r="18" fill="#1A110B" />
+  <circle cx="180" cy="98" r="18" fill="#1A110B" />
+  <circle cx="220" cy="98" r="18" fill="#1A110B" />
+  <circle cx="250" cy="110" r="18" fill="#1A110B" />
+
+  <path d="M136,150 Q135,225 200,230 Q265,225 264,150 Q270,180 250,215 Q200,240 150,215 Q130,180 136,150 Z" fill="#1A110B" />
+
+  <ellipse cx="155" cy="175" rx="14" ry="10" fill="url(#bochechas)" />
+  <ellipse cx="245" cy="175" rx="14" ry="10" fill="url(#bochechas)" />
+
+  <ellipse cx="175" cy="145" rx="14" ry="18" fill="#FFFFFF" />
+  <ellipse cx="177" cy="145" rx="7" ry="9" fill="#321B10" />
+  <circle cx="175" cy="141" r="3" fill="#FFFFFF" />
+  <ellipse cx="225" cy="145" rx="14" ry="18" fill="#FFFFFF" />
+  <ellipse cx="223" cy="145" rx="7" ry="9" fill="#321B10" />
+  <circle cx="221" cy="141" r="3" fill="#FFFFFF" />
+
+  <path d="M155,123 Q175,115 190,125" stroke="#1A110B" stroke-width="7" stroke-linecap="round" fill="none" />
+  <path d="M245,123 Q225,115 210,125" stroke="#1A110B" stroke-width="7" stroke-linecap="round" fill="none" />
+
+  <ellipse cx="200" cy="160" rx="10" ry="7" fill="#26130A" />
+
+  <path d="M175,178 Q200,210 225,178 Z" fill="#FFFFFF" />
+  <path d="M180,182 Q200,206 220,182 Z" fill="#8C1C1C" />
+
+  <path d="M120,250 Q90,290 140,320" stroke="url(#paletó)" stroke-width="32" stroke-linecap="round" fill="none" />
+  <circle cx="140" cy="320" r="14" fill="url(#pele)" />
+
+  <rect x="135" y="240" width="130" height="90" rx="12" fill="url(#tablet)" stroke="#A6F1FF" stroke-width="2" transform="rotate(-5, 200, 285)" />
+  <rect x="150" y="255" width="40" height="6" rx="3" fill="#FFFFFF" fill-opacity="0.8" />
+  <rect x="150" y="267" width="60" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.5" />
+  <circle cx="230" cy="285" r="15" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-dasharray="70 30" />
+  <rect x="150" y="295" width="25" height="20" fill="#FFFFFF" fill-opacity="0.6" />
+  <rect x="180" y="303" width="20" height="12" fill="#FFFFFF" fill-opacity="0.6" />
+
+  <path d="M280,250 Q305,290 255,315" stroke="url(#paletó)" stroke-width="32" stroke-linecap="round" fill="none" />
+  <circle cx="255" cy="315" r="14" fill="url(#pele)" />
+</svg>

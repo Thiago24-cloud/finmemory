@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
+import { todayBR } from '../../../lib/gamification/spTimezone';
 
 /**
  * POST /api/missions/complete
@@ -25,9 +26,7 @@ export default async function handler(req, res) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return res.status(500).json({ error: 'Serviço indisponível' });
 
-  const todayBR = new Date(
-    new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
-  ).toISOString().slice(0, 10);
+  const today = todayBR();
 
   const { data: mission, error: mErr } = await supabase
     .from('daily_missions')
@@ -44,7 +43,7 @@ export default async function handler(req, res) {
     .select('*')
     .eq('user_id', userId)
     .eq('mission_id', mission_id)
-    .eq('mission_date', todayBR)
+    .eq('mission_date', today)
     .maybeSingle();
 
   if (existing?.completed) {
@@ -57,7 +56,7 @@ export default async function handler(req, res) {
   const upsertPayload = {
     user_id: userId,
     mission_id,
-    mission_date: todayBR,
+    mission_date: today,
     steps_done: newSteps,
     completed: nowComplete,
     completed_at: nowComplete ? new Date().toISOString() : null,
@@ -72,7 +71,13 @@ export default async function handler(req, res) {
 
   let xpAwarded = 0;
   if (nowComplete) {
-    xpAwarded = mission.xp_reward;
+    const { data: streakUser } = await supabase
+      .from('users')
+      .select('welcome_back_bonus_until')
+      .eq('id', userId)
+      .maybeSingle();
+    const doubleXp = streakUser?.welcome_back_bonus_until === today;
+    xpAwarded = mission.xp_reward * (doubleXp ? 2 : 1);
     await supabase.rpc('award_mission_xp', { p_user_id: userId, p_xp: xpAwarded }).catch(() => {
       // Fallback se a RPC não existir: UPDATE direto
       return supabase.from('users').select('xp_points, level').eq('id', userId).maybeSingle().then(({ data }) => {

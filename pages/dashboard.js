@@ -28,6 +28,8 @@ import {
 } from '../lib/dashboardOnboardingStorage';
 import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
 import { usePlan } from '../hooks/usePlan';
+import { useGamification } from '../hooks/useGamification';
+import { CharacterWidget } from '../components/gamification/CharacterWidget';
 import { normalizePluggyMoney } from '../lib/pluggyMoney';
 import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
 
@@ -882,6 +884,28 @@ export default function Dashboard() {
   const isAuthenticated = status === 'authenticated' && session;
   const isLoading = status === 'loading';
   const { missions: missionsToday } = useMissionsToday();
+  const { streak_current, loading: gamificationLoading } = useGamification();
+
+  const characterSignals = useMemo(() => {
+    const missions = missionsToday || [];
+    return {
+      context: 'dashboard',
+      loading: openFinance.loading || gamificationLoading,
+      hasOpenFinanceAccounts: (openFinance.data?.accounts?.length ?? 0) > 0,
+      syncing: Boolean(openFinance.data?.syncing),
+      expenseTotal: openFinance.data?.month?.expenseTotal ?? 0,
+      incomeTotal: openFinance.data?.month?.incomeTotal ?? 0,
+      allMissionsComplete: missions.length > 0 && missions.every((m) => m.completed),
+      hasAnyMission: missions.length > 0,
+      streakCurrent: streak_current,
+    };
+  }, [
+    openFinance.loading,
+    openFinance.data,
+    missionsToday,
+    streak_current,
+    gamificationLoading,
+  ]);
 
   // Meses únicos das transações apenas do ano mais recente (evita lista com anos antigos)
   const availableMonths = useMemo(() => {
@@ -1005,6 +1029,8 @@ export default function Dashboard() {
 
             {/* Header */}
             <DashboardHeader user={session.user} onSignOut={handleDisconnect} />
+
+            <CharacterWidget signals={characterSignals} />
 
             {/* Saldo + missões do dia + carrossel de meses */}
             <div className="px-5 mt-4 space-y-2">

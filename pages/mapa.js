@@ -34,13 +34,16 @@ import { StatesUnlockPanel } from '../components/map/StatesUnlockPanel';
 import { FinancePlansInline } from '../components/FinancePlansInline';
 import { BRAND } from '../lib/brandTokens';
 import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
+import { CharacterWidget } from '../components/gamification/CharacterWidget';
+import { useGamification } from '../hooks/useGamification';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
 /** Mapa em tela cheia; UI flutuante — só para alinhar GPS/carrinho no Leaflet. */
 const MAP_MAP_PADDING_TOP_PX = 0;
 /** Altura aproximada da faixa flutuante (safe area + barra pesquisa + fila de chips — mobile em 2 linhas). */
-const MAP_OVERLAY_TOP_LOGGED_PX = 132;
+/** Faixa superior (busca + chips + mascote compacto). */
+const MAP_OVERLAY_TOP_LOGGED_PX = 228;
 const MAP_OVERLAY_TOP_GUEST_PX = 56;
 
 function formatCurrencyBRL(value) {
@@ -79,6 +82,7 @@ export async function getServerSideProps(ctx) {
 export default function MapaPage() {
   const router = useRouter();
   const { data: session } = useSession();
+  const { data: gamification, loading: gamificationLoading } = useGamification();
   const [showSharedBanner, setShowSharedBanner] = useState(false);
   const [showMenuSheet, setShowMenuSheet] = useState(false);
   const [showStatesPanel, setShowStatesPanel] = useState(false);
@@ -269,6 +273,15 @@ export default function MapaPage() {
       setPlanningListaSheetOpen(false);
     }
   }, [planningMode]);
+
+  const characterSignals = useMemo(
+    () => ({
+      context: 'map',
+      loading: gamificationLoading,
+      streakCurrent: gamification?.streak_current ?? 0,
+    }),
+    [gamificationLoading, gamification?.streak_current]
+  );
 
   return (
     <>
@@ -498,6 +511,12 @@ export default function MapaPage() {
                     <X className="h-3.5 w-3.5" aria-hidden />
                     Limpar
                   </button>
+                </div>
+              ) : null}
+
+              {!isDetailExpanded ? (
+                <div className="pointer-events-auto w-full">
+                  <CharacterWidget signals={characterSignals} variant="map" />
                 </div>
               ) : null}
             </div>

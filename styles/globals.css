@@ -751,3 +751,85 @@ body.finmemory-native-barcode-scan-active .finmemory-barcode-scanner-ui {
 .fm-xp-overlay--out {
   animation: fm-xp-float-out 0.4s ease-in forwards;
 }
+
+/* Character Engine — idle, bounce Duolingo, balão */
+.finmemory-char-idle {
+  animation: floatIdle 3s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+@keyframes floatIdle {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.01);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.finmemory-char-bounce {
+  animation: duolingoBounce 0.5s cubic-bezier(0.25, 1.5, 0.5, 1);
+  transform-origin: bottom center;
+}
+
+@keyframes duolingoBounce {
+  0% {
+    transform: scale(1, 1) translateY(0);
+  }
+  30% {
+    transform: scale(1.15, 0.85) translateY(0);
+  }
+  50% {
+    transform: scale(0.9, 1.15) translateY(-15px);
+  }
+  75% {
+    transform: scale(1.05, 0.95) translateY(2px);
+  }
+  100% {
+    transform: scale(1, 1) translateY(0);
+  }
+}
+
+.speech-bubble-appear {
+  animation: bubblePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  transform-origin: left bottom;
+  opacity: 0;
+}
+
+@keyframes bubblePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finmemory-char-idle,
+  .finmemory-char-bounce,
+  .speech-bubble-appear {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Mascote gamificado (Dashboard / Welcome Back) — ajuste width para maior/menor */
+.container-personagem {
+  width: 130px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.container-personagem img,
+.container-personagem svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}

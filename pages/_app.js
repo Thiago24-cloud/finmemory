@@ -17,6 +17,7 @@ import { MissionsTodayProvider } from '../components/missions/MissionsTodayConte
 import { ProfileFirstLoginGate } from '../components/onboarding/ProfileFirstLoginGate';
 import { AccountTypeGate } from '../components/onboarding/AccountTypeGate';
 import { RecoveryIdentifierGate } from '../components/onboarding/RecoveryIdentifierGate';
+import { WelcomeBackGate } from '../components/gamification/WelcomeBackGate';
 import { UserRoleProvider } from '../contexts/UserRoleContext';
 import AppMainBottomNav from '../components/AppMainBottomNav';
 import PageTransitionLayout from '../components/PageTransitionLayout';
@@ -106,6 +107,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
         <AccountTypeGate>
         <ProfileFirstLoginGate>
         <RecoveryIdentifierGate>
+        <WelcomeBackGate>
         <AppSplashGate>
           <PWAInstallProvider>
             <ServiceWorkerRegister />
@@ -123,6 +125,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             </AnalyticsProvider>
           </PWAInstallProvider>
         </AppSplashGate>
+        </WelcomeBackGate>
         </RecoveryIdentifierGate>
         </ProfileFirstLoginGate>
         </AccountTypeGate>
