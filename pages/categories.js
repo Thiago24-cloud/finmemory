@@ -6,17 +6,11 @@ import { ArrowLeft, Tags, Loader2 } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
 import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
 import { displayCategoryForReport } from '../lib/reportCategoryDisplay';
-import { normalizePluggyMoney } from '../lib/pluggyMoney';
+import { getExpenseAmountForDashboard } from '../lib/transacaoExpenseAmount';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-}
-
-function rowTotalForReport(row) {
-  const raw = Number(row?.total) || 0;
-  if (String(row?.source || '').toLowerCase() === 'pluggy') return normalizePluggyMoney(raw);
-  return raw;
 }
 
 export default function CategoriesPage() {
@@ -66,7 +60,7 @@ export default function CategoriesPage() {
     transactions.forEach((t) => {
       const cat = displayCategoryForReport(t.categoria);
       if (!map[cat]) map[cat] = { total: 0, count: 0 };
-      map[cat].total += rowTotalForReport(t);
+      map[cat].total += getExpenseAmountForDashboard(t);
       map[cat].count += 1;
     });
     return Object.entries(map)

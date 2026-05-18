@@ -8,7 +8,7 @@ import PlanGuard from '../components/PlanGuard';
 import { MONTH_FILTER } from '../lib/appMicrocopy';
 import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
 import { displayCategoryForReport } from '../lib/reportCategoryDisplay';
-import { normalizePluggyMoney } from '../lib/pluggyMoney';
+import { getExpenseAmountForDashboard } from '../lib/transacaoExpenseAmount';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
@@ -38,12 +38,6 @@ function getLatestYear(monthKeys) {
     }
   });
   return latest;
-}
-
-function rowTotalForReport(row) {
-  const raw = Number(row?.total) || 0;
-  if (String(row?.source || '').toLowerCase() === 'pluggy') return normalizePluggyMoney(raw);
-  return raw;
 }
 
 export default function ReportsPage() {
@@ -112,11 +106,11 @@ export default function ReportsPage() {
 
   const summary = useMemo(() => {
     const list = filteredTransactions;
-    const total = list.reduce((s, t) => s + rowTotalForReport(t), 0);
+    const total = list.reduce((s, t) => s + getExpenseAmountForDashboard(t), 0);
     const byCategory = {};
     list.forEach((t) => {
       const cat = displayCategoryForReport(t.categoria);
-      byCategory[cat] = (byCategory[cat] || 0) + rowTotalForReport(t);
+      byCategory[cat] = (byCategory[cat] || 0) + getExpenseAmountForDashboard(t);
     });
     const categories = Object.entries(byCategory).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     return { total, count: list.length, categories };

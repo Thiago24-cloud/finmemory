@@ -30,8 +30,8 @@ import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
 import { usePlan } from '../hooks/usePlan';
 import { useGamification } from '../hooks/useGamification';
 import { CharacterWidget } from '../components/gamification/CharacterWidget';
-import { normalizePluggyMoney } from '../lib/pluggyMoney';
 import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
+import { getExpenseAmountForDashboard } from '../lib/transacaoExpenseAmount';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
 let supabaseInstance = null;
@@ -69,14 +69,6 @@ function getYearMonthKey(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getTransactionTotalForDashboard(row) {
-  const raw = Number(row?.total) || 0;
-  if (String(row?.source || '').toLowerCase() === 'pluggy') {
-    return normalizePluggyMoney(raw);
-  }
-  return raw;
 }
 
 function getLatestYear(monthKeys) {
@@ -926,7 +918,7 @@ export default function Dashboard() {
     (transactions || []).forEach((t) => {
       const ym = getYearMonthKey(t.data);
       if (!ym) return;
-      map[ym] = (map[ym] || 0) + getTransactionTotalForDashboard(t);
+      map[ym] = (map[ym] || 0) + getExpenseAmountForDashboard(t);
     });
     return map;
   }, [transactions]);
@@ -982,7 +974,7 @@ export default function Dashboard() {
     (filteredTransactions || []).length > 0 || openFinanceTransactionsForMonth.length > 0;
 
   const totalBalance = useMemo(() => {
-    return (filteredTransactions || []).reduce((sum, t) => sum + getTransactionTotalForDashboard(t), 0);
+    return (filteredTransactions || []).reduce((sum, t) => sum + getExpenseAmountForDashboard(t), 0);
   }, [filteredTransactions]);
   const balanceLoading = loading && (transactions || []).length === 0;
 
@@ -1033,7 +1025,7 @@ export default function Dashboard() {
             <CharacterWidget signals={characterSignals} />
 
             {/* Saldo + missões do dia + carrossel de meses */}
-            <div className="px-5 mt-4 space-y-2">
+            <div className="px-5 mt-4 space-y-3 relative z-10">
               <BalanceCard
                 compact
                 balance={totalBalance}

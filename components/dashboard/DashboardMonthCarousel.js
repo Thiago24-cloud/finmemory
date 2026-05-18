@@ -68,14 +68,15 @@ export function DashboardMonthCarousel({
               }}
               onClick={() => onMonthChange?.(ym)}
               className={cn(
-                'snap-start shrink-0 min-w-[108px] max-w-[124px] rounded-xl px-3 py-2 text-left transition-all border',
+                'snap-start shrink-0 min-w-[108px] max-w-[124px] rounded-xl px-3 py-2 text-left transition-colors border isolate',
+                /* Fundo opaco — bg-card/80 deixava ver o verde do BalanceCard por baixo (efeito “duplicado”) */
                 selected
-                  ? 'border-[#00E676]/55 bg-[#00E676]/10 shadow-[0_0_0_1px_rgba(0,230,118,0.25)]'
-                  : 'border-[#1E2A3A] bg-card/80 hover:border-[#00E676]/25 hover:bg-card'
+                  ? 'border-[#00E676]/55 bg-[#0f1a14] shadow-sm'
+                  : 'border-[#1E2A3A] bg-[#0A0E1A] hover:border-[#00E676]/25 hover:bg-[#0d1218]'
               )}
             >
               <p className="text-[11px] font-semibold text-foreground truncate leading-tight">{labelForYm(ym)}</p>
-              <p className="text-[13px] font-black tabular-nums text-[#00E676] mt-0.5 leading-tight">
+              <p className="text-[13px] font-bold tabular-nums text-[#00E676] mt-0.5 leading-tight antialiased">
                 {loading ? '…' : fmtCurrency(total)}
               </p>
             </button>
