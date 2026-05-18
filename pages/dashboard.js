@@ -32,6 +32,11 @@ import { useGamification } from '../hooks/useGamification';
 import { CharacterWidget } from '../components/gamification/CharacterWidget';
 import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
 import { getExpenseAmountForDashboard } from '../lib/transacaoExpenseAmount';
+import { getYearMonthKey } from '../lib/dashboardMonthKey';
+import {
+  aggregateMonthExpenseTotals,
+  filterMonthsToLatestYear,
+} from '../lib/monthExpenseTotals';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
 let supabaseInstance = null;
@@ -55,31 +60,6 @@ function getSupabase() {
   }
   
   return supabaseInstance;
-}
-
-function getYearMonthKey(value) {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}`;
-    const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-    if (brMatch) return `${brMatch[3]}-${brMatch[2]}`;
-  }
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getLatestYear(monthKeys) {
-  let latest = null;
-  monthKeys.forEach((ym) => {
-    const year = parseInt(ym.split('-')[0], 10);
-    if (!Number.isNaN(year)) {
-      latest = latest === null ? year : Math.max(latest, year);
-    }
-  });
-  return latest;
 }
 
 export async function getServerSideProps(ctx) {
@@ -133,6 +113,9 @@ export default function Dashboard() {
   const [showLogs, setShowLogs] = useState(false);
   const [debugInfo, setDebugInfo] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(null); // 'YYYY-MM' ou null = todos
+  const [apiMonthTotals, setApiMonthTotals] = useState({});
+  const [apiExpenseMonths, setApiExpenseMonths] = useState([]);
+  const [monthTotalsLoading, setMonthTotalsLoading] = useState(false);
   const [tipGmailDismissed, setTipGmailDismissed] = useState(true);
   const [tipMapDismissed, setTipMapDismissed] = useState(true);
   const [showTrashSheet, setShowTrashSheet] = useState(false);
@@ -682,6 +665,31 @@ export default function Dashboard() {
     }
   }, [userId, loadTransactions]);
 
+  const loadMonthTotals = useCallback(async () => {
+    setMonthTotalsLoading(true);
+    try {
+      const r = await fetch('/api/dashboard/month-totals', { credentials: 'include' });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.monthTotals) {
+        setApiMonthTotals(j.monthTotals);
+        setApiExpenseMonths(
+          Array.isArray(j.months)
+            ? j.months
+            : Object.keys(j.monthTotals).sort((a, b) => b.localeCompare(a))
+        );
+      }
+    } catch (e) {
+      console.warn('[dashboard] month-totals:', e?.message || e);
+    } finally {
+      setMonthTotalsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    loadMonthTotals();
+  }, [userId, transactions, loadMonthTotals]);
+
   // Pareamento após o resumo Open Finance terminar de carregar (inclui mudança de conta / refresh implícito do hook)
   useEffect(() => {
     if (!userId || status !== 'authenticated' || openFinance.loading) return;
@@ -695,11 +703,12 @@ export default function Dashboard() {
       } catch (e) {
         console.warn('[dashboard] auto-link-pluggy (pós Open Finance):', e?.message || e);
       }
+      if (!cancelled) await loadMonthTotals();
     })();
     return () => {
       cancelled = true;
     };
-  }, [userId, status, openFinance.loading, loadTransactions]);
+  }, [userId, status, openFinance.loading, loadTransactions, loadMonthTotals]);
 
   // Onboarding: mostrar dicas uma vez (localStorage)
   useEffect(() => {
@@ -899,29 +908,16 @@ export default function Dashboard() {
     gamificationLoading,
   ]);
 
-  // Meses únicos das transações apenas do ano mais recente (evita lista com anos antigos)
-  const availableMonths = useMemo(() => {
-    const set = new Set();
-    (transactions || []).forEach((t) => {
-      const ym = getYearMonthKey(t.data);
-      if (ym) set.add(ym);
-    });
-    const allMonths = Array.from(set);
-    const latestYear = getLatestYear(allMonths);
-    const filtered = latestYear ? allMonths.filter((ym) => ym.startsWith(`${latestYear}-`)) : allMonths;
-    return filtered.sort((a, b) => b.localeCompare(a));
+  const clientMonthExpense = useMemo(() => {
+    const { monthTotals: map, months } = aggregateMonthExpenseTotals({ transacoes: transactions || [] });
+    return { monthTotals: map, months: filterMonthsToLatestYear(months) };
   }, [transactions]);
 
-  /** Total por mês (NF-e / OCR) para chips do carrossel */
-  const monthTotals = useMemo(() => {
-    const map = {};
-    (transactions || []).forEach((t) => {
-      const ym = getYearMonthKey(t.data);
-      if (!ym) return;
-      map[ym] = (map[ym] || 0) + getExpenseAmountForDashboard(t);
-    });
-    return map;
-  }, [transactions]);
+  const availableMonths =
+    apiExpenseMonths.length > 0 ? apiExpenseMonths : clientMonthExpense.months;
+
+  const monthTotals =
+    Object.keys(apiMonthTotals).length > 0 ? apiMonthTotals : clientMonthExpense.monthTotals;
 
   // UX estilo app bancário: abrir já no mês mais recente (evita mostrar acumulado histórico gigante).
   useEffect(() => {
@@ -1040,7 +1036,7 @@ export default function Dashboard() {
                   selectedMonth={selectedMonth}
                   onMonthChange={setSelectedMonth}
                   monthTotals={monthTotals}
-                  loading={loading}
+                  loading={loading || monthTotalsLoading}
                 />
               )}
             </div>
