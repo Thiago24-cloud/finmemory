@@ -29,13 +29,20 @@ function isPublicPagePath(pathname) {
   return false;
 }
 
+/** Arquivos em /public — não passar pelo filtro de beta (evita img quebrada no mascote, logos, etc.). */
+function isPublicStaticAsset(pathname) {
+  return /\.(?:svg|png|jpe?g|gif|webp|ico|woff2?|txt|xml|json)$/i.test(pathname);
+}
+
 export async function middleware(req) {
+  const { pathname } = req.nextUrl;
+
+  if (isPublicStaticAsset(pathname)) return NextResponse.next();
+
   const allowlist = getPrivateBetaAllowlistFromEnv();
   if (!allowlist) {
     return NextResponse.next();
   }
-
-  const { pathname } = req.nextUrl;
 
   if (pathname.startsWith('/_next')) return NextResponse.next();
 

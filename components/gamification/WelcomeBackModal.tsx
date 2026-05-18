@@ -7,7 +7,7 @@ import {
   CHARACTER_CLICK_DEBOUNCE_MS,
   mascotAnimationClass,
 } from '../../lib/gamification/characterAnimation';
-import { MASCOT_IMAGE_SRC } from '../../lib/gamification/characterStateConfig';
+import { MascotImage } from './MascotImage';
 import { pickRandomSpeech } from '../../lib/gamification/characterSpeeches.js';
 import { cn } from '../../lib/utils';
 
@@ -95,13 +95,7 @@ export function WelcomeBackModal({
         >
           <div className="flex items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-orange-500/20 p-3 ring-2 ring-primary/30">
             <div className={cn('container-personagem', mascotClass)}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={MASCOT_IMAGE_SRC}
-                alt="Mascote FinMemory"
-                className="object-contain object-bottom pointer-events-none"
-                draggable={false}
-              />
+              <MascotImage width={130} className="pointer-events-none w-full h-auto" />
             </div>
           </div>
           {showBubble && greeting ? (

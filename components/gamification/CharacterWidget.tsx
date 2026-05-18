@@ -3,7 +3,7 @@
 import { cn } from '../../lib/utils';
 import { useCharacterEngine } from '../../hooks/useCharacterEngine';
 import { mascotAnimationClass } from '../../lib/gamification/characterAnimation';
-import { MASCOT_IMAGE_SRC } from '../../lib/gamification/characterStateConfig';
+import { MascotImage } from './MascotImage';
 
 export type CharacterSignals = {
   context?: 'dashboard' | 'map';
@@ -93,12 +93,9 @@ export function CharacterWidget({
               mascotClass
             )}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={MASCOT_IMAGE_SRC}
-              alt="Mascote FinMemory"
-              className="object-contain object-bottom drop-shadow-md pointer-events-none"
-              draggable={false}
+            <MascotImage
+              width={isMap ? 88 : 130}
+              className="drop-shadow-md pointer-events-none w-full h-auto"
             />
             {ui.confetti ? (
               <span className="pointer-events-none absolute -top-1 -right-1 text-lg animate-bounce">
