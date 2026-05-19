@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useUserRole } from '../../contexts/UserRoleContext';
+import { isPartnerRoute } from '../../lib/marketingRoutes';
 
 /**
  * Redireciona para /escolher-perfil quando o utilizador ainda não escolheu Consumidor vs Varejista.
@@ -12,21 +13,27 @@ export function AccountTypeGate({ children }) {
   const router = useRouter();
   const { status } = useSession();
   const { needsSelection, loading } = useUserRole();
+  const path = router.pathname || '';
+  const skipPartner = isPartnerRoute(path);
 
   useEffect(() => {
+    if (skipPartner) return;
     if (status !== 'authenticated' || loading) return;
 
-    const path = router.pathname;
-    if (needsSelection && path !== '/escolher-perfil') {
+    const currentPath = router.pathname;
+    if (needsSelection && currentPath !== '/escolher-perfil') {
       void router.replace('/escolher-perfil');
       return;
     }
-    if (!needsSelection && path === '/escolher-perfil') {
+    if (!needsSelection && currentPath === '/escolher-perfil') {
       void router.replace('/dashboard');
     }
-  }, [status, loading, needsSelection, router]);
+  }, [skipPartner, status, loading, needsSelection, router]);
 
-  const path = router.pathname;
+  if (skipPartner) {
+    return <>{children}</>;
+  }
+
   const blocking =
     status === 'authenticated' &&
     loading &&

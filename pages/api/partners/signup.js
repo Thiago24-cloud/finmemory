@@ -161,20 +161,24 @@ export default async function handler(req, res) {
   let userId = null;
 
   try {
-    const { data: userRow, error: userErr } = await supabase
-      .from('users')
-      .insert({
-        email: normalizedEmail,
-        name: responsibleName,
-        google_id: null,
-        account_type: ACCOUNT_TYPE_VAREJISTA,
-        access_token: null,
-        refresh_token: null,
-        token_expiry: null,
-        last_sync: new Date(),
-      })
-      .select('id')
-      .single();
+    const signupNow = new Date().toISOString();
+    const userInsert = {
+      email: normalizedEmail,
+      name: responsibleName,
+      google_id: null,
+      account_type: ACCOUNT_TYPE_VAREJISTA,
+      account_type_selected_at: signupNow,
+      account_type_chosen_explicitly: true,
+      access_token: null,
+      refresh_token: null,
+      token_expiry: null,
+      last_sync: new Date(),
+    };
+    let { data: userRow, error: userErr } = await supabase.from('users').insert(userInsert).select('id').single();
+    if (userErr?.message?.includes('account_type_chosen_explicitly')) {
+      const { account_type_chosen_explicitly: _a, account_type_selected_at: _b, ...legacyInsert } = userInsert;
+      ({ data: userRow, error: userErr } = await supabase.from('users').insert(legacyInsert).select('id').single());
+    }
 
     if (userErr || !userRow?.id) {
       if (userErr?.code === '23505') {

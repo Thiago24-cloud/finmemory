@@ -1,6 +1,11 @@
 import Head from 'next/head';
 import { PartnersLandingPage } from '../components/landing/partners/PartnersLandingPage';
 
+/** Evita SSG estático que pode quebrar hidratação com useSession no formulário. */
+export async function getServerSideProps() {
+  return { props: {} };
+}
+
 export default function ParceirosPage() {
   return (
     <>

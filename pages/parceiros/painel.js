@@ -38,5 +38,9 @@ export async function getServerSideProps(ctx) {
     };
   }
 
-  return { props: {} };
+  return {
+    props: {
+      session: JSON.parse(JSON.stringify(session)),
+    },
+  };
 }

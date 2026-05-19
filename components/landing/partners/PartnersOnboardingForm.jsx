@@ -28,8 +28,9 @@ export function PartnersOnboardingForm() {
   const [success, setSuccess] = useState(null);
 
   useEffect(() => {
-    if (loggedIn && session.user.email) {
-      setForm((prev) => ({ ...prev, email: session.user.email }));
+    const email = session?.user?.email;
+    if (loggedIn && email) {
+      setForm((prev) => ({ ...prev, email }));
     }
   }, [loggedIn, session?.user?.email]);
 
@@ -127,7 +128,7 @@ export function PartnersOnboardingForm() {
           <Field label="Complemento (opcional)" name="addressComplement" value={form.addressComplement} onChange={onChange} placeholder="Sala, loja, referência" />
           {loggedIn ? (
             <p className="text-sm text-white/50 m-0 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
-              Conta: <strong className="text-white">{session.user.email}</strong>
+              Conta: <strong className="text-white">{session?.user?.email}</strong>
             </p>
           ) : (
             <>

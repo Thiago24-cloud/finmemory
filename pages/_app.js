@@ -27,12 +27,16 @@ import { isMerchantPanelPage, isPublicMarketingPage } from '../lib/marketingRout
 import '../styles/globals.css';
 
 if (typeof window !== 'undefined' && hasPosthogProjectKey()) {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-    // Tráfego via reverse proxy em `next.config.ts` (`/ingest` → PostHog Cloud).
-    api_host: `${window.location.origin}/ingest`,
-    capture_pageview: false,
-    capture_pageleave: true,
-  });
+  try {
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+      // Tráfego via reverse proxy em `next.config.ts` (`/ingest` → PostHog Cloud).
+      api_host: `${window.location.origin}/ingest`,
+      capture_pageview: false,
+      capture_pageleave: true,
+    });
+  } catch (e) {
+    console.warn('[posthog] init failed:', e?.message || e);
+  }
 }
 
 /**
