@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { CONTACT_EMAIL, LANDING_NAV, PLAY_STORE_URL } from '../../lib/landingConstants';
+import { CONTACT_EMAIL, LANDING_NAV, PARTNERS_LANDING_URL, PLAY_STORE_URL } from '../../lib/landingConstants';
 
 function NavLink({ href, children, onClick, className }) {
   return (
@@ -173,6 +173,12 @@ export default function InstitutionalLanding() {
 
           <div className="hidden lg:flex items-center gap-3">
             <Link
+              href={PARTNERS_LANDING_URL}
+              className="text-sm font-medium text-[#2ECC49] hover:text-[#5ee06f] transition-colors"
+            >
+              Sou lojista
+            </Link>
+            <Link
               href="/login"
               className="text-sm font-medium text-white/70 hover:text-white transition-colors"
             >
@@ -201,6 +207,13 @@ export default function InstitutionalLanding() {
                 {item.label}
               </NavLink>
             ))}
+            <Link
+              href={PARTNERS_LANDING_URL}
+              onClick={closeMenu}
+              className="py-2 text-sm font-medium text-[#2ECC49]"
+            >
+              Sou lojista
+            </Link>
             <Link
               href="/login"
               onClick={closeMenu}
@@ -337,6 +350,15 @@ export default function InstitutionalLanding() {
                 items={retailerItems}
               />
             </div>
+            <p className="mt-8 text-center m-0">
+              <Link
+                href={PARTNERS_LANDING_URL}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-[#22a83a] hover:text-[#2ECC49] transition-colors"
+              >
+                Cadastre sua loja no FinMemory Parceiros
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </p>
           </div>
         </section>
 

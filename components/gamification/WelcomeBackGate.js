@@ -20,7 +20,7 @@ export function WelcomeBackGate({ children }) {
   const [open, setOpen] = useState(false);
   const [payload, setPayload] = useState(null);
 
-  const skipPaths = ['/', '/login', '/signup', '/auth-error', '/escolher-perfil'];
+  const skipPaths = ['/', '/login', '/signup', '/auth-error', '/escolher-perfil', '/parceiros', '/parceiros/painel'];
 
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.supabaseId) return;

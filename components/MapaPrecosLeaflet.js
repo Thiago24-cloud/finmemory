@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, mem
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useSession } from 'next-auth/react';
+import { useReportUserLocation } from '../lib/hooks/reportUserLocation';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ShoppingCart, Loader2, Check, X, Navigation, Clock } from 'lucide-react';
@@ -3080,6 +3081,10 @@ export default function MapaPrecosLeaflet({
   const storeReloadRef = useRef(() => {});
   /** Última posição de &quot;Minha localização&quot; — usada como origem nas rotas (padrão Google Maps). */
   const [userMapPosition, setUserMapPosition] = useState(null);
+  useReportUserLocation(
+    userMapPosition,
+    sessionStatus === 'authenticated' && Boolean(session?.user?.supabaseId)
+  );
   /** Lojas visíveis no mapa (bounds) — para esconder pin de “N preços” no mesmo sítio do pin da loja. */
   const [storesVisibleOnMap, setStoresVisibleOnMap] = useState([]);
 

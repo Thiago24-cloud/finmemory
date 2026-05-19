@@ -25,6 +25,7 @@ import {
   todayIsoSaoPaulo,
 } from '../../../lib/promotionValidity';
 import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
+import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
 
 /**
  * GET /api/map/store-offers?store_id=UUID
@@ -235,7 +236,7 @@ export default async function handler(req, res) {
       .select(baseSelect)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual', 'scraper_dia', 'scraper_atacadao'])
+      .in('source', MAP_PUBLIC_PRICE_POINT_SOURCES)
       .ilike('category', '%promo%')
       .gte('created_at', promoCutoffIso)
       .gte('lat', latMin)
@@ -250,7 +251,7 @@ export default async function handler(req, res) {
       .select(baseSelect)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual', 'scraper_dia', 'scraper_atacadao'])
+      .in('source', MAP_PUBLIC_PRICE_POINT_SOURCES)
       .not('category', 'ilike', '%promo%')
       .gte('created_at', normalCutoffIso)
       .gte('lat', latMin)
@@ -265,7 +266,7 @@ export default async function handler(req, res) {
       .select('product_name, product_id, created_at')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .in('source', ['bot_fila_aprovado', 'admin_manual', 'community_manual', 'scraper_dia', 'scraper_atacadao'])
+      .in('source', MAP_PUBLIC_PRICE_POINT_SOURCES)
       .gte('created_at', normalCutoffIso)
       .gte('lat', latMin)
       .lte('lat', latMax)

@@ -7,6 +7,27 @@ import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { normalizeEmail } from '../../../lib/securityPolicy';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 import { FINMEMORY_CREDENTIAL_ERROR, credentialLoginRejected } from '../../../lib/finmemoryLoginErrorCodes';
+import { ensureMerchantStoreLink } from '../../../lib/merchant/ensureMerchantStoreLink';
+import { normalizeAccountType, ACCOUNT_TYPE_VAREJISTA } from '../../../lib/userType';
+
+async function attachMerchantStoreToToken(token, supabase, userId, accountType) {
+  if (!token || !supabase || !userId || normalizeAccountType(accountType) !== ACCOUNT_TYPE_VAREJISTA) {
+    if (token) {
+      token.merchantStoreId = null;
+      token.merchantStoreName = null;
+    }
+    return;
+  }
+  try {
+    const ctx = await ensureMerchantStoreLink(supabase, userId);
+    token.merchantStoreId = ctx?.store?.id || null;
+    token.merchantStoreName = ctx?.store?.name || null;
+  } catch (e) {
+    console.warn('[auth] merchant store lookup:', e?.message || e);
+    token.merchantStoreId = null;
+    token.merchantStoreName = null;
+  }
+}
 
 const DEFAULT_GOOGLE_PLAY_REVIEWER_EMAILS = ['thiagochimzie4@gmail.com', 'thiagochimezie44@gmail.com'];
 
@@ -232,6 +253,7 @@ export const authOptions = {
             if (data.name) token.name = data.name;
             if (data.avatar_url) token.picture = data.avatar_url;
             token.account_type = data.account_type || 'consumidor';
+            await attachMerchantStoreToToken(token, supabase, data.id, token.account_type);
           } else if (error) {
             // plano/plano_ativo columns may not exist yet — fallback to basic query
             console.warn('jwt callback: extended query failed, trying fallback:', error?.message);
@@ -258,6 +280,9 @@ export const authOptions = {
         if (typeof session.name === 'string') token.name = session.name;
         if (session.image !== undefined) token.picture = session.image;
         if (typeof session.account_type === 'string') token.account_type = session.account_type;
+        if (token.supabaseId && supabase) {
+          await attachMerchantStoreToToken(token, supabase, token.supabaseId, token.account_type);
+        }
       }
 
       return token;
@@ -290,6 +315,8 @@ export const authOptions = {
         session.user.plano = token.plano || 'free';
         session.user.plano_ativo = Boolean(token.plano_ativo);
         session.user.account_type = token.account_type || 'consumidor';
+        session.user.merchantStoreId = token.merchantStoreId || null;
+        session.user.merchantStoreName = token.merchantStoreName || null;
         if (token.name) session.user.name = token.name;
         if (token.picture) session.user.image = token.picture;
       }

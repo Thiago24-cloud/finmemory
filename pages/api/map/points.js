@@ -11,6 +11,7 @@ import { applyPeerPromoImageReuse } from '../../../lib/reuseMapProductImages';
 import { isLikelyNonProductScraperTitle } from '../../../lib/mapStoreChainMatch';
 import { displayPromoProductName } from '../../../lib/mapOfferDisplay';
 import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
+import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
 
 /**
  * GET /api/map/points - lista pontos do mapa.
@@ -205,7 +206,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
-          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia', 'scraper_atacadao'])
+          .in('source', MAP_PUBLIC_PRICE_POINT_SOURCES)
           .ilike('category', '%promo%')
           .gte('created_at', promoCutoffIso),
         bbox
@@ -222,7 +223,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
-          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia', 'scraper_atacadao'])
+          .in('source', MAP_PUBLIC_PRICE_POINT_SOURCES)
           .is('category', null)
           .gte('created_at', normalCutoffIso),
         bbox
@@ -237,7 +238,7 @@ export default async function handler(req, res) {
           .select(baseSelect)
           .not('lat', 'is', null)
           .not('lng', 'is', null)
-          .in('source', ['bot_fila_aprovado', 'admin_manual', 'scraper_dia', 'scraper_atacadao'])
+          .in('source', MAP_PUBLIC_PRICE_POINT_SOURCES)
           .not('category', 'ilike', '%promo%')
           .gte('created_at', normalCutoffIso),
         bbox
@@ -294,7 +295,7 @@ export default async function handler(req, res) {
 
     // Bloqueio global do pipeline bruto:
     // `promocoes_supermercados` não entra no mapa. Fluxo obrigatório:
-    // bot -> bot_promocoes_fila (aprovado) -> price_points.source='bot_fila_aprovado'.
+    // bot -> bot_promocoes_fila (aprovado) -> price_points; parceiros -> merchant_panel.
 
     /**
      * Fallback de imagem no mapa:

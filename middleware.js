@@ -13,6 +13,9 @@ function isPublicApiPath(pathname) {
   if (pathname.startsWith('/api/pluggy/webhook')) return true;
   if (pathname === '/api/webhook') return true;
   if (pathname === '/api/signup') return true;
+  if (pathname.startsWith('/api/partners/')) return true;
+  if (pathname.startsWith('/api/merchant/')) return true;
+  if (pathname === '/api/map/produtos-proximos') return true;
   if (pathname.startsWith('/api/scraper/')) return true;
   if (pathname.startsWith('/api/scrapers/')) return true;
   return false;
@@ -26,6 +29,7 @@ function isPublicPagePath(pathname) {
   if (pathname.startsWith('/privacidade')) return true;
   if (pathname.startsWith('/termos')) return true;
   if (pathname.startsWith('/download')) return true;
+  if (pathname.startsWith('/parceiros')) return true;
   return false;
 }
 

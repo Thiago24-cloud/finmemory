@@ -23,6 +23,7 @@ import AppMainBottomNav from '../components/AppMainBottomNav';
 import PageTransitionLayout from '../components/PageTransitionLayout';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import { capturePosthog, hasPosthogProjectKey } from '../lib/posthogClient';
+import { isMerchantPanelPage, isPublicMarketingPage } from '../lib/marketingRoutes';
 import '../styles/globals.css';
 
 if (typeof window !== 'undefined' && hasPosthogProjectKey()) {
@@ -87,19 +88,88 @@ function PostHogIdentify() {
   return null;
 }
 
+function SafePostHogProvider({ children }) {
+  if (hasPosthogProjectKey()) {
+    return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
+  }
+  return children;
+}
+
+/** Landing institucional + /parceiros — evita splash/mapa/missões que quebram marketing. */
+function MarketingAppShell({ session, children }) {
+  return (
+    <SafePostHogProvider>
+      <ErrorBoundary>
+        <SessionProvider session={session}>
+          <DeployRecovery />
+          {children}
+          <ClientOnly>
+            <SafeGoogleAnalytics />
+          </ClientOnly>
+        </SessionProvider>
+      </ErrorBoundary>
+    </SafePostHogProvider>
+  );
+}
+
+/** Painel do lojista — sessão + perfil, sem bottom nav. */
+function MerchantAppShell({ session, children }) {
+  return (
+    <SafePostHogProvider>
+      <ErrorBoundary>
+        <SessionProvider session={session}>
+          <PostHogIdentify />
+          <UserRoleProvider>
+            <AccountTypeGate>
+              <DeployRecovery />
+              {children}
+            </AccountTypeGate>
+          </UserRoleProvider>
+        </SessionProvider>
+      </ErrorBoundary>
+    </SafePostHogProvider>
+  );
+}
+
 export default function App({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter();
+  const pathname = router.pathname || '';
+  const marketing = router.isReady && isPublicMarketingPage(pathname);
+  const merchantPanel = router.isReady && isMerchantPanelPage(pathname);
 
   useEffect(() => {
-    // Pageview da página inicial (routeChangeComplete não dispara no primeiro load)
     capturePosthog('$pageview');
     const handleRouteChange = () => capturePosthog('$pageview');
     router.events.on('routeChangeComplete', handleRouteChange);
     return () => router.events.off('routeChangeComplete', handleRouteChange);
   }, [router.events]);
 
+  if (!router.isReady) {
+    return (
+      <SessionProvider session={session}>
+        <Component {...pageProps} />
+      </SessionProvider>
+    );
+  }
+
+  if (marketing) {
+    return (
+      <MarketingAppShell session={session}>
+        <Component {...pageProps} />
+      </MarketingAppShell>
+    );
+  }
+
+  if (merchantPanel) {
+    return (
+      <MerchantAppShell session={session}>
+        <Component {...pageProps} />
+      </MerchantAppShell>
+    );
+  }
+
   return (
-    <PostHogProvider client={posthog}>
+    <SafePostHogProvider>
     <ErrorBoundary>
       <SessionProvider session={session}>
         <PostHogIdentify />
@@ -135,6 +205,6 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
         </ClientOnly>
       </SessionProvider>
     </ErrorBoundary>
-    </PostHogProvider>
+    </SafePostHogProvider>
   );
 }
