@@ -134,8 +134,8 @@ function MerchantAppShell({ session, children }) {
 export default function App({ Component, pageProps: { session, ...pageProps } }) {
   const router = useRouter();
   const pathname = router.pathname || '';
-  const marketing = router.isReady && isPublicMarketingPage(pathname);
-  const merchantPanel = router.isReady && isMerchantPanelPage(pathname);
+  const marketing = isPublicMarketingPage(pathname);
+  const merchantPanel = isMerchantPanelPage(pathname);
 
   useEffect(() => {
     capturePosthog('$pageview');
@@ -145,9 +145,25 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
   }, [router.events]);
 
   if (!router.isReady) {
+    if (marketing) {
+      return (
+        <MarketingAppShell session={session}>
+          <Component {...pageProps} />
+        </MarketingAppShell>
+      );
+    }
+    if (merchantPanel) {
+      return (
+        <MerchantAppShell session={session}>
+          <Component {...pageProps} />
+        </MerchantAppShell>
+      );
+    }
     return (
       <SessionProvider session={session}>
-        <Component {...pageProps} />
+        <MissionsTodayProvider>
+          <Component {...pageProps} />
+        </MissionsTodayProvider>
       </SessionProvider>
     );
   }
