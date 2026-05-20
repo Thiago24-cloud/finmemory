@@ -48,7 +48,7 @@ export function SaldoHojeField({
         {loading
           ? 'Recalculando contas…'
           : contasCount > 0
-            ? `${contasCount} conta${contasCount === 1 ? '' : 's'} · débito + crédito disponível`
+            ? `${contasCount} conta${contasCount === 1 ? '' : 's'} · débito + saldo ainda disponível no cartão`
             : usingMock
               ? 'Dados de exemplo (mock) — conecte o Open Finance para saldos reais'
               : 'Sem contas conectadas'}

@@ -154,7 +154,7 @@ export default async function handler(req, res) {
   );
   contas = resolveContasForSaldo(contas);
   const saldoHoje = calculateSaldoHoje(contas);
-  /** Poder de compra: Σ(saldo_debito) + Σ(limite_credito_disponivel) — modelo genérico de contas. */
+  /** Saldo de hoje: Σ(débito) + Σ(o que ainda pode gastar no cartão — não o limite total). */
   const accountBalanceTotal = saldoHoje;
 
   const accountsOut = accounts.map((a) => {

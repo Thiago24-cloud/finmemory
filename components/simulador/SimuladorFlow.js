@@ -929,7 +929,7 @@ export function SimuladorFlow() {
                       <span className="text-zinc-400 truncate">{c.nome_banco}</span>
                       <span className="shrink-0 tabular-nums text-zinc-300">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                          (Number(c.saldo_debito) || 0) + (Number(c.limite_credito_disponivel) || 0)
+                          (Number(c.saldo_debito) || 0) + (Number(c.saldo_cartao_disponivel) || 0)
                         )}
                       </span>
                     </li>
@@ -939,7 +939,7 @@ export function SimuladorFlow() {
               <p className="text-[11px] text-zinc-500 leading-snug">
                 <span className="text-[#39FF14] font-semibold">Poder de compra sugerido</span>
                 {' '}
-                (Σ saldo débito + Σ limite crédito disponível
+                (Σ débito + Σ ainda disponível no cartão — não o limite total
                 {hints?.usingMockContas ? ' · dados de exemplo' : ''}):{' '}
                 <strong className="text-zinc-200">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
