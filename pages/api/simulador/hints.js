@@ -3,6 +3,10 @@ import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { buildContasFromOpenFinance } from '../../../lib/finance/buildContasFromOpenFinance';
 import {
+  gastoCartaoFromDashboardBalance,
+  saldoCartaoComLimiteManual,
+} from '../../../lib/finance/creditCardGasto';
+import {
   calculateSaldoHoje,
   resolveContasForSaldo,
 } from '../../../lib/finance/contaFinanceira';
@@ -99,10 +103,10 @@ export default async function handler(req, res) {
 
   const { data: cardsEarly, error: cardEarlyErr } = await supabase
     .from('manual_credit_cards')
-    .select('id, label, due_day, closing_day, credit_limit')
+    .select('id, label, due_day, closing_day, credit_limit, bank_account_id')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
-    .limit(8);
+    .limit(12);
 
   if (cardEarlyErr) {
     console.warn('[simulador/hints] manual_credit_cards (early):', cardEarlyErr.message);
@@ -114,7 +118,16 @@ export default async function handler(req, res) {
     due_day: c.due_day,
     closing_day: c.closing_day,
     credit_limit: c.credit_limit != null ? Number(c.credit_limit) : null,
+    bank_account_id: c.bank_account_id || null,
   }));
+
+  /** bank_accounts.id → limite total digitado no simulador */
+  const limitsByAccountId = {};
+  for (const c of manualCards) {
+    if (c.bank_account_id && c.credit_limit != null && c.credit_limit > 0) {
+      limitsByAccountId[c.bank_account_id] = c.credit_limit;
+    }
+  }
 
   const accountsForHint = accounts.map((a) => ({
     balance: a.balance,
@@ -150,8 +163,24 @@ export default async function handler(req, res) {
       balance: a.balance,
       account_type: a.account_type,
     })),
-    manualLimitsOrdered
+    { byAccountId: limitsByAccountId, orderedFallback: manualLimitsOrdered }
   );
+
+  const creditCards = accounts
+    .filter((a) => isCreditLikeAccount(a.account_type, a.name))
+    .map((a) => {
+      const balance = Number(a.balance) || 0;
+      const limite = limitsByAccountId[a.id] ?? null;
+      return {
+        bank_account_id: a.id,
+        name: (a.name || 'Cartão').trim(),
+        balance_dashboard: Math.round(balance * 100) / 100,
+        gasto_dashboard: gastoCartaoFromDashboardBalance(balance),
+        credit_limit: limite,
+        disponivel:
+          limite != null && limite > 0 ? saldoCartaoComLimiteManual(limite, balance) : null,
+      };
+    });
   contas = resolveContasForSaldo(contas);
   const saldoHoje = calculateSaldoHoje(contas);
   /** Saldo de hoje: Σ(débito) + Σ(o que ainda pode gastar no cartão — não o limite total). */
@@ -361,6 +390,8 @@ export default async function handler(req, res) {
     ok: true,
     saldoHoje,
     contas,
+    creditCards,
+    limitsByAccountId,
     usingMockContas: contas.length > 0 && accounts.length === 0,
     accountBalanceTotal: Math.round(accountBalanceTotal * 100) / 100,
     startingBalanceBreakdown: {

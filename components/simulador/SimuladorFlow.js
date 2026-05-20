@@ -27,8 +27,11 @@ import {
   reliabilityLabel,
 } from '../../lib/simuladorProjection';
 import { SimuladorMonthCalendar } from './SimuladorMonthCalendar';
+import { SimuladorCreditLimitsPanel } from './SimuladorCreditLimitsPanel';
 import { SaldoHojeField } from './SaldoHojeField';
 import { useSaldoDeHoje } from '../../hooks/useSaldoDeHoje';
+import { buildContasFromOpenFinance } from '../../lib/finance/buildContasFromOpenFinance';
+import { resolveContasForSaldo } from '../../lib/finance/contaFinanceira';
 import { NEED, SimuladorNecessityPie } from './SimuladorNecessityPie';
 import { SimuladorRadarChart } from './SimuladorRadarChart';
 
@@ -199,6 +202,8 @@ export function SimuladorFlow() {
   const lastSentRef = useRef('');
   const [debouncedState, setDebouncedState] = useState(state);
 
+  const [limitsPreview, setLimitsPreview] = useState(null);
+
   const fetchHints = useCallback(async () => {
     if (status !== 'authenticated') return;
     setHintsLoading(true);
@@ -213,10 +218,43 @@ export function SimuladorFlow() {
     }
   }, [status]);
 
+  const contasParaSaldo = useMemo(() => {
+    const accounts = hints?.accounts;
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      return hints?.contas ?? null;
+    }
+
+    const byAccountId = { ...(hints?.limitsByAccountId || {}) };
+    const previewSource = limitsPreview ?? hints?.creditCards ?? [];
+    for (const c of previewSource) {
+      const id = c.bank_account_id;
+      const lim =
+        c.limite != null && Number.isFinite(Number(c.limite)) && Number(c.limite) > 0
+          ? Number(c.limite)
+          : c.credit_limit != null && c.credit_limit > 0
+            ? Number(c.credit_limit)
+            : null;
+      if (id && lim != null) byAccountId[id] = lim;
+    }
+
+    const built = buildContasFromOpenFinance(
+      accounts.map((a) => ({
+        id: a.id,
+        name: a.name,
+        balance: a.balance,
+        account_type: a.account_type,
+      })),
+      { byAccountId }
+    );
+    return resolveContasForSaldo(built);
+  }, [hints, limitsPreview]);
+
   const saldoDeHoje = useSaldoDeHoje({
-    contas: hints?.contas,
-    saldoHojeFromApi: hints?.saldoHoje ?? hints?.accountBalanceTotal,
+    contas: contasParaSaldo,
+    saldoHojeFromApi:
+      limitsPreview != null ? null : (hints?.saldoHoje ?? hints?.accountBalanceTotal),
     enabled: status === 'authenticated',
+    onRefresh: fetchHints,
   });
 
   useEffect(() => {
@@ -716,6 +754,17 @@ export function SimuladorFlow() {
 
   const dayRow = (
     <>
+      <SimuladorCreditLimitsPanel
+        creditCards={hints?.creditCards ?? []}
+        loading={hintsLoading}
+        fieldClass={fieldClass}
+        labelClass={labelClass}
+        onLimitsChange={setLimitsPreview}
+        onSaved={() => {
+          setLimitsPreview(null);
+          void fetchHints();
+        }}
+      />
       <div className="grid grid-cols-2 gap-3">
         <SaldoHojeField
           labelClass={labelClass}
