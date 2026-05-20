@@ -14,8 +14,7 @@ import {
  *   contas?: import('../lib/finance/contaFinanceira').ContaFinanceira[] | null,
  *   saldoHojeFromApi?: number | null,
  *   enabled?: boolean,
- *   /** @deprecated Preferir refresh explícito no Simulador (evita fetch duplicado em focus/visibility). */
- *   onRefresh?: () => void | Promise<void>,
+ *   onRefresh?: (() => void | Promise<void>) | null
  * }} options
  */
 export function useSaldoDeHoje({
