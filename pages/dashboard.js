@@ -20,12 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/S
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
-import { DashboardSpotlightTour } from '../components/onboarding/DashboardSpotlightTour';
 import { DASHBOARD } from '../lib/appMicrocopy';
-import {
-  isDashboardOnboardingDoneLocal,
-  setDashboardOnboardingDoneLocal,
-} from '../lib/dashboardOnboardingStorage';
 import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
 import { usePlan } from '../hooks/usePlan';
 import { useGamification } from '../hooks/useGamification';
@@ -123,8 +118,6 @@ export default function Dashboard() {
   const [trashLoading, setTrashLoading] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
-  const [onboardingTourReady, setOnboardingTourReady] = useState(false);
   const { can: canPlanFeature, loading: planLoading } = usePlan();
   const canOpenFinance = !planLoading && canPlanFeature('open_finance');
   const [recentPrices, setRecentPrices] = useState([]);
@@ -273,39 +266,6 @@ export default function Dashboard() {
       setOpenFinanceAccountId(null);
     }
   }, [openFinance.data?.accounts, openFinanceAccountId]);
-
-  useEffect(() => {
-    if (status !== 'authenticated' || !userId) return undefined;
-    if (typeof window !== 'undefined' && isDashboardOnboardingDoneLocal(userId)) {
-      return undefined;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch('/api/user/onboarding', { credentials: 'include' });
-        if (r.ok) {
-          const j = await r.json();
-          if (!cancelled && j.showTour === true) {
-            setOnboardingTourOpen(true);
-            window.setTimeout(() => {
-              if (!cancelled) setOnboardingTourReady(true);
-            }, 700);
-          }
-          return;
-        }
-        if (r.status === 401) return;
-      } catch (_) {
-        /* rede */
-      }
-      // Fallback: erro de servidor ou rede — uma vez por browser (ex.: coluna ainda não no PostgREST)
-      if (!cancelled && typeof window !== 'undefined' && !isDashboardOnboardingDoneLocal(userId)) {
-        setOnboardingTourOpen(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, status]);
 
   const loadTransactions = useCallback(async (uid) => {
     if (!uid) {
@@ -1346,16 +1306,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {onboardingTourOpen && onboardingTourReady && (
-        <DashboardSpotlightTour
-          userId={userId}
-          onComplete={() => {
-            if (userId) setDashboardOnboardingDoneLocal(userId);
-            setOnboardingTourOpen(false);
-            setOnboardingTourReady(false);
-          }}
-        />
-      )}
     </div>
   );
 }

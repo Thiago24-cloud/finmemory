@@ -17,6 +17,7 @@ import {
 import { cn } from '../../lib/utils';
 import { DASHBOARD, QUICK_ACTION_TITLE } from '../../lib/appMicrocopy';
 import { canUseRestrictedFeatures } from '../../lib/restrictedFeatureAccess';
+import { QUICK_ACCESS_TOUR_IDS } from '../../lib/onboarding/featureTourSteps';
 
 const CELL =
   'flex flex-col items-center gap-1 w-full min-w-0 rounded-xl py-1.5 px-0.5 transition-transform hover:-translate-y-0.5 active:scale-[0.98]';
@@ -148,6 +149,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
                 className={cn(CELL, 'text-inherit bg-transparent border-0 cursor-pointer')}
                 onClick={onClick}
                 title={title}
+                data-tour-id={QUICK_ACCESS_TOUR_IDS[key]}
               >
                 {body}
               </button>
@@ -158,7 +160,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
             <Link
               key={key}
               href={href}
-              data-tour-id={key === 'mapa' ? 'dashboard-mapa' : undefined}
+              data-tour-id={QUICK_ACCESS_TOUR_IDS[key]}
               className={cn(CELL, 'no-underline text-inherit')}
               title={title || label}
             >

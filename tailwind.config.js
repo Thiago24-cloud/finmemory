@@ -48,6 +48,10 @@ module.exports = {
         'fade-in': { from: { opacity: '0', transform: 'translateY(8px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
         'slide-up': { from: { opacity: '0', transform: 'translateY(16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
         'scale-in': { from: { opacity: '0', transform: 'scale(0.95)' }, to: { opacity: '1', transform: 'scale(1)' } },
+        'onboarding-hand-bounce': {
+          '0%, 100%': { transform: 'translateY(0) scale(1)' },
+          '50%': { transform: 'translateY(-12px) scale(1.05)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -55,6 +59,7 @@ module.exports = {
         'fade-in': 'fade-in 0.4s ease-out forwards',
         'slide-up': 'slide-up 0.5s ease-out forwards',
         'scale-in': 'scale-in 0.3s ease-out forwards',
+        'onboarding-hand-bounce': 'onboarding-hand-bounce 1.15s ease-in-out infinite',
       },
     },
   },

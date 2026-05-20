@@ -56,6 +56,7 @@ export function CharacterWidget({
 
   return (
     <section
+      data-tour-id={isMap ? undefined : 'dashboard-mascot'}
       className={cn(
         'relative overflow-hidden rounded-2xl border',
         isMap

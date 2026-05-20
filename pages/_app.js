@@ -19,6 +19,9 @@ import { AccountTypeGate } from '../components/onboarding/AccountTypeGate';
 import { RecoveryIdentifierGate } from '../components/onboarding/RecoveryIdentifierGate';
 import { WelcomeBackGate } from '../components/gamification/WelcomeBackGate';
 import { UserRoleProvider } from '../contexts/UserRoleContext';
+import { OnboardingTourProvider } from '../contexts/OnboardingTourContext';
+import { OnboardingGuideGate } from '../components/onboarding/OnboardingGuideGate';
+import { FeatureUsageRecorder } from '../components/onboarding/FeatureUsageRecorder';
 import AppMainBottomNav from '../components/AppMainBottomNav';
 import PageTransitionLayout from '../components/PageTransitionLayout';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
@@ -194,6 +197,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
       <SessionProvider session={session}>
         <PostHogIdentify />
         <UserRoleProvider>
+        <OnboardingTourProvider>
         <AccountTypeGate>
         <ProfileFirstLoginGate>
         <RecoveryIdentifierGate>
@@ -208,6 +212,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
                   <PageTransitionLayout>
                     <Component {...pageProps} />
                   </PageTransitionLayout>
+                  <FeatureUsageRecorder />
+                  <OnboardingGuideGate />
                   <AppMainBottomNav />
                 </MapCartProvider>
               </MissionsTodayProvider>
@@ -219,6 +225,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
         </RecoveryIdentifierGate>
         </ProfileFirstLoginGate>
         </AccountTypeGate>
+        </OnboardingTourProvider>
         </UserRoleProvider>
         <ClientOnly>
           <SafeGoogleAnalytics />
