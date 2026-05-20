@@ -148,6 +148,13 @@ export default function CobrancasDoMes({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, monthKey]);
 
+  useEffect(() => {
+    const onRefresh = () => load();
+    window.addEventListener('finmemory:cobrancas-refresh', onRefresh);
+    return () => window.removeEventListener('finmemory:cobrancas-refresh', onRefresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, monthKey]);
+
   const openCheckin = (cobranca, competencia) => {
     setSelectedCobranca(cobranca);
     setSelectedCompetencia(competencia);

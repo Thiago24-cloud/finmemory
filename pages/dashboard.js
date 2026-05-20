@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/S
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
+import DetectedSubscriptionsPanel from '../components/dashboard/DetectedSubscriptionsPanel';
 import { DASHBOARD } from '../lib/appMicrocopy';
 import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
 import { usePlan } from '../hooks/usePlan';
@@ -1131,6 +1132,14 @@ export default function Dashboard() {
 
             {/* Cobranças do mês */}
             <div className="px-5 mt-4">
+              <DetectedSubscriptionsPanel
+                userId={userId}
+                onConfirmed={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('finmemory:cobrancas-refresh'));
+                  }
+                }}
+              />
               <CobrancasDoMes userId={userId} selectedMonth={selectedMonth} onAfterPayment={() => loadTransactions(userId)} />
             </div>
 
