@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   const ctx = await ensureMerchantStoreLink(auth.supabase, auth.userId);
   if (!ctx?.store?.id) {
-    return res.status(404).json({
+    return res.status(403).json({
       code: 'MERCHANT_STORE_NOT_LINKED',
       error: 'Nenhuma loja encontrada para esta conta. Cadastre-se em /parceiros.',
       linked: false,

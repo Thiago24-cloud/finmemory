@@ -72,6 +72,13 @@ export default function AdminHomePage() {
       ready: true,
       badge: 'Novo',
     },
+    {
+      href: '/admin/partner-stores',
+      title: 'Lojas parceiras',
+      desc: 'Aprovar cadastros de /parceiros (needs_review) antes de publicarem ofertas e receberem pedidos.',
+      ready: true,
+      badge: 'Novo',
+    },
   ];
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Loader2, Zap } from 'lucide-react';
+import { painelApi } from '../../lib/merchant/painelApiPaths';
 
 function formatBrl(value) {
   return Number(value).toFixed(2).replace('.', ',');
@@ -15,7 +16,7 @@ export function MerchantProductCard({ product, onUpdated }) {
   const patch = async (body) => {
     setBusy(true);
     try {
-      const res = await fetch(`/api/merchant/products/${product.id}`, {
+      const res = await fetch(painelApi.product(product.id), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

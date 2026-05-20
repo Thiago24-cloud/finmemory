@@ -6,6 +6,10 @@ import { signOut, useSession } from 'next-auth/react';
 import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
+import { MerchantOrdersSection } from './MerchantOrdersSection';
+import { MerchantStripeSection } from './MerchantStripeSection';
+import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchant/merchantApiErrorMessage';
+import { painelApi } from '../../lib/merchant/painelApiPaths';
 
 export function MerchantPanel() {
   const { data: session } = useSession();
@@ -22,20 +26,25 @@ export function MerchantPanel() {
     setRepairing(true);
     setError('');
     try {
-      const res = await fetch('/api/merchant/repair-link', { method: 'POST' });
+      const res = await fetch(painelApi.repairLink, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.linked) {
         setNeedsPartnerSignup(false);
         setSuccess(`Loja vinculada: ${data.store?.name || 'OK'}. Recarregando…`);
         return true;
       }
+      logMerchantApiFailure('repair-link', res, data);
       setNeedsPartnerSignup(true);
       setError(
-        data.error ||
+        formatMerchantApiError(
+          res,
+          data,
           'Sua conta é de lojista, mas ainda não há loja cadastrada. Use o formulário em /parceiros (mesmo e-mail e senha).'
+        )
       );
       return false;
-    } catch {
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') console.warn('[MerchantPanel] repair-link', err);
       setError('Erro de rede ao sincronizar vínculo.');
       return false;
     } finally {
@@ -48,40 +57,69 @@ export function MerchantPanel() {
     setError('');
     setNeedsPartnerSignup(false);
     try {
-      let ctxRes = await fetch('/api/merchant/context');
+      let ctxRes = await fetch(painelApi.context);
       let ctxData = await ctxRes.json().catch(() => ({}));
 
       if (!ctxRes.ok && ctxData.code === 'MERCHANT_STORE_NOT_LINKED') {
         const repaired = await tryRepairLink();
         if (repaired) {
-          ctxRes = await fetch('/api/merchant/context');
+          ctxRes = await fetch(painelApi.context);
           ctxData = await ctxRes.json().catch(() => ({}));
         }
       }
 
-      const prodRes = await fetch('/api/merchant/products');
+      const prodRes = await fetch(painelApi.products);
       const prodData = await prodRes.json().catch(() => ({}));
 
       if (!ctxRes.ok) {
+        logMerchantApiFailure('context', ctxRes, ctxData);
+        if (ctxRes.status === 404 && !ctxData.code) {
+          setError(
+            'API do painel não encontrada no servidor (404). Confirme o deploy recente — rotas em /api/parceiros/painel/*.'
+          );
+          setCtx(null);
+          return;
+        }
         if (ctxData.code === 'MERCHANT_STORE_NOT_LINKED') {
           setNeedsPartnerSignup(true);
         }
         setError(
-          ctxData.error ||
+          formatMerchantApiError(
+            ctxRes,
+            ctxData,
             'Não foi possível carregar a loja. Se você só escolheu o perfil "lojista", cadastre a loja em /parceiros.'
+          )
         );
         setCtx(null);
         return;
       }
       setCtx(ctxData);
       if (!prodRes.ok) {
+        logMerchantApiFailure('products', prodRes, prodData);
         setProducts([]);
-        if (prodRes.status !== 503) setError(prodData.error || 'Erro ao listar produtos.');
+        if (prodRes.status === 503) {
+          setError(
+            formatMerchantApiError(
+              prodRes,
+              prodData,
+              'Banco ainda sem a tabela produtos_loja. No Supabase → SQL Editor, execute os arquivos .sql da pasta supabase/migrations (não cole código JavaScript do painel).'
+            )
+          );
+        } else if (prodRes.status === 404 && !prodData.code) {
+          setError(
+            'API de produtos não encontrada no servidor (404). Confirme o deploy — /api/parceiros/painel/products.'
+          );
+        } else if (prodRes.status !== 403 && prodRes.status !== 404) {
+          setError(
+            formatMerchantApiError(prodRes, prodData, 'Erro ao listar produtos.')
+          );
+        }
       } else {
         setProducts(prodData.products || []);
       }
-    } catch {
-      setError('Erro de rede.');
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') console.warn('[MerchantPanel] load', err);
+      setError('Erro de rede. Verifique a conexão e tente de novo.');
     } finally {
       setLoading(false);
     }
@@ -193,6 +231,16 @@ export function MerchantPanel() {
               </p>
             ) : null}
 
+            {ctx?.store?.needs_review ? (
+              <p
+                className="text-sm text-amber-200/95 bg-amber-500/10 border border-amber-500/35 rounded-xl px-4 py-3 mb-4"
+                role="status"
+              >
+                Sua loja está em <strong>análise</strong>. Você pode cadastrar produtos, mas ofertas no mapa e pedidos
+                dos clientes só liberam após aprovação da equipe FinMemory.
+              </p>
+            ) : null}
+
             <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
               <h2 className="text-sm font-bold m-0 text-white/90">Sua loja no mapa</h2>
               {address ? (
@@ -223,6 +271,10 @@ export function MerchantPanel() {
                 Ofertas ativas aparecem por ~3 dias para quem está a até ~3 km.
               </p>
             </section>
+
+            <MerchantStripeSection />
+
+            <MerchantOrdersSection tempoPreparoMedio={ctx?.store?.tempo_preparo_medio ?? 15} />
 
             <section className="mt-8">
               <div className="flex items-center justify-between gap-3">

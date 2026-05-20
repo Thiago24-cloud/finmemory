@@ -20,7 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/S
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
 import CobrancasDoMes from '../components/dashboard/CobrancasDoMes';
-import { DashboardOnboardingTour } from '../components/onboarding/DashboardOnboardingTour';
+import { DashboardSpotlightTour } from '../components/onboarding/DashboardSpotlightTour';
 import { DASHBOARD } from '../lib/appMicrocopy';
 import {
   isDashboardOnboardingDoneLocal,
@@ -124,6 +124,7 @@ export default function Dashboard() {
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
+  const [onboardingTourReady, setOnboardingTourReady] = useState(false);
   const { can: canPlanFeature, loading: planLoading } = usePlan();
   const canOpenFinance = !planLoading && canPlanFeature('open_finance');
   const [recentPrices, setRecentPrices] = useState([]);
@@ -284,7 +285,12 @@ export default function Dashboard() {
         const r = await fetch('/api/user/onboarding', { credentials: 'include' });
         if (r.ok) {
           const j = await r.json();
-          if (!cancelled && j.showTour === true) setOnboardingTourOpen(true);
+          if (!cancelled && j.showTour === true) {
+            setOnboardingTourOpen(true);
+            window.setTimeout(() => {
+              if (!cancelled) setOnboardingTourReady(true);
+            }, 700);
+          }
           return;
         }
         if (r.status === 401) return;
@@ -975,11 +981,9 @@ export default function Dashboard() {
   const balanceLoading = loading && (transactions || []).length === 0;
 
   const missionsSlotForCard = useMemo(() => {
-    if (!missionsToday?.length) return null;
-    const completed = missionsToday.filter((m) => m.completed).length;
-    return (
-      <DashboardMissionsProgress completed={completed} total={missionsToday.length} />
-    );
+    const total = missionsToday?.length || 6;
+    const completed = missionsToday?.filter((m) => m.completed).length ?? 0;
+    return <DashboardMissionsProgress completed={completed} total={total} />;
   }, [missionsToday]);
 
   const transactionCount = (transactions || []).length;
@@ -1342,12 +1346,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {onboardingTourOpen && (
-        <DashboardOnboardingTour
+      {onboardingTourOpen && onboardingTourReady && (
+        <DashboardSpotlightTour
           userId={userId}
           onComplete={() => {
             if (userId) setDashboardOnboardingDoneLocal(userId);
             setOnboardingTourOpen(false);
+            setOnboardingTourReady(false);
           }}
         />
       )}

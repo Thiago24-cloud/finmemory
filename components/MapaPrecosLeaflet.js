@@ -30,6 +30,7 @@ import { useMapCart } from './map/MapCartContext';
 import { useBagBackgroundMonitoring } from './map/useBagBackgroundMonitoring';
 import { MapBottomPaddingSync } from './map/MapBottomPaddingSync';
 import { useMissionsToday } from './missions/MissionsTodayContext';
+import { MerchantPickupOrderButton } from './merchant/MerchantPickupOrderButton';
 import { completeDailyMission } from '../lib/completeDailyMission';
 import {
   getMapPinOpenAirLabelStyle,
@@ -1017,6 +1018,65 @@ async function fetchMapPoints(map, searchIntent) {
   }
 }
 
+/** Ofertas de parceiros (produtos_loja) no raio — complementa price_points. */
+async function fetchMerchantOfferPoints(lat, lng, raioKm = 8) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  try {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lng: String(lng),
+      raio_km: String(raioKm),
+    });
+    const res = await fetch(`/api/map/produtos-proximos?${params}`);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[map] produtos-proximos', res.status, json?.error, json?.code);
+      }
+      return [];
+    }
+    return (json.items || [])
+      .map((row) => {
+        const latN = Number(row.lat ?? row.latitude);
+        const lngN = Number(row.lng ?? row.longitude);
+        if (!Number.isFinite(latN) || !Number.isFinite(lngN)) return null;
+        const price = Number(row.preco_oferta);
+        const id = `merchant-pl-${row.produto_id}`;
+        return {
+          id,
+          nome: row.nome_comercial,
+          produto: displayPromoProductName(row.nome_produto, row.nome_comercial),
+          preco: price,
+          precoLabel: formatPrecoExibicao(price, 'Supermercado - Promoção', id),
+          promo_image_url: row.url_imagem || null,
+          lat: latN,
+          lng: lngN,
+          categoria: 'Supermercado - Promoção',
+          time_ago: '',
+          user_label: 'Parceiro',
+          source: 'merchant_panel',
+          loja_id: row.loja_id,
+          produto_loja_id: row.produto_id,
+        };
+      })
+      .filter(Boolean);
+  } catch (e) {
+    console.warn('[map] produtos-proximos fetch failed:', e);
+    return [];
+  }
+}
+
+function mergeMapPointsDeduped(primary, extra) {
+  const byId = new Map();
+  for (const p of primary || []) {
+    if (p?.id) byId.set(p.id, p);
+  }
+  for (const p of extra || []) {
+    if (p?.id && !byId.has(p.id)) byId.set(p.id, p);
+  }
+  return Array.from(byId.values());
+}
+
 const MAP_VIEWPORT_MERGE_MAX = 1600;
 
 /**
@@ -1171,7 +1231,7 @@ function PlanningActionController({
 }
 
 /** Carrega pontos: busca por produto (global) ou por área visível (região / pan). */
-function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }) {
+function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef, userPosition = null }) {
   const map = useMap();
   const debounceRef = useRef(null);
   /** Evita que uma resposta lenta (viewport antigo) substitua pins de um movimento mais recente. */
@@ -1191,10 +1251,22 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
       if (gen === loadGenerationRef.current) setCarregando(true);
     }, 220);
     try {
-      const points = await fetchMapPoints(map, searchIntent);
+      const userLat = Number(userPosition?.lat);
+      const userLng = Number(userPosition?.lng);
+      const fetchNearby =
+        searchIntent.type !== 'product' &&
+        Number.isFinite(userLat) &&
+        Number.isFinite(userLng);
+
+      const [points, merchantPoints] = await Promise.all([
+        fetchMapPoints(map, searchIntent),
+        fetchNearby ? fetchMerchantOfferPoints(userLat, userLng) : Promise.resolve([]),
+      ]);
+
       clearTimeout(loadingTimer);
       if (gen !== loadGenerationRef.current) return;
-      const raw = points.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
+      const mergedPoints = mergeMapPointsDeduped(points, merchantPoints);
+      const raw = mergedPoints.filter((p) => !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
       const wasProduct = searchIntent.type === 'product';
 
       if (wasProduct) {
@@ -1227,7 +1299,7 @@ function PricePointsLoader({ searchIntent, setLocais, setCarregando, reloadRef }
         setCarregando(false);
       }
     }
-  }, [map, searchIntent, setLocais, setCarregando]);
+  }, [map, searchIntent, setLocais, setCarregando, userPosition?.lat, userPosition?.lng]);
 
   useEffect(() => {
     reloadRef.current = () => {
@@ -2685,6 +2757,21 @@ function MapsStyleOfferPopup({ group, accentHex, cartOfferIdSet, onMapPointCartT
           <p className="text-[10px] text-emerald-700 font-medium mt-1.5 px-0.5 leading-snug">
             Toque no card ou em <strong>+ Cesta</strong> para adicionar ao carrinho (abre à direita). Encarte em PDF: use o botão no card.
           </p>
+        ) : null}
+
+        {count === 1 &&
+        first?.source === 'merchant_panel' &&
+        first?.loja_id &&
+        first?.produto_loja_id ? (
+          <div className="px-3 pb-2">
+            <MerchantPickupOrderButton
+              lojaId={first.loja_id}
+              produtoLojaId={first.produto_loja_id}
+              productName={first.produto}
+              price={Number(first.preco)}
+              storeName={storeTitle}
+            />
+          </div>
         ) : null}
 
         {(first?.time_ago || first?.user_label) && count === 1 && (
@@ -4464,6 +4551,7 @@ export default function MapaPrecosLeaflet({
           setLocais={setLocais}
           setCarregando={setCarregando}
           reloadRef={reloadPointsRef}
+          userPosition={userMapPosition}
         />
         {/* Preços primeiro; lojas depois + z-index maior — evita círculos de promo cobrirem estabelecimentos */}
         <SuperclusterPriceMarkersLayer

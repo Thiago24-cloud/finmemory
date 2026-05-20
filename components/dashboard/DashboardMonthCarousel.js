@@ -42,7 +42,7 @@ export function DashboardMonthCarousel({
   if (!months.length) return null;
 
   return (
-    <div className={cn(className)}>
+    <div className={cn(className)} data-tour-id="dashboard-month-carousel">
       <p className="text-[11px] font-medium text-muted-foreground mb-2">{DASHBOARD.monthCarouselLabel}</p>
       <div
         ref={stripRef}

@@ -14,6 +14,7 @@ export function DashboardMissionsProgress({ completed, total, className }) {
   return (
     <Link
       href="/missoes"
+      data-tour-id="dashboard-missions"
       className={cn(
         'block rounded-lg px-1 py-0.5 -mx-1 no-underline outline-none',
         'focus-visible:ring-2 focus-visible:ring-[#00E676]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1E2E]',

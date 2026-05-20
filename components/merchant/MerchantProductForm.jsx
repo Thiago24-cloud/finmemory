@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Camera, Loader2, Zap } from 'lucide-react';
+import { painelApi } from '../../lib/merchant/painelApiPaths';
 
 const EMPTY = {
   name: '',
@@ -33,7 +34,7 @@ export function MerchantProductForm({ onSaved, onCancel }) {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      const res = await fetch('/api/merchant/products/upload-image', {
+      const res = await fetch(painelApi.uploadImage, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: dataUrl }),
@@ -61,7 +62,7 @@ export function MerchantProductForm({ onSaved, onCancel }) {
         ? parseFloat(String(form.priceOriginal).replace(',', '.'))
         : null;
 
-      const res = await fetch('/api/merchant/products', {
+      const res = await fetch(painelApi.products, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

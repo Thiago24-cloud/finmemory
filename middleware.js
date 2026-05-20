@@ -14,6 +14,8 @@ function isPublicApiPath(pathname) {
   if (pathname === '/api/webhook') return true;
   if (pathname === '/api/signup') return true;
   if (pathname.startsWith('/api/partners/')) return true;
+  if (pathname.startsWith('/api/parceiros/pedidos')) return true;
+  if (pathname.startsWith('/api/parceiros/painel/')) return true;
   if (pathname.startsWith('/api/merchant/')) return true;
   if (pathname === '/api/map/produtos-proximos') return true;
   if (pathname.startsWith('/api/scraper/')) return true;

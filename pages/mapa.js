@@ -36,6 +36,7 @@ import { BRAND } from '../lib/brandTokens';
 import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
 import { CharacterWidget } from '../components/gamification/CharacterWidget';
 import { useGamification } from '../hooks/useGamification';
+import { MapOnboardingTutor } from '../components/onboarding/MapOnboardingTutor';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -281,6 +282,12 @@ export default function MapaPage() {
       streakCurrent: gamification?.streak_current ?? 0,
     }),
     [gamificationLoading, gamification?.streak_current]
+  );
+
+  const mapTutorUserId =
+    session?.user?.supabaseId || session?.user?.email || null;
+  const showMapOnboardingTutor = Boolean(
+    session && !showMapLanding && !isDetailOpen && !wazeUi
   );
 
   return (
@@ -877,6 +884,12 @@ export default function MapaPage() {
         )}
 
         <StatesUnlockPanel open={showStatesPanel} onClose={() => setShowStatesPanel(false)} />
+
+        <MapOnboardingTutor
+          userId={mapTutorUserId}
+          userName={session?.user?.name}
+          enabled={showMapOnboardingTutor}
+        />
 
       </div>
     </>

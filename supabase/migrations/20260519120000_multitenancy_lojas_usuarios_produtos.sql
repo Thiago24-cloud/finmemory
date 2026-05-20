@@ -125,7 +125,28 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 4) Consulta geo — ofertas a até N km
+-- 4) PostGIS + índice geográfico em stores (feed por raio)
+-- ---------------------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+DO $idx$
+BEGIN
+  CREATE INDEX IF NOT EXISTS idx_stores_point_geog
+    ON public.stores
+    USING gist ((st_setsrid(st_makepoint(lng, lat), 4326)::geography))
+    WHERE lat IS NOT NULL
+      AND lng IS NOT NULL
+      AND COALESCE(active, true) = true;
+EXCEPTION
+  WHEN undefined_function THEN
+    RAISE NOTICE 'idx_stores_point_geog: ative postgis e volte a correr esta migração.';
+  WHEN OTHERS THEN
+    RAISE NOTICE 'idx_stores_point_geog: %', SQLERRM;
+END
+$idx$;
+
+-- ---------------------------------------------------------------------------
+-- 5) Consulta geo — ofertas a até N km (SECURITY DEFINER: feed ignora RLS de tenant)
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.produtos_oferta_proximos(
   p_lat double precision,
@@ -139,10 +160,14 @@ RETURNS TABLE (
   nome_produto text,
   preco_oferta numeric,
   url_imagem text,
-  distancia_km double precision
+  distancia_km double precision,
+  latitude double precision,
+  longitude double precision
 )
 LANGUAGE sql
 STABLE
+SECURITY DEFINER
+SET search_path = public
 AS $$
   SELECT
     p.id AS produto_id,
@@ -156,7 +181,9 @@ AS $$
         ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
         ST_SetSRID(ST_MakePoint(s.lng, s.lat), 4326)::geography
       ) / 1000.0
-    )::double precision AS distancia_km
+    )::double precision AS distancia_km,
+    s.lat::double precision AS latitude,
+    s.lng::double precision AS longitude
   FROM public.produtos_loja p
   INNER JOIN public.stores s ON s.id = p.loja_id
   WHERE COALESCE(s.active, true) = true
@@ -173,10 +200,39 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.produtos_oferta_proximos IS
-  'Ofertas ativas (produtos_loja) de lojas num raio (km).';
+  'Ofertas ativas (produtos_loja) de lojas num raio (km). Bypass RLS via SECURITY DEFINER; filtros no WHERE.';
+
+GRANT SELECT ON public.produtos_loja TO anon, authenticated;
+GRANT SELECT ON public.usuarios_loja TO authenticated;
+
+REVOKE ALL ON FUNCTION public.produtos_oferta_proximos(double precision, double precision, double precision) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.produtos_oferta_proximos(double precision, double precision, double precision)
+  TO anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
--- 5) RLS
+-- 6) RLS — helper (evita subquery repetida por linha)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_meu_loja_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT ul.loja_id
+  FROM public.usuarios_loja ul
+  WHERE ul.id = auth.uid()
+  LIMIT 1;
+$$;
+
+COMMENT ON FUNCTION public.get_meu_loja_id IS
+  'loja_id do usuário autenticado (tenant). Usado nas políticas RLS de produtos_loja.';
+
+REVOKE ALL ON FUNCTION public.get_meu_loja_id() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_meu_loja_id() TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 7) RLS
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.usuarios_loja ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.produtos_loja ENABLE ROW LEVEL SECURITY;
@@ -195,35 +251,26 @@ CREATE POLICY usuarios_loja_update_own ON public.usuarios_loja
 DROP POLICY IF EXISTS produtos_loja_select_tenant ON public.produtos_loja;
 CREATE POLICY produtos_loja_select_tenant ON public.produtos_loja
   FOR SELECT TO authenticated
-  USING (
-    loja_id IN (SELECT ul.loja_id FROM public.usuarios_loja ul WHERE ul.id = auth.uid())
-  );
+  USING (loja_id = public.get_meu_loja_id());
 
 DROP POLICY IF EXISTS produtos_loja_insert_tenant ON public.produtos_loja;
 CREATE POLICY produtos_loja_insert_tenant ON public.produtos_loja
   FOR INSERT TO authenticated
-  WITH CHECK (
-    loja_id IN (SELECT ul.loja_id FROM public.usuarios_loja ul WHERE ul.id = auth.uid())
-  );
+  WITH CHECK (loja_id = public.get_meu_loja_id());
 
 DROP POLICY IF EXISTS produtos_loja_update_tenant ON public.produtos_loja;
 CREATE POLICY produtos_loja_update_tenant ON public.produtos_loja
   FOR UPDATE TO authenticated
-  USING (
-    loja_id IN (SELECT ul.loja_id FROM public.usuarios_loja ul WHERE ul.id = auth.uid())
-  )
-  WITH CHECK (
-    loja_id IN (SELECT ul.loja_id FROM public.usuarios_loja ul WHERE ul.id = auth.uid())
-  );
+  USING (loja_id = public.get_meu_loja_id())
+  WITH CHECK (loja_id = public.get_meu_loja_id());
 
 DROP POLICY IF EXISTS produtos_loja_delete_tenant ON public.produtos_loja;
 CREATE POLICY produtos_loja_delete_tenant ON public.produtos_loja
   FOR DELETE TO authenticated
-  USING (
-    loja_id IN (SELECT ul.loja_id FROM public.usuarios_loja ul WHERE ul.id = auth.uid())
-  );
+  USING (loja_id = public.get_meu_loja_id());
 
+-- public = anon + authenticated: feed de ofertas visível mesmo com lojista logado
 DROP POLICY IF EXISTS produtos_loja_select_ofertas_publicas ON public.produtos_loja;
 CREATE POLICY produtos_loja_select_ofertas_publicas ON public.produtos_loja
-  FOR SELECT TO anon
+  FOR SELECT TO public
   USING (em_oferta = true AND status_disponivel = true);

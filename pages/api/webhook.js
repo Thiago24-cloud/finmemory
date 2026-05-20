@@ -1,6 +1,11 @@
 import Stripe from 'stripe';
 import { getSupabaseAdmin } from '../../lib/supabaseAdmin';
 import { planFromStripePriceId } from '../../lib/stripePlanPrice';
+import {
+  handleConnectAccountUpdated,
+  handlePedidoCheckoutExpired,
+  handlePedidoCheckoutSession,
+} from '../../lib/stripe/webhookPedidoCheckout';
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -165,6 +170,9 @@ export default async function handler(req, res) {
   }
 
   async function syncFromCheckoutSession(session) {
+    const pedidoHandled = await handlePedidoCheckoutSession(supabase, session);
+    if (pedidoHandled.handled) return;
+
     const userId = session.metadata?.user_id || session.client_reference_id;
     const subId = session.subscription;
     const custId = session.customer;
@@ -187,6 +195,14 @@ export default async function handler(req, res) {
       }
       case 'checkout.session.async_payment_succeeded': {
         await syncFromCheckoutSession(event.data.object);
+        break;
+      }
+      case 'checkout.session.expired': {
+        await handlePedidoCheckoutExpired(supabase, event.data.object);
+        break;
+      }
+      case 'account.updated': {
+        await handleConnectAccountUpdated(supabase, event.data.object);
         break;
       }
       case 'customer.subscription.created':

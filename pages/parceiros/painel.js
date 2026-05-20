@@ -2,7 +2,7 @@ import Head from 'next/head';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../api/auth/[...nextauth]';
 import { MerchantPanel } from '../../components/merchant/MerchantPanel';
-import { normalizeAccountType, ACCOUNT_TYPE_VAREJISTA } from '../../lib/userType';
+import { resolveMerchantPanelAccessFromSession } from '../../lib/merchant/resolveMerchantPanelAccess';
 
 export default function ParceirosPainelPage() {
   return (
@@ -28,11 +28,19 @@ export async function getServerSideProps(ctx) {
     };
   }
 
-  const accountType = normalizeAccountType(session.user.account_type);
-  if (accountType !== ACCOUNT_TYPE_VAREJISTA) {
+  const access = await resolveMerchantPanelAccessFromSession(session);
+  if (access === 'need_profile') {
     return {
       redirect: {
         destination: '/escolher-perfil?next=' + encodeURIComponent('/parceiros/painel'),
+        permanent: false,
+      },
+    };
+  }
+  if (access === 'no_store') {
+    return {
+      redirect: {
+        destination: '/parceiros#cadastro',
         permanent: false,
       },
     };

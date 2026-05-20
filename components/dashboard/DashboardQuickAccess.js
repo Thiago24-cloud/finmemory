@@ -50,7 +50,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
     {
       key: 'mapa',
       href: hrefOrLock('/mapa', '/mapa'),
-      label: 'Mapa',
+      label: 'Caça-Preço',
       Icon: Map,
       tile: 'bg-gradient-to-br from-sky-900/70 to-[#1E2A3A] border-sky-500/35 text-sky-300',
       labelClass: 'text-sky-200/95',
@@ -158,6 +158,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
             <Link
               key={key}
               href={href}
+              data-tour-id={key === 'mapa' ? 'dashboard-mapa' : undefined}
               className={cn(CELL, 'no-underline text-inherit')}
               title={title || label}
             >

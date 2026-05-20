@@ -43,7 +43,7 @@ export function DashboardOnboardingTour({ userId, onComplete, className }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: '{}',
+        body: JSON.stringify({ key: 'home_intro', value: true }),
       });
     } catch (_) {
       /* ignora */

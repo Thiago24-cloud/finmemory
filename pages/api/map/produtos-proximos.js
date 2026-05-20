@@ -28,13 +28,21 @@ export default async function handler(req, res) {
   });
 
   if (error) {
+    console.error('[produtos-proximos]', error.message, error.code, error.details);
     if (error.message?.includes('produtos_oferta_proximos')) {
       return res.status(503).json({
-        error: 'Função produtos_oferta_proximos não encontrada. Aplique a migração 20260519120000.',
+        error: 'Função produtos_oferta_proximos não encontrada. Aplique as migrações 20260519120000 e 20260522120000.',
+        code: 'RPC_MISSING',
       });
     }
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message, code: error.code || 'RPC_ERROR' });
   }
 
-  return res.status(200).json({ items: data || [], count: (data || []).length });
+  const items = (data || []).map((row) => ({
+    ...row,
+    lat: row.latitude ?? row.lat ?? null,
+    lng: row.longitude ?? row.lng ?? null,
+  }));
+
+  return res.status(200).json({ items, count: items.length });
 }
