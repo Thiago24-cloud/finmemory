@@ -1,10 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CalendarDays,
+  Check,
+  CreditCard,
+  FileText,
+  Home,
+  Loader2,
+  Plus,
+  Receipt,
+  Tv,
+  Zap,
+} from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/Sheet';
 import { ExpressionValueField } from '../ui/ExpressionValueField';
-import { CalendarDays, CheckCircle2, PlusCircle } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
+
+const SWIPE_PAY_THRESHOLD_PX = 72;
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -20,13 +34,11 @@ function computeDueDateMensal(diaVencimento, year, monthIndex) {
   return toLocalISODate(new Date(year, monthIndex, day));
 }
 
-/** Mesma lógica do visor da calculadora: aceita 39,90 / 39.90 / 1.234,56 / R$ 100 */
 function parseValor(v) {
   let raw = (v || '').toString().trim();
   if (!raw) return null;
   raw = raw.replace(/\s/g, '').replace(/^R\$\s?/i, '');
   if (!raw) return null;
-  // Com vírgula => formato BR (ponto milhar, vírgula decimal)
   const cleaned = raw.includes(',')
     ? raw.replace(/\./g, '').replace(',', '.')
     : raw.replace(/,/g, '');
@@ -47,11 +59,162 @@ function ensureMonthKey(selectedMonth) {
   return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 }
 
-export default function CobrancasDoMes({
-  userId,
-  selectedMonth,
-  onAfterPayment,
-}) {
+function formatDueLong(isoDate) {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  const day = dt.getDate();
+  const month = dt.toLocaleDateString('pt-BR', { month: 'long' });
+  return `${String(day).padStart(2, '0')} de ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
+}
+
+function formatDueShort(isoDate) {
+  if (!isoDate) return '';
+  const [, m, d] = isoDate.split('-');
+  return `${d}/${m}`;
+}
+
+function pickCategoryVisual(titulo, categoria) {
+  const t = `${titulo || ''} ${categoria || ''}`.toLowerCase();
+  if (/netflix|streaming|spotify|disney|prime|hbo|tv/.test(t)) {
+    return { Icon: Tv, ring: 'text-violet-400', bg: 'bg-violet-500/15' };
+  }
+  if (/luz|energia|eletr/.test(t)) {
+    return { Icon: Zap, ring: 'text-amber-400', bg: 'bg-amber-500/15' };
+  }
+  if (/boleto/.test(t)) {
+    return { Icon: FileText, ring: 'text-sky-400', bg: 'bg-sky-500/15' };
+  }
+  if (/empr[eé]stimo|financi|hipoteca|aluguel/.test(t)) {
+    return { Icon: Home, ring: 'text-orange-400', bg: 'bg-orange-500/15' };
+  }
+  if (/cart[aã]o|credito|crédito/.test(t)) {
+    return { Icon: CreditCard, ring: 'text-emerald-400', bg: 'bg-emerald-500/15' };
+  }
+  return { Icon: Receipt, ring: 'text-primary', bg: 'bg-primary/10' };
+}
+
+function paymentStatusLabel(pago, pagamento) {
+  if (!pago) return 'Pendente';
+  const forma = String(pagamento?.forma_pagamento || '').trim();
+  if (!forma) return 'Pago';
+  if (/cart/i.test(forma)) return 'Cartão';
+  return forma;
+}
+
+function CobrancaRow({ item, onOpenDetail, onQuickPay, paying }) {
+  const { cobranca, competencia, pago, pagamento } = item;
+  const { Icon, ring, bg } = pickCategoryVisual(cobranca.titulo, cobranca.categoria);
+  const [offsetX, setOffsetX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startXRef = useRef(0);
+  const startOffsetRef = useRef(0);
+
+  const onTouchStart = (e) => {
+    if (pago || paying) return;
+    startXRef.current = e.touches[0].clientX;
+    startOffsetRef.current = offsetX;
+    setDragging(true);
+  };
+
+  const onTouchMove = (e) => {
+    if (pago || paying) return;
+    const dx = e.touches[0].clientX - startXRef.current;
+    const next = Math.max(0, Math.min(96, startOffsetRef.current + dx));
+    setOffsetX(next);
+  };
+
+  const onTouchEnd = async () => {
+    setDragging(false);
+    if (pago || paying) return;
+    if (offsetX >= SWIPE_PAY_THRESHOLD_PX) {
+      setOffsetX(0);
+      await onQuickPay?.();
+      return;
+    }
+    setOffsetX(0);
+  };
+
+  const handleClick = () => {
+    if (pago) return;
+    onOpenDetail?.();
+  };
+
+  return (
+    <div className="relative overflow-hidden">
+      {!pago ? (
+        <div
+          className="absolute inset-y-0 left-0 flex w-24 items-center justify-center bg-primary text-primary-foreground"
+          aria-hidden
+        >
+          <Check className="h-6 w-6" strokeWidth={2.5} />
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={pago || paying}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className={cn(
+          'relative flex w-full items-center gap-3 py-3.5 text-left transition-transform',
+          dragging ? 'duration-0' : 'duration-200 ease-out',
+          pago ? 'opacity-55' : 'hover:bg-white/[0.03] active:bg-white/[0.05]',
+          !pago && !paying && 'cursor-pointer'
+        )}
+        style={{ transform: `translateX(${offsetX}px)` }}
+      >
+        <div
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+            bg,
+            ring
+          )}
+        >
+          <Icon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              'truncate text-[15px] font-semibold text-foreground',
+              pago && 'line-through decoration-white/30'
+            )}
+          >
+            {cobranca.titulo}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Vence em {formatDueShort(competencia)}
+            <span className="text-muted-foreground/60"> · </span>
+            {paymentStatusLabel(pago, pagamento)}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2 pl-1">
+          <span
+            className={cn(
+              'text-[15px] font-semibold tabular-nums',
+              pago ? 'text-muted-foreground' : 'text-foreground'
+            )}
+          >
+            {formatBRL(cobranca.valor)}
+          </span>
+          {pago ? (
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+            </span>
+          ) : paying ? (
+            <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden />
+          ) : null}
+        </div>
+      </button>
+    </div>
+  );
+}
+
+export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }) {
   const [cobrancas, setCobrancas] = useState([]);
   const [pagamentos, setPagamentos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +222,7 @@ export default function CobrancasDoMes({
   const [addOpen, setAddOpen] = useState(false);
   const [formTitulo, setFormTitulo] = useState('');
   const [formValor, setFormValor] = useState('');
-  const [formDia, setFormDia] = useState('2'); // padrão dia 2
+  const [formDia, setFormDia] = useState('2');
   const [formCategoria, setFormCategoria] = useState('Servicos');
 
   const [checkinOpen, setCheckinOpen] = useState(false);
@@ -69,24 +232,13 @@ export default function CobrancasDoMes({
   const [obs, setObs] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingNew, setSavingNew] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [payingId, setPayingId] = useState(null);
 
   const monthKey = useMemo(() => ensureMonthKey(selectedMonth), [selectedMonth]);
-  const monthLabel = useMemo(() => {
-    const [y, m] = monthKey.split('-').map(Number);
-    const dt = new Date(y, (m || 1) - 1, 1);
-    return dt.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  }, [monthKey]);
   const monthInfo = useMemo(() => {
     const [y, m] = monthKey.split('-').map(Number);
     return { year: y, monthIndex: (m || 1) - 1 };
   }, [monthKey]);
-
-  const monthStart = useMemo(() => `${monthKey}-01`, [monthKey]);
-  const monthEnd = useMemo(() => {
-    const lastDay = new Date(monthInfo.year, monthInfo.monthIndex + 1, 0).getDate();
-    return toLocalISODate(new Date(monthInfo.year, monthInfo.monthIndex, lastDay));
-  }, [monthInfo]);
 
   const paidMap = useMemo(() => {
     const map = new Map();
@@ -100,7 +252,7 @@ export default function CobrancasDoMes({
     const items = [];
     for (const c of cobrancas || []) {
       if (!c || !c.ativa) continue;
-      if (c.recorrencia !== 'mensal') continue; // MVP: só mensal
+      if (c.recorrencia !== 'mensal') continue;
 
       const competencia = computeDueDateMensal(c.dia_vencimento || 2, monthInfo.year, monthInfo.monthIndex);
       const key = `${c.id}_${competencia}`;
@@ -112,13 +264,20 @@ export default function CobrancasDoMes({
         pagamento,
       });
     }
-    // ordenar por competencia
     items.sort((a, b) => (a.competencia < b.competencia ? -1 : 1));
     return items;
   }, [cobrancas, monthInfo, paidMap]);
 
-  const unpaidTotal = useMemo(() => {
-    return dueItems.reduce((sum, it) => (it.pago ? sum : sum + Number(it.cobranca.valor) || 0), 0);
+  const monthTotal = useMemo(
+    () => dueItems.reduce((sum, it) => sum + (Number(it.cobranca.valor) || 0), 0),
+    [dueItems]
+  );
+
+  const nextDueSubtitle = useMemo(() => {
+    const pending = dueItems.filter((it) => !it.pago);
+    const target = pending[0] || dueItems[0];
+    if (!target) return 'Nenhum compromisso neste mês';
+    return `Próximo vencimento: ${formatDueLong(target.competencia)}`;
   }, [dueItems]);
 
   const load = async () => {
@@ -137,7 +296,7 @@ export default function CobrancasDoMes({
       setPagamentos(Array.isArray(json.pagamentos) ? json.pagamentos : []);
     } catch (e) {
       console.error('Erro ao carregar cobrancas do mes:', e);
-      toast.error(e?.message || 'Erro ao carregar cobranças');
+      toast.error(e?.message || 'Erro ao carregar compromissos');
     } finally {
       setLoading(false);
     }
@@ -161,6 +320,39 @@ export default function CobrancasDoMes({
     setFormaPagamento('Pix');
     setObs('');
     setCheckinOpen(true);
+  };
+
+  const registerPayment = async (cobranca, competencia, { forma = 'Pix', observacao = null } = {}) => {
+    if (!userId || !cobranca) return false;
+    const payKey = `${cobranca.id}_${competencia}`;
+    setPayingId(payKey);
+    try {
+      const res = await fetch('/api/cobrancas/pagamento', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cobranca_id: cobranca.id,
+          competencia,
+          forma_pagamento: forma || null,
+          obs: observacao,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || `Erro ${res.status}`);
+      }
+      toast.success('Pagamento registrado');
+      await onAfterPayment?.();
+      await load();
+      return true;
+    } catch (e) {
+      console.error('Erro ao confirmar pagamento:', e);
+      toast.error(e?.message || 'Erro ao registrar pagamento');
+      return false;
+    } finally {
+      setPayingId(null);
+    }
   };
 
   const handleAdd = async () => {
@@ -201,159 +393,107 @@ export default function CobrancasDoMes({
       setFormDia('2');
       setFormCategoria('Servicos');
       await load();
-      toast.success('Cobrança adicionada');
+      toast.success('Compromisso adicionado');
     } catch (e) {
       console.error('Erro ao adicionar cobranca:', e);
-      toast.error(e?.message || 'Erro ao adicionar cobrança');
+      toast.error(e?.message || 'Erro ao adicionar');
     } finally {
       setSavingNew(false);
     }
   };
 
   const handleConfirmPayment = async () => {
-    if (!userId || !selectedCobranca) return;
+    if (!selectedCobranca) return;
     setSaving(true);
-    try {
-      const res = await fetch('/api/cobrancas/pagamento', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cobranca_id: selectedCobranca.id,
-          competencia: selectedCompetencia,
-          forma_pagamento: formaPagamento || null,
-          obs: obs || null,
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || `Erro ${res.status}`);
-      }
-
-      toast.success('Pagamento registrado!');
+    const ok = await registerPayment(selectedCobranca, selectedCompetencia, {
+      forma: formaPagamento,
+      observacao: obs || null,
+    });
+    setSaving(false);
+    if (ok) {
       setCheckinOpen(false);
       setSelectedCobranca(null);
       setSelectedCompetencia('');
       setObs('');
-      await onAfterPayment?.();
-      await load();
-    } catch (e) {
-      console.error('Erro ao confirmar pagamento:', e);
-      toast.error(e?.message || 'Erro ao registrar pagamento');
-    } finally {
-      setSaving(false);
     }
   };
 
   return (
-    <div className="card-lovable bg-white rounded-2xl p-4 mb-6">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full text-left flex items-start justify-between gap-3"
-        aria-label="Abrir ou fechar cobranças do mês"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-[#333] flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            Cobranças do mês
+    <section className="mb-6 overflow-hidden rounded-2xl border border-[#1E2A3A] bg-card">
+      <header className="flex items-start justify-between gap-4 border-b border-[#1E2A3A]/80 px-4 py-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <h2 className="text-base font-bold tracking-tight text-foreground">Compromissos do Mês</h2>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{nextDueSubtitle}</p>
+        </div>
+        <p className="shrink-0 text-lg font-bold tabular-nums text-foreground">{formatBRL(monthTotal)}</p>
+      </header>
+
+      <div className="px-4">
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            Carregando...
+          </div>
+        ) : dueItems.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Nenhum compromisso neste mês.
           </p>
-          <p className="text-xs text-[#666]">{monthLabel} · check-in quando pagar</p>
-        </div>
+        ) : (
+          <ul className="divide-y divide-[#1E2A3A]/90">
+            {dueItems.map((it) => {
+              const rowKey = `${it.cobranca.id}_${it.competencia}`;
+              return (
+                <li key={rowKey}>
+                  <CobrancaRow
+                    item={it}
+                    paying={payingId === rowKey}
+                    onOpenDetail={() => openCheckin(it.cobranca, it.competencia)}
+                    onQuickPay={() => registerPayment(it.cobranca, it.competencia, { forma: 'Pix' })}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right">
-            <p className="text-[10px] text-[#666] mb-0.5">Não pagas</p>
-            <p className="text-sm font-bold text-[#333]">{formatBRL(unpaidTotal)}</p>
-          </div>
+      <footer className="border-t border-[#1E2A3A]/80 px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+          Adicionar nova cobrança
+        </button>
+        {!loading && dueItems.length > 0 ? (
+          <p className="mt-1 text-[10px] text-muted-foreground/80">
+            Toque na linha para detalhes · arraste para a direita para marcar como pago
+          </p>
+        ) : null}
+      </footer>
 
-          <div
-            className={
-              expanded
-                ? 'w-9 h-9 rounded-2xl bg-[#e8f5e9] border border-[#c8e6c9] text-[#28a745] flex items-center justify-center font-bold'
-                : 'w-9 h-9 rounded-2xl bg-white border border-[#e5e7eb] text-[#666] flex items-center justify-center font-bold'
-            }
-          >
-            {expanded ? '−' : '+'}
-          </div>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="mt-3">
-          {loading ? (
-            <div className="text-xs text-[#666]">Carregando...</div>
-          ) : dueItems.length === 0 ? (
-            <div className="text-xs text-[#666]">Nenhuma cobrança para este mês. Toque em Adicionar.</div>
-          ) : (
-            <div className="space-y-2 max-h-[210px] overflow-y-auto pr-1">
-              {dueItems.map((it) => {
-                const { cobranca, competencia, pago } = it;
-                return (
-                  <div
-                    key={`${cobranca.id}_${competencia}`}
-                    className="flex items-start justify-between gap-3 p-3 rounded-xl border border-[#e5e7eb] bg-[#f8f9fa]/40"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-[#666]">{competencia}</span>
-                        {pago ? (
-                          <span className="text-xs inline-flex items-center gap-1 text-[#16a34a] font-semibold">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Pago
-                          </span>
-                        ) : (
-                          <span className="text-xs text-[#666]">Agendado</span>
-                        )}
-                      </div>
-                      <p className="text-sm font-semibold text-[#333] truncate">{cobranca.titulo}</p>
-                      <p className="text-xs text-[#666]">{formatBRL(cobranca.valor)}</p>
-                    </div>
-
-                    {!pago ? (
-                      <button
-                        type="button"
-                        onClick={() => openCheckin(cobranca, competencia)}
-                        className="shrink-0 px-3 py-2 rounded-xl bg-[#2ECC49] hover:bg-[#22a83a] text-white text-xs font-semibold"
-                      >
-                        Paguei
-                      </button>
-                    ) : (
-                      <div className="shrink-0 w-20" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#e8f5e9] border border-[#c8e6c9] text-[#28a745] text-sm font-semibold hover:bg-[#c8e6c9]"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Adicionar
-          </button>
-        </div>
-      )}
-
-      {/* Sheet adicionar cobranca */}
       <Sheet open={addOpen} onOpenChange={setAddOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
+        <SheetContent
+          side="bottom"
+          className="max-h-[85vh] overflow-y-auto rounded-t-3xl border-[#1E2A3A] bg-card px-5 pb-10 pt-4"
+        >
           <SheetHeader className="mb-4">
-            <SheetTitle className="text-lg font-bold text-center">Nova cobrança (mensal)</SheetTitle>
-            <p className="text-xs text-[#666] text-center">Padrão dia 2</p>
+            <SheetTitle className="text-center text-lg font-bold">Nova cobrança (mensal)</SheetTitle>
+            <p className="text-center text-xs text-muted-foreground">Padrão dia 2</p>
           </SheetHeader>
 
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-[#333] mb-1">Título</p>
+              <p className="mb-1 text-sm font-medium text-foreground">Título</p>
               <input
-                className="w-full px-4 py-2 rounded-xl border border-[#e5e7eb] bg-white text-[#333] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/40"
+                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 value={formTitulo}
                 onChange={(e) => setFormTitulo(e.target.value)}
-                placeholder="Ex: Streaming, Luz..."
+                placeholder="Ex: Netflix, Luz..."
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -363,7 +503,7 @@ export default function CobrancasDoMes({
                 onChange={setFormValor}
                 mode="money"
                 placeholder="Ex: 39,90"
-                inputClassName="rounded-xl border-[#e5e7eb]"
+                inputClassName="rounded-xl border-[#1E2A3A]"
                 hint="Teclado com + − × ÷."
               />
               <ExpressionValueField
@@ -373,14 +513,14 @@ export default function CobrancasDoMes({
                 mode="integer"
                 integerMin={1}
                 integerMax={31}
-                inputClassName="rounded-xl border-[#e5e7eb]"
+                inputClassName="rounded-xl border-[#1E2A3A]"
                 hint="Dia 1–31."
               />
             </div>
             <div>
-              <p className="text-sm font-medium text-[#333] mb-1">Categoria</p>
+              <p className="mb-1 text-sm font-medium text-foreground">Categoria</p>
               <input
-                className="w-full px-4 py-2 rounded-xl border border-[#e5e7eb] bg-white text-[#333] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/40"
+                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 value={formCategoria}
                 onChange={(e) => setFormCategoria(e.target.value)}
                 placeholder="Servicos"
@@ -391,7 +531,7 @@ export default function CobrancasDoMes({
               type="button"
               disabled={savingNew}
               onClick={handleAdd}
-              className="w-full h-12 rounded-xl bg-[#2ECC49] hover:bg-[#22a83a] text-white text-sm font-semibold disabled:opacity-60"
+              className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:opacity-95 disabled:opacity-60"
             >
               {savingNew ? 'Salvando...' : 'Salvar cobrança'}
             </button>
@@ -399,39 +539,42 @@ export default function CobrancasDoMes({
         </SheetContent>
       </Sheet>
 
-      {/* Sheet check-in pagamento */}
       <Sheet open={checkinOpen} onOpenChange={setCheckinOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto">
+        <SheetContent
+          side="bottom"
+          className="max-h-[85vh] overflow-y-auto rounded-t-3xl border-[#1E2A3A] bg-card px-5 pb-10 pt-4"
+        >
           <SheetHeader className="mb-4">
-            <SheetTitle className="text-lg font-bold text-center">Registrar pagamento</SheetTitle>
+            <SheetTitle className="text-center text-lg font-bold">Registrar pagamento</SheetTitle>
             {selectedCobranca ? (
-              <p className="text-xs text-[#666] text-center">
-                {selectedCobranca.titulo} · competencia {selectedCompetencia}
+              <p className="text-center text-xs text-muted-foreground">
+                {selectedCobranca.titulo} · vence {formatDueShort(selectedCompetencia)}
               </p>
             ) : null}
           </SheetHeader>
 
           <div className="space-y-4">
             {selectedCobranca ? (
-              <div className="bg-background border border-border rounded-xl p-3">
-                <p className="text-xs text-[#666] mb-1">Valor</p>
-                <p className="text-sm font-bold text-[#333]">{formatBRL(selectedCobranca.valor)}</p>
+              <div className="rounded-xl border border-[#1E2A3A] bg-background p-3">
+                <p className="mb-1 text-xs text-muted-foreground">Valor</p>
+                <p className="text-sm font-bold text-foreground">{formatBRL(selectedCobranca.valor)}</p>
               </div>
             ) : null}
 
             <div>
-              <p className="text-sm font-medium text-[#333] mb-2">Forma de pagamento</p>
+              <p className="mb-2 text-sm font-medium text-foreground">Forma de pagamento</p>
               <div className="grid grid-cols-2 gap-2">
                 {['Pix', 'Cartao', 'Dinheiro', 'Boleto'].map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => setFormaPagamento(v)}
-                    className={
+                    className={cn(
+                      'h-10 rounded-xl text-xs font-semibold',
                       formaPagamento === v
-                        ? 'h-10 rounded-xl bg-[#2ECC49] text-white text-xs font-semibold'
-                        : 'h-10 rounded-xl bg-white border border-[#e5e7eb] text-[#333] text-xs font-semibold'
-                    }
+                        ? 'bg-primary text-primary-foreground'
+                        : 'border border-[#1E2A3A] bg-background text-foreground'
+                    )}
                   >
                     {v}
                   </button>
@@ -440,9 +583,9 @@ export default function CobrancasDoMes({
             </div>
 
             <div>
-              <p className="text-sm font-medium text-[#333] mb-1">Obs (opcional)</p>
+              <p className="mb-1 text-sm font-medium text-foreground">Obs (opcional)</p>
               <input
-                className="w-full px-4 py-2 rounded-xl border border-[#e5e7eb] bg-white text-[#333] focus:outline-none focus:ring-2 focus:ring-[#2ECC49]/40"
+                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 value={obs}
                 onChange={(e) => setObs(e.target.value)}
                 placeholder="Ex: desconto, parcela..."
@@ -453,14 +596,13 @@ export default function CobrancasDoMes({
               type="button"
               disabled={saving}
               onClick={handleConfirmPayment}
-              className="w-full h-12 rounded-xl bg-[#2ECC49] hover:bg-[#22a83a] text-white text-sm font-semibold disabled:opacity-60"
+              className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60"
             >
-              {saving ? 'Salvando...' : 'Paguei'}
+              {saving ? 'Salvando...' : 'Confirmar pagamento'}
             </button>
           </div>
         </SheetContent>
       </Sheet>
-    </div>
+    </section>
   );
 }
-
