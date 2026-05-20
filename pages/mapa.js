@@ -594,9 +594,7 @@ export default function MapaPage() {
           <button
             type="button"
             onClick={() => setShowStatesPanel(true)}
-            className={`absolute right-3 z-30 flex items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-[12px] font-bold text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] transition-colors hover:bg-[#f8f9fa] pointer-events-auto ${
-              bottom-[5.5rem]
-            }`}
+            className="absolute right-3 bottom-[5.5rem] z-30 flex items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-[12px] font-bold text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] transition-colors hover:bg-[#f8f9fa] pointer-events-auto"
             aria-label="Ver estados desbloqueados"
           >
             <span>🗺️</span>
