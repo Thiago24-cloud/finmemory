@@ -1,6 +1,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
+import { buildContasFromOpenFinance } from '../../../lib/finance/buildContasFromOpenFinance';
+import {
+  calculateSaldoHoje,
+  resolveContasForSaldo,
+} from '../../../lib/finance/contaFinanceira';
 import { computePurchasingPowerHint, isCreditLikeAccount } from '../../../lib/simuladorHintsBalance';
 
 /** Mês civil em America/Sao_Paulo (YYYY-MM-DD início e fim). */
@@ -137,8 +142,20 @@ export default async function handler(req, res) {
   );
 
   const balanceHints = computePurchasingPowerHint(accountsForHint, manualLimitsOrdered);
-  /** Poder de compra: Σ(débito) + Σ(crédito disponível); crédito com limite manual usa limite − fatura implícita no saldo. */
-  const accountBalanceTotal = balanceHints.purchasingPower;
+
+  let contas = buildContasFromOpenFinance(
+    accounts.map((a) => ({
+      id: a.id,
+      name: (a.name || 'Conta').trim() || 'Conta',
+      balance: a.balance,
+      account_type: a.account_type,
+    })),
+    manualLimitsOrdered
+  );
+  contas = resolveContasForSaldo(contas);
+  const saldoHoje = calculateSaldoHoje(contas);
+  /** Poder de compra: Σ(saldo_debito) + Σ(limite_credito_disponivel) — modelo genérico de contas. */
+  const accountBalanceTotal = saldoHoje;
 
   const accountsOut = accounts.map((a) => {
     const bal = Number(a.balance) || 0;
@@ -342,6 +359,9 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
+    saldoHoje,
+    contas,
+    usingMockContas: contas.length > 0 && accounts.length === 0,
     accountBalanceTotal: Math.round(accountBalanceTotal * 100) / 100,
     startingBalanceBreakdown: {
       naiveSumAllAccounts: balanceHints.naiveSumAllAccounts,

@@ -27,6 +27,8 @@ import {
   reliabilityLabel,
 } from '../../lib/simuladorProjection';
 import { SimuladorMonthCalendar } from './SimuladorMonthCalendar';
+import { SaldoHojeField } from './SaldoHojeField';
+import { useSaldoDeHoje } from '../../hooks/useSaldoDeHoje';
 import { NEED, SimuladorNecessityPie } from './SimuladorNecessityPie';
 import { SimuladorRadarChart } from './SimuladorRadarChart';
 
@@ -211,6 +213,12 @@ export function SimuladorFlow() {
     }
   }, [status]);
 
+  const saldoDeHoje = useSaldoDeHoje({
+    contas: hints?.contas,
+    saldoHojeFromApi: hints?.saldoHoje ?? hints?.accountBalanceTotal,
+    enabled: status === 'authenticated',
+  });
+
   useEffect(() => {
     if (status === 'loading') return undefined;
 
@@ -378,14 +386,31 @@ export function SimuladorFlow() {
     setState((s) => ({ ...s, ...patch }));
   }, []);
 
+  useEffect(() => {
+    if (!hints || saldoDeHoje.wasTouched()) return;
+    const next = saldoDeHoje.saldoHoje;
+    if (!(typeof next === 'number' && Number.isFinite(next))) return;
+    setState((s) => {
+      if (Math.abs((Number(s.startingBalance) || 0) - next) < 0.01) return s;
+      return { ...s, startingBalance: next };
+    });
+  }, [hints, saldoDeHoje.saldoHoje]);
+
   const applyOpenFinanceHints = useCallback(() => {
     if (!hints) return;
+    saldoDeHoje.resetTouched();
     const card = hints.manualCards?.[0];
+    const saldo =
+      typeof hints.saldoHoje === 'number'
+        ? hints.saldoHoje
+        : typeof hints.accountBalanceTotal === 'number'
+          ? hints.accountBalanceTotal
+          : saldoDeHoje.saldoHoje;
     setState((s) => ({
       ...s,
       startingBalance:
-        typeof hints.accountBalanceTotal === 'number'
-          ? Math.round(hints.accountBalanceTotal * 100) / 100
+        typeof saldo === 'number' && Number.isFinite(saldo)
+          ? Math.round(saldo * 100) / 100
           : s.startingBalance,
       salaryAmount:
         hints.month?.incomeTotal > 0 ? hints.month.incomeTotal : s.salaryAmount,
@@ -407,7 +432,7 @@ export function SimuladorFlow() {
           ? card.closing_day
           : s.bestPurchaseDay,
     }));
-  }, [hints]);
+  }, [hints, saldoDeHoje]);
 
   const dim = useMemo(() => daysInCurrentMonth(), []);
   const todayDay = useMemo(() => new Date().getDate(), []);
@@ -692,15 +717,24 @@ export function SimuladorFlow() {
   const dayRow = (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelClass}>Saldo hoje (poder de compra sugerido)</label>
-          <input
-            type="number"
-            className={fieldClass}
-            value={state.startingBalance}
-            onChange={(e) => set({ startingBalance: Number(e.target.value) })}
-          />
-        </div>
+        <SaldoHojeField
+          labelClass={labelClass}
+          fieldClass={fieldClass}
+          saldoHoje={saldoDeHoje.saldoHoje}
+          value={state.startingBalance}
+          loading={hintsLoading}
+          contasCount={saldoDeHoje.contas.length}
+          usingMock={Boolean(hints?.usingMockContas)}
+          onChange={(n) => {
+            saldoDeHoje.markTouched();
+            set({ startingBalance: n });
+          }}
+          onBlurSync={() => {
+            if (!saldoDeHoje.wasTouched()) {
+              set({ startingBalance: saldoDeHoje.saldoHoje });
+            }
+          }}
+        />
         <div>
           <label className={labelClass}>Gasto médio / dia</label>
           <input
@@ -886,15 +920,30 @@ export function SimuladorFlow() {
               )}
             </div>
           </div>
-          {hints?.hasOpenFinance && (
+          {(hints?.hasOpenFinance || (hints?.contas?.length ?? 0) > 0) && (
             <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-2">
+              {hints?.contas?.length > 0 ? (
+                <ul className="text-[10px] text-zinc-500 space-y-1">
+                  {hints.contas.map((c) => (
+                    <li key={c.id} className="flex justify-between gap-2">
+                      <span className="text-zinc-400 truncate">{c.nome_banco}</span>
+                      <span className="shrink-0 tabular-nums text-zinc-300">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          (Number(c.saldo_debito) || 0) + (Number(c.limite_credito_disponivel) || 0)
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <p className="text-[11px] text-zinc-500 leading-snug">
                 <span className="text-[#39FF14] font-semibold">Poder de compra sugerido</span>
-                {' '}(Σ contas à vista + Σ crédito disponível; limite do cartão manual alinha por ordem A→Z com
-                contas de crédito Open Finance):{' '}
+                {' '}
+                (Σ saldo débito + Σ limite crédito disponível
+                {hints?.usingMockContas ? ' · dados de exemplo' : ''}):{' '}
                 <strong className="text-zinc-200">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    hints.accountBalanceTotal || 0
+                    hints.saldoHoje ?? hints.accountBalanceTotal ?? 0
                   )}
                 </strong>
                 {hints?.startingBalanceBreakdown ? (
