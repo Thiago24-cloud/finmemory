@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
   Check,
+  ChevronDown,
   CreditCard,
   FileText,
   Home,
@@ -233,6 +234,8 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
   const [saving, setSaving] = useState(false);
   const [savingNew, setSavingNew] = useState(false);
   const [payingId, setPayingId] = useState(null);
+  /** Fechado por padrão — lista só ao tocar no cabeçalho. */
+  const [expanded, setExpanded] = useState(false);
 
   const monthKey = useMemo(() => ensureMonthKey(selectedMonth), [selectedMonth]);
   const monthInfo = useMemo(() => {
@@ -274,11 +277,18 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
   );
 
   const nextDueSubtitle = useMemo(() => {
+    if (dueItems.length === 0) return 'Nenhum compromisso neste mês';
+    if (!expanded) {
+      const n = dueItems.length;
+      const p = dueItems.filter((it) => !it.pago).length;
+      if (p > 0) return `${p} a pagar de ${n} · Toque para ver`;
+      return `${n} compromisso${n === 1 ? '' : 's'} · Toque para ver`;
+    }
     const pending = dueItems.filter((it) => !it.pago);
     const target = pending[0] || dueItems[0];
-    if (!target) return 'Nenhum compromisso neste mês';
+    if (!target) return `${dueItems.length} no mês`;
     return `Próximo vencimento: ${formatDueLong(target.competencia)}`;
-  }, [dueItems]);
+  }, [dueItems, expanded]);
 
   const load = async () => {
     if (!userId) return;
@@ -420,17 +430,37 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
 
   return (
     <section className="mb-6 overflow-hidden rounded-2xl border border-[#1E2A3A] bg-card">
-      <header className="flex items-start justify-between gap-4 border-b border-[#1E2A3A]/80 px-4 py-4">
-        <div className="min-w-0">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className={cn(
+          'flex w-full items-start justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-white/[0.03]',
+          expanded && 'border-b border-[#1E2A3A]/80'
+        )}
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Recolher compromissos do mês' : 'Ver compromissos do mês'}
+      >
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             <h2 className="text-base font-bold tracking-tight text-foreground">Compromissos do Mês</h2>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{nextDueSubtitle}</p>
         </div>
-        <p className="shrink-0 text-lg font-bold tabular-nums text-foreground">{formatBRL(monthTotal)}</p>
-      </header>
+        <div className="flex shrink-0 items-center gap-2 pt-0.5">
+          <p className="text-lg font-bold tabular-nums text-foreground">{formatBRL(monthTotal)}</p>
+          <ChevronDown
+            className={cn(
+              'h-5 w-5 text-muted-foreground transition-transform duration-200',
+              expanded && 'rotate-180'
+            )}
+            aria-hidden
+          />
+        </div>
+      </button>
 
+      {expanded ? (
+        <>
       <div className="px-4">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
@@ -475,6 +505,8 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
           </p>
         ) : null}
       </footer>
+        </>
+      ) : null}
 
       <Sheet open={addOpen} onOpenChange={setAddOpen}>
         <SheetContent
