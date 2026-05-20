@@ -5,6 +5,7 @@ import { getConsumerCoachStep } from '../../../lib/onboarding/coachConsumerSteps
 import {
   applyCoachHintDismiss,
   applyIntroStepComplete,
+  applyCacaPrecoMapJourneyComplete,
   isIntroSequenceComplete,
   normalizeCoachJourney,
   resolveCoachHint,
@@ -76,6 +77,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ...resolved,
+      coach_journey: journey,
       introComplete: isIntroSequenceComplete(journey),
       inactiveHours: Number.isFinite(inactiveHours) ? Math.round(inactiveHours) : null,
     });
@@ -90,6 +92,17 @@ export default async function handler(req, res) {
       next.feature_last_used[body.featureId] = new Date().toISOString();
       await supabase.from('users').update({ coach_journey: next }).eq('id', userId);
       return res.status(200).json({ ok: true, coach_journey: next });
+    }
+
+    if (action === 'complete_caca_preco_map') {
+      const nextJourney = applyCacaPrecoMapJourneyComplete(journey);
+      await supabase.from('users').update({ coach_journey: nextJourney }).eq('id', userId);
+      await supabase.rpc('update_user_onboarding_progress', {
+        p_user_id: userId,
+        p_key: 'map_opened',
+        p_value: true,
+      });
+      return res.status(200).json({ ok: true, coach_journey: nextJourney });
     }
 
     const stepId = body.stepId;

@@ -785,6 +785,7 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
   const [position, setPosition] = useState(null);
   const [error, setError] = useState(null);
   const [locating, setLocating] = useState(false);
+  const [gpsJourneyPulse, setGpsJourneyPulse] = useState(false);
   const { map, zoom } = useMapAndZoom();
   const showYouLabel = zoom >= MAP_LABEL_MIN_ZOOM;
   const isDesktopChrome = useMatchMedia('(min-width: 768px)');
@@ -811,7 +812,12 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
     if (typeof window === 'undefined') return undefined;
     const onHeaderDirections = () => requestLocation();
     window.addEventListener('finmemory-map-request-location', onHeaderDirections);
-    return () => window.removeEventListener('finmemory-map-request-location', onHeaderDirections);
+    const onGpsHighlight = (e) => setGpsJourneyPulse(Boolean(e?.detail?.active));
+    window.addEventListener('finmemory-caca-preco-highlight-gps', onGpsHighlight);
+    return () => {
+      window.removeEventListener('finmemory-map-request-location', onHeaderDirections);
+      window.removeEventListener('finmemory-caca-preco-highlight-gps', onGpsHighlight);
+    };
   }, [requestLocation]);
 
   useEffect(() => {
@@ -822,9 +828,14 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
       setPosition([lat, lng]);
       setError(null);
       setLocating(false);
-      map.flyTo(e.latlng, Math.max(map.getZoom(), 15));
+      map.flyTo(e.latlng, Math.max(map.getZoom(), 15), { duration: 0.55 });
       onLocationFoundRef.current?.(lat, lng);
       onUserPositionChangeRef.current?.(lat, lng);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('finmemory-map-user-location', { detail: { lat, lng } })
+        );
+      }
     };
     const onError = (e) => {
       setLocating(false);
@@ -868,9 +879,12 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
         <div style={{ position: 'absolute', top: headerOffsetPx + 8, right: 10, zIndex: 1000 }}>
           <button
             type="button"
+            data-tour-id="map-gps-locate"
             onClick={requestLocation}
             disabled={locating}
-            className="flex items-center gap-2 rounded-full border border-[#dadce0] bg-white px-3 py-2.5 text-sm font-medium text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] hover:bg-[#f8f9fa] disabled:opacity-60"
+            className={`flex items-center gap-2 rounded-full border border-[#dadce0] bg-white px-3 py-2.5 text-sm font-medium text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] hover:bg-[#f8f9fa] disabled:opacity-60 ${
+              gpsJourneyPulse ? 'animate-onboarding-gps-pulse ring-2 ring-[#C9A227] border-[#C9A227]' : ''
+            }`}
             title="Centrar mapa na minha localização"
           >
             {locating ? <>⏳ A obter...</> : <>📍 Minha localização</>}
@@ -891,11 +905,14 @@ function LocationMarker({ onLocationFound, onUserPositionChange, headerOffsetPx 
         >
           <button
             type="button"
+            data-tour-id="map-gps-locate"
             onClick={requestLocation}
             disabled={locating}
             title="Minha localização"
             aria-label="Centrar mapa na minha localização"
-            className="pointer-events-auto inline-flex max-w-[min(calc(100vw-1.5rem),280px)] items-center gap-2 whitespace-nowrap rounded-full border border-[#dadce0] bg-white px-3 py-2.5 text-sm font-medium text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] transition-transform hover:bg-[#f8f9fa] disabled:opacity-60 active:scale-[0.99]"
+            className={`pointer-events-auto inline-flex max-w-[min(calc(100vw-1.5rem),280px)] items-center gap-2 whitespace-nowrap rounded-full border border-[#dadce0] bg-white px-3 py-2.5 text-sm font-medium text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] transition-transform hover:bg-[#f8f9fa] disabled:opacity-60 active:scale-[0.99] ${
+              gpsJourneyPulse ? 'animate-onboarding-gps-pulse ring-2 ring-[#C9A227] border-[#C9A227]' : ''
+            }`}
           >
             {locating ? (
               <span className="text-lg shrink-0" aria-hidden>
@@ -4120,6 +4137,33 @@ export default function MapaPrecosLeaflet({
     void trackBackendEvent('rota_iniciada', '/mapa');
     setRoutePickerOpen(true);
   }, [firstMissionStop, missionRoute.stops, estimatedSavingsTotal]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onFocusStore = (e) => {
+      const { storeId, lat, lng, storeName } = e?.detail || {};
+      if (!storeId) return;
+      const store = {
+        id: storeId,
+        lat: Number(lat),
+        lng: Number(lng),
+        name: storeName || 'Loja',
+      };
+      if (Number.isFinite(store.lat) && Number.isFinite(store.lng)) {
+        handleRequestStoreShop(store);
+      }
+    };
+    const onStartRoute = () => {
+      setSuggestionIntentReady(true);
+      handleStartMissionRoute();
+    };
+    window.addEventListener('finmemory-caca-preco-focus-store', onFocusStore);
+    window.addEventListener('finmemory-caca-preco-start-route', onStartRoute);
+    return () => {
+      window.removeEventListener('finmemory-caca-preco-focus-store', onFocusStore);
+      window.removeEventListener('finmemory-caca-preco-start-route', onStartRoute);
+    };
+  }, [handleRequestStoreShop, handleStartMissionRoute]);
 
   const handleOpenMissionInGoogle = useCallback(async () => {
     if (!firstMissionStop) return;

@@ -52,6 +52,10 @@ module.exports = {
           '0%, 100%': { transform: 'translateY(0) scale(1)' },
           '50%': { transform: 'translateY(-12px) scale(1.05)' },
         },
+        'onboarding-gps-pulse': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(201, 162, 39, 0.55)' },
+          '50%': { boxShadow: '0 0 0 12px rgba(201, 162, 39, 0)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -60,6 +64,7 @@ module.exports = {
         'slide-up': 'slide-up 0.5s ease-out forwards',
         'scale-in': 'scale-in 0.3s ease-out forwards',
         'onboarding-hand-bounce': 'onboarding-hand-bounce 1.15s ease-in-out infinite',
+        'onboarding-gps-pulse': 'onboarding-gps-pulse 1.4s ease-in-out infinite',
       },
     },
   },

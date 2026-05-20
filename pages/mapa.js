@@ -37,6 +37,11 @@ import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
 import { CharacterWidget } from '../components/gamification/CharacterWidget';
 import { useGamification } from '../hooks/useGamification';
 import { MapOnboardingTutor } from '../components/onboarding/MapOnboardingTutor';
+import { CacaPrecoJourney } from '../components/onboarding/CacaPrecoJourney';
+import {
+  shouldForceCacaPrecoJourney,
+  isCacaPrecoJourneyDoneLocal,
+} from '../lib/onboarding/cacaPrecoJourneyStorage';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -286,8 +291,14 @@ export default function MapaPage() {
 
   const mapTutorUserId =
     session?.user?.supabaseId || session?.user?.email || null;
+  const forceCacaPrecoJourney = router.isReady && shouldForceCacaPrecoJourney(router.query);
+  const cacaPrecoJourneyDone =
+    mapTutorUserId && !forceCacaPrecoJourney && isCacaPrecoJourneyDoneLocal(mapTutorUserId);
+  const showCacaPrecoJourney = Boolean(
+    session && !showMapLanding && !wazeUi && (!cacaPrecoJourneyDone || forceCacaPrecoJourney)
+  );
   const showMapOnboardingTutor = Boolean(
-    session && !showMapLanding && !isDetailOpen && !wazeUi
+    session && !showMapLanding && !isDetailOpen && !wazeUi && !showCacaPrecoJourney
   );
 
   return (
@@ -884,6 +895,12 @@ export default function MapaPage() {
         )}
 
         <StatesUnlockPanel open={showStatesPanel} onClose={() => setShowStatesPanel(false)} />
+
+        <CacaPrecoJourney
+          userId={mapTutorUserId}
+          userName={session?.user?.name}
+          enabled={showCacaPrecoJourney}
+        />
 
         <MapOnboardingTutor
           userId={mapTutorUserId}
