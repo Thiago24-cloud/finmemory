@@ -13,14 +13,9 @@ import {
   Navigation,
   Zap,
   Camera,
-  Route,
   Map,
-  Wallet,
-  Sparkles,
   ShoppingCart,
   ScanBarcode,
-  ChevronDown,
-  ChevronUp,
   X,
 } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
@@ -31,8 +26,6 @@ import { useMatchMedia } from '../lib/useMatchMedia';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/Sheet';
 import { MapOverlayCategoryChips } from '../components/map/MapOverlayCategoryChips';
 import { StatesUnlockPanel } from '../components/map/StatesUnlockPanel';
-import { FinancePlansInline } from '../components/FinancePlansInline';
-import { BRAND } from '../lib/brandTokens';
 import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
 import { CharacterWidget } from '../components/gamification/CharacterWidget';
 import { useGamification } from '../hooks/useGamification';
@@ -51,19 +44,6 @@ const MAP_MAP_PADDING_TOP_PX = 0;
 /** Faixa superior (busca + chips + mascote compacto). */
 const MAP_OVERLAY_TOP_LOGGED_PX = 228;
 const MAP_OVERLAY_TOP_GUEST_PX = 56;
-
-function formatCurrencyBRL(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '--';
-  return n.toFixed(2).replace('.', ',');
-}
-
-function formatDistancePtBr(meters) {
-  const n = Number(meters);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  if (n < 1000) return `${Math.round(n)} m`;
-  return `${(n / 1000).toFixed(1).replace('.', ',')} km`;
-}
 
 export async function getServerSideProps(ctx) {
   try {
@@ -110,8 +90,7 @@ export default function MapaPage() {
     .slice(0, 12);
   const planningMode = parsedPlanningItems.length > 0;
   const [planningSummary, setPlanningSummary] = useState(null);
-  const [planningActionRequest, setPlanningActionRequest] = useState({ id: 0, mode: '' });
-  const [planningIntelExpanded, setPlanningIntelExpanded] = useState(false);
+  const [planningActionRequest] = useState({ id: 0, mode: '' });
   const [planningListaSheetOpen, setPlanningListaSheetOpen] = useState(false);
   /** Tem de vir antes de `showMapLanding` — senão TDZ no bundle (“Cannot access … before initialization”). */
   const [mapLandingOpen, setMapLandingOpen] = useState(false);
@@ -227,55 +206,10 @@ export default function MapaPage() {
     });
   }, []);
 
-  const planningIntelPeek = useMemo(() => {
-    if (!planningSummary) {
-      return {
-        headline: 'A calcular a melhor opção para a sua lista…',
-        sub: null,
-        savingsLine: null,
-      };
-    }
-    const one = planningSummary.oneStore;
-    const cheap = planningSummary.cheapest;
-    const ic = planningSummary.itemsCount || 0;
-    if (one?.storeName) {
-      const pct = one.coveragePct ?? Math.round((one.coveredItems / Math.max(ic, 1)) * 100);
-      let savingsLine = null;
-      if (cheap?.total != null && one.total != null && cheap.total < one.total - 0.05) {
-        savingsLine = `Economize até R$ ${formatCurrencyBRL(one.total - cheap.total)} com rota em ${
-          cheap.storesCount || 1
-        } mercado(s)`;
-      }
-      return {
-        headline: `Melhor opção combinada: ${one.storeName}`,
-        sub: `R$ ${formatCurrencyBRL(one.total)} · ${pct}% da lista`,
-        savingsLine,
-      };
-    }
-    if (cheap?.total != null) {
-      return {
-        headline: 'Menor preço total (vários mercados)',
-        sub: `R$ ${formatCurrencyBRL(cheap.total)}`,
-        savingsLine: null,
-      };
-    }
-    return {
-      headline: 'Poucos preços na área visível',
-      sub: 'Arraste o mapa ou aproxime para ver mais lojas',
-      savingsLine: null,
-    };
-  }, [planningSummary]);
-
-  const planningBottomPadPx =
-    session && !showMapLanding && planningMode && !isDetailExpanded
-      ? planningIntelExpanded
-        ? 320
-        : 168
-      : 0;
+  const planningBottomPadPx = 0;
 
   useEffect(() => {
     if (!planningMode) {
-      setPlanningIntelExpanded(false);
       setPlanningListaSheetOpen(false);
     }
   }, [planningMode]);
@@ -613,229 +547,6 @@ export default function MapaPage() {
           </SheetContent>
         </Sheet>
 
-        {session && !showMapLanding && planningMode && !isDetailExpanded ? (
-          <div
-            className="pointer-events-none absolute inset-x-0 z-[22] px-3"
-            style={{ bottom: 'calc(4.35rem + env(safe-area-inset-bottom, 0px))' }}
-          >
-            <div
-              className={`pointer-events-auto mx-auto w-full max-w-lg overflow-hidden rounded-t-2xl border shadow-[0_-12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl ${
-                wazeUi
-                  ? 'border-[#2a2d3a] bg-[#13161f]/95 text-[#f3f4f6]'
-                  : 'border-white/10 bg-[#12141a]/94 text-foreground'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setPlanningIntelExpanded((e) => !e)}
-                className="flex w-full flex-col gap-1 border-b border-white/10 px-3 pb-2.5 pt-2 text-left"
-              >
-                <span className="mx-auto h-1 w-9 rounded-full bg-white/25" aria-hidden />
-                <div className="flex items-start gap-2 pt-1">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-bold leading-snug text-white">{planningIntelPeek.headline}</p>
-                    {planningIntelPeek.sub ? (
-                      <p className="mt-0.5 text-xs font-semibold text-primary">{planningIntelPeek.sub}</p>
-                    ) : null}
-                    {planningIntelPeek.savingsLine ? (
-                      <p className="mt-1 text-[11px] leading-snug text-zinc-400">{planningIntelPeek.savingsLine}</p>
-                    ) : null}
-                  </div>
-                  {planningIntelExpanded ? (
-                    <ChevronUp className="mt-0.5 h-5 w-5 shrink-0 text-zinc-500" aria-hidden />
-                  ) : (
-                    <ChevronDown className="mt-0.5 h-5 w-5 shrink-0 text-zinc-500" aria-hidden />
-                  )}
-                </div>
-              </button>
-
-              <div className="flex items-center justify-center gap-2 border-b border-white/5 px-3 py-2.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'money' }))
-                  }
-                  disabled={!planningSummary?.cheapest}
-                  className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-emerald-400 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Foco economia — ver rota no mapa"
-                  aria-label="Foco economia"
-                >
-                  <Wallet className="h-5 w-5" strokeWidth={2} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'time' }))
-                  }
-                  disabled={!planningSummary?.oneStore}
-                  className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-sky-400 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Foco tempo — maior cobertura em um mercado"
-                  aria-label="Foco tempo"
-                >
-                  <Route className="h-5 w-5" strokeWidth={2} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'quality' }))
-                  }
-                  disabled={!planningSummary?.quality}
-                  className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-violet-400 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Foco qualidade — itens diferenciados"
-                  aria-label="Foco qualidade"
-                >
-                  <Sparkles className="h-5 w-5" strokeWidth={2} />
-                </button>
-              </div>
-
-              {planningIntelExpanded ? (
-                <div className="max-h-[48vh] space-y-2 overflow-y-auto px-3 pb-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'money' }))
-                    }
-                    disabled={!planningSummary?.cheapest}
-                    className={`w-full rounded-xl border px-3 py-3 text-left ${
-                      wazeUi ? 'border-[#2a2d3a] bg-[#0c0f16]' : 'border-white/10 bg-black/30'
-                    } ${planningSummary?.cheapest ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Wallet className="h-4 w-4 text-emerald-400" />
-                      <p className="text-xs font-bold text-white">Economia (melhor combinação)</p>
-                      {planningSummary?.cheapest?.badge ? (
-                        <span className="ml-auto rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                          {planningSummary.cheapest.badge}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm font-bold text-white">
-                      Menor preço total:{' '}
-                      {planningSummary?.cheapest
-                        ? `R$ ${formatCurrencyBRL(planningSummary.cheapest.total)}`
-                        : 'calculando...'}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-zinc-400">
-                      {planningSummary?.cheapest
-                        ? `${planningSummary.cheapest.coveredItems}/${planningSummary.itemsCount} itens em ${planningSummary.cheapest.storesCount} mercado(s).`
-                        : 'Buscando melhor combinação por item...'}
-                    </p>
-                    {planningSummary?.cheapest?.actionLabel ? (
-                      <p className="mt-1 text-[10px] font-medium text-emerald-300">{planningSummary.cheapest.actionLabel}</p>
-                    ) : null}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'time' }))
-                    }
-                    disabled={!planningSummary?.oneStore}
-                    className={`w-full rounded-xl border px-3 py-3 text-left ${
-                      wazeUi ? 'border-[#2a2d3a] bg-[#0c0f16]' : 'border-white/10 bg-black/30'
-                    } ${planningSummary?.oneStore ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Route className="h-4 w-4 text-sky-400" />
-                      <p className="text-xs font-bold text-white">Cobertura (um mercado)</p>
-                      {planningSummary?.oneStore?.badge ? (
-                        <span className="ml-auto rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
-                          {planningSummary.oneStore.badge}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm font-bold text-white">
-                      Tudo em 1 lugar:{' '}
-                      {planningSummary?.oneStore
-                        ? `R$ ${formatCurrencyBRL(planningSummary.oneStore.total)}`
-                        : 'calculando...'}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-zinc-400">
-                      {planningSummary?.oneStore
-                        ? `${planningSummary.oneStore.coveredItems}/${planningSummary.itemsCount} itens em ${planningSummary.oneStore.storeName}.`
-                        : 'Buscando loja com maior cobertura da sua lista...'}
-                    </p>
-                    {planningSummary?.oneStore ? (
-                      <p className="mt-1 text-[10px] font-medium text-sky-300">
-                        {planningSummary.oneStore.actionLabel}
-                        {planningSummary.oneStore.distanceMeters != null
-                          ? ` • ${formatDistancePtBr(planningSummary.oneStore.distanceMeters)}`
-                          : ''}
-                        {planningSummary.oneStore.exclusivesCount > 0
-                          ? ` • ${planningSummary.oneStore.exclusivesCount} item(ns) exclusivo(s)`
-                          : ''}
-                      </p>
-                    ) : null}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPlanningActionRequest((prev) => ({ id: Number(prev.id || 0) + 1, mode: 'quality' }))
-                    }
-                    disabled={!planningSummary?.quality}
-                    className={`w-full rounded-xl border px-3 py-3 text-left ${
-                      wazeUi ? 'border-[#2a2d3a] bg-[#0c0f16]' : 'border-white/10 bg-black/30'
-                    } ${planningSummary?.quality ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-violet-400" />
-                      <p className="text-xs font-bold text-white">Itens diferenciados</p>
-                      {planningSummary?.quality?.badge ? (
-                        <span className="ml-auto rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-semibold text-violet-300">
-                          {planningSummary.quality.badge}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm font-bold text-white">
-                      Curadoria premium:{' '}
-                      {planningSummary?.quality ? `R$ ${formatCurrencyBRL(planningSummary.quality.total)}` : 'calculando...'}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-zinc-400">
-                      {planningSummary?.quality
-                        ? `${planningSummary.quality.coveredItems}/${planningSummary.itemsCount} itens em ${planningSummary.quality.storeName}.`
-                        : 'Buscando melhor loja para itens diferenciados...'}
-                    </p>
-                    {planningSummary?.quality ? (
-                      <p className="mt-1 text-[10px] font-medium text-violet-300">
-                        {planningSummary.quality.actionLabel}
-                        {planningSummary.quality.distanceMeters != null
-                          ? ` • ${formatDistancePtBr(planningSummary.quality.distanceMeters)}`
-                          : ''}
-                        {planningSummary.quality.exclusivesCount > 0
-                          ? ` • ${planningSummary.quality.exclusivesCount} item(ns) exclusivo(s)`
-                          : ''}
-                      </p>
-                    ) : null}
-                  </button>
-
-                  <div
-                    className={`rounded-xl border px-3 py-2 text-[11px] ${
-                      wazeUi ? 'border-[#2a2d3a] bg-[#0c0f16] text-[#d1d5db]' : 'border-white/10 bg-black/25 text-zinc-300'
-                    }`}
-                    style={
-                      wazeUi
-                        ? undefined
-                        : {
-                            borderColor: BRAND.primarySoftBorder,
-                            background: 'rgba(0,0,0,0.2)',
-                            color: BRAND.primaryText,
-                          }
-                    }
-                  >
-                    <FinancePlansInline
-                      className="m-0"
-                      emphasize
-                      showLink
-                      linkClassName="font-semibold text-primary no-underline hover:underline"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
         <Sheet open={planningListaSheetOpen && !showMapLanding} onOpenChange={setPlanningListaSheetOpen}>
           <SheetContent
             side="bottom"
@@ -884,7 +595,7 @@ export default function MapaPage() {
             type="button"
             onClick={() => setShowStatesPanel(true)}
             className={`absolute right-3 z-30 flex items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-[12px] font-bold text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] transition-colors hover:bg-[#f8f9fa] pointer-events-auto ${
-              planningMode && !isDetailExpanded ? 'bottom-[calc(11.5rem+env(safe-area-inset-bottom))]' : 'bottom-[5.5rem]'
+              bottom-[5.5rem]
             }`}
             aria-label="Ver estados desbloqueados"
           >
