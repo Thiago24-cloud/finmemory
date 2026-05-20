@@ -21,6 +21,7 @@ export function SimuladorCreditLimitsPanel({
   labelClass,
   onLimitsChange,
   onSaved,
+  showFormula = false,
 }) {
   const [draft, setDraft] = useState({});
   const [saving, setSaving] = useState(false);
@@ -100,9 +101,18 @@ export function SimuladorCreditLimitsPanel({
         <div className="min-w-0 flex-1">
           <p className={cn(labelClass, 'text-purple-200/90 mb-0')}>Limites dos cartões de crédito</p>
           <p className="text-[10px] text-zinc-500 mt-1 leading-snug">
-            Digite o <strong className="text-zinc-400">limite total</strong> de cada cartão. O app usa o
-            valor do <strong className="text-zinc-400">dashboard</strong> como gasto e calcula: limite −
-            gasto = disponível no simulador.
+            {showFormula ? (
+              <>
+                Informe o <strong className="text-zinc-400">limite total</strong> de cada banco/cartão. O gasto vem do{' '}
+                <strong className="text-zinc-400">dashboard</strong> (Open Finance). Fórmula:{' '}
+                <span className="text-[#39FF14] font-medium">limite − gasto = disponível</span> no Saldo de hoje.
+              </>
+            ) : (
+              <>
+                Digite o <strong className="text-zinc-400">limite total</strong> de cada cartão. O app usa o valor do{' '}
+                <strong className="text-zinc-400">dashboard</strong> como gasto: limite − gasto = disponível.
+              </>
+            )}
           </p>
         </div>
       </div>

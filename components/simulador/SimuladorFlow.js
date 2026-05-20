@@ -28,8 +28,9 @@ import {
   reliabilityLabel,
 } from '../../lib/simuladorProjection';
 import { SimuladorMonthCalendar } from './SimuladorMonthCalendar';
-import { SimuladorCreditLimitsPanel } from './SimuladorCreditLimitsPanel';
 import { SaldoHojeField } from './SaldoHojeField';
+import { SimuladorMainTabs } from './SimuladorMainTabs';
+import { SimuladorCartoesTab } from './SimuladorCartoesTab';
 import { useSaldoDeHoje } from '../../hooks/useSaldoDeHoje';
 import { buildContasFromOpenFinance } from '../../lib/finance/buildContasFromOpenFinance';
 import { resolveContasForSaldo } from '../../lib/finance/contaFinanceira';
@@ -45,6 +46,17 @@ const SimuladorRadarChart = dynamic(
 );
 
 const STORAGE_KEY = 'finmemory-simulador-v1';
+const TAB_STORAGE_KEY = 'finmemory-simulador-tab';
+
+function loadMainTab() {
+  if (typeof window === 'undefined') return 'fluxo';
+  try {
+    const t = window.localStorage.getItem(TAB_STORAGE_KEY);
+    return t === 'cartoes' ? 'cartoes' : 'fluxo';
+  } catch {
+    return 'fluxo';
+  }
+}
 
 function newExtraRowId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -217,6 +229,7 @@ export function SimuladorFlow() {
   const [debouncedState, setDebouncedState] = useState(state);
 
   const [limitsPreview, setLimitsPreview] = useState(null);
+  const [mainTab, setMainTab] = useState('fluxo');
   const hintsHydratedRef = useRef(false);
   const stateHydratedRef = useRef(false);
   const hintsBootstrapRef = useRef(false);
@@ -292,6 +305,25 @@ export function SimuladorFlow() {
       limitsPreview != null ? null : (hints?.saldoHoje ?? hints?.accountBalanceTotal),
     enabled: status === 'authenticated',
   });
+
+  useEffect(() => {
+    setMainTab(loadMainTab());
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      window.localStorage.setItem(TAB_STORAGE_KEY, mainTab);
+    } catch {
+      /* ignore */
+    }
+  }, [mainTab, mounted]);
+
+  useEffect(() => {
+    if (mainTab === 'cartoes' && status === 'authenticated' && !hints) {
+      void fetchHints({ silent: false });
+    }
+  }, [mainTab, status, hints, fetchHints]);
 
   useEffect(() => {
     if (status === 'loading') return undefined;
@@ -807,24 +839,8 @@ export function SimuladorFlow() {
 
   const labelClass = 'text-xs font-medium text-zinc-400 mb-1 block';
 
-  const creditLimitsBlock =
-    state.step >= 4 ? (
-      <SimuladorCreditLimitsPanel
-        creditCards={hints?.creditCards ?? []}
-        loading={hintsLoading && !hintsHydratedRef.current}
-        fieldClass={fieldClass}
-        labelClass={labelClass}
-        onLimitsChange={handleLimitsPreview}
-        onSaved={() => {
-          setLimitsPreview(null);
-          void fetchHints({ silent: true });
-        }}
-      />
-    ) : null;
-
   const dayRow = (
     <>
-      {creditLimitsBlock}
       <div className="grid grid-cols-2 gap-3">
         <SaldoHojeField
           labelClass={labelClass}
@@ -843,6 +859,11 @@ export function SimuladorFlow() {
               set({ startingBalance: saldoDeHoje.saldoHoje });
             }
           }}
+          hintExtra={
+            mainTab === 'fluxo'
+              ? 'Cartão de crédito: configure o limite na aba Cartões (limite − gasto do dashboard).'
+              : null
+          }
         />
         <div>
           <label className={labelClass}>Gasto médio / dia</label>
@@ -1009,6 +1030,37 @@ export function SimuladorFlow() {
       </header>
 
       <div className="max-w-md mx-auto px-4 pt-4 space-y-4">
+        <SimuladorMainTabs active={mainTab} onChange={setMainTab} />
+
+        {mainTab === 'cartoes' ? (
+          <SimuladorCartoesTab
+            creditCards={hints?.creditCards ?? []}
+            hintsLoading={hintsLoading}
+            hintsHydrated={Boolean(hints)}
+            saldoHoje={saldoDeHoje.saldoHoje}
+            contas={saldoDeHoje.contas}
+            contasCount={saldoDeHoje.contas.length}
+            usingMock={Boolean(hints?.usingMockContas)}
+            startingBalance={state.startingBalance}
+            onStartingBalanceChange={(n) => {
+              saldoDeHoje.markTouched();
+              set({ startingBalance: n });
+            }}
+            onStartingBalanceBlur={() => {
+              if (!saldoDeHoje.wasTouched()) {
+                set({ startingBalance: saldoDeHoje.saldoHoje });
+              }
+            }}
+            onLimitsChange={handleLimitsPreview}
+            onLimitsSaved={() => {
+              setLimitsPreview(null);
+              void fetchHints({ silent: true });
+            }}
+            fieldClass={fieldClass}
+            labelClass={labelClass}
+          />
+        ) : (
+          <>
         <div className="flex gap-1.5">
           {Array.from({ length: steps }, (_, i) => (
             <div
@@ -1684,43 +1736,58 @@ export function SimuladorFlow() {
             </p>
           </>
         )}
+          </>
+        )}
       </div>
 
       <div className="fixed bottom-[4.75rem] left-0 right-0 z-40 px-4 max-w-md mx-auto flex gap-2">
-        <button
-          type="button"
-          onClick={goPrev}
-          disabled={state.step <= 1}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1 py-3 rounded-2xl border border-zinc-800 bg-zinc-900/90 text-sm font-medium text-zinc-200',
-            state.step <= 1 && 'opacity-40 pointer-events-none'
-          )}
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Voltar
-        </button>
-        {state.step < steps ? (
+        {mainTab === 'cartoes' ? (
           <button
             type="button"
-            onClick={goNext}
-            disabled={!canNext}
-            className={cn(
-              'flex-[1.35] flex items-center justify-center gap-1 py-3 rounded-2xl text-sm font-semibold text-white',
-              'bg-gradient-to-r from-purple-600 to-fuchsia-600 shadow-lg shadow-purple-900/40',
-              !canNext && 'opacity-50 pointer-events-none'
-            )}
+            onClick={() => setMainTab('fluxo')}
+            className="w-full flex items-center justify-center gap-1 py-3 rounded-2xl text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-fuchsia-600 shadow-lg shadow-purple-900/40"
           >
-            Continuar
+            Voltar à simulação
             <ChevronRight className="h-4 w-4" />
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => set({ step: 1 })}
-            className="flex-[1.35] py-3 rounded-2xl text-sm font-semibold text-white bg-zinc-800 border border-zinc-700"
-          >
-            Recomeçar passos
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={state.step <= 1}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-1 py-3 rounded-2xl border border-zinc-800 bg-zinc-900/90 text-sm font-medium text-zinc-200',
+                state.step <= 1 && 'opacity-40 pointer-events-none'
+              )}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Voltar
+            </button>
+            {state.step < steps ? (
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!canNext}
+                className={cn(
+                  'flex-[1.35] flex items-center justify-center gap-1 py-3 rounded-2xl text-sm font-semibold text-white',
+                  'bg-gradient-to-r from-purple-600 to-fuchsia-600 shadow-lg shadow-purple-900/40',
+                  !canNext && 'opacity-50 pointer-events-none'
+                )}
+              >
+                Continuar
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => set({ step: 1 })}
+                className="flex-[1.35] py-3 rounded-2xl text-sm font-semibold text-white bg-zinc-800 border border-zinc-700"
+              >
+                Recomeçar passos
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

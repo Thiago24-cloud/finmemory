@@ -21,6 +21,7 @@ export function SaldoHojeField({
   usingMock = false,
   fieldClass,
   labelClass,
+  hintExtra = null,
 }) {
   return (
     <div>
@@ -53,6 +54,7 @@ export function SaldoHojeField({
               ? 'Dados de exemplo (mock) — conecte o Open Finance para saldos reais'
               : 'Sem contas conectadas'}
       </p>
+      {hintExtra ? <p className="mt-1 text-[10px] text-purple-400/90">{hintExtra}</p> : null}
     </div>
   );
 }
