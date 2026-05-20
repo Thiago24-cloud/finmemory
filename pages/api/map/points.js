@@ -12,6 +12,10 @@ import { isLikelyNonProductScraperTitle } from '../../../lib/mapStoreChainMatch'
 import { displayPromoProductName } from '../../../lib/mapOfferDisplay';
 import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
 import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
+import {
+  buildMapPointsSearchOrFilter,
+  parseMapSearchTerms,
+} from '../../../lib/mapPointsSearch';
 
 /**
  * GET /api/map/points - lista pontos do mapa.
@@ -190,12 +194,12 @@ export default async function handler(req, res) {
     const baseSelect =
       'id, product_name, price, store_name, lat, lng, category, created_at, user_id, product_id';
 
+    const searchTerms = parseMapSearchTerms(q);
+    const searchOrFilter = buildMapPointsSearchOrFilter(searchTerms);
+
     const applySearch = (qb) => {
-      if (q.length < 2) return qb;
-      const pattern = `%${q}%`;
-      return qb.or(
-        `product_name.ilike.${pattern},store_name.ilike.${pattern},category.ilike.${pattern}`
-      );
+      if (!searchOrFilter) return qb;
+      return qb.or(searchOrFilter);
     };
 
     // 1) Ofertas/promoções (import DIA etc.): TTL maior — bbox antes de order/limit (PostgREST)
