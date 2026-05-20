@@ -15,15 +15,16 @@ export default function PageTransitionLayout({ children }) {
     return <div className="min-h-0">{children}</div>;
   }
 
+  /** Sem `mode="wait"` — evita frame vazio entre rotas (piscar ao abrir /planos). */
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence initial={false}>
       <motion.div
         key={router.asPath}
         className="min-h-0"
-        initial={{ opacity: 0.92 }}
+        initial={{ opacity: 0.98 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0.94 }}
-        transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+        exit={{ opacity: 0.99 }}
+        transition={{ duration: 0.08, ease: 'easeOut' }}
       >
         {children}
       </motion.div>

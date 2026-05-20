@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, Check, Lock, X } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, Lock, X } from 'lucide-react';
 import { PLAN_LABELS } from '../lib/planAccess';
 import { BRAND } from '../lib/brandTokens';
 
@@ -82,18 +82,27 @@ export default function PlanosPage() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const [upsell, setUpsell] = useState(null);
+  /** Evita piscar botões quando `update()` refresca a sessão. */
+  const sessionEverOkRef = useRef(false);
+  const stripeSyncStartedRef = useRef(false);
 
   const closeUpsell = useCallback(() => setUpsell(null), []);
 
+  if (status === 'authenticated' && session?.user) {
+    sessionEverOkRef.current = true;
+  }
+
   useEffect(() => {
+    if (status === 'loading') return;
     if (status === 'unauthenticated') {
       router.replace('/login?callbackUrl=/planos');
     }
   }, [status, router]);
 
-  /** Alinha plano na UI com Stripe + Supabase (webhook pode atrasar; JWT pode ficar desatualizado). */
+  /** Sync Stripe em background — sem trocar a UI para “A carregar…” a cada refresh de sessão. */
   useEffect(() => {
-    if (status !== 'authenticated') return;
+    if (status !== 'authenticated' || stripeSyncStartedRef.current) return;
+    stripeSyncStartedRef.current = true;
     let cancelled = false;
     (async () => {
       try {
@@ -101,8 +110,8 @@ export default function PlanosPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        if (cancelled) return;
-        if (res.ok) await update();
+        if (cancelled || !res.ok) return;
+        await update().catch(() => {});
       } catch {
         /* ignore */
       }
@@ -119,7 +128,18 @@ export default function PlanosPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [upsell, closeUpsell]);
 
-  const authed = status === 'authenticated' && session?.user;
+  const userReady =
+    sessionEverOkRef.current || (status === 'authenticated' && Boolean(session?.user));
+  const showInitialLoader = status === 'loading' && !sessionEverOkRef.current;
+
+  if (showInitialLoader) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3 text-gray-500">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" aria-hidden />
+        <p className="text-sm">A carregar planos…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-24">
@@ -137,7 +157,7 @@ export default function PlanosPage() {
             Compare o que inclui cada nível. Passe o rato pelos cartões para destacar. A assinatura abre no Stripe
             Checkout (pagamento seguro).
           </p>
-          {authed ? (
+          {userReady ? (
             <p
               className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
               style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg, color: BRAND.primaryText }}
@@ -182,7 +202,7 @@ export default function PlanosPage() {
                 Cancele quando quiser. Assinatura mensal via Stripe.
               </p>
               <div className="mt-5 flex flex-col gap-2">
-                {authed ? (
+                {userReady && session?.user ? (
                   <UpgradeBtn
                     plan={upsell.plan}
                     userId={session.user.supabaseId}
@@ -191,12 +211,8 @@ export default function PlanosPage() {
                   >
                     {upsell.cta}
                   </UpgradeBtn>
-                ) : status === 'authenticated' ? (
-                  <p className="text-center text-sm text-amber-800">
-                    Configure o Stripe para concluir a assinatura aqui.
-                  </p>
                 ) : (
-                  <p className="text-center text-sm text-gray-500">A carregar…</p>
+                  <p className="text-center text-sm text-gray-500">Inicie sessão para assinar.</p>
                 )}
                 <button
                   type="button"
@@ -248,7 +264,7 @@ export default function PlanosPage() {
               <Li>Canal de distribuição para escritórios</Li>
               <Li>Comissão de 25% ao parceiro contador</Li>
             </ul>
-            {authed ? (
+            {userReady && session?.user ? (
               <UpgradeBtn
                 plan="enterprise"
                 userId={session.user.supabaseId}
@@ -258,7 +274,7 @@ export default function PlanosPage() {
                 Assinar Enterprise
               </UpgradeBtn>
             ) : (
-              <p className="mt-6 text-center text-sm text-gray-500">A carregar…</p>
+              <div className="mt-6 h-10 rounded-lg bg-gray-100 animate-pulse" aria-hidden />
             )}
           </div>
 
@@ -279,7 +295,7 @@ export default function PlanosPage() {
               <Li>Relatórios avançados</Li>
               <Li>Suporte prioritário</Li>
             </ul>
-            {authed ? (
+            {userReady && session?.user ? (
               <UpgradeBtn
                 plan="pro"
                 userId={session.user.supabaseId}
@@ -289,7 +305,7 @@ export default function PlanosPage() {
                 Assinar Pro
               </UpgradeBtn>
             ) : (
-              <p className="mt-6 text-center text-sm text-gray-500">A carregar…</p>
+              <div className="mt-6 h-10 rounded-lg bg-gray-100 animate-pulse" aria-hidden />
             )}
           </div>
 
@@ -307,7 +323,7 @@ export default function PlanosPage() {
               <Li>~R$20 por membro/mês</Li>
               <Li>Melhor custo-benefício para famílias</Li>
             </ul>
-            {authed ? (
+            {userReady && session?.user ? (
               <UpgradeBtn
                 plan="familia"
                 userId={session.user.supabaseId}
@@ -317,7 +333,7 @@ export default function PlanosPage() {
                 Assinar Família
               </UpgradeBtn>
             ) : (
-              <p className="mt-6 text-center text-sm text-gray-500">A carregar…</p>
+              <div className="mt-6 h-10 rounded-lg bg-gray-100 animate-pulse" aria-hidden />
             )}
           </div>
         </div>

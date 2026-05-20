@@ -33,7 +33,6 @@ async function fetchWithTimeout(input, init = {}, ms = ACCOUNT_FETCH_TIMEOUT_MS)
 }
 
 const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, userEmail }) {
-  const router = useRouter();
   if (!supabaseId || !userEmail) return null;
   return (
     <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -41,13 +40,13 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
       <p className="mt-1 text-sm text-gray-500">
         Assinatura no Stripe — Pro, Família ou Enterprise. Os preços vêm do Stripe Checkout.
       </p>
-      <button
-        type="button"
-        onClick={() => router.push('/planos')}
-        className="mt-4 w-full rounded-xl bg-[#2ECC49] py-3 px-4 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#25b340] hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100"
+      <Link
+        href="/planos"
+        prefetch
+        className="mt-4 block w-full rounded-xl bg-[#2ECC49] py-3 px-4 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#25b340] hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100"
       >
         Ver planos disponíveis
-      </button>
+      </Link>
       <div className="mt-4 flex flex-col gap-2">
         <UpgradePlan
           plan="pro"
@@ -468,24 +467,33 @@ export default function SettingsPage() {
           </div>
         ) : null}
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <Link href="/mapa?landing=1" className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-200 text-gray-900">
+        <div className="rounded-2xl border border-zinc-700 shadow-sm overflow-hidden">
+          <Link
+            href="/mapa?landing=1"
+            className="flex items-center gap-4 p-4 bg-white hover:bg-gray-50 transition-colors border-b border-zinc-700 text-gray-900"
+          >
             <span className="h-5 w-5 flex items-center justify-center text-base">🗺️</span>
             <span className="font-medium">Como quer começar? (guia do mapa)</span>
           </Link>
-          <Link href="/privacidade" className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-200 text-gray-900">
-            <Shield className="h-5 w-5 text-gray-500" />
-            <span className="font-medium">Política de Privacidade</span>
+          <Link
+            href="/privacidade"
+            className="flex items-center gap-4 p-4 bg-zinc-900 hover:bg-zinc-800 transition-colors border-b border-zinc-800 text-white"
+          >
+            <Shield className="h-5 w-5 text-zinc-300" />
+            <span className="font-medium text-white">Política de Privacidade</span>
           </Link>
-          <Link href="/termos" className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-200 text-gray-900">
-            <FileText className="h-5 w-5 text-gray-500" />
-            <span className="font-medium">Termos de Uso</span>
+          <Link
+            href="/termos"
+            className="flex items-center gap-4 p-4 bg-zinc-900 hover:bg-zinc-800 transition-colors border-b border-zinc-800 text-white"
+          >
+            <FileText className="h-5 w-5 text-zinc-300" />
+            <span className="font-medium text-white">Termos de Uso</span>
           </Link>
           {status === 'authenticated' && session && (
             <button
               type="button"
               onClick={handleDisconnect}
-              className="w-full flex items-center gap-4 p-4 hover:bg-red-50 transition-colors text-left text-red-600 font-semibold"
+              className="w-full flex items-center gap-4 p-4 bg-zinc-900 hover:bg-red-950/40 transition-colors text-left text-red-400 font-semibold"
             >
               <LogOut className="h-5 w-5" />
               <span>Sair da conta</span>
