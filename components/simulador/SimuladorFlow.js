@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import {
@@ -33,7 +34,15 @@ import { useSaldoDeHoje } from '../../hooks/useSaldoDeHoje';
 import { buildContasFromOpenFinance } from '../../lib/finance/buildContasFromOpenFinance';
 import { resolveContasForSaldo } from '../../lib/finance/contaFinanceira';
 import { NEED, SimuladorNecessityPie } from './SimuladorNecessityPie';
-import { SimuladorRadarChart } from './SimuladorRadarChart';
+const SimuladorRadarChart = dynamic(
+  () => import('./SimuladorRadarChart').then((m) => m.SimuladorRadarChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[148px] rounded-xl bg-zinc-800/60 animate-pulse" aria-hidden />
+    ),
+  }
+);
 
 const STORAGE_KEY = 'finmemory-simulador-v1';
 
@@ -163,9 +172,14 @@ function loadState() {
   if (typeof window === 'undefined') return defaultState();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
-    const parsed = JSON.parse(raw);
-    return normalizeSimuladorState(parsed);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const base = parsed ? normalizeSimuladorState(parsed) : defaultState();
+    const stepRaw = window.localStorage.getItem(`${STORAGE_KEY}-step`);
+    const stepSaved = stepRaw ? parseInt(stepRaw, 10) : null;
+    if (stepSaved >= 1 && stepSaved <= 4) {
+      return { ...base, step: Math.max(base.step || 1, stepSaved) };
+    }
+    return base;
   } catch {
     return defaultState();
   }
@@ -203,20 +217,43 @@ export function SimuladorFlow() {
   const [debouncedState, setDebouncedState] = useState(state);
 
   const [limitsPreview, setLimitsPreview] = useState(null);
+  const hintsHydratedRef = useRef(false);
+  const stateHydratedRef = useRef(false);
+  const hintsBootstrapRef = useRef(false);
+  const realtimeDebounceRef = useRef(null);
 
-  const fetchHints = useCallback(async () => {
+  const fetchHints = useCallback(async ({ silent = false } = {}) => {
     if (status !== 'authenticated') return;
-    setHintsLoading(true);
+    const isBackground = silent || hintsHydratedRef.current;
+    if (!isBackground) setHintsLoading(true);
     try {
       const res = await fetch('/api/simulador/hints', { credentials: 'include' });
       const json = await res.json().catch(() => ({}));
-      if (res.ok && json?.ok) setHints(json);
+      if (res.ok && json?.ok) {
+        setHints(json);
+        hintsHydratedRef.current = true;
+      }
     } catch {
       /* ignore */
     } finally {
-      setHintsLoading(false);
+      if (!isBackground) setHintsLoading(false);
     }
   }, [status]);
+
+  const scheduleHintsRefresh = useCallback(
+    (delayMs = 4000) => {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+      realtimeDebounceRef.current = setTimeout(() => {
+        realtimeDebounceRef.current = null;
+        void fetchHints({ silent: true });
+      }, delayMs);
+    },
+    [fetchHints]
+  );
+
+  const handleLimitsPreview = useCallback((preview) => {
+    setLimitsPreview(preview);
+  }, []);
 
   const contasParaSaldo = useMemo(() => {
     const accounts = hints?.accounts;
@@ -254,18 +291,22 @@ export function SimuladorFlow() {
     saldoHojeFromApi:
       limitsPreview != null ? null : (hints?.saldoHoje ?? hints?.accountBalanceTotal),
     enabled: status === 'authenticated',
-    onRefresh: fetchHints,
   });
 
   useEffect(() => {
     if (status === 'loading') return undefined;
 
     if (status !== 'authenticated') {
-      setState(loadState());
+      if (!stateHydratedRef.current) {
+        setState(loadState());
+        stateHydratedRef.current = true;
+      }
       setMounted(true);
       setRemoteReady(true);
       return undefined;
     }
+
+    if (stateHydratedRef.current) return undefined;
 
     let cancelled = false;
 
@@ -280,15 +321,22 @@ export function SimuladorFlow() {
 
         if (cancelled) return;
 
-        if (hintsJson?.ok) setHints(hintsJson);
+        if (hintsJson?.ok) {
+          setHints(hintsJson);
+          hintsHydratedRef.current = true;
+        }
 
+        const local = loadState();
         if (stateJson?.state && typeof stateJson.state === 'object') {
-          const merged = normalizeSimuladorState(stateJson.state);
+          const remote = normalizeSimuladorState(stateJson.state);
+          const merged = {
+            ...remote,
+            step: Math.max(remote.step || 1, local.step || 1),
+          };
           setState(merged);
           lastSentRef.current = JSON.stringify(merged);
           setSaveStatus('saved');
         } else {
-          const local = loadState();
           setState(local);
           lastSentRef.current = JSON.stringify(local);
         }
@@ -300,6 +348,7 @@ export function SimuladorFlow() {
         }
       } finally {
         if (!cancelled) {
+          stateHydratedRef.current = true;
           setMounted(true);
           setRemoteReady(true);
         }
@@ -351,26 +400,26 @@ export function SimuladorFlow() {
     return () => clearTimeout(t);
   }, [state, remoteReady, status]);
 
+  /** Atualização em segundo plano: ao voltar à aba (debounced) e a cada 2 min — sem piscar a UI. */
   useEffect(() => {
-    if (status !== 'authenticated') return undefined;
+    if (status !== 'authenticated' || !mounted) return undefined;
     const onVisible = () => {
-      if (document.visibilityState === 'visible') fetchHints();
+      if (document.visibilityState === 'visible') scheduleHintsRefresh(1200);
     };
-    window.addEventListener('focus', fetchHints);
     document.addEventListener('visibilitychange', onVisible);
     const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') fetchHints();
-    }, 15000);
+      if (document.visibilityState === 'visible') void fetchHints({ silent: true });
+    }, 120_000);
     return () => {
-      window.removeEventListener('focus', fetchHints);
       document.removeEventListener('visibilitychange', onVisible);
       window.clearInterval(id);
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
     };
-  }, [status, fetchHints]);
+  }, [status, mounted, fetchHints, scheduleHintsRefresh]);
 
-  /** Realtime (quando ativo no projeto Supabase) + polling 15s — hints alinham após nova despesa. */
+  /** Realtime Supabase — debounce 4s para não disparar dezenas de requests seguidos. */
   useEffect(() => {
-    if (status !== 'authenticated' || !session?.user?.supabaseId) return undefined;
+    if (status !== 'authenticated' || !session?.user?.supabaseId || !mounted) return undefined;
     const sb = getSupabase();
     if (!sb) return undefined;
     const uid = session.user.supabaseId;
@@ -379,16 +428,12 @@ export function SimuladorFlow() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bank_transactions', filter: `user_id=eq.${uid}` },
-        () => {
-          fetchHints();
-        }
+        () => scheduleHintsRefresh(4000)
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'transacoes', filter: `user_id=eq.${uid}` },
-        () => {
-          fetchHints();
-        }
+        () => scheduleHintsRefresh(4000)
       )
       .subscribe();
     return () => {
@@ -398,14 +443,16 @@ export function SimuladorFlow() {
         /* ignore */
       }
     };
-  }, [status, session?.user?.supabaseId, fetchHints]);
+  }, [status, session?.user?.supabaseId, mounted, scheduleHintsRefresh]);
 
   useEffect(() => {
     if (state.step !== 4) setFocusedDay(null);
   }, [state.step]);
 
+  /** Preenche burn rate automático só na primeira carga de hints (evita “pulos” a cada 15s). */
   useEffect(() => {
-    if (!hints) return;
+    if (!hints || hintsBootstrapRef.current) return;
+    hintsBootstrapRef.current = true;
     setState((s) => {
       if (!s.dailyBurnAuto) return s;
       const suggested =
@@ -418,21 +465,20 @@ export function SimuladorFlow() {
       if (Math.abs((Number(s.dailyBurn) || 0) - suggested) < 0.01) return s;
       return { ...s, dailyBurn: suggested };
     });
-  }, [hints]);
+    if (!saldoDeHoje.wasTouched()) {
+      const next = saldoDeHoje.saldoHoje;
+      if (typeof next === 'number' && Number.isFinite(next)) {
+        setState((s) => {
+          if (Math.abs((Number(s.startingBalance) || 0) - next) < 0.01) return s;
+          return { ...s, startingBalance: next };
+        });
+      }
+    }
+  }, [hints, saldoDeHoje]);
 
   const set = useCallback((patch) => {
     setState((s) => ({ ...s, ...patch }));
   }, []);
-
-  useEffect(() => {
-    if (!hints || saldoDeHoje.wasTouched()) return;
-    const next = saldoDeHoje.saldoHoje;
-    if (!(typeof next === 'number' && Number.isFinite(next))) return;
-    setState((s) => {
-      if (Math.abs((Number(s.startingBalance) || 0) - next) < 0.01) return s;
-      return { ...s, startingBalance: next };
-    });
-  }, [hints, saldoDeHoje.saldoHoje]);
 
   const applyOpenFinanceHints = useCallback(() => {
     if (!hints) return;
@@ -747,31 +793,45 @@ export function SimuladorFlow() {
     if (state.step > 1) set({ step: state.step - 1 });
   };
 
+  useEffect(() => {
+    if (!mounted || !stateHydratedRef.current) return;
+    try {
+      window.localStorage.setItem(`${STORAGE_KEY}-step`, String(state.step));
+    } catch {
+      /* ignore */
+    }
+  }, [state.step, mounted]);
+
   const fieldClass =
     'w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50';
 
   const labelClass = 'text-xs font-medium text-zinc-400 mb-1 block';
 
-  const dayRow = (
-    <>
+  const creditLimitsBlock =
+    state.step >= 4 ? (
       <SimuladorCreditLimitsPanel
         creditCards={hints?.creditCards ?? []}
-        loading={hintsLoading}
+        loading={hintsLoading && !hintsHydratedRef.current}
         fieldClass={fieldClass}
         labelClass={labelClass}
-        onLimitsChange={setLimitsPreview}
+        onLimitsChange={handleLimitsPreview}
         onSaved={() => {
           setLimitsPreview(null);
-          void fetchHints();
+          void fetchHints({ silent: true });
         }}
       />
+    ) : null;
+
+  const dayRow = (
+    <>
+      {creditLimitsBlock}
       <div className="grid grid-cols-2 gap-3">
         <SaldoHojeField
           labelClass={labelClass}
           fieldClass={fieldClass}
           saldoHoje={saldoDeHoje.saldoHoje}
           value={state.startingBalance}
-          loading={hintsLoading}
+          loading={hintsLoading && !hintsHydratedRef.current}
           contasCount={saldoDeHoje.contas.length}
           usingMock={Boolean(hints?.usingMockContas)}
           onChange={(n) => {
@@ -919,6 +979,15 @@ export function SimuladorFlow() {
     </>
   );
 
+  if (!mounted) {
+    return (
+      <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center gap-3 px-6">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-400" aria-hidden />
+        <p className="text-sm text-zinc-500">A carregar simulador…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100 pb-28 pt-safe">
       <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-zinc-800/80 bg-zinc-950/90 px-3 py-3 backdrop-blur-md">
@@ -971,7 +1040,7 @@ export function SimuladorFlow() {
           </div>
           {(hints?.hasOpenFinance || (hints?.contas?.length ?? 0) > 0) && (
             <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-2">
-              {hints?.contas?.length > 0 ? (
+              {state.step <= 2 && hints?.contas?.length > 0 ? (
                 <ul className="text-[10px] text-zinc-500 space-y-1">
                   {hints.contas.map((c) => (
                     <li key={c.id} className="flex justify-between gap-2">
@@ -985,7 +1054,7 @@ export function SimuladorFlow() {
                   ))}
                 </ul>
               ) : null}
-              <p className="text-[11px] text-zinc-500 leading-snug">
+              <p className={cn('text-[11px] text-zinc-500 leading-snug', state.step >= 3 && 'line-clamp-2')}>
                 <span className="text-[#39FF14] font-semibold">Poder de compra sugerido</span>
                 {' '}
                 (Σ débito + Σ ainda disponível no cartão — não o limite total
@@ -995,7 +1064,7 @@ export function SimuladorFlow() {
                     hints.saldoHoje ?? hints.accountBalanceTotal ?? 0
                   )}
                 </strong>
-                {hints?.startingBalanceBreakdown ? (
+                {state.step <= 2 && hints?.startingBalanceBreakdown ? (
                   <>
                     {' '}
                     <span className="text-zinc-600">
@@ -1011,26 +1080,6 @@ export function SimuladorFlow() {
                         hints.startingBalanceBreakdown.creditAvailableSum || 0
                       )}
                     </span>
-                    {(hints.startingBalanceBreakdown.conservativeNet || 0) !==
-                    (hints.startingBalanceBreakdown.purchasingPower || 0) ? (
-                      <span className="text-zinc-600">
-                        {' '}
-                        · Só à vista − dívida no cartão (referência):{' '}
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                          hints.startingBalanceBreakdown.conservativeNet || 0
-                        )}
-                      </span>
-                    ) : null}
-                    {(hints.startingBalanceBreakdown.naiveSumAllAccounts || 0) !==
-                    (hints.accountBalanceTotal || 0) ? (
-                      <span className="text-zinc-600">
-                        {' '}
-                        · Soma bruta Pluggy (referência):{' '}
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                          hints.startingBalanceBreakdown.naiveSumAllAccounts || 0
-                        )}
-                      </span>
-                    ) : null}
                   </>
                 ) : null}
                 . Burn rate real (28d):{' '}
@@ -1065,7 +1114,7 @@ export function SimuladorFlow() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => fetchHints()}
+                  onClick={() => void fetchHints({ silent: false })}
                   disabled={hintsLoading}
                   className="inline-flex items-center justify-center gap-1 py-2.5 px-3 rounded-xl text-xs font-medium border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
                 >

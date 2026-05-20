@@ -14,6 +14,7 @@ import {
  *   contas?: import('../lib/finance/contaFinanceira').ContaFinanceira[] | null,
  *   saldoHojeFromApi?: number | null,
  *   enabled?: boolean,
+ *   /** @deprecated Preferir refresh explícito no Simulador (evita fetch duplicado em focus/visibility). */
  *   onRefresh?: () => void | Promise<void>,
  * }} options
  */
@@ -21,7 +22,7 @@ export function useSaldoDeHoje({
   contas: contasProp,
   saldoHojeFromApi,
   enabled = true,
-  onRefresh,
+  onRefresh = null,
 } = {}) {
   const [tick, setTick] = useState(0);
   const touchedRef = useRef(false);

@@ -51,7 +51,9 @@ export function SimuladorCreditLimitsPanel({
   }, [creditCards, draft]);
 
   useEffect(() => {
-    onLimitsChange?.(preview);
+    if (!onLimitsChange) return undefined;
+    const t = window.setTimeout(() => onLimitsChange(preview), 280);
+    return () => window.clearTimeout(t);
   }, [preview, onLimitsChange]);
 
   const save = useCallback(async () => {
