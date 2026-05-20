@@ -1,15 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { Flame, Sparkles, X } from 'lucide-react';
-import {
-  CHARACTER_BUBBLE_DELAY_MS,
-  CHARACTER_CLICK_DEBOUNCE_MS,
-  mascotAnimationClass,
-} from '../../lib/gamification/characterAnimation';
-import { MascotImage } from './MascotImage';
-import { pickRandomSpeech } from '../../lib/gamification/characterSpeeches.js';
-import { cn } from '../../lib/utils';
 
 export type WelcomeBackModalProps = {
   open: boolean;
@@ -28,47 +19,7 @@ export function WelcomeBackModal({
   onDismiss,
   onCta,
 }: WelcomeBackModalProps) {
-  const [isBouncing, setIsBouncing] = useState(false);
-  const [showBubble, setShowBubble] = useState(false);
-  const [greeting, setGreeting] = useState('');
-  const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastClickRef = useRef(0);
-
-  const runEntrance = useCallback((line?: string) => {
-    if (line) setGreeting(line);
-    setIsBouncing(true);
-    setShowBubble(false);
-    if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
-    bubbleTimerRef.current = setTimeout(() => {
-      setIsBouncing(false);
-      setShowBubble(true);
-      bubbleTimerRef.current = null;
-    }, CHARACTER_BUBBLE_DELAY_MS);
-  }, []);
-
-  useEffect(() => {
-    if (!open) {
-      setShowBubble(false);
-      setIsBouncing(false);
-      return undefined;
-    }
-    const line = pickRandomSpeech('META_BATIDA');
-    runEntrance(line);
-    return () => {
-      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
-    };
-  }, [open, runEntrance]);
-
-  const handleMascotClick = () => {
-    const now = Date.now();
-    if (now - lastClickRef.current < CHARACTER_CLICK_DEBOUNCE_MS) return;
-    lastClickRef.current = now;
-    runEntrance(pickRandomSpeech('META_BATIDA'));
-  };
-
   if (!open) return null;
-
-  const mascotClass = mascotAnimationClass('float-idle', isBouncing);
 
   return (
     <div
@@ -87,27 +38,9 @@ export function WelcomeBackModal({
           <X className="h-5 w-5" />
         </button>
 
-        <button
-          type="button"
-          onClick={handleMascotClick}
-          className="mx-auto flex cursor-pointer flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full"
-          aria-label="Mascote FinMemory — toque para nova mensagem"
-        >
-          <div className="flex items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-orange-500/20 p-3 ring-2 ring-primary/30">
-            <div className={cn('container-personagem', mascotClass)}>
-              <MascotImage width={130} className="pointer-events-none w-full h-auto" />
-            </div>
-          </div>
-          {showBubble && greeting ? (
-            <p className="speech-bubble-appear mt-3 max-w-[260px] rounded-2xl border-[3px] border-[#EAE6DF] bg-white px-4 py-2.5 text-center text-sm font-semibold text-foreground shadow-sm dark:border-border dark:bg-card">
-              {greeting}
-            </p>
-          ) : null}
-        </button>
-
         <h2
           id="welcome-back-title"
-          className="mt-6 text-center text-2xl font-bold tracking-tight text-foreground"
+          className="text-center text-2xl font-bold tracking-tight text-foreground"
         >
           {displayName}, que bom que você voltou!
         </h2>

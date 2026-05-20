@@ -128,8 +128,7 @@ export function GuidedOnboarding({ userId, steps, mode = 'intro', onComplete }) 
         open={modalOpen}
         title={step.modalTitle}
         body={step.modalBody}
-        mascotLine={step.mascotLine}
-        showMascot={step.showMascot}
+        showMascot={false}
         coachMode={mode === 'coach'}
         stepIndex={stepIndex}
         stepCount={steps.length}
