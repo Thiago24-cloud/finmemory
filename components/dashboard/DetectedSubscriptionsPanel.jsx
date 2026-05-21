@@ -80,7 +80,11 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
         body: JSON.stringify({ dismiss: unique }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Falha ao ignorar');
+      if (!res.ok || !json.ok) {
+        const err = new Error(json.error || 'Falha ao ignorar assinaturas');
+        err.hint = res.status === 503 ? 'migration' : null;
+        throw err;
+      }
 
       setDetected((prev) => prev.filter((d) => !unique.includes(d.id)));
       setSelected((prev) => {
@@ -94,7 +98,15 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
         toast.success(n === 1 ? 'Removida da lista' : `${n} removidas da lista`);
       }
     } catch (e) {
-      toast.error(e?.message || 'Erro ao remover');
+      const msg = e?.message || 'Erro ao remover';
+      if (e?.hint === 'migration' || /tabela|migration|subscription_detection/i.test(msg)) {
+        toast.error(msg, {
+          description: 'Supabase → SQL Editor → scripts/sql/subscription-detection-dismissals-setup.sql',
+          duration: 12000,
+        });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setDismissing(false);
     }
@@ -245,11 +257,14 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => dismissOne(d.id, d.nome_amigavel)}
-                      className="shrink-0 flex w-11 items-center justify-center rounded-xl border border-[#1E2A3A] bg-card/80 text-muted-foreground transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissOne(d.id, d.nome_amigavel);
+                      }}
+                      className="shrink-0 flex w-12 min-w-[48px] items-center justify-center rounded-xl border-2 border-red-500/35 bg-red-500/15 text-red-400 transition hover:bg-red-500/25 hover:border-red-400/55 active:scale-95"
                       aria-label={`Remover ${d.nome_amigavel} da lista`}
                     >
-                      <Trash2 className="h-4 w-4" strokeWidth={2} />
+                      <Trash2 className="h-5 w-5" strokeWidth={2.2} />
                     </button>
                   </li>
                 );

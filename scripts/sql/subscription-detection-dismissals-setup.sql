@@ -1,4 +1,7 @@
--- Assinaturas detectadas (Pluggy) que o utilizador ignorou — não voltam a aparecer na lista.
+-- =============================================================================
+-- Assinaturas detectadas — tabela para "Remover da lista" (ignorar)
+-- Cole no Supabase SQL Editor se o botão de lixeira falhar.
+-- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.subscription_detection_dismissals (
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -9,9 +12,6 @@ CREATE TABLE IF NOT EXISTS public.subscription_detection_dismissals (
 
 CREATE INDEX IF NOT EXISTS subscription_detection_dismissals_user_idx
   ON public.subscription_detection_dismissals (user_id, created_at DESC);
-
-COMMENT ON TABLE public.subscription_detection_dismissals IS
-  'IDs estáveis (sub_*) de detecções ignoradas pelo utilizador em Assinaturas detectadas.';
 
 ALTER TABLE public.subscription_detection_dismissals ENABLE ROW LEVEL SECURITY;
 

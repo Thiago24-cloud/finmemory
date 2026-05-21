@@ -115,8 +115,9 @@ export default async function handler(req, res) {
         if (e?.code === 'MISSING_TABLE') {
           return res.status(503).json({ ok: false, error: e.message });
         }
-        console.error('[detected-subscriptions] dismiss:', e?.message || e);
-        return res.status(500).json({ ok: false, error: 'Falha ao ignorar assinaturas' });
+        console.error('[detected-subscriptions] dismiss:', e?.message || e, e?.code);
+        const msg = String(e?.message || 'Falha ao ignorar assinaturas').slice(0, 500);
+        return res.status(500).json({ ok: false, error: msg, code: e?.code || null });
       }
     }
 
