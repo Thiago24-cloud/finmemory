@@ -102,16 +102,36 @@ if ($envMap.Count -eq 0) {
     exit 1
 }
 
-# Escapar vírgulas nos valores para gcloud no Windows (ex.: lista de e-mails admin)
-$pairs = @()
-foreach ($entry in $envMap.GetEnumerator()) {
-    $val = [string]$entry.Value -replace ',', '^,'
-    $pairs += "$($entry.Key)=$val"
+# Mesclar com env já no serviço e gravar YAML (suporta vírgulas e @ nos valores)
+$merged = @{}
+try {
+    $desc = gcloud run services describe finmemory --region southamerica-east1 --project $FINMEMORY_GCP_PROJECT --format=json 2>$null | ConvertFrom-Json
+    $containerEnv = $desc.spec.template.spec.containers[0].env
+    if ($containerEnv) {
+        foreach ($item in $containerEnv) {
+            if ($item.name -and $null -ne $item.value) {
+                $merged[$item.name] = [string]$item.value
+            }
+        }
+    }
+} catch {
+    Write-Host "Aviso: nao foi possivel ler env atual do Cloud Run; apenas chaves do .env.local serao enviadas." -ForegroundColor Yellow
 }
-$envVarsStr = $pairs -join ","
+foreach ($entry in $envMap.GetEnumerator()) {
+    $merged[$entry.Key] = [string]$entry.Value
+}
+
+$envFile = Join-Path $env:TEMP "finmemory-cloud-run-env.yaml"
+$lines = @()
+foreach ($entry in $merged.GetEnumerator() | Sort-Object Name) {
+    $val = [string]$entry.Value
+    $escaped = $val -replace '\\', '\\\\' -replace '"', '\"'
+    $lines += "$($entry.Key): `"$escaped`""
+}
+Set-Content -Path $envFile -Value ($lines -join "`n") -Encoding UTF8
 
 Write-Host "Atualizando Cloud Run ($FINMEMORY_GCP_PROJECT) com variaveis de autenticacao e Supabase..." -ForegroundColor Cyan
-& gcloud run services update finmemory --region southamerica-east1 --project $FINMEMORY_GCP_PROJECT --update-env-vars $envVarsStr
+& gcloud run services update finmemory --region southamerica-east1 --project $FINMEMORY_GCP_PROJECT --set-env-vars-file $envFile
 if ($LASTEXITCODE -ne 0) { exit 1 }
 $url = $vars["NEXTAUTH_URL"]
 Write-Host "Cloud Run atualizado. Teste o login em: $url" -ForegroundColor Green
