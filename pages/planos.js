@@ -154,8 +154,8 @@ export default function PlanosPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Planos FinMemory</h1>
           <p className="mt-1 text-gray-600 text-sm max-w-2xl">
-            Compare o que inclui cada nível. Passe o rato pelos cartões para destacar. A assinatura abre no Stripe
-            Checkout (pagamento seguro).
+            Compare o que inclui cada nível. O pagamento abre em{' '}
+            <strong className="text-gray-800">finmemory.com.br/checkout</strong> (formulário Stripe embutido, sem sair do site).
           </p>
           {userReady ? (
             <p

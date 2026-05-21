@@ -6,19 +6,26 @@ import { checkoutPlanOrDefault, stripePriceIdsFromEnv } from '../../lib/stripePl
 import { stripeAppBaseUrl } from '../../lib/stripe/appBaseUrl';
 import { getStripeCheckoutDiagnostics } from '../../lib/stripe/checkoutDiagnostics';
 
-function parsePlanFromBody(req) {
-  if (typeof req.body === 'object' && req.body !== null && req.body.plan != null) {
-    return req.body.plan;
-  }
+function parseJsonBody(req) {
+  if (typeof req.body === 'object' && req.body !== null) return req.body;
   if (typeof req.body === 'string' && req.body.trim()) {
     try {
-      const parsed = JSON.parse(req.body);
-      return parsed?.plan;
+      return JSON.parse(req.body);
     } catch {
-      return undefined;
+      return {};
     }
   }
-  return undefined;
+  return {};
+}
+
+function parsePlanFromBody(req) {
+  const body = parseJsonBody(req);
+  return body?.plan;
+}
+
+function parseUiModeFromBody(req) {
+  const body = parseJsonBody(req);
+  return body?.uiMode === 'embedded' ? 'embedded' : 'hosted';
 }
 
 /**
@@ -39,6 +46,7 @@ export default async function handler(req, res) {
   }
 
   const plan = checkoutPlanOrDefault(parsePlanFromBody(req));
+  const uiMode = parseUiModeFromBody(req);
   const prices = stripePriceIdsFromEnv();
   const priceId = prices[plan];
   if (!priceId) {
@@ -116,17 +124,16 @@ export default async function handler(req, res) {
       await supabase.from('users').update({ stripe_customer_id: customerId }).eq('id', userId);
     }
 
+    const returnUrl = `${origin}/settings?stripe=success&plan=${encodeURIComponent(plan)}&session_id={CHECKOUT_SESSION_ID}`;
     const successUrl = `${origin}/settings?stripe=success&plan=${encodeURIComponent(plan)}`;
     const cancelUrl = `${origin}/planos?stripe=cancel`;
 
-    const checkoutSession = await stripe.checkout.sessions.create({
+    const sessionBase = {
       mode: 'subscription',
       customer: customerId,
       client_reference_id: userId,
       line_items: [{ price: priceId, quantity: 1 }],
       locale: 'pt-BR',
-      success_url: successUrl,
-      cancel_url: cancelUrl,
       metadata: { user_id: userId, plan },
       subscription_data: {
         metadata: { user_id: userId, plan },
@@ -134,6 +141,38 @@ export default async function handler(req, res) {
       payment_method_types: ['card'],
       billing_address_collection: 'auto',
       allow_promotion_codes: true,
+      /** Evita botão Link a piscar/relayout no Checkout hospedado. */
+      wallet_options: {
+        link: { display: 'never' },
+      },
+    };
+
+    if (uiMode === 'embedded') {
+      const checkoutSession = await stripe.checkout.sessions.create({
+        ...sessionBase,
+        ui_mode: 'embedded',
+        redirect_on_completion: 'if_required',
+        return_url: returnUrl,
+      });
+
+      if (!checkoutSession.client_secret) {
+        return res.status(500).json({
+          error: 'Stripe não devolveu sessão de pagamento. Tente novamente.',
+          code: 'no_client_secret',
+        });
+      }
+
+      return res.status(200).json({
+        clientSecret: checkoutSession.client_secret,
+        sessionId: checkoutSession.id,
+        uiMode: 'embedded',
+      });
+    }
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+      ...sessionBase,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
 
     if (!checkoutSession.url) {
@@ -143,7 +182,11 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({ url: checkoutSession.url, sessionId: checkoutSession.id });
+    return res.status(200).json({
+      url: checkoutSession.url,
+      sessionId: checkoutSession.id,
+      uiMode: 'hosted',
+    });
   } catch (e) {
     console.error('[stripe/create-checkout-session]', e?.message || e);
     const msg = e?.message || 'Erro ao criar checkout.';

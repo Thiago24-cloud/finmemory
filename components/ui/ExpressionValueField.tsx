@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useEffect, useId, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useId, useCallback, useRef, memo, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { commitMoneyExpressionToDisplayString, commitIntegerString } from '../../lib/moneyExpressionCommit';
 
-function KeypadButton({
+const KeypadButton = memo(function KeypadButton({
   children,
   onClick,
   className,
-  ...rest
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -19,17 +18,17 @@ function KeypadButton({
   return (
     <button
       type="button"
+      onPointerDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={cn(
-        'py-3 rounded-xl text-sm font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 active:scale-[0.98] dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90 dark:shadow-none',
+        'py-3 rounded-xl text-sm font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 active:bg-muted dark:active:bg-secondary/80 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90 dark:shadow-none touch-manipulation',
         className
       )}
-      {...rest}
     >
       {children}
     </button>
   );
-}
+});
 
 export type ExpressionValueFieldMode = 'money' | 'integer';
 
@@ -78,10 +77,16 @@ export function ExpressionValueField({
     setMounted(true);
   }, []);
 
+  const openRef = useRef(false);
+  openRef.current = open;
+
+  /** Só inicializa draft ao abrir — evita piscar/reset ao tocar teclas (foco volta ao input). */
   const openPad = useCallback(() => {
     if (disabled) return;
-    setDraft(String(value ?? ''));
-    setApplyError('');
+    if (!openRef.current) {
+      setDraft(String(value ?? ''));
+      setApplyError('');
+    }
     setOpen(true);
   }, [disabled, value]);
 
@@ -183,6 +188,7 @@ export function ExpressionValueField({
           role="dialog"
           aria-modal="true"
           aria-labelledby={`${fieldId}-title`}
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-2 shrink-0">
@@ -248,7 +254,7 @@ export function ExpressionValueField({
         onClick={openPad}
         onFocus={(e) => {
           e.preventDefault();
-          openPad();
+          if (!openRef.current) openPad();
         }}
         className={cn(
           'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2ECC49] focus:border-transparent cursor-pointer bg-white',

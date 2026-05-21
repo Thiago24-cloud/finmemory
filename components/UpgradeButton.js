@@ -1,18 +1,8 @@
-import { useCallback, useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
-
-let stripePromise;
-function getStripe() {
-  const publishableKey =
-    typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY : '';
-  if (!publishableKey) return null;
-  if (!stripePromise) stripePromise = loadStripe(publishableKey);
-  return stripePromise;
-}
+import { useCallback, useRef, useState } from 'react';
 
 /**
  * Inicia Checkout Stripe (FinMemory planos pagos). O utilizador tem de estar logado; o servidor usa a sessão NextAuth.
- * Props opcionais userId / userEmail reservadas para analytics futuros (não são enviadas ao servidor aqui).
+ * Fluxo: /checkout?plan=… (Stripe embutido no site — menos piscar que redirect para checkout.stripe.com).
  */
 export default function UpgradeButton({
   className = '',
@@ -24,49 +14,26 @@ export default function UpgradeButton({
 }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+  const navigatingRef = useRef(false);
 
   const onClick = useCallback(async () => {
+    if (navigatingRef.current) return;
     setErr('');
     setLoading(true);
     try {
       const callbackPath =
         typeof window !== 'undefined'
-          ? `${window.location.pathname}${window.location.search || ''}`
-          : '/planos';
+          ? `/checkout?plan=${encodeURIComponent(plan)}`
+          : '/checkout';
 
-      const r = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ plan }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        if (r.status === 401) {
-          if (typeof window !== 'undefined') {
-            window.location.href = `/login?callbackUrl=${encodeURIComponent(callbackPath)}`;
-            return;
-          }
-        }
-        const detail = Array.isArray(data.issues) && data.issues[0] ? ` (${data.issues[0]})` : '';
-        throw new Error((data.error || 'Não foi possível iniciar o pagamento.') + detail);
-      }
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      const stripe = await getStripe();
-      if (!stripe || !data.sessionId) {
-        throw new Error(
-          'Não foi possível abrir o pagamento. Atualize a página e tente de novo; se persistir, contacte o suporte.'
-        );
-      }
-      const { error } = await stripe.redirectToCheckout({ sessionId: data.sessionId });
-      if (error) throw error;
+      if (typeof window === 'undefined') return;
+
+      navigatingRef.current = true;
+      window.location.replace(callbackPath);
     } catch (e) {
       console.error('[stripe/upgrade-button]', e);
+      navigatingRef.current = false;
       setErr(e?.message || 'Erro ao abrir pagamento');
-    } finally {
       setLoading(false);
     }
   }, [plan]);

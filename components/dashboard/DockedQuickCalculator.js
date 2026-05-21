@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calculator, ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -12,10 +13,18 @@ import { CALC_DRAG_MIME } from '../../lib/calcDragMime';
 const MOBILE_DOCK_BOTTOM = 'calc(4.5rem + env(safe-area-inset-bottom, 0px))';
 
 const CALC_KEY =
-  'py-2.5 rounded-xl text-sm font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 active:scale-[0.98] dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90 dark:shadow-none';
+  'py-2.5 rounded-xl text-sm font-semibold border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 active:bg-muted/90 dark:active:bg-secondary/70 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/90 dark:shadow-none touch-manipulation select-none';
+
+const CalcKey = memo(function CalcKey({ label, onPress }) {
+  return (
+    <button type="button" onPointerDown={(e) => e.preventDefault()} onClick={onPress} className={CALC_KEY}>
+      {label}
+    </button>
+  );
+});
 
 const CALC_ACTION =
-  'flex-1 py-2 rounded-xl border border-border text-xs font-semibold bg-secondary/40 text-secondary-foreground hover:bg-secondary/60 active:scale-[0.99] dark:bg-muted/40 dark:text-foreground dark:hover:bg-muted/60';
+  'flex-1 py-2 rounded-xl border border-border text-xs font-semibold bg-secondary/40 text-secondary-foreground hover:bg-secondary/60 active:bg-secondary/70 dark:bg-muted/40 dark:text-foreground dark:hover:bg-muted/60 touch-manipulation';
 
 /**
  * Calculadora rápida acoplada: barra fina no mobile (acima do BottomNav) e painel fixo à direita no desktop.
@@ -65,34 +74,33 @@ export function DockedQuickCalculator() {
     }
   };
 
+  const [resultPulse, setResultPulse] = useState(false);
+  useEffect(() => {
+    if (pulseKey <= 0) return;
+    setResultPulse(true);
+    const t = window.setTimeout(() => setResultPulse(false), 450);
+    return () => window.clearTimeout(t);
+  }, [pulseKey]);
+
   const result = safeEvalExpression(expr);
   const resultLabel =
     result != null
       ? new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 }).format(result)
       : '—';
 
-  const keysRow = (keys) =>
-    keys.map((k) => (
-      <button
-        key={k}
-        type="button"
-        onClick={() => appendChar(k)}
-        className={CALC_KEY}
-      >
-        {k}
-      </button>
-    ));
+  const keysRow = (keys) => keys.map((k) => <CalcKey key={k} label={k} onPress={() => appendChar(k)} />);
 
   const keypad = (
     <div className="space-y-2">
       <div className="rounded-2xl bg-[#0b1220] text-white p-3 min-h-[3.25rem] flex flex-col justify-center">
         <p className="text-[10px] text-white/55 m-0 mb-0.5">Expressão</p>
-        <p className="text-xs font-mono break-all m-0 leading-snug max-h-[4.5rem] overflow-y-auto">{expr || '0'}</p>
+        <p className="text-xs font-mono break-all m-0 leading-snug max-h-[4.5rem] overflow-y-auto tabular-nums">
+          {expr || '0'}
+        </p>
         <p
-          key={pulseKey}
           className={cn(
-            'text-lg font-bold text-primary m-0 mt-1.5 tabular-nums',
-            pulseKey > 0 && 'finmemory-calc-pulse'
+            'text-lg font-bold text-primary m-0 mt-1.5 tabular-nums min-h-[1.35rem]',
+            resultPulse && 'finmemory-calc-pulse'
           )}
         >
           {resultLabel}
@@ -103,9 +111,7 @@ export function DockedQuickCalculator() {
       <div className="grid grid-cols-4 gap-1.5">{keysRow(['1', '2', '3', '-'])}</div>
       <div className="grid grid-cols-4 gap-1.5">
         {keysRow(['0', '.', '(', ')'])}
-        <button type="button" onClick={() => appendChar('+')} className={CALC_KEY}>
-          +
-        </button>
+        <CalcKey label="+" onPress={() => appendChar('+')} />
       </div>
       <div className="flex gap-2">
         <button type="button" onClick={backspace} className={CALC_ACTION}>
