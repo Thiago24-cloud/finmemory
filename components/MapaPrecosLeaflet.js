@@ -14,7 +14,19 @@ import { toast } from 'sonner';
 import { openGoogleMapsDirectionsPreferCurrentLocation, openWazeNavigation } from '../lib/mapDirections';
 import { getMapThemeById, getCategoryColor, getStorePinMainColor, MAP_THEMES } from '../lib/colors';
 import { trackBackendEvent, trackEvent } from '../lib/analytics';
-import { SAO_PAULO_STATE_CENTER, SAO_PAULO_STATE_ZOOM } from '../lib/saoPauloStateMap';
+import {
+  SAO_PAULO_CITY_CENTER,
+  SAO_PAULO_STATE_MAX_BOUNDS,
+  MAP_DEFAULT_ZOOM,
+  MAP_MIN_ZOOM,
+  MAP_MAX_ZOOM,
+  MAP_MAX_BOUNDS_VISCOSITY,
+} from '../lib/saoPauloStateMap';
+import {
+  getSupermercadoData,
+  fetchStoreOffersFromApi,
+  clearStoreOffersCache,
+} from '../lib/mapStoreOffersCache';
 import { getSupabase } from '../lib/supabase';
 import { parsePriceToNumber } from '../lib/parseMapPrice';
 import { getMapOfferSeenPresentation } from '../lib/mapOfferSeenLabel';
@@ -39,9 +51,9 @@ import {
 } from '../lib/mapPinVisual';
 import Supercluster from 'supercluster';
 
-/** Vista inicial: Estado de São Paulo (zoom out); o utilizador aproxima para bairro/cidade. */
-const DEFAULT_MAP_CENTER = Object.freeze([...SAO_PAULO_STATE_CENTER]);
-const DEFAULT_MAP_ZOOM = SAO_PAULO_STATE_ZOOM;
+/** Vista inicial: capital paulista; pan/zoom limitados ao estado (lib/saoPauloStateMap). */
+const DEFAULT_MAP_CENTER = Object.freeze([...SAO_PAULO_CITY_CENTER]);
+const DEFAULT_MAP_ZOOM = MAP_DEFAULT_ZOOM;
 
 /** Com zoom baixo, esconder nomes ao lado dos pins (menos poluição, como no Google Maps). Busca ativa mostra nomes. */
 const MAP_LABEL_MIN_ZOOM = 15;
@@ -2957,7 +2969,7 @@ function PriceClusterMarker({ count, lat, lng, minPrice, clusterId, clusterIndex
               return;
             }
           }
-          map.flyTo([lat, lng], Math.min(map.getZoom() + 2, 18), { duration: 0.38 });
+          map.flyTo([lat, lng], Math.min(map.getZoom() + 2, MAP_MAX_ZOOM), { duration: 0.38 });
         } catch (_) {}
       },
     }),
@@ -3202,6 +3214,8 @@ export default function MapaPrecosLeaflet({
   const [selectedItems, setSelectedItems] = useState([]);
   const [shopLoading, setShopLoading] = useState(false);
   const [shopErr, setShopErr] = useState('');
+  /** Cache expirado + offline: aviso discreto sem bloquear a lista. */
+  const [shopCacheNotice, setShopCacheNotice] = useState('');
   const [budgetCap, setBudgetCap] = useState(50);
   const [savingList, setSavingList] = useState(false);
   const [saveBanner, setSaveBanner] = useState('');
@@ -3644,21 +3658,26 @@ export default function MapaPrecosLeaflet({
     setEncarteSortBy('validade');
     setShopLoading(true);
     setShopErr('');
+    setShopCacheNotice('');
     setShopOffers([]);
     setShopPromotions([]);
     setSelectedItems([]);
     setSelectedProducts((prev) => prev.filter((x) => !String(x.offerId || x.id).startsWith('encarte-')));
-    fetch(`/api/map/store-offers?store_id=${encodeURIComponent(store.id)}`)
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Erro ao carregar ofertas');
-        setShopOffers(Array.isArray(data.offers) ? data.offers : []);
-        setShopPromotions(Array.isArray(data.promotions) ? data.promotions : []);
-        if (data.store && typeof data.store === 'object') {
+
+    const storeId = store.id;
+    getSupermercadoData({
+      storeId,
+      fetchFresh: () => fetchStoreOffersFromApi(storeId),
+    })
+      .then((result) => {
+        setShopOffers(Array.isArray(result.data.offers) ? result.data.offers : []);
+        setShopPromotions(Array.isArray(result.data.promotions) ? result.data.promotions : []);
+        if (result.data.store && typeof result.data.store === 'object') {
           setShopStore((prev) =>
-            prev && prev.id === store.id ? { ...prev, ...data.store } : prev
+            prev && prev.id === store.id ? { ...prev, ...result.data.store } : prev
           );
         }
+        setShopCacheNotice(result.notice || '');
       })
       .catch((e) => setShopErr(e.message || 'Erro ao carregar ofertas'))
       .finally(() => setShopLoading(false));
@@ -3708,6 +3727,7 @@ export default function MapaPrecosLeaflet({
             prev.filter((r) => String(r.id) !== oid && String(r.id) !== oid.replace(/^promo-/i, ''))
           );
         }
+        await clearStoreOffersCache(shopStore.id);
       } catch (e) {
         toast.error(e?.message || 'Erro ao confirmar');
       } finally {
@@ -4568,6 +4588,10 @@ export default function MapaPrecosLeaflet({
       <MapContainer
         center={DEFAULT_MAP_CENTER}
         zoom={DEFAULT_MAP_ZOOM}
+        minZoom={MAP_MIN_ZOOM}
+        maxZoom={MAP_MAX_ZOOM}
+        maxBounds={SAO_PAULO_STATE_MAX_BOUNDS}
+        maxBoundsViscosity={MAP_MAX_BOUNDS_VISCOSITY}
         zoomControl={false}
         style={mapContainerStyle}
         className={`z-0 finmemory-map-tiles finmemory-map-theme-${theme.id}`}
@@ -5232,6 +5256,18 @@ export default function MapaPrecosLeaflet({
               >
                 <span>Precos podem variar na loja fisica. Compare antes de fechar compra.</span>
               </div>
+              {shopCacheNotice ? (
+                <p
+                  className={`mb-2 rounded-lg px-2.5 py-2 text-[11px] ${
+                    wazeUi
+                      ? 'border border-amber-500/30 bg-amber-500/10 text-amber-200'
+                      : 'border border-amber-300 bg-amber-50 text-amber-900'
+                  }`}
+                  role="status"
+                >
+                  {shopCacheNotice}
+                </p>
+              ) : null}
               {shopLoading && (
                 <div className="flex justify-center py-12">
                   <Loader2
@@ -5409,6 +5445,7 @@ export default function MapaPrecosLeaflet({
           promotions={shopPromotions}
           loading={shopLoading}
           error={shopErr}
+          cacheNotice={shopCacheNotice}
           onClose={() => setShopOpen(false)}
           onVisualMetrics={handleShopSheetVisualMetrics}
           canConfirmPrice={Boolean(session?.user?.email)}
@@ -5427,6 +5464,9 @@ export default function MapaPrecosLeaflet({
               setShopPromotions((prev) =>
                 prev.filter((r) => String(r.id) !== oid && String(r.id) !== oid.replace(/^promo-/i, ''))
               );
+            }
+            if (shopStore?.id) {
+              void clearStoreOffersCache(shopStore.id);
             }
           }}
         />

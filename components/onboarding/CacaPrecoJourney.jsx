@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { MascotImage } from '../gamification/MascotImage';
 import { useMapCart } from '../map/MapCartContext';
+import { getSupermercadoData, fetchStoreOffersFromApi } from '../../lib/mapStoreOffersCache';
 import { CacaPrecoSpeechBubble } from './CacaPrecoSpeechBubble';
 import { CacaPrecoWishBag } from './CacaPrecoWishBag';
 import { CacaPrecoProductPicker } from './CacaPrecoProductPicker';
@@ -181,11 +182,12 @@ export function CacaPrecoJourney({ userId, userName, enabled = true }) {
     if (!store?.storeId) return [];
     setProductsLoading(true);
     try {
-      const res = await fetch(
-        `/api/map/store-offers?store_id=${encodeURIComponent(store.storeId)}`
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return [];
+      const storeId = store.storeId;
+      const result = await getSupermercadoData({
+        storeId,
+        fetchFresh: () => fetchStoreOffersFromApi(storeId),
+      });
+      const data = result.data;
       const offers = (data.offers || []).map((o) => ({
         id: String(o.id),
         productName: o.product_name || o.name,
@@ -196,7 +198,7 @@ export function CacaPrecoJourney({ userId, userName, enabled = true }) {
         store_lat: store.lat,
         store_lng: store.lng,
       }));
-      const promos = (data.promotions || []).map((p, i) => ({
+      const promos = (data?.promotions || []).map((p, i) => ({
         id: `encarte-${p.id || i}`,
         productName: p.title || p.product_name || 'Promoção',
         name: p.title || p.product_name,

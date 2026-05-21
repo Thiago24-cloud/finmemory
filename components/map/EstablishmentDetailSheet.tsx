@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getMapProductImageSrcForImg } from '../../lib/mapImageProxy';
 import { displayPromoProductName } from '../../lib/mapOfferDisplay';
 import FilterChips from './FilterChips';
+import { clearStoreOffersCache } from '../../lib/mapStoreOffersCache';
 
 export type EstablishmentSheetOffer = {
   id: string | number;
@@ -259,6 +260,8 @@ export type EstablishmentDetailSheetProps = {
   promotions: EstablishmentSheetPromotion[];
   loading: boolean;
   error?: string;
+  /** Cache expirado exibido offline (contingência). */
+  cacheNotice?: string;
   onClose: () => void;
   onVisualMetrics?: (m: {
     bottomInsetPx: number;
@@ -282,6 +285,7 @@ export default function EstablishmentDetailSheet({
   promotions,
   loading,
   error,
+  cacheNotice,
   onClose,
   onVisualMetrics,
   canConfirmPrice,
@@ -444,6 +448,7 @@ export default function EstablishmentDetailSheet({
       if (retired) {
         setRetiredConfirmIds((prev) => new Set(prev).add(p.confirmId));
       }
+      await clearStoreOffersCache(store.id);
       setConfirmed((prev) => new Set(prev).add(p.key));
       if (appUserId) setConfirmLock(appUserId, p.confirmId);
       if (data.awarded && data.xp_awarded) {
@@ -598,6 +603,14 @@ export default function EstablishmentDetailSheet({
             </div>
 
             <div className="pt-1">
+              {cacheNotice ? (
+                <p
+                  className="mx-1 mb-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-2 text-center text-[11px] text-amber-200"
+                  role="status"
+                >
+                  {cacheNotice}
+                </p>
+              ) : null}
               {loading ? (
                 <div className="flex justify-center py-10">
                   <Loader2 className="h-8 w-8 animate-spin text-orange-400" />

@@ -26,6 +26,7 @@ import {
 } from '../../../lib/promotionValidity';
 import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
 import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
+import { computeStoreOffersCacheExpiresAt } from '../../../lib/mapStoreOffersCacheExpires';
 
 /**
  * GET /api/map/store-offers?store_id=UUID
@@ -470,10 +471,18 @@ export default async function handler(req, res) {
     console.log('[store-offers] promotions count:', tablePromotions.length);
 
     sanitizeMapPointsPromoImagesHttpsOnly(offers);
+
+    const cacheExpiresAt = computeStoreOffersCacheExpiresAt({
+      store,
+      offers,
+      promotions: tablePromotions,
+    });
+
     return res.status(200).json({
       store,
       offers,
       promotions: tablePromotions,
+      cacheExpiresAt,
     });
   } catch (e) {
     console.error('GET /api/map/store-offers:', e);

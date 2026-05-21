@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Supercluster from 'supercluster';
 import { getSupabase } from '../lib/supabase';
+import {
+  SAO_PAULO_CITY_CENTER,
+  SAO_PAULO_STATE_BOUNDS,
+  MAP_DEFAULT_ZOOM,
+  MAP_MIN_ZOOM,
+  MAP_MAX_ZOOM,
+} from '../lib/saoPauloStateMap';
 
 // Cores da marca FinMemory (logo: verde #2ECC49, preto, branco)
 const BRAND = {
@@ -315,9 +322,9 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
   const mapPointsRef = useRef(null);
   const mapQuestionsRef = useRef([]);
   const openQuestionPopupRef = useRef(null);
-  const [lng] = useState(-46.6333);
-  const [lat] = useState(-23.5505);
-  const [zoom] = useState(12);
+  const [lng] = useState(SAO_PAULO_CITY_CENTER[1]);
+  const [lat] = useState(SAO_PAULO_CITY_CENTER[0]);
+  const [zoom] = useState(MAP_DEFAULT_ZOOM);
   const [mapStyle, setMapStyle] = useState(MAP_STYLES[0]);
   const [mapError, setMapError] = useState(null);
   const [mapRetry, setMapRetry] = useState(0);
@@ -348,7 +355,7 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
     if (!mapInstance || !index) return;
     const b = mapInstance.getBounds();
     const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
-    const zoom = Math.min(18, Math.max(0, Math.round(mapInstance.getZoom())));
+    const zoom = Math.min(MAP_MAX_ZOOM, Math.max(MAP_MIN_ZOOM, Math.round(mapInstance.getZoom())));
     const clusters = index.getClusters(bbox, zoom);
 
     markersRef.current.forEach((m) => m.remove());
@@ -361,7 +368,7 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
 
       if (isCluster) {
         const el = createClusterMarkerElement(count, () => {
-          mapInstance.flyTo({ center: [lng, lat], zoom: Math.min(zoom + 2, 18) });
+          mapInstance.flyTo({ center: [lng, lat], zoom: Math.min(zoom + 2, MAP_MAX_ZOOM) });
         });
         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([lng, lat])
@@ -524,7 +531,13 @@ export default function PriceMap({ mapboxToken: tokenProp, refreshQuestionsTrigg
         container: mapContainer.current,
         style: mapStyle.url,
         center: [lng, lat],
-        zoom: zoom
+        zoom,
+        minZoom: MAP_MIN_ZOOM,
+        maxZoom: MAP_MAX_ZOOM,
+        maxBounds: [
+          [SAO_PAULO_STATE_BOUNDS.minLng, SAO_PAULO_STATE_BOUNDS.minLat],
+          [SAO_PAULO_STATE_BOUNDS.maxLng, SAO_PAULO_STATE_BOUNDS.maxLat],
+        ],
       });
 
       map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
