@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [recoveryHint, setRecoveryHint] = useState(null); // { maskedEmail, found }
   const [infoMsg, setInfoMsg] = useState('');
 
-  const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/mapa';
+  const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/dashboard';
 
   /** Conta já validada: escolha de perfil primeiro, depois destino */
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function LoginPage() {
         /* segue para destino padrão */
       }
       if (cancelled) return;
-      const dest = callbackUrl.startsWith('/') ? callbackUrl : '/mapa';
+      const dest = callbackUrl.startsWith('/') ? callbackUrl : '/dashboard';
       router.replace(dest);
     })();
 
@@ -143,7 +143,7 @@ export default function LoginPage() {
       return;
     }
     const dest =
-      typeof loginRes.url === 'string' && loginRes.url.startsWith('/') ? loginRes.url : callbackUrl.startsWith('/') ? callbackUrl : '/mapa';
+      typeof loginRes.url === 'string' && loginRes.url.startsWith('/') ? loginRes.url : callbackUrl.startsWith('/') ? callbackUrl : '/dashboard';
     router.replace(dest);
   };
 
