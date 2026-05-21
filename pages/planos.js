@@ -1,13 +1,11 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowLeft, Check, Loader2, Lock, X } from 'lucide-react';
+import UpgradeBtn from '../components/UpgradeButton';
 import { PLAN_LABELS } from '../lib/planAccess';
 import { BRAND } from '../lib/brandTokens';
-
-const UpgradeBtn = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
 /** Base comum: hover “acende” azul em todos os planos (não só no Pro). */
 const cardBase =
@@ -60,6 +58,15 @@ function LiLocked({ children, onUnlock }) {
   );
 }
 
+function PlanCtaPlaceholder() {
+  return (
+    <div
+      className="mt-6 h-10 rounded-lg border border-gray-200 bg-gray-50"
+      aria-hidden
+    />
+  );
+}
+
 const UPSELL_COPY = {
   radar: {
     title: 'Ative o radar de ofertas',
@@ -79,18 +86,14 @@ const UPSELL_COPY = {
 };
 
 export default function PlanosPage() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [upsell, setUpsell] = useState(null);
-  /** Evita piscar botões quando `update()` refresca a sessão. */
-  const sessionEverOkRef = useRef(false);
-  const stripeSyncStartedRef = useRef(false);
 
   const closeUpsell = useCallback(() => setUpsell(null), []);
 
-  if (status === 'authenticated' && session?.user) {
-    sessionEverOkRef.current = true;
-  }
+  const sessionUser = session?.user;
+  const userReady = Boolean(sessionUser);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -99,27 +102,15 @@ export default function PlanosPage() {
     }
   }, [status, router]);
 
-  /** Sync Stripe em background — sem trocar a UI para “A carregar…” a cada refresh de sessão. */
+  /** Sync Stripe em background — sem `update()` (evita status `loading` e piscar botões). */
   useEffect(() => {
-    if (status !== 'authenticated' || stripeSyncStartedRef.current) return;
-    stripeSyncStartedRef.current = true;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/stripe/sync-plan-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (cancelled || !res.ok) return;
-        await update().catch(() => {});
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [status, update]);
+    if (status !== 'authenticated') return undefined;
+    fetch('/api/stripe/sync-plan-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(() => {});
+    return undefined;
+  }, [status]);
 
   useEffect(() => {
     if (!upsell) return;
@@ -128,9 +119,7 @@ export default function PlanosPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [upsell, closeUpsell]);
 
-  const userReady =
-    sessionEverOkRef.current || (status === 'authenticated' && Boolean(session?.user));
-  const showInitialLoader = status === 'loading' && !sessionEverOkRef.current;
+  const showInitialLoader = status === 'loading' && !sessionUser;
 
   if (showInitialLoader) {
     return (
@@ -162,7 +151,7 @@ export default function PlanosPage() {
               className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
               style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg, color: BRAND.primaryText }}
             >
-              Plano ativo: {PLAN_LABELS[String(session?.user?.plano || 'free').toLowerCase()] || 'Grátis'}
+              Plano ativo: {PLAN_LABELS[String(sessionUser?.plano || 'free').toLowerCase()] || 'Grátis'}
             </p>
           ) : null}
         </div>
@@ -202,11 +191,11 @@ export default function PlanosPage() {
                 Cancele quando quiser. Assinatura mensal via Stripe.
               </p>
               <div className="mt-5 flex flex-col gap-2">
-                {userReady && session?.user ? (
+                {userReady ? (
                   <UpgradeBtn
                     plan={upsell.plan}
-                    userId={session.user.supabaseId}
-                    userEmail={session.user.email}
+                    userId={sessionUser.supabaseId}
+                    userEmail={sessionUser.email}
                     className="w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-blue-700"
                   >
                     {upsell.cta}
@@ -264,17 +253,17 @@ export default function PlanosPage() {
               <Li>Canal de distribuição para escritórios</Li>
               <Li>Comissão de 25% ao parceiro contador</Li>
             </ul>
-            {userReady && session?.user ? (
+            {userReady ? (
               <UpgradeBtn
                 plan="enterprise"
-                userId={session.user.supabaseId}
-                userEmail={session.user.email}
+                userId={sessionUser.supabaseId}
+                userEmail={sessionUser.email}
                 className="mt-6 w-full rounded-lg bg-gradient-to-r from-gray-900 to-gray-800 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-gray-800 hover:to-gray-900"
               >
                 Assinar Enterprise
               </UpgradeBtn>
             ) : (
-              <div className="mt-6 h-10 rounded-lg bg-gray-100 animate-pulse" aria-hidden />
+              <PlanCtaPlaceholder />
             )}
           </div>
 
@@ -295,17 +284,17 @@ export default function PlanosPage() {
               <Li>Relatórios avançados</Li>
               <Li>Suporte prioritário</Li>
             </ul>
-            {userReady && session?.user ? (
+            {userReady ? (
               <UpgradeBtn
                 plan="pro"
-                userId={session.user.supabaseId}
-                userEmail={session.user.email}
+                userId={sessionUser.supabaseId}
+                userEmail={sessionUser.email}
                 className="mt-6 w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-blue-500 hover:to-blue-600"
               >
                 Assinar Pro
               </UpgradeBtn>
             ) : (
-              <div className="mt-6 h-10 rounded-lg bg-gray-100 animate-pulse" aria-hidden />
+              <PlanCtaPlaceholder />
             )}
           </div>
 
@@ -323,17 +312,17 @@ export default function PlanosPage() {
               <Li>~R$20 por membro/mês</Li>
               <Li>Melhor custo-benefício para famílias</Li>
             </ul>
-            {userReady && session?.user ? (
+            {userReady ? (
               <UpgradeBtn
                 plan="familia"
-                userId={session.user.supabaseId}
-                userEmail={session.user.email}
+                userId={sessionUser.supabaseId}
+                userEmail={sessionUser.email}
                 className="mt-6 w-full rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-emerald-500 hover:to-emerald-600"
               >
                 Assinar Família
               </UpgradeBtn>
             ) : (
-              <div className="mt-6 h-10 rounded-lg bg-gray-100 animate-pulse" aria-hidden />
+              <PlanCtaPlaceholder />
             )}
           </div>
         </div>

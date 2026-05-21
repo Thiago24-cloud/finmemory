@@ -1,6 +1,10 @@
 -- =============================================================================
 -- Assinaturas detectadas — tabela para "Remover da lista" (ignorar)
 -- Cole no Supabase SQL Editor se o botão de lixeira falhar.
+--
+-- IMPORTANTE: user_id deve referenciar public.users(id) (supabaseId da sessão),
+-- NÃO auth.users. Se já criou a tabela com FK errada, rode também:
+-- supabase/migrations/20260521170000_subscription_dismissals_fk_public_users.sql
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.subscription_detection_dismissals (
@@ -32,3 +36,11 @@ CREATE POLICY "subscription_dismissals_delete_own"
 
 GRANT SELECT, INSERT, DELETE ON public.subscription_detection_dismissals TO authenticated;
 GRANT ALL ON public.subscription_detection_dismissals TO service_role;
+
+-- Corrige FK se a tabela tiver sido criada a apontar para auth.users
+ALTER TABLE public.subscription_detection_dismissals
+  DROP CONSTRAINT IF EXISTS subscription_detection_dismissals_user_id_fkey;
+
+ALTER TABLE public.subscription_detection_dismissals
+  ADD CONSTRAINT subscription_detection_dismissals_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES public.users (id) ON DELETE CASCADE;

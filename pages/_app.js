@@ -209,9 +209,13 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             <AnalyticsProvider>
               <MissionsTodayProvider>
                 <MapCartProvider>
-                  <PageTransitionLayout>
+                  {pathname === '/planos' ? (
                     <Component {...pageProps} />
-                  </PageTransitionLayout>
+                  ) : (
+                    <PageTransitionLayout>
+                      <Component {...pageProps} />
+                    </PageTransitionLayout>
+                  )}
                   <FeatureUsageRecorder />
                   <OnboardingGuideGate />
                   <AppMainBottomNav />

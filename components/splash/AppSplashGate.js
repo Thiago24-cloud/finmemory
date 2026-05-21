@@ -19,6 +19,8 @@ const SPLASH_SKIP_PATHS = new Set([
   '/escolher-perfil',
   '/parceiros',
   '/parceiros/painel',
+  '/planos',
+  '/checkout',
 ]);
 
 /** Tempo mínimo desde o arranque até iniciar o fade-out (marca + “carregamento”). */

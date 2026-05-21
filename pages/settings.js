@@ -42,7 +42,8 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
       </p>
       <Link
         href="/planos"
-        prefetch
+        prefetch={false}
+        scroll={false}
         className="mt-4 block w-full rounded-xl bg-[#2ECC49] py-3 px-4 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#25b340] hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100"
       >
         Ver planos disponíveis

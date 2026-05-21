@@ -38,7 +38,8 @@ export function AccountTypeGate({ children }) {
     status === 'authenticated' &&
     loading &&
     path !== '/escolher-perfil' &&
-    path !== '/login';
+    path !== '/login' &&
+    path !== '/planos';
 
   if (blocking) {
     return (

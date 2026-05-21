@@ -82,7 +82,8 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) {
         const err = new Error(json.error || 'Falha ao ignorar assinaturas');
-        err.hint = res.status === 503 ? 'migration' : null;
+        err.hint =
+          res.status === 503 ? 'migration' : res.status === 409 || json.code === 'USER_FK' ? 'user_fk' : null;
         throw err;
       }
 
@@ -102,6 +103,11 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
       if (e?.hint === 'migration' || /tabela|migration|subscription_detection/i.test(msg)) {
         toast.error(msg, {
           description: 'Supabase → SQL Editor → scripts/sql/subscription-detection-dismissals-setup.sql',
+          duration: 12000,
+        });
+      } else if (/Conta não encontrada|Saia da sessão|USER_FK|foreign key/i.test(msg)) {
+        toast.error(msg, {
+          description: 'Ajustes → sair → entrar de novo. Se continuar, execute no Supabase a migration 20260521170000_subscription_dismissals_fk_public_users.sql',
           duration: 12000,
         });
       } else {

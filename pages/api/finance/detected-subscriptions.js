@@ -6,6 +6,7 @@ import {
   bankTransactionToPluggyLike,
   detectSubscriptions,
 } from '../../../lib/finance/detectSubscriptions';
+import { resolvePublicUserId } from '../../../lib/resolvePublicUserId';
 import {
   dismissSubscriptionDetections,
   getDismissedSubscriptionIds,
@@ -15,15 +16,6 @@ function isoDateDaysAgo(days) {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - days);
   return d.toISOString().slice(0, 10);
-}
-
-async function resolveUserId(session, supabase) {
-  let userId = session?.user?.supabaseId;
-  if (userId) return userId;
-  const email = session?.user?.email;
-  if (!email) return null;
-  const { data } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
-  return data?.id || null;
 }
 
 /**
@@ -45,9 +37,13 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: 'Configuração incompleta' });
   }
 
-  const userId = await resolveUserId(session, supabase);
+  const userId = await resolvePublicUserId(session, supabase);
   if (!userId) {
-    return res.status(401).json({ ok: false, error: 'Utilizador não encontrado' });
+    return res.status(401).json({
+      ok: false,
+      error: 'Utilizador não encontrado. Saia e entre novamente.',
+      code: 'USER_NOT_FOUND',
+    });
   }
 
   const days = Math.min(365, Math.max(30, parseInt(String(req.query?.days || '120'), 10) || 120));
@@ -113,7 +109,10 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, dismissed_count: dismissed });
       } catch (e) {
         if (e?.code === 'MISSING_TABLE') {
-          return res.status(503).json({ ok: false, error: e.message });
+          return res.status(503).json({ ok: false, error: e.message, code: e.code });
+        }
+        if (e?.code === 'USER_FK') {
+          return res.status(409).json({ ok: false, error: e.message, code: e.code });
         }
         console.error('[detected-subscriptions] dismiss:', e?.message || e, e?.code);
         const msg = String(e?.message || 'Falha ao ignorar assinaturas').slice(0, 500);
