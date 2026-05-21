@@ -49,9 +49,14 @@ FROM public.promocoes_supermercados
 WHERE ativo IS DISTINCT FROM true;
 
 -- ---------------------------------------------------------------------------
--- 1) Limpeza principal — apaga promoções já vencidas (expira_em no passado)
---    Ajuste o LIMIT se o editor der timeout (ex.: 10000 ou 50000).
---    Repita o DELETE até "DELETE 0" (nenhuma linha removida).
+-- 1a) Tudo de uma vez no SQL Editor (1,2M+ linhas pode dar TIMEOUT no Free)
+--     Se falhar, use 1b ou: npm run db:cleanup-promocoes-expired
+-- ---------------------------------------------------------------------------
+-- DELETE FROM public.promocoes_supermercados WHERE expira_em < now();
+
+-- ---------------------------------------------------------------------------
+-- 1b) Limpeza em lotes — repita até "DELETE 0"
+--     Ajuste o LIMIT se o editor der timeout (ex.: 10000 ou 50000).
 -- ---------------------------------------------------------------------------
 DELETE FROM public.promocoes_supermercados
 WHERE id IN (

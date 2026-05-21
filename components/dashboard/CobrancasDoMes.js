@@ -5,17 +5,14 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
-  CreditCard,
-  FileText,
-  Home,
   Loader2,
+  MoreVertical,
   Plus,
-  Receipt,
-  Tv,
-  Zap,
+  Trash2,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/Sheet';
 import { ExpressionValueField } from '../ui/ExpressionValueField';
+import { SubscriptionBrandAvatar } from './SubscriptionBrandAvatar';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
 
@@ -75,26 +72,6 @@ function formatDueShort(isoDate) {
   return `${d}/${m}`;
 }
 
-function pickCategoryVisual(titulo, categoria) {
-  const t = `${titulo || ''} ${categoria || ''}`.toLowerCase();
-  if (/netflix|streaming|spotify|disney|prime|hbo|tv/.test(t)) {
-    return { Icon: Tv, ring: 'text-violet-400', bg: 'bg-violet-500/15' };
-  }
-  if (/luz|energia|eletr/.test(t)) {
-    return { Icon: Zap, ring: 'text-amber-400', bg: 'bg-amber-500/15' };
-  }
-  if (/boleto/.test(t)) {
-    return { Icon: FileText, ring: 'text-sky-400', bg: 'bg-sky-500/15' };
-  }
-  if (/empr[eé]stimo|financi|hipoteca|aluguel/.test(t)) {
-    return { Icon: Home, ring: 'text-orange-400', bg: 'bg-orange-500/15' };
-  }
-  if (/cart[aã]o|credito|crédito/.test(t)) {
-    return { Icon: CreditCard, ring: 'text-emerald-400', bg: 'bg-emerald-500/15' };
-  }
-  return { Icon: Receipt, ring: 'text-primary', bg: 'bg-primary/10' };
-}
-
 function paymentStatusLabel(pago, pagamento) {
   if (!pago) return 'Pendente';
   const forma = String(pagamento?.forma_pagamento || '').trim();
@@ -103,9 +80,8 @@ function paymentStatusLabel(pago, pagamento) {
   return forma;
 }
 
-function CobrancaRow({ item, onOpenDetail, onQuickPay, paying }) {
+function CobrancaRow({ item, onOpenPayment, onOpenManage, onQuickPay, paying }) {
   const { cobranca, competencia, pago, pagamento } = item;
-  const { Icon, ring, bg } = pickCategoryVisual(cobranca.titulo, cobranca.categoria);
   const [offsetX, setOffsetX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const startXRef = useRef(0);
@@ -136,13 +112,13 @@ function CobrancaRow({ item, onOpenDetail, onQuickPay, paying }) {
     setOffsetX(0);
   };
 
-  const handleClick = () => {
-    if (pago) return;
-    onOpenDetail?.();
-  };
-
   return (
-    <div className="relative overflow-hidden">
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-xl border border-[#1E2A3A]/80 bg-[#0f1419]/40',
+        pago && 'border-[#1E2A3A]/50 bg-[#0f1419]/20'
+      )}
+    >
       {!pago ? (
         <div
           className="absolute inset-y-0 left-0 flex w-24 items-center justify-center bg-primary text-primary-foreground"
@@ -152,65 +128,88 @@ function CobrancaRow({ item, onOpenDetail, onQuickPay, paying }) {
         </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={pago || paying}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+      <div
         className={cn(
-          'relative flex w-full items-center gap-3 py-3.5 text-left transition-transform',
-          dragging ? 'duration-0' : 'duration-200 ease-out',
-          pago ? 'opacity-55' : 'hover:bg-white/[0.03] active:bg-white/[0.05]',
-          !pago && !paying && 'cursor-pointer'
+          'relative flex w-full items-center gap-3 px-3 py-3 transition-transform',
+          dragging ? 'duration-0' : 'duration-200 ease-out'
         )}
         style={{ transform: `translateX(${offsetX}px)` }}
       >
-        <div
+        <SubscriptionBrandAvatar
+          titulo={cobranca.titulo}
+          categoria={cobranca.categoria}
+          size={44}
+        />
+
+        <button
+          type="button"
+          onClick={() => (pago ? onOpenManage?.() : onOpenPayment?.())}
+          disabled={paying}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
           className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-            bg,
-            ring
+            'min-w-0 flex-1 text-left',
+            !pago && !paying && 'cursor-pointer',
+            paying && 'pointer-events-none'
           )}
         >
-          <Icon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-        </div>
-
-        <div className="min-w-0 flex-1">
           <p
             className={cn(
-              'truncate text-[15px] font-semibold text-foreground',
-              pago && 'line-through decoration-white/30'
+              'truncate text-[15px] font-semibold leading-snug text-foreground',
+              pago && 'text-muted-foreground line-through decoration-muted-foreground/50'
             )}
           >
             {cobranca.titulo}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Vence em {formatDueShort(competencia)}
-            <span className="text-muted-foreground/60"> · </span>
-            {paymentStatusLabel(pago, pagamento)}
+          <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+            Vence {formatDueShort(competencia)}
+            <span className="text-muted-foreground/50"> · </span>
+            <span className={pago ? 'text-primary/90' : 'text-amber-400/95'}>
+              {paymentStatusLabel(pago, pagamento)}
+            </span>
           </p>
-        </div>
+        </button>
 
-        <div className="flex shrink-0 items-center gap-2 pl-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           <span
             className={cn(
-              'text-[15px] font-semibold tabular-nums',
+              'text-[15px] font-bold tabular-nums tracking-tight',
               pago ? 'text-muted-foreground' : 'text-foreground'
             )}
           >
             {formatBRL(cobranca.valor)}
           </span>
           {pago ? (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-primary">
               <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
             </span>
           ) : paying ? (
             <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden />
           ) : null}
+          <button
+            type="button"
+            onClick={() => onOpenManage?.()}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+            aria-label={`Opções: ${cobranca.titulo}`}
+          >
+            <MoreVertical className="h-5 w-5" strokeWidth={2} />
+          </button>
         </div>
-      </button>
+      </div>
+    </div>
+  );
+}
+
+function SectionLabel({ children, count }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-0.5 pb-2 pt-1">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{children}</p>
+      {count != null ? (
+        <span className="rounded-full bg-[#1E2A3A] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -227,14 +226,15 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
   const [formCategoria, setFormCategoria] = useState('Servicos');
 
   const [checkinOpen, setCheckinOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [selectedCobranca, setSelectedCobranca] = useState(null);
   const [selectedCompetencia, setSelectedCompetencia] = useState('');
   const [formaPagamento, setFormaPagamento] = useState('Pix');
   const [obs, setObs] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingNew, setSavingNew] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [payingId, setPayingId] = useState(null);
-  /** Fechado por padrão — lista só ao tocar no cabeçalho. */
   const [expanded, setExpanded] = useState(false);
 
   const monthKey = useMemo(() => ensureMonthKey(selectedMonth), [selectedMonth]);
@@ -271,24 +271,31 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
     return items;
   }, [cobrancas, monthInfo, paidMap]);
 
+  const pendingItems = useMemo(() => dueItems.filter((it) => !it.pago), [dueItems]);
+  const paidItems = useMemo(() => dueItems.filter((it) => it.pago), [dueItems]);
+
   const monthTotal = useMemo(
     () => dueItems.reduce((sum, it) => sum + (Number(it.cobranca.valor) || 0), 0),
     [dueItems]
+  );
+
+  const pendingTotal = useMemo(
+    () => pendingItems.reduce((sum, it) => sum + (Number(it.cobranca.valor) || 0), 0),
+    [pendingItems]
   );
 
   const nextDueSubtitle = useMemo(() => {
     if (dueItems.length === 0) return 'Nenhum compromisso neste mês';
     if (!expanded) {
       const n = dueItems.length;
-      const p = dueItems.filter((it) => !it.pago).length;
+      const p = pendingItems.length;
       if (p > 0) return `${p} a pagar de ${n} · Toque para ver`;
       return `${n} compromisso${n === 1 ? '' : 's'} · Toque para ver`;
     }
-    const pending = dueItems.filter((it) => !it.pago);
-    const target = pending[0] || dueItems[0];
+    const target = pendingItems[0] || dueItems[0];
     if (!target) return `${dueItems.length} no mês`;
-    return `Próximo vencimento: ${formatDueLong(target.competencia)}`;
-  }, [dueItems, expanded]);
+    return `Próximo: ${formatDueLong(target.competencia)}`;
+  }, [dueItems, expanded, pendingItems]);
 
   const load = async () => {
     if (!userId) return;
@@ -329,7 +336,15 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
     setSelectedCompetencia(competencia);
     setFormaPagamento('Pix');
     setObs('');
+    setManageOpen(false);
     setCheckinOpen(true);
+  };
+
+  const openManage = (cobranca, competencia) => {
+    setSelectedCobranca(cobranca);
+    setSelectedCompetencia(competencia || '');
+    setCheckinOpen(false);
+    setManageOpen(true);
   };
 
   const registerPayment = async (cobranca, competencia, { forma = 'Pix', observacao = null } = {}) => {
@@ -362,6 +377,37 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
       return false;
     } finally {
       setPayingId(null);
+    }
+  };
+
+  const removeCobranca = async (cobranca) => {
+    if (!userId || !cobranca?.id) return;
+    const ok = window.confirm(
+      `Remover "${cobranca.titulo}" do app?\n\nDeixa de aparecer nos próximos meses. Pagamentos já registrados permanecem no histórico.`
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/cobrancas?id=${encodeURIComponent(cobranca.id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || `Erro ${res.status}`);
+      }
+      toast.success('Compromisso removido');
+      setManageOpen(false);
+      setCheckinOpen(false);
+      setSelectedCobranca(null);
+      setSelectedCompetencia('');
+      await load();
+    } catch (e) {
+      console.error('Erro ao remover cobranca:', e);
+      toast.error(e?.message || 'Erro ao remover');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -402,6 +448,7 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
       setFormValor('');
       setFormDia('2');
       setFormCategoria('Servicos');
+      setExpanded(true);
       await load();
       toast.success('Compromisso adicionado');
     } catch (e) {
@@ -428,14 +475,29 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
     }
   };
 
+  const renderItem = (it) => {
+    const rowKey = `${it.cobranca.id}_${it.competencia}`;
+    return (
+      <li key={rowKey}>
+        <CobrancaRow
+          item={it}
+          paying={payingId === rowKey}
+          onOpenPayment={() => openCheckin(it.cobranca, it.competencia)}
+          onOpenManage={() => openManage(it.cobranca, it.competencia)}
+          onQuickPay={() => registerPayment(it.cobranca, it.competencia, { forma: 'Pix' })}
+        />
+      </li>
+    );
+  };
+
   return (
-    <section className="mb-6 overflow-hidden rounded-2xl border border-[#1E2A3A] bg-card">
+    <section className="mb-6 overflow-hidden rounded-2xl border border-[#1E2A3A] bg-card shadow-sm">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         className={cn(
           'flex w-full items-start justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-white/[0.03]',
-          expanded && 'border-b border-[#1E2A3A]/80'
+          expanded && 'border-b border-[#1E2A3A]'
         )}
         aria-expanded={expanded}
         aria-label={expanded ? 'Recolher compromissos do mês' : 'Ver compromissos do mês'}
@@ -445,9 +507,14 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
             <CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             <h2 className="text-base font-bold tracking-tight text-foreground">Compromissos do Mês</h2>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{nextDueSubtitle}</p>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">{nextDueSubtitle}</p>
+          {expanded && pendingItems.length > 0 ? (
+            <p className="mt-0.5 text-xs text-amber-400/90">
+              Falta pagar: {formatBRL(pendingTotal)}
+            </p>
+          ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2 pt-0.5">
+        <div className="flex shrink-0 flex-col items-end gap-0.5 pt-0.5">
           <p className="text-lg font-bold tabular-nums text-foreground">{formatBRL(monthTotal)}</p>
           <ChevronDown
             className={cn(
@@ -461,50 +528,49 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
 
       {expanded ? (
         <>
-      <div className="px-4">
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            Carregando...
+          <div className="px-4 pb-4">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-sm font-medium text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                Carregando...
+              </div>
+            ) : dueItems.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Nenhum compromisso neste mês.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {pendingItems.length > 0 ? (
+                  <div>
+                    <SectionLabel count={pendingItems.length}>A pagar</SectionLabel>
+                    <ul className="space-y-2">{pendingItems.map(renderItem)}</ul>
+                  </div>
+                ) : null}
+                {paidItems.length > 0 ? (
+                  <div>
+                    <SectionLabel count={paidItems.length}>Pagos neste mês</SectionLabel>
+                    <ul className="space-y-2">{paidItems.map(renderItem)}</ul>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
-        ) : dueItems.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Nenhum compromisso neste mês.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[#1E2A3A]/90">
-            {dueItems.map((it) => {
-              const rowKey = `${it.cobranca.id}_${it.competencia}`;
-              return (
-                <li key={rowKey}>
-                  <CobrancaRow
-                    item={it}
-                    paying={payingId === rowKey}
-                    onOpenDetail={() => openCheckin(it.cobranca, it.competencia)}
-                    onQuickPay={() => registerPayment(it.cobranca, it.competencia, { forma: 'Pix' })}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
 
-      <footer className="border-t border-[#1E2A3A]/80 px-4 py-3">
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden />
-          Adicionar nova cobrança
-        </button>
-        {!loading && dueItems.length > 0 ? (
-          <p className="mt-1 text-[10px] text-muted-foreground/80">
-            Toque na linha para detalhes · arraste para a direita para marcar como pago
-          </p>
-        ) : null}
-      </footer>
+          <footer className="border-t border-[#1E2A3A] px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+              Adicionar compromisso
+            </button>
+            {!loading && dueItems.length > 0 ? (
+              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                Logos por serviço · toque na linha para pagar · ⋮ para remover · arraste → para marcar pago
+              </p>
+            ) : null}
+          </footer>
         </>
       ) : null}
 
@@ -514,18 +580,18 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
           className="max-h-[85vh] overflow-y-auto rounded-t-3xl border-[#1E2A3A] bg-card px-5 pb-10 pt-4"
         >
           <SheetHeader className="mb-4">
-            <SheetTitle className="text-center text-lg font-bold">Nova cobrança (mensal)</SheetTitle>
-            <p className="text-center text-xs text-muted-foreground">Padrão dia 2</p>
+            <SheetTitle className="text-center text-lg font-bold">Novo compromisso</SheetTitle>
+            <p className="text-center text-xs text-muted-foreground">Recorrente mensal</p>
           </SheetHeader>
 
           <div className="space-y-4">
             <div>
-              <p className="mb-1 text-sm font-medium text-foreground">Título</p>
+              <p className="mb-1 text-sm font-medium text-foreground">Nome do serviço</p>
               <input
-                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 value={formTitulo}
                 onChange={(e) => setFormTitulo(e.target.value)}
-                placeholder="Ex: Netflix, Luz..."
+                placeholder="Ex: Netflix, Amazon Prime, Canva, Cursor..."
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -552,10 +618,10 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
             <div>
               <p className="mb-1 text-sm font-medium text-foreground">Categoria</p>
               <input
-                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 value={formCategoria}
                 onChange={(e) => setFormCategoria(e.target.value)}
-                placeholder="Servicos"
+                placeholder="Streaming, Servicos..."
               />
             </div>
 
@@ -565,7 +631,7 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
               onClick={handleAdd}
               className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:opacity-95 disabled:opacity-60"
             >
-              {savingNew ? 'Salvando...' : 'Salvar cobrança'}
+              {savingNew ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </SheetContent>
@@ -579,20 +645,23 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
           <SheetHeader className="mb-4">
             <SheetTitle className="text-center text-lg font-bold">Registrar pagamento</SheetTitle>
             {selectedCobranca ? (
-              <p className="text-center text-xs text-muted-foreground">
-                {selectedCobranca.titulo} · vence {formatDueShort(selectedCompetencia)}
-              </p>
+              <div className="mt-3 flex items-center justify-center gap-3">
+                <SubscriptionBrandAvatar
+                  titulo={selectedCobranca.titulo}
+                  categoria={selectedCobranca.categoria}
+                  size={48}
+                />
+                <div className="text-left">
+                  <p className="text-sm font-bold text-foreground">{selectedCobranca.titulo}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Vence {formatDueShort(selectedCompetencia)} · {formatBRL(selectedCobranca.valor)}
+                  </p>
+                </div>
+              </div>
             ) : null}
           </SheetHeader>
 
           <div className="space-y-4">
-            {selectedCobranca ? (
-              <div className="rounded-xl border border-[#1E2A3A] bg-background p-3">
-                <p className="mb-1 text-xs text-muted-foreground">Valor</p>
-                <p className="text-sm font-bold text-foreground">{formatBRL(selectedCobranca.valor)}</p>
-              </div>
-            ) : null}
-
             <div>
               <p className="mb-2 text-sm font-medium text-foreground">Forma de pagamento</p>
               <div className="grid grid-cols-2 gap-2">
@@ -617,7 +686,7 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
             <div>
               <p className="mb-1 text-sm font-medium text-foreground">Obs (opcional)</p>
               <input
-                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-xl border border-[#1E2A3A] bg-background px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 value={obs}
                 onChange={(e) => setObs(e.target.value)}
                 placeholder="Ex: desconto, parcela..."
@@ -632,6 +701,63 @@ export default function CobrancasDoMes({ userId, selectedMonth, onAfterPayment }
             >
               {saving ? 'Salvando...' : 'Confirmar pagamento'}
             </button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={manageOpen} onOpenChange={setManageOpen}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[85vh] overflow-y-auto rounded-t-3xl border-[#1E2A3A] bg-card px-5 pb-10 pt-4"
+        >
+          <SheetHeader className="mb-4">
+            <SheetTitle className="text-center text-lg font-bold">Gerenciar compromisso</SheetTitle>
+            {selectedCobranca ? (
+              <div className="mt-3 flex items-center gap-3 rounded-2xl border border-[#1E2A3A] bg-background/80 p-3">
+                <SubscriptionBrandAvatar
+                  titulo={selectedCobranca.titulo}
+                  categoria={selectedCobranca.categoria}
+                  size={52}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-bold text-foreground">{selectedCobranca.titulo}</p>
+                  <p className="text-sm font-semibold tabular-nums text-foreground">
+                    {formatBRL(selectedCobranca.valor)} / mês
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Vencimento dia {selectedCobranca.dia_vencimento || 2}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </SheetHeader>
+
+          <div className="space-y-3">
+            {selectedCobranca && selectedCompetencia ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setManageOpen(false);
+                  openCheckin(selectedCobranca, selectedCompetencia);
+                }}
+                className="h-12 w-full rounded-xl border border-[#1E2A3A] bg-background text-sm font-semibold text-foreground hover:bg-white/[0.04]"
+              >
+                Registrar pagamento deste mês
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              disabled={deleting || !selectedCobranca}
+              onClick={() => removeCobranca(selectedCobranca)}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 text-sm font-semibold text-red-400 hover:bg-red-500/15 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+              {deleting ? 'Removendo...' : 'Remover do app'}
+            </button>
+            <p className="text-center text-[11px] leading-snug text-muted-foreground">
+              Some da lista em todos os meses. Histórico de pagamentos já feitos não é apagado.
+            </p>
           </div>
         </SheetContent>
       </Sheet>

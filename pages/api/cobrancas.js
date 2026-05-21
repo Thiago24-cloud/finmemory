@@ -100,6 +100,39 @@ export default async function handler(req, res) {
     }
   }
 
-  res.setHeader('Allow', ['GET', 'POST']);
+  if (req.method === 'DELETE') {
+    const id = String(req.query?.id || req.body?.id || '').trim();
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Informe id da cobrança (query ?id= ou body.id)' });
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('cobrancas')
+        .update({ ativa: false })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select('id, titulo')
+        .maybeSingle();
+
+      if (error) {
+        if (isMissingTable(error.message)) {
+          return res.status(503).json({ success: false, error: 'Funcionalidade de cobranças ainda não habilitada' });
+        }
+        throw error;
+      }
+
+      if (!data) {
+        return res.status(404).json({ success: false, error: 'Cobrança não encontrada' });
+      }
+
+      return res.status(200).json({ success: true, removed: data });
+    } catch (e) {
+      console.error('[api/cobrancas DELETE]', e?.message || e);
+      return res.status(500).json({ success: false, error: e?.message || 'Erro ao remover cobrança' });
+    }
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
   return res.status(405).json({ success: false, error: 'Method not allowed' });
 }

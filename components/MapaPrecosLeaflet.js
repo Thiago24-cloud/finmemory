@@ -21,6 +21,7 @@ import {
   MAP_MIN_ZOOM,
   MAP_MAX_ZOOM,
   MAP_MAX_BOUNDS_VISCOSITY,
+  clampBboxToSaoPauloState,
 } from '../lib/saoPauloStateMap';
 import {
   getSupermercadoData,
@@ -1167,12 +1168,16 @@ function MapRegionFly({ searchQuery, searchIntent, onRegionFitted }) {
   useEffect(() => {
     if (!map || searchIntent.type !== 'region' || !searchIntent.bbox) return;
 
-    const b = searchIntent.bbox;
-    const key = `${b.sw_lat},${b.sw_lng},${b.ne_lat},${b.ne_lng}`;
+    const clipped = clampBboxToSaoPauloState(searchIntent.bbox);
+    if (!clipped) return;
+    const key = `${clipped.sw_lat},${clipped.sw_lng},${clipped.ne_lat},${clipped.ne_lng}`;
     if (regionKeyRef.current === key) return;
     regionKeyRef.current = key;
 
-    const bounds = L.latLngBounds([b.sw_lat, b.sw_lng], [b.ne_lat, b.ne_lng]);
+    const bounds = L.latLngBounds(
+      [clipped.sw_lat, clipped.sw_lng],
+      [clipped.ne_lat, clipped.ne_lng]
+    );
     let finished = false;
     const finish = () => {
       if (finished) return;
@@ -4603,6 +4608,8 @@ export default function MapaPrecosLeaflet({
           }
           url={tileUrl}
           detectRetina={tileDetectRetina}
+          bounds={SAO_PAULO_STATE_MAX_BOUNDS}
+          noWrap
         />
         <LocationMarker
           onLocationFound={handleLocationFound}

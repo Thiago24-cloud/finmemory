@@ -15,6 +15,7 @@
     "check-r2": "node scripts/check-r2-env.mjs",
     "verify-build": "node scripts/verify-build.mjs",
     "diagnose:sacolao": "node -r dotenv/config scripts/diagnose-sacolao-store-promos.mjs",
+    "db:cleanup-promocoes-expired": "node -r dotenv/config scripts/run-promocoes-cleanup-expired.mjs",
     "agent": "node jobs/agent.js",
     "agent:finmemory": "node finmemory-agent/agent.js",
     "agent:supermercados": "node finmemory-agent/agent.js",
