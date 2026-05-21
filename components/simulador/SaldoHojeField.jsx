@@ -8,10 +8,10 @@ const fmt = (v) =>
   );
 
 /**
- * Campo "Saldo hoje (poder de compra sugerido)" — valor calculado em pill + input editável.
+ * Campo "Saldo hoje" — valor calculado + input editável (layout compacto).
  */
 export function SaldoHojeField({
-  label = 'Saldo hoje (poder de compra sugerido)',
+  label = 'Saldo hoje',
   saldoHoje,
   value,
   onChange,
@@ -25,36 +25,37 @@ export function SaldoHojeField({
 }) {
   return (
     <div>
-      <label className={labelClass}>{label}</label>
-      <div
-        className={cn(
-          'mt-1 rounded-full border border-indigo-500/40 bg-indigo-950/90 px-4 py-2.5',
-          'text-lg font-semibold tabular-nums text-zinc-50 shadow-inner',
-          loading && 'animate-pulse text-zinc-500'
-        )}
-        aria-live="polite"
-      >
-        {loading ? '…' : fmt(saldoHoje)}
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <label className={cn(labelClass, 'mb-0')}>{label}</label>
+        <span
+          className={cn(
+            'text-sm font-semibold tabular-nums text-zinc-100',
+            loading && 'animate-pulse text-zinc-600'
+          )}
+          aria-live="polite"
+        >
+          {loading ? '…' : fmt(saldoHoje)}
+        </span>
       </div>
       <input
         type="number"
         step="0.01"
-        className={cn(fieldClass, 'mt-2')}
+        className={fieldClass}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         onBlur={() => onBlurSync?.()}
         aria-label={`${label} — valor editável`}
       />
-      <p className="mt-1 text-[10px] text-zinc-500">
+      <p className="mt-1 text-[10px] text-zinc-600 leading-snug">
         {loading
-          ? 'Recalculando contas…'
+          ? 'Recalculando…'
           : contasCount > 0
-            ? `${contasCount} conta${contasCount === 1 ? '' : 's'} · débito + saldo ainda disponível no cartão`
+            ? `${contasCount} conta${contasCount === 1 ? '' : 's'} · débito + disponível no cartão`
             : usingMock
-              ? 'Dados de exemplo (mock) — conecte o Open Finance para saldos reais'
+              ? 'Exemplo — conecte o Open Finance'
               : 'Sem contas conectadas'}
       </p>
-      {hintExtra ? <p className="mt-1 text-[10px] text-purple-400/90">{hintExtra}</p> : null}
+      {hintExtra ? <p className="mt-1 text-[10px] text-zinc-500">{hintExtra}</p> : null}
     </div>
   );
 }

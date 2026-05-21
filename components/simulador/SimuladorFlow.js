@@ -204,14 +204,7 @@ function daysInCurrentMonth() {
 
 function Card({ className, children }) {
   return (
-    <div
-      className={cn(
-        'rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-4 shadow-[0_0_0_1px_rgba(168,85,247,0.06)]',
-        className
-      )}
-    >
-      {children}
-    </div>
+    <div className={cn('rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-3', className)}>{children}</div>
   );
 }
 
@@ -290,9 +283,10 @@ export function SimuladorFlow() {
     const built = buildContasFromOpenFinance(
       accounts.map((a) => ({
         id: a.id,
-        name: a.name,
+        name: a.raw_name || a.name,
         balance: a.balance,
         account_type: a.account_type,
+        connector_name: a.connector_name,
       })),
       { byAccountId }
     );
@@ -835,9 +829,9 @@ export function SimuladorFlow() {
   }, [state.step, mounted]);
 
   const fieldClass =
-    'w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50';
+    'w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-purple-500/40';
 
-  const labelClass = 'text-xs font-medium text-zinc-400 mb-1 block';
+  const labelClass = 'text-[11px] font-medium text-zinc-500 mb-1 block';
 
   const dayRow = (
     <>
@@ -859,11 +853,7 @@ export function SimuladorFlow() {
               set({ startingBalance: saldoDeHoje.saldoHoje });
             }
           }}
-          hintExtra={
-            mainTab === 'fluxo'
-              ? 'Cartão de crédito: configure o limite na aba Cartões (limite − gasto do dashboard).'
-              : null
-          }
+          hintExtra={mainTab === 'fluxo' ? 'Limite do cartão na aba Cartões.' : null}
         />
         <div>
           <label className={labelClass}>Gasto médio / dia</label>
@@ -902,9 +892,9 @@ export function SimuladorFlow() {
           <button
             type="button"
             onClick={() => setBurnAuditOpen((o) => !o)}
-            className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-700/90 bg-zinc-950/60 px-2.5 py-1.5 text-left text-[10px] font-semibold text-zinc-300 hover:border-[#39FF14]/40 hover:bg-zinc-900/80"
+            className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-800 px-2 py-1 text-left text-[10px] text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
           >
-            <span className="text-[#39FF14]">Modo auditoria — gasto médio (28 dias)</span>
+            <span>Auditoria 28 dias</span>
             <ChevronDown
               className={cn('h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform', burnAuditOpen && 'rotate-180')}
               aria-hidden
@@ -966,7 +956,7 @@ export function SimuladorFlow() {
           />
         </div>
       </div>
-      <div className="mt-3 rounded-xl border border-purple-500/20 bg-purple-950/20 px-3 py-2.5">
+      <div className="mt-3 rounded-lg border border-zinc-800/80 bg-zinc-900/20 px-3 py-2">
         <p className="text-xs text-zinc-300">
           Com seu gasto atual de{' '}
           <strong className="text-purple-300">
@@ -1073,29 +1063,27 @@ export function SimuladorFlow() {
           ))}
         </div>
 
-        <Card className="border-purple-500/15 bg-zinc-900/50">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs text-zinc-400 min-w-0">
-              <Cloud className="h-4 w-4 text-purple-400 shrink-0" />
-              {status !== 'authenticated' ? (
-                <span>Inicie sessão para guardar o simulador na sua conta.</span>
-              ) : saveStatus === 'saving' ? (
-                <span className="inline-flex items-center gap-1">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> A guardar…
-                </span>
-              ) : saveStatus === 'error' ? (
-                <span className="text-amber-400">Não foi possível guardar. Verifique a ligação.</span>
-              ) : (
-                <span className="text-zinc-500">Simulador sincronizado com a conta.</span>
-              )}
-            </div>
+        <Card className="border-zinc-800/40">
+          <div className="flex items-center gap-2 text-[11px] text-zinc-500 min-w-0">
+            <Cloud className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+            {status !== 'authenticated' ? (
+              <span>Inicie sessão para guardar na conta.</span>
+            ) : saveStatus === 'saving' ? (
+              <span className="inline-flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin shrink-0" /> A guardar…
+              </span>
+            ) : saveStatus === 'error' ? (
+              <span className="text-amber-400/90">Não foi possível guardar.</span>
+            ) : (
+              <span>Sincronizado com Open Finance</span>
+            )}
           </div>
           {(hints?.hasOpenFinance || (hints?.contas?.length ?? 0) > 0) && (
-            <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-2">
-              {state.step <= 2 && hints?.contas?.length > 0 ? (
-                <ul className="text-[10px] text-zinc-500 space-y-1">
+            <div className="mt-2.5 space-y-2.5">
+              {hints?.contas?.length > 0 ? (
+                <ul className="text-[11px] text-zinc-500 divide-y divide-zinc-800/60">
                   {hints.contas.map((c) => (
-                    <li key={c.id} className="flex justify-between gap-2">
+                    <li key={c.id} className="flex justify-between gap-3 py-1 first:pt-0 last:pb-0">
                       <span className="text-zinc-400 truncate">{c.nome_banco}</span>
                       <span className="shrink-0 tabular-nums text-zinc-300">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
@@ -1106,61 +1094,31 @@ export function SimuladorFlow() {
                   ))}
                 </ul>
               ) : null}
-              <p className={cn('text-[11px] text-zinc-500 leading-snug', state.step >= 3 && 'line-clamp-2')}>
-                <span className="text-[#39FF14] font-semibold">Poder de compra sugerido</span>
-                {' '}
-                (Σ débito + Σ ainda disponível no cartão — não o limite total
-                {hints?.usingMockContas ? ' · dados de exemplo' : ''}):{' '}
-                <strong className="text-zinc-200">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    hints.saldoHoje ?? hints.accountBalanceTotal ?? 0
-                  )}
-                </strong>
-                {state.step <= 2 && hints?.startingBalanceBreakdown ? (
-                  <>
-                    {' '}
-                    <span className="text-zinc-600">
-                      · À vista:{' '}
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                        hints.startingBalanceBreakdown.debitAccountsSum || 0
-                      )}
-                    </span>
-                    <span className="text-zinc-600">
-                      {' '}
-                      · Crédito disponível (estimado):{' '}
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                        hints.startingBalanceBreakdown.creditAvailableSum || 0
-                      )}
-                    </span>
-                  </>
-                ) : null}
-                . Burn rate real (28d):{' '}
-                <strong className="text-zinc-200">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    hints.dailyBurnReal28d || hints.dailyBurnHint || 0
-                  )}
-                  /dia
-                </strong>
-                .
-              </p>
-              {hints?.burnRateBreakdown ? (
-                <p className="text-[10px] text-zinc-600">
-                  28 dias · Open Finance{' '}
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    hints.burnRateBreakdown.openFinanceDebits || 0
-                  )}{' '}
-                  + OCR/Manual{' '}
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    hints.burnRateBreakdown.ocrManualDebits || 0
-                  )}
-                  .
-                </p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+                <span>
+                  Saldo{' '}
+                  <strong className="text-zinc-100 tabular-nums">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                      hints.saldoHoje ?? hints.accountBalanceTotal ?? 0
+                    )}
+                  </strong>
+                </span>
+                <span>
+                  Burn 28d{' '}
+                  <strong className="text-zinc-300 tabular-nums">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                      hints.dailyBurnReal28d || hints.dailyBurnHint || 0
+                    )}
+                    /dia
+                  </strong>
+                </span>
+                {hints?.usingMockContas ? <span className="text-zinc-600">· exemplo</span> : null}
+              </div>
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={applyOpenFinanceHints}
-                  className="flex-1 min-w-[140px] py-2.5 px-3 rounded-xl text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 transition-colors"
+                  className="flex-1 py-2 px-3 rounded-lg text-[11px] font-medium text-white bg-purple-600/90 hover:bg-purple-600 transition-colors"
                 >
                   Preencher com dados reais
                 </button>
@@ -1168,10 +1126,10 @@ export function SimuladorFlow() {
                   type="button"
                   onClick={() => void fetchHints({ silent: false })}
                   disabled={hintsLoading}
-                  className="inline-flex items-center justify-center gap-1 py-2.5 px-3 rounded-xl text-xs font-medium border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-1 py-2 px-2.5 rounded-lg text-[11px] text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-700 disabled:opacity-50"
+                  aria-label="Atualizar dados"
                 >
                   <RefreshCw className={cn('h-3.5 w-3.5', hintsLoading && 'animate-spin')} />
-                  Atualizar
                 </button>
               </div>
             </div>
@@ -1189,10 +1147,8 @@ export function SimuladorFlow() {
 
         {state.step === 1 && (
           <>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Em caso de aperto, você tem alguém a quem pedir ajuda? Mapeie <span className="text-purple-300">quem</span>,{' '}
-              <span className="text-purple-300">quando</span> costuma rolar um Pix e o <span className="text-purple-300">valor</span>{' '}
-              médio — assim o radar mostra se seu mês depende de terceiros.
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Quem pode ajudar, em que dia e valor médio — para o radar mostrar dependência de terceiros.
             </p>
             <Card>
               <div className="flex items-center justify-between gap-3 mb-3">
@@ -1220,7 +1176,7 @@ export function SimuladorFlow() {
               {state.hasSupport && (
                 <div className="space-y-4">
                   {state.contacts.map((c) => (
-                    <div key={c.id} className="rounded-xl border border-zinc-800 bg-black/30 p-3 space-y-2">
+                    <div key={c.id} className="rounded-lg border border-zinc-800/60 p-2.5 space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-zinc-500">Contato</span>
                         {state.contacts.length > 1 && (
@@ -1302,10 +1258,8 @@ export function SimuladorFlow() {
 
         {state.step === 2 && (
           <>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Bônus, freela ou Pix extra? Informe a <span className="text-purple-300">fonte</span>, o valor e a{' '}
-              <span className="text-purple-300">confiabilidade</span>. Se você já “gastou” esse dinheiro na cabeça, marque
-              abaixo — o simulador ignora a entrada (evita ilusão de caixa).
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Entradas extras (freela, bônus). Marque se o valor já está comprometido — o simulador ignora.
             </p>
             <Card>
               <label className="flex items-center gap-2 text-sm text-zinc-300 mb-3">
@@ -1322,7 +1276,7 @@ export function SimuladorFlow() {
                   {(state.extraRows || []).map((row, idx) => (
                     <div
                       key={row.id}
-                      className="rounded-xl border border-zinc-800/90 bg-zinc-950/40 p-3 space-y-3"
+                      className="rounded-lg border border-zinc-800/60 p-2.5 space-y-2.5"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-zinc-500">Entrada {idx + 1}</span>
@@ -1407,7 +1361,7 @@ export function SimuladorFlow() {
                               key={key}
                               onClick={() => updateExtraRow(row.id, { necessity: key })}
                               className={cn(
-                                'flex flex-1 flex-col items-center gap-1 rounded-xl border py-2 text-[10px] font-medium transition-colors',
+                                'flex flex-1 flex-col items-center gap-1 rounded-lg border py-1.5 text-[10px] font-medium transition-colors',
                                 normalizeNecessity(row.necessity) === key
                                   ? 'border-purple-500/70 bg-purple-950/40 text-purple-200'
                                   : 'border-zinc-800 bg-zinc-950/60 text-zinc-500 hover:border-zinc-600'
@@ -1447,10 +1401,8 @@ export function SimuladorFlow() {
 
         {state.step === 3 && (
           <>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Crédito não é só limite: é <span className="text-purple-300">calendário</span>. Parte da conta pesada pode
-              ir para o <span className="text-purple-300">dia do vencimento da fatura</span> — o gráfico mostra o efeito no
-              saldo ao longo do mês (educativo; não substitui regras do banco).
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Vencimento e fechamento da fatura — o gráfico reparte a conta pesada no calendário (educativo).
             </p>
             <Card>
               <div className="grid grid-cols-2 gap-3">
@@ -1547,9 +1499,9 @@ export function SimuladorFlow() {
               </div>
             ) : null}
 
-            <div className="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-950/40 to-zinc-950 p-4">
-              <p className="text-xs uppercase tracking-widest text-purple-300/90">Saldo final previsto</p>
-              <p className="text-2xl font-semibold text-white mt-1">
+            <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-3">
+              <p className="text-[10px] uppercase tracking-wide text-zinc-500">Saldo final previsto</p>
+              <p className="text-xl font-semibold text-zinc-100 mt-0.5">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(projection.finalBalance)}
               </p>
               <p className="text-xs text-zinc-500 mt-1">

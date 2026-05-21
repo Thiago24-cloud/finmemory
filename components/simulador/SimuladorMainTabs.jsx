@@ -16,7 +16,7 @@ export function SimuladorMainTabs({ active = 'fluxo', onChange }) {
 
   return (
     <div
-      className="flex rounded-xl border border-zinc-800 bg-zinc-950/80 p-1 gap-1"
+      className="flex rounded-lg border border-zinc-800/80 bg-zinc-950/50 p-0.5 gap-0.5"
       role="tablist"
       aria-label="Secções do simulador"
     >
@@ -30,13 +30,11 @@ export function SimuladorMainTabs({ active = 'fluxo', onChange }) {
             aria-selected={on}
             onClick={() => onChange?.(id)}
             className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-semibold transition-colors',
-              on
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/80'
+              'flex-1 flex items-center justify-center gap-1 rounded-md py-2 text-[11px] font-medium transition-colors',
+              on ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
             )}
           >
-            <Icon className="h-4 w-4 shrink-0" aria-hidden />
+            <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {label}
           </button>
         );

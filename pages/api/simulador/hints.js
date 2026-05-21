@@ -1,6 +1,9 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
+import { formatBankAccountDisplayNameMinimal } from '../../../lib/bankAccountDisplay';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
+import { createPluggyServerClient } from '../../../lib/pluggySyncTransactions';
+import { pickConnectorMeta } from '../../../lib/pluggyConnectorMeta';
 import { buildContasFromOpenFinance } from '../../../lib/finance/buildContasFromOpenFinance';
 import {
   gastoCartaoFromDashboardBalance,
@@ -101,6 +104,38 @@ export default async function handler(req, res) {
     accounts = accounts.filter((a) => activeItemIds.has(a.item_id));
   }
 
+  const itemIds = Array.from(
+    new Set(
+      accounts
+        .map((a) => (typeof a?.item_id === 'string' ? a.item_id.trim() : ''))
+        .filter(Boolean)
+    )
+  );
+  const connectorByItemId = {};
+  const pluggy = createPluggyServerClient();
+  if (pluggy && itemIds.length > 0) {
+    await Promise.all(
+      itemIds.map(async (itemId) => {
+        try {
+          const item = await pluggy.fetchItem(itemId);
+          connectorByItemId[itemId] = pickConnectorMeta(item);
+        } catch (err) {
+          console.warn('[simulador/hints] fetchItem:', itemId, err?.message || err);
+        }
+      })
+    );
+  }
+
+  const accountDisplayParams = (a) => {
+    const meta = connectorByItemId[a.item_id] || {};
+    return {
+      connectorName: meta.name || null,
+      connectorId: meta.id || null,
+      connectorImageUrl: meta.imageUrl || null,
+      connectorPrimaryColor: meta.primaryColor || null,
+    };
+  };
+
   const { data: cardsEarly, error: cardEarlyErr } = await supabase
     .from('manual_credit_cards')
     .select('id, label, due_day, closing_day, credit_limit, bank_account_id')
@@ -157,12 +192,19 @@ export default async function handler(req, res) {
   const balanceHints = computePurchasingPowerHint(accountsForHint, manualLimitsOrdered);
 
   let contas = buildContasFromOpenFinance(
-    accounts.map((a) => ({
-      id: a.id,
-      name: (a.name || 'Conta').trim() || 'Conta',
-      balance: a.balance,
-      account_type: a.account_type,
-    })),
+    accounts.map((a) => {
+      const meta = accountDisplayParams(a);
+      return {
+        id: a.id,
+        name: (a.name || 'Conta').trim() || 'Conta',
+        balance: a.balance,
+        account_type: a.account_type,
+        connector_name: meta.connectorName,
+        connector_id: meta.connectorId,
+        connector_image_url: meta.connectorImageUrl,
+        connector_primary_color: meta.connectorPrimaryColor,
+      };
+    }),
     { byAccountId: limitsByAccountId, orderedFallback: manualLimitsOrdered }
   );
 
@@ -171,9 +213,19 @@ export default async function handler(req, res) {
     .map((a) => {
       const balance = Number(a.balance) || 0;
       const limite = limitsByAccountId[a.id] ?? null;
+      const meta = accountDisplayParams(a);
+      const rawName = (a.name || 'Cartão').trim();
       return {
         bank_account_id: a.id,
-        name: (a.name || 'Cartão').trim(),
+        name: formatBankAccountDisplayNameMinimal({
+          connectorName: meta.connectorName,
+          name: rawName,
+          accountType: a.account_type,
+          connectorId: meta.connectorId,
+          connectorImageUrl: meta.connectorImageUrl,
+          connectorPrimaryColor: meta.connectorPrimaryColor,
+        }),
+        raw_name: rawName,
         balance_dashboard: Math.round(balance * 100) / 100,
         gasto_dashboard: gastoCartaoFromDashboardBalance(balance),
         credit_limit: limite,
@@ -189,9 +241,21 @@ export default async function handler(req, res) {
   const accountsOut = accounts.map((a) => {
     const bal = Number(a.balance) || 0;
     const credit = isCreditLikeAccount(a.account_type, a.name);
+    const meta = accountDisplayParams(a);
+    const rawName = (a.name || 'Conta').trim() || 'Conta';
+    const displayParams = {
+      connectorName: meta.connectorName,
+      name: rawName,
+      accountType: a.account_type,
+      connectorId: meta.connectorId,
+      connectorImageUrl: meta.connectorImageUrl,
+      connectorPrimaryColor: meta.connectorPrimaryColor,
+    };
     return {
       id: a.id,
-      name: (a.name || 'Conta').trim() || 'Conta',
+      name: formatBankAccountDisplayNameMinimal(displayParams),
+      raw_name: rawName,
+      connector_name: meta.connectorName,
       balance: Math.round(bal * 100) / 100,
       currency_code: a.currency_code || 'BRL',
       account_type: a.account_type || null,

@@ -95,54 +95,37 @@ export function SimuladorCreditLimitsPanel({
   }
 
   return (
-    <div className="rounded-xl border border-purple-500/25 bg-purple-950/20 p-3 space-y-3">
-      <div className="flex items-start gap-2">
-        <CreditCard className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className={cn(labelClass, 'text-purple-200/90 mb-0')}>Limites dos cartões de crédito</p>
-          <p className="text-[10px] text-zinc-500 mt-1 leading-snug">
-            {showFormula ? (
-              <>
-                Informe o <strong className="text-zinc-400">limite total</strong> de cada banco/cartão. O gasto vem do{' '}
-                <strong className="text-zinc-400">dashboard</strong> (Open Finance). Fórmula:{' '}
-                <span className="text-[#39FF14] font-medium">limite − gasto = disponível</span> no Saldo de hoje.
-              </>
-            ) : (
-              <>
-                Digite o <strong className="text-zinc-400">limite total</strong> de cada cartão. O app usa o valor do{' '}
-                <strong className="text-zinc-400">dashboard</strong> como gasto: limite − gasto = disponível.
-              </>
-            )}
-          </p>
-        </div>
-      </div>
+    <div className="rounded-lg border border-zinc-800/60 p-2.5 space-y-2.5">
+      <p className={cn(labelClass, 'mb-0 flex items-center gap-1.5')}>
+        <CreditCard className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
+        Limites (credito)
+      </p>
+      {showFormula ? (
+        <p className="text-[10px] text-zinc-600">limite − gasto dashboard = disponível</p>
+      ) : null}
 
       {loading ? (
         <div className="flex items-center gap-2 text-xs text-zinc-500 py-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando cartões…
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2 divide-y divide-zinc-800/50">
           {preview.map((c) => (
-            <li
-              key={c.bank_account_id}
-              className="rounded-lg border border-zinc-700/80 bg-zinc-950/60 p-2.5 space-y-2"
-            >
-              <p className="text-xs font-semibold text-zinc-200 truncate">{c.name}</p>
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <span className="text-zinc-500">
-                  Gasto (dashboard):{' '}
-                  <strong className="text-zinc-300">{fmt(c.gasto)}</strong>
-                </span>
-                <span className="text-zinc-500 text-right">
-                  Disponível:{' '}
-                  <strong className="text-[#39FF14]">
-                    {c.disponivel != null ? fmt(c.disponivel) : '—'}
-                  </strong>
-                </span>
+            <li key={c.bank_account_id} className="pt-2 first:pt-0 space-y-1.5">
+              <div className="flex justify-between gap-2 items-baseline">
+                <p className="text-[11px] text-zinc-400 truncate">{c.name}</p>
+                <p className="text-[10px] text-zinc-600 shrink-0 tabular-nums">
+                  gasto {fmt(c.gasto)}
+                  {c.disponivel != null ? (
+                    <>
+                      {' '}
+                      · <span className="text-emerald-400/90">{fmt(c.disponivel)}</span>
+                    </>
+                  ) : null}
+                </p>
               </div>
               <div>
-                <label className={cn(labelClass, 'text-[10px]')}>Limite total do cartão (R$)</label>
+                <label className={cn(labelClass, 'text-[10px]')}>Limite (R$)</label>
                 <input
                   type="number"
                   min={0}
@@ -166,7 +149,7 @@ export function SimuladorCreditLimitsPanel({
           type="button"
           onClick={() => void save()}
           disabled={saving || loading || creditCards.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-2"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600/90 hover:bg-purple-600 disabled:opacity-50 text-white text-[11px] font-medium px-3 py-1.5"
         >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
           Guardar limites
