@@ -68,11 +68,10 @@ if (-not $vars["FINMEMORY_PUBLIC_ACCESS"]) {
     $vars["FINMEMORY_PUBLIC_ACCESS"] = "1"
 }
 $vars.Remove("FINMEMORY_LOCKDOWN_SINGLE_USER") | Out-Null
-$pairs = @()
+$envMap = @{}
 foreach ($k in $required) {
     if ($vars[$k]) {
-        $v = $vars[$k] -replace '"', '\"'
-        $pairs += "$k=$v"
+        $envMap[$k] = $vars[$k]
     } else {
         Write-Host "Aviso: $k nao definido no .env.local" -ForegroundColor Yellow
     }
@@ -84,10 +83,7 @@ $pluggyOptional = @(
     "PLUGGY_WIDGET_SANDBOX_CONNECTOR_ONLY", "PLUGGY_SANDBOX_CONNECTOR_ID"
 )
 foreach ($k in $pluggyOptional) {
-    if ($vars[$k]) {
-        $v = $vars[$k] -replace '"', '\"'
-        $pairs += "$k=$v"
-    }
+    if ($vars[$k]) { $envMap[$k] = $vars[$k] }
 }
 
 # Opcional: Cloudflare R2 (comprovantes OCR) + OpenAI
@@ -98,17 +94,21 @@ $r2Optional = @(
     "OPENAI_API_KEY"
 )
 foreach ($k in $r2Optional) {
-    if ($vars[$k]) {
-        $v = $vars[$k] -replace '"', '\"'
-        $pairs += "$k=$v"
-    }
+    if ($vars[$k]) { $envMap[$k] = $vars[$k] }
 }
 
-$envVarsStr = $pairs -join ","
-if (-not $envVarsStr) {
+if ($envMap.Count -eq 0) {
     Write-Host "Nenhuma variavel para atualizar." -ForegroundColor Red
     exit 1
 }
+
+# Escapar vírgulas nos valores para gcloud no Windows (ex.: lista de e-mails admin)
+$pairs = @()
+foreach ($entry in $envMap.GetEnumerator()) {
+    $val = [string]$entry.Value -replace ',', '^,'
+    $pairs += "$($entry.Key)=$val"
+}
+$envVarsStr = $pairs -join ","
 
 Write-Host "Atualizando Cloud Run ($FINMEMORY_GCP_PROJECT) com variaveis de autenticacao e Supabase..." -ForegroundColor Cyan
 & gcloud run services update finmemory --region southamerica-east1 --project $FINMEMORY_GCP_PROJECT --update-env-vars $envVarsStr
