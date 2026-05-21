@@ -9,7 +9,15 @@ import { useCalculatorDockOptional } from './CalculatorDockContext';
 /**
  * Carrossel de contas Open Finance: tema de marca (logo + cores) e filtro ao toque.
  * @param {{
- *   accounts?: Array<{ id: string; display_name?: string; name?: string; balance?: number; currency_code?: string }>;
+ *   accounts?: Array<{
+ *     id: string;
+ *     display_name?: string;
+ *     name?: string;
+ *     balance?: number;
+ *     currency_code?: string;
+ *     account_kind?: 'credito' | 'debito';
+ *     balance_display_color?: string;
+ *   }>;
  *   loading?: boolean;
  *   selectedAccountId?: string | null;
  *   onSelectAccount?: (accountId: string | null) => void;
@@ -108,9 +116,9 @@ export function OpenFinanceBankCarousel({
               </button>
             )}
             {visibleAccounts.map((a) => {
-              const label = a.display_name || a.name || 'Conta';
+              const cardTitle = a.display_name || a.name || 'Conta';
               const itemId = String(a?.item_id || '').trim();
-              const bankIdentity = itemBrandText[itemId] || label;
+              const bankIdentity = itemBrandText[itemId] || a.bank_brand_label || cardTitle;
               const theme = getBankTheme({
                 bankIdentity,
                 connectorName: a.connector_name,
@@ -118,10 +126,9 @@ export function OpenFinanceBankCarousel({
                 connectorImageUrl: a.connector_image_url,
                 connectorPrimaryColor: a.connector_primary_color,
               });
-              const shortLabel =
-                theme.label && label.toLowerCase().includes(theme.label.toLowerCase())
-                  ? theme.label
-                  : label;
+              const balanceColor =
+                a.balance_display_color ||
+                (a.account_kind === 'credito' ? '#EF4444' : '#22C55E');
               const balanceNum =
                 a.balance != null && Number.isFinite(Number(a.balance)) ? Number(a.balance) : null;
               const bal =
@@ -190,7 +197,7 @@ export function OpenFinanceBankCarousel({
                   aria-disabled={!canFilter && !calcDock}
                   aria-label={
                     calcDock && balanceNum != null
-                      ? `${shortLabel}, saldo ${bal}. Toque para enviar à calculadora${canFilter ? ' e filtrar movimentos' : ''}.`
+                      ? `${cardTitle}, saldo ${bal}. Toque para enviar à calculadora${canFilter ? ' e filtrar movimentos' : ''}.`
                       : undefined
                   }
                 >
@@ -213,22 +220,25 @@ export function OpenFinanceBankCarousel({
                         className="shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-sm font-bold"
                         aria-hidden
                       >
-                        {shortLabel.slice(0, 1).toUpperCase()}
+                        {cardTitle.slice(0, 1).toUpperCase()}
                       </span>
                     )}
-                    <p className="text-[11px] font-semibold leading-tight line-clamp-2 m-0 flex-1 opacity-95 pt-0.5">
-                      {shortLabel}
+                    <p className="text-[11px] font-bold leading-tight line-clamp-2 m-0 flex-1 pt-0.5">
+                      {cardTitle}
                     </p>
                   </div>
                   <div className="flex items-end justify-between gap-2 mt-2 min-h-[1.75rem]">
                     <p
                       className="text-base font-bold tabular-nums m-0 leading-tight truncate min-w-0 flex-1"
-                      style={{ color: theme.textColor }}
+                      style={{ color: balanceColor }}
                     >
                       {bal}
                     </p>
-                    <span className="text-[9px] font-medium uppercase tracking-wide opacity-90 shrink-0 self-end">
-                      Conectado
+                    <span
+                      className="text-[9px] font-semibold uppercase tracking-wide shrink-0 self-end opacity-95"
+                      style={{ color: theme.textColor }}
+                    >
+                      {a.account_kind === 'credito' ? 'Crédito' : 'Débito'}
                     </span>
                   </div>
                 </div>

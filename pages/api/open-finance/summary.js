@@ -3,6 +3,10 @@ import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { createPluggyServerClient } from '../../../lib/pluggySyncTransactions';
 import { pickConnectorMeta } from '../../../lib/pluggyConnectorMeta';
+import {
+  disambiguateDuplicateDisplayNames,
+  enrichBankAccountForDisplay,
+} from '../../../lib/bankAccountDisplay';
 
 /** Mês civil em America/Sao_Paulo (YYYY-MM-DD início e fim). */
 function brazilCurrentMonthRange() {
@@ -83,24 +87,6 @@ export default async function handler(req, res) {
     accountsFiltered = accountsFiltered.filter((a) => activeItemIds.has(a.item_id));
   }
 
-  const nameCounts = accountsFiltered.reduce((acc, a) => {
-    const key = (a.name || 'Conta').trim() || 'Conta';
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  accountsFiltered = accountsFiltered.map((a) => {
-    const base = (a.name || 'Conta').trim() || 'Conta';
-    const dup = (nameCounts[base] || 0) > 1;
-    const suffix =
-      dup && typeof a.item_id === 'string' && a.item_id.length >= 6
-        ? a.item_id.slice(-6)
-        : null;
-    return {
-      ...a,
-      display_name: suffix ? `${base} · …${suffix}` : base,
-    };
-  });
-
   const itemIds = Array.from(
     new Set(
       accountsFiltered
@@ -124,16 +110,18 @@ export default async function handler(req, res) {
     );
   }
 
-  accountsFiltered = accountsFiltered.map((a) => {
-    const meta = connectorByItemId[a.item_id] || {};
-    return {
-      ...a,
-      connector_id: meta.id || null,
-      connector_name: meta.name || null,
-      connector_image_url: meta.imageUrl || null,
-      connector_primary_color: meta.primaryColor || null,
-    };
-  });
+  accountsFiltered = disambiguateDuplicateDisplayNames(
+    accountsFiltered.map((a) => {
+      const meta = connectorByItemId[a.item_id] || {};
+      return enrichBankAccountForDisplay({
+        ...a,
+        connector_id: meta.id || null,
+        connector_name: meta.name || null,
+        connector_image_url: meta.imageUrl || null,
+        connector_primary_color: meta.primaryColor || null,
+      });
+    })
+  );
 
   let txQuery = supabase
     .from('bank_transactions')
