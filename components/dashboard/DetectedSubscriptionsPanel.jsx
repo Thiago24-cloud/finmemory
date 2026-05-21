@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { CheckCircle2, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/Sheet';
 import { cn } from '../../lib/utils';
@@ -16,12 +16,13 @@ const confidenceLabel = {
 };
 
 /**
- * Assinaturas detectadas via Pluggy — validação antes de gravar em `cobrancas`.
+ * Assinaturas detectadas via Pluggy — validar (cobranças) ou ignorar.
  */
 export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
   const [detected, setDetected] = useState([]);
   const [selected, setSelected] = useState(new Set());
 
@@ -63,6 +64,63 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
     });
   };
 
+  const dismissIds = async (ids, { silent = false } = {}) => {
+    const unique = [...new Set(ids)].filter(Boolean);
+    if (!unique.length) {
+      if (!silent) toast.message('Nada para remover');
+      return;
+    }
+
+    setDismissing(true);
+    try {
+      const res = await fetch('/api/finance/detected-subscriptions', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dismiss: unique }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Falha ao ignorar');
+
+      setDetected((prev) => prev.filter((d) => !unique.includes(d.id)));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const id of unique) next.delete(id);
+        return next;
+      });
+
+      if (!silent) {
+        const n = json.dismissed_count ?? unique.length;
+        toast.success(n === 1 ? 'Removida da lista' : `${n} removidas da lista`);
+      }
+    } catch (e) {
+      toast.error(e?.message || 'Erro ao remover');
+    } finally {
+      setDismissing(false);
+    }
+  };
+
+  const dismissOne = (id, nome) => {
+    const ok = window.confirm(
+      `Remover "${nome}" da lista?\n\nNão será adicionada às cobranças e deixa de aparecer nas detecções.`
+    );
+    if (!ok) return;
+    void dismissIds([id]);
+  };
+
+  const dismissSelected = () => {
+    const ids = [...selected];
+    if (!ids.length) {
+      toast.message('Selecione as assinaturas a remover');
+      return;
+    }
+    const ok = window.confirm(
+      `Remover ${ids.length} assinatura${ids.length === 1 ? '' : 's'} da lista?\n\nNão serão adicionadas às cobranças.`
+    );
+    if (!ok) return;
+    void dismissIds(ids);
+  };
+
   const confirmSelected = async () => {
     const ids = [...selected];
     if (!ids.length) {
@@ -94,6 +152,7 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
   if (!userId) return null;
 
   const showBanner = pending.length > 0;
+  const busy = saving || dismissing;
 
   return (
     <>
@@ -113,7 +172,7 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
                 {pending.length === 1 ? '' : 's'}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Netflix, Spotify e similares no seu cartão — confirme antes de salvar nas cobranças.
+                Confirme para salvar nas cobranças ou remova o que não for assinatura.
               </p>
             </div>
             <span className="text-xs font-medium text-violet-300 shrink-0">Revisar</span>
@@ -129,8 +188,7 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
               Assinaturas detectadas
             </SheetTitle>
             <p className="text-xs text-muted-foreground font-normal">
-              Com base nas transações Pluggy (Open Finance). Marque as que quer acompanhar como cobrança
-              mensal.
+              Toque na linha para marcar · Confirmar adiciona às cobranças · Lixeira remove da lista.
             </p>
           </SheetHeader>
 
@@ -148,12 +206,13 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
               {pending.map((d) => {
                 const on = selected.has(d.id);
                 return (
-                  <li key={d.id}>
+                  <li key={d.id} className="flex items-stretch gap-1.5">
                     <button
                       type="button"
                       onClick={() => toggle(d.id)}
+                      disabled={busy}
                       className={cn(
-                        'w-full rounded-xl border p-3 text-left transition',
+                        'flex-1 min-w-0 rounded-xl border p-3 text-left transition',
                         on
                           ? 'border-violet-500/50 bg-violet-500/10'
                           : 'border-[#1E2A3A] bg-card/80 opacity-80'
@@ -183,38 +242,63 @@ export default function DetectedSubscriptionsPanel({ userId, onConfirmed }) {
                         </div>
                       </div>
                     </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => dismissOne(d.id, d.nome_amigavel)}
+                      className="shrink-0 flex w-11 items-center justify-center rounded-xl border border-[#1E2A3A] bg-card/80 text-muted-foreground transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+                      aria-label={`Remover ${d.nome_amigavel} da lista`}
+                    >
+                      <Trash2 className="h-4 w-4" strokeWidth={2} />
+                    </button>
                   </li>
                 );
               })}
             </ul>
           )}
 
-          <div className="flex gap-2 pt-2 border-t border-[#1E2A3A]">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="flex-1 rounded-xl border border-[#1E2A3A] py-3 text-sm font-medium text-muted-foreground"
-            >
-              Depois
-            </button>
-            <button
-              type="button"
-              disabled={saving || pending.length === 0 || selected.size === 0}
-              onClick={() => void confirmSelected()}
-              className="flex-1 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 py-3 text-sm font-semibold text-white"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-              ) : (
-                `Confirmar (${selected.size})`
-              )}
-            </button>
+          <div className="flex flex-col gap-2 pt-2 border-t border-[#1E2A3A]">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                disabled={busy}
+                className="flex-1 rounded-xl border border-[#1E2A3A] py-3 text-sm font-medium text-muted-foreground"
+              >
+                Depois
+              </button>
+              <button
+                type="button"
+                disabled={busy || pending.length === 0 || selected.size === 0}
+                onClick={() => void dismissSelected()}
+                className="flex-1 rounded-xl border border-red-500/35 bg-red-500/10 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/15 disabled:opacity-50"
+              >
+                {dismissing ? (
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                ) : (
+                  `Remover (${selected.size})`
+                )}
+              </button>
+              <button
+                type="button"
+                disabled={busy || pending.length === 0 || selected.size === 0}
+                onClick={() => void confirmSelected()}
+                className="flex-1 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 py-3 text-sm font-semibold text-white"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                ) : (
+                  `Confirmar (${selected.size})`
+                )}
+              </button>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={() => void load()}
-            className="w-full mt-2 text-[10px] text-muted-foreground hover:text-foreground"
+            disabled={busy}
+            className="w-full mt-2 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             Atualizar análise
           </button>

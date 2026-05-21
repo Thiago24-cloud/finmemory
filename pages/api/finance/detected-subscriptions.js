@@ -6,6 +6,10 @@ import {
   bankTransactionToPluggyLike,
   detectSubscriptions,
 } from '../../../lib/finance/detectSubscriptions';
+import {
+  dismissSubscriptionDetections,
+  getDismissedSubscriptionIds,
+} from '../../../lib/subscriptionDismissals';
 
 function isoDateDaysAgo(days) {
   const d = new Date();
@@ -27,8 +31,8 @@ async function resolveUserId(session, supabase) {
  *      Lista assinaturas detectadas (Pluggy / bank_transactions) para validação.
  *
  * POST /api/finance/detected-subscriptions
- *      body: { confirm: [{ id, titulo?, valor?, dia_vencimento?, categoria? }] }
- *      Cria entradas em `cobrancas` (recorrência mensal) após OK do utilizador.
+ *      body: { confirm: [{ id, ... }] } — grava em `cobrancas`
+ *      body: { dismiss: ["sub_...", ...] } — ignora (não mostra de novo)
  */
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
@@ -73,7 +77,15 @@ export default async function handler(req, res) {
 
   const existingTitulos = (cobrancas || []).map((c) => c.titulo).filter(Boolean);
 
-  const detected = detectSubscriptions(pluggyLike, { existingCobrancaTitulos: existingTitulos });
+  let dismissedIds = new Set();
+  try {
+    dismissedIds = await getDismissedSubscriptionIds(supabase, userId);
+  } catch (e) {
+    console.warn('[detected-subscriptions] dismissals:', e?.message || e);
+  }
+
+  const detectedAll = detectSubscriptions(pluggyLike, { existingCobrancaTitulos: existingTitulos });
+  const detected = detectedAll.filter((d) => !dismissedIds.has(d.id));
 
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -84,17 +96,36 @@ export default async function handler(req, res) {
       detected,
       pending: detected.filter((d) => !d.ja_cadastrada),
       already_registered: detected.filter((d) => d.ja_cadastrada),
+      dismissed_count: dismissedIds.size,
     });
   }
 
   if (req.method === 'POST') {
     const body = typeof req.body === 'object' && req.body !== null ? req.body : {};
-    const confirm = Array.isArray(body.confirm) ? body.confirm : [];
-    if (!confirm.length) {
-      return res.status(400).json({ ok: false, error: 'Envie confirm: [{ id, ... }]' });
+    const dismiss = Array.isArray(body.dismiss) ? body.dismiss : [];
+    if (dismiss.length) {
+      try {
+        const { dismissed } = await dismissSubscriptionDetections(
+          supabase,
+          userId,
+          dismiss.map((x) => (typeof x === 'string' ? x : x?.id))
+        );
+        return res.status(200).json({ ok: true, dismissed_count: dismissed });
+      } catch (e) {
+        if (e?.code === 'MISSING_TABLE') {
+          return res.status(503).json({ ok: false, error: e.message });
+        }
+        console.error('[detected-subscriptions] dismiss:', e?.message || e);
+        return res.status(500).json({ ok: false, error: 'Falha ao ignorar assinaturas' });
+      }
     }
 
-    const byId = new Map(detected.map((d) => [d.id, d]));
+    const confirm = Array.isArray(body.confirm) ? body.confirm : [];
+    if (!confirm.length) {
+      return res.status(400).json({ ok: false, error: 'Envie confirm ou dismiss' });
+    }
+
+    const byId = new Map(detectedAll.map((d) => [d.id, d]));
     const created = [];
     const skipped = [];
 

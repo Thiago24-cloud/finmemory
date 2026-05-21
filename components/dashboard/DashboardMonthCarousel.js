@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '../../lib/utils';
 import { DASHBOARD } from '../../lib/appMicrocopy';
+import { useCalculatorDockOptional } from './CalculatorDockContext';
+import { pushAmountToCalculator } from '../../lib/pushAmountToCalculator';
 
 const fmtCurrency = (v) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
@@ -29,6 +31,7 @@ export function DashboardMonthCarousel({
   loading = false,
   className,
 }) {
+  const calcDock = useCalculatorDockOptional();
   const stripRef = useRef(null);
   const chipRefs = useRef({});
 
@@ -66,9 +69,16 @@ export function DashboardMonthCarousel({
               ref={(node) => {
                 chipRefs.current[ym] = node;
               }}
-              onClick={() => onMonthChange?.(ym)}
+              onClick={(e) => {
+                onMonthChange?.(ym);
+                if (!loading && calcDock && total > 0) {
+                  pushAmountToCalculator(calcDock, total, '-', e, fmtCurrency(total));
+                }
+              }}
+              title={calcDock && total > 0 && !loading ? 'Toque para filtrar o mês e enviar o total à calculadora' : undefined}
               className={cn(
                 'snap-start shrink-0 min-w-[108px] max-w-[124px] rounded-xl px-3 py-2 text-left transition-colors border isolate',
+                calcDock && total > 0 && !loading && 'cursor-pointer active:scale-[0.98]',
                 /* Fundo opaco — bg-card/80 deixava ver o verde do BalanceCard por baixo (efeito “duplicado”) */
                 selected
                   ? 'border-[#00E676]/55 bg-[#0f1a14] shadow-sm'
