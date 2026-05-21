@@ -2,16 +2,7 @@ import Stripe from 'stripe';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
-
-function appBaseUrl() {
-  return (
-    process.env.STRIPE_APP_BASE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_BASE_URL ||
-    process.env.NEXTAUTH_URL ||
-    ''
-  ).replace(/\/$/, '');
-}
+import { stripeAppBaseUrl } from '../../../lib/stripe/appBaseUrl';
 
 /**
  * POST /api/stripe/create-billing-portal
@@ -35,7 +26,7 @@ export default async function handler(req, res) {
   if (userErr || !userRow) return res.status(404).json({ error: 'Utilizador não encontrado' });
   const customerId = String(userRow.stripe_customer_id || '').trim();
   if (!customerId) return res.status(400).json({ error: 'Conta sem cliente Stripe vinculado' });
-  const returnUrl = `${appBaseUrl() || 'https://finmemory.com.br'}/settings`;
+  const returnUrl = `${stripeAppBaseUrl() || 'https://finmemory.com.br'}/settings`;
   try {
     const stripe = new Stripe(secret);
     const portal = await stripe.billingPortal.sessions.create({

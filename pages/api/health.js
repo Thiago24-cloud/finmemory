@@ -1,3 +1,5 @@
+import { getStripeCheckoutDiagnostics } from '../../lib/stripe/checkoutDiagnostics';
+
 /**
  * Health Check Endpoint
  * 
@@ -69,6 +71,13 @@ export default async function handler(req, res) {
       if (health.status === 'ok') health.status = 'degraded';
       health.checks.authEnv.hint =
         'Login Google pode falhar: defina NEXTAUTH_SECRET, GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no Cloud Run. Opcional: SUPABASE_SERVICE_ROLE_KEY.';
+    }
+
+    const stripeDiag = getStripeCheckoutDiagnostics();
+    health.checks.stripeCheckout = stripeDiag.checks;
+    if (!stripeDiag.ok) {
+      if (health.status === 'ok') health.status = 'degraded';
+      health.checks.stripeCheckoutIssues = stripeDiag.issues;
     }
   }
 

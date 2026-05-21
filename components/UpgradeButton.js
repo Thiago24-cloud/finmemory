@@ -29,48 +29,43 @@ export default function UpgradeButton({
     setErr('');
     setLoading(true);
     try {
+      const callbackPath =
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search || ''}`
+          : '/planos';
+
       const r = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
+        credentials: 'include',
         body: JSON.stringify({ plan }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         if (r.status === 401) {
           if (typeof window !== 'undefined') {
-            const cb = encodeURIComponent('/planos');
-            window.location.href = `/login?callbackUrl=${cb}`;
+            window.location.href = `/login?callbackUrl=${encodeURIComponent(callbackPath)}`;
             return;
           }
         }
-        throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
+        const detail = Array.isArray(data.issues) && data.issues[0] ? ` (${data.issues[0]})` : '';
+        throw new Error((data.error || 'Não foi possível iniciar o pagamento.') + detail);
       }
       if (data.url) {
-        // Alguns browsers/webviews são sensíveis ao fluxo assíncrono;
-        // forçamos navegação no mesmo separador com fallback.
-        window.location.assign(data.url);
-        setTimeout(() => {
-          try {
-            window.open(data.url, '_self');
-          } catch (_) {
-            // noop
-          }
-        }, 150);
+        window.location.href = data.url;
         return;
       }
       const stripe = await getStripe();
       if (!stripe || !data.sessionId) {
         throw new Error(
-          'Checkout não pôde abrir pelo fallback Stripe.js. Verifique NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY e tente novamente.'
+          'Não foi possível abrir o pagamento. Atualize a página e tente de novo; se persistir, contacte o suporte.'
         );
       }
       const { error } = await stripe.redirectToCheckout({ sessionId: data.sessionId });
       if (error) throw error;
     } catch (e) {
-      // Deixa rastro para inspeção no browser em casos de "clique sem ação".
       console.error('[stripe/upgrade-button]', e);
-      setErr(e?.message || 'Erro');
+      setErr(e?.message || 'Erro ao abrir pagamento');
     } finally {
       setLoading(false);
     }

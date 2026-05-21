@@ -30,8 +30,12 @@ if (-not $vars["NEXTAUTH_SECRET"]) {
     Write-Host "NEXTAUTH_SECRET gerado e adicionado ao .env.local" -ForegroundColor Green
 }
 
-# URL do app: por padrão usa o URL canónico do serviço finmemory neste projeto
-if (-not $vars["NEXTAUTH_URL"]) {
+# URL canónica: domínio público (checkout/OAuth) tem prioridade sobre *.run.app
+$canonicalApp = $vars["NEXT_PUBLIC_APP_URL"]
+if ($canonicalApp -and $canonicalApp -match '^https?://') {
+    $vars["NEXTAUTH_URL"] = $canonicalApp.TrimEnd('/')
+    Write-Host "NEXTAUTH_URL = NEXT_PUBLIC_APP_URL ($($vars['NEXTAUTH_URL']))" -ForegroundColor Cyan
+} elseif (-not $vars["NEXTAUTH_URL"]) {
     $runUrl = gcloud run services describe finmemory --region=southamerica-east1 --project=$FINMEMORY_GCP_PROJECT --format="value(status.url)" 2>$null
     if ($runUrl) {
         $vars["NEXTAUTH_URL"] = $runUrl.TrimEnd('/')
@@ -52,7 +56,7 @@ $required = @(
     "NEXT_PUBLIC_APP_URL",
     # Stripe — server-side runtime (não embutidas no bundle)
     "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
-    "STRIPE_PLUS_PRICE_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_FAMILIA_PRICE_ID",
+    "STRIPE_PLUS_PRICE_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_FAMILIA_PRICE_ID", "STRIPE_ENTERPRISE_PRICE_ID",
     "FINMEMORY_PUBLIC_ACCESS"
 )
 # Garantir callback Google = NEXTAUTH_URL + /api/auth/callback/google

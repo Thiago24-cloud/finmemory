@@ -33,6 +33,7 @@ const mapbox =
   process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN?.trim() ||
   process.env._MAPBOX_ACCESS_TOKEN?.trim() ||
   '';
+const stripePublishable = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || '';
 
 if (!supabaseUrl || !supabaseAnon) {
   console.error(
@@ -44,6 +45,12 @@ if (!supabaseUrl || !supabaseAnon) {
 if (!mapbox) {
   console.warn(
     '[deploy-cloud-run] Aviso: NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN vazio — o build do Docker pode falhar ou o mapa ficar sem token.'
+  );
+}
+
+if (!stripePublishable) {
+  console.warn(
+    '[deploy-cloud-run] Aviso: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY vazio — checkout Stripe no cliente pode falhar no fallback.'
   );
 }
 
@@ -60,6 +67,7 @@ const substitutions = [
   `_NEXT_PUBLIC_SUPABASE_URL=${supabaseUrl}`,
   `_NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnon}`,
   `_MAPBOX_ACCESS_TOKEN=${mapbox}`,
+  `_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${stripePublishable}`,
 ].join(',');
 
 console.log(`[deploy-cloud-run] Projeto GCP: ${GCP_PROJECT}`);
