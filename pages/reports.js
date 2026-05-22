@@ -9,6 +9,7 @@ import { MONTH_FILTER } from '../lib/appMicrocopy';
 import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
 import { displayCategoryForReport } from '../lib/reportCategoryDisplay';
 import { getExpenseAmountForDashboard } from '../lib/transacaoExpenseAmount';
+import { filterMonthsUpToCurrent, getLatestYear } from '../lib/dashboardMonthKey';
 
 function formatCurrency(value) {
   if (value == null) return 'R$ 0,00';
@@ -27,17 +28,6 @@ function getYearMonthKey(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getLatestYear(monthKeys) {
-  let latest = null;
-  monthKeys.forEach((ym) => {
-    const year = parseInt(ym.split('-')[0], 10);
-    if (!Number.isNaN(year)) {
-      latest = latest === null ? year : Math.max(latest, year);
-    }
-  });
-  return latest;
 }
 
 export default function ReportsPage() {
@@ -93,7 +83,7 @@ export default function ReportsPage() {
     const allMonths = Array.from(set);
     const latestYear = getLatestYear(allMonths);
     const filtered = latestYear ? allMonths.filter((ym) => ym.startsWith(`${latestYear}-`)) : allMonths;
-    return filtered.sort((a, b) => b.localeCompare(a));
+    return filterMonthsUpToCurrent(filtered).sort((a, b) => b.localeCompare(a));
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {

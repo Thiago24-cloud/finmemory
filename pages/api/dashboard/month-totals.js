@@ -3,7 +3,7 @@ import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import {
   aggregateMonthExpenseTotals,
-  filterMonthsToLatestYear,
+  filterMonthsForDashboard,
 } from '../../../lib/monthExpenseTotals';
 
 /**
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       transacoes: transacoes || [],
     });
 
-    const months = filterMonthsToLatestYear(allMonths);
+    const months = filterMonthsForDashboard(allMonths);
 
     const filteredTotals = {};
     for (const ym of months) {

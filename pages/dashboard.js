@@ -26,10 +26,10 @@ import { useOpenFinanceSummary } from '../hooks/useOpenFinance';
 import { usePlan } from '../hooks/usePlan';
 import { dedupePluggyTransactions } from '../lib/dedupePluggyTransactions';
 import { getExpenseAmountForDashboard } from '../lib/transacaoExpenseAmount';
-import { getYearMonthKey } from '../lib/dashboardMonthKey';
+import { getYearMonthKey, pickDefaultDashboardMonth } from '../lib/dashboardMonthKey';
 import {
   aggregateMonthExpenseTotals,
-  filterMonthsToLatestYear,
+  filterMonthsForDashboard,
 } from '../lib/monthExpenseTotals';
 
 // Lazy initialization do Supabase - só cria quando realmente necessário (não durante build)
@@ -852,7 +852,7 @@ export default function Dashboard() {
   const { missions: missionsToday } = useMissionsToday();
   const clientMonthExpense = useMemo(() => {
     const { monthTotals: map, months } = aggregateMonthExpenseTotals({ transacoes: transactions || [] });
-    return { monthTotals: map, months: filterMonthsToLatestYear(months) };
+    return { monthTotals: map, months: filterMonthsForDashboard(months) };
   }, [transactions]);
 
   const availableMonths =
@@ -861,11 +861,11 @@ export default function Dashboard() {
   const monthTotals =
     Object.keys(apiMonthTotals).length > 0 ? apiMonthTotals : clientMonthExpense.monthTotals;
 
-  // UX estilo app bancário: abrir já no mês mais recente (evita mostrar acumulado histórico gigante).
+  // Abrir no mês atual (se houver dados); nunca selecionar mês futuro no carrossel.
   useEffect(() => {
-    if (selectedMonth) return;
     if (!availableMonths.length) return;
-    setSelectedMonth(availableMonths[0]);
+    if (selectedMonth && availableMonths.includes(selectedMonth)) return;
+    setSelectedMonth(pickDefaultDashboardMonth(availableMonths));
   }, [availableMonths, selectedMonth]);
 
   // Transações filtradas pelo mês selecionado
