@@ -131,7 +131,7 @@ foreach ($entry in $merged.GetEnumerator() | Sort-Object Name) {
 Set-Content -Path $envFile -Value ($lines -join "`n") -Encoding UTF8
 
 Write-Host "Atualizando Cloud Run ($FINMEMORY_GCP_PROJECT) com variaveis de autenticacao e Supabase..." -ForegroundColor Cyan
-& gcloud run services update finmemory --region southamerica-east1 --project $FINMEMORY_GCP_PROJECT --set-env-vars-file $envFile
+& gcloud run services update finmemory --region southamerica-east1 --project $FINMEMORY_GCP_PROJECT --env-vars-file $envFile
 if ($LASTEXITCODE -ne 0) { exit 1 }
 $url = $vars["NEXTAUTH_URL"]
 Write-Host "Cloud Run atualizado. Teste o login em: $url" -ForegroundColor Green
