@@ -39,7 +39,7 @@ export default function OpenFinanceConnectPanel({ onSuccess, onError }) {
   );
 
   if (limitsLoading) {
-    return <p className="text-sm text-gray-500">A carregar…</p>;
+    return <p className="text-sm text-foreground/70">A carregar…</p>;
   }
 
   const canConnect = limits?.canConnectMore !== false;
@@ -48,11 +48,11 @@ export default function OpenFinanceConnectPanel({ onSuccess, onError }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-foreground/85">
         {max <= 1
           ? 'Plano Grátis: 1 banco ligado, sem limite de tempo.'
           : `Seu plano: até ${max} bancos ligados.`}{' '}
-        <span className="text-gray-500">
+        <span className="text-[#2ECC49] font-medium">
           ({used}/{max} em uso)
         </span>
       </p>
@@ -60,14 +60,14 @@ export default function OpenFinanceConnectPanel({ onSuccess, onError }) {
       {canConnect ? (
         <ConnectBank onSuccess={handleSuccess} onError={onError} />
       ) : (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Limite de bancos atingido</p>
-          <p className="mt-1 text-amber-900/90">
+        <div className="rounded-xl border border-amber-500/35 bg-amber-950/40 px-4 py-3 text-sm">
+          <p className="font-semibold text-[#2ECC49]">Limite de bancos atingido</p>
+          <p className="mt-1 text-foreground/85">
             Para ligar outro banco, assine um plano pago (Pro, Família ou Enterprise).
           </p>
           <Link
             href="/planos"
-            className="mt-3 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="mt-3 inline-flex rounded-lg bg-[#2ECC49] px-4 py-2 text-sm font-semibold text-white hover:bg-[#25b340]"
           >
             Ver planos
           </Link>

@@ -3,7 +3,7 @@ import { Instagram } from 'lucide-react';
 import PlanGuard from '../PlanGuard';
 import ProximityAlertsSettings from '../ProximityAlertsSettings';
 import { PLAN_LABELS } from '../../lib/planAccess';
-import { BRAND } from '../../lib/brandTokens';
+import { APP_DARK_UI, BRAND } from '../../lib/brandTokens';
 import { cn } from '../../lib/utils';
 
 const pulse =
@@ -137,35 +137,26 @@ export const SettingsSubscriptionCenterCard = memo(function SettingsSubscription
   billingPortalBusy,
 }) {
   return (
-    <div
-      className="mb-6 overflow-hidden rounded-2xl p-4 shadow-sm"
-      style={{ border: `1px solid ${BRAND.primarySoftBorder}`, background: BRAND.primarySoftBg }}
-    >
-      <h2 className="text-base font-semibold text-gray-900">Centro de Assinatura</h2>
-      <p className="mt-1 text-sm text-gray-600">Status do pagamento e ativação do seu plano em tempo real.</p>
+    <div className={cn(APP_DARK_UI.card, 'mb-6 overflow-hidden')}>
+      <h2 className={APP_DARK_UI.sectionTitle}>Centro de Assinatura</h2>
+      <p className={APP_DARK_UI.sectionLead}>Status do pagamento e ativação do seu plano em tempo real.</p>
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="rounded-xl bg-white px-3 py-2" style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}>
-          <p className="text-[11px] text-gray-500">Plano atual</p>
-          <p className="text-sm font-semibold text-gray-900">
+        <div className={APP_DARK_UI.statBox}>
+          <p className={APP_DARK_UI.label}>Plano atual</p>
+          <p className={cn(APP_DARK_UI.value, 'mt-0.5')}>
             {PLAN_LABELS[String(subscriptionStatus.plano || 'free')] || 'Grátis'}
           </p>
         </div>
-        <div className="rounded-xl bg-white px-3 py-2" style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}>
-          <p className="text-[11px] text-gray-500">Situação</p>
-          <p
-            className="text-sm font-semibold"
-            style={{ color: subscriptionStatus.plano_ativo ? BRAND.primaryText : '#111827' }}
-          >
+        <div className={APP_DARK_UI.statBox}>
+          <p className={APP_DARK_UI.label}>Situação</p>
+          <p className={cn(APP_DARK_UI.value, 'mt-0.5', subscriptionStatus.plano_ativo && 'text-[#2ECC49]')}>
             {subscriptionStatus.plano_ativo ? 'Ativo' : 'Inativo'}
             {subscriptionStatus.cancel_at_period_end ? ' (encerrando no fim do ciclo)' : ''}
           </p>
         </div>
-        <div
-          className="rounded-xl bg-white px-3 py-2 sm:col-span-2"
-          style={{ border: `1px solid ${BRAND.primarySoftBorder}` }}
-        >
-          <p className="text-[11px] text-gray-500">Próxima renovação</p>
-          <p className="text-sm font-semibold text-gray-900">
+        <div className={cn(APP_DARK_UI.statBox, 'sm:col-span-2')}>
+          <p className={APP_DARK_UI.label}>Próxima renovação</p>
+          <p className={cn(APP_DARK_UI.value, 'mt-0.5')}>
             {subscriptionStatus.next_billing_at
               ? new Date(subscriptionStatus.next_billing_at).toLocaleDateString('pt-BR')
               : 'Sem cobrança futura no momento'}
@@ -173,14 +164,14 @@ export const SettingsSubscriptionCenterCard = memo(function SettingsSubscription
         </div>
       </div>
       {subscriptionStatus.error ? (
-        <p className="mt-2 text-xs text-red-600">{subscriptionStatus.error}</p>
+        <p className="mt-2 text-xs text-red-400">{subscriptionStatus.error}</p>
       ) : null}
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
           onClick={onRefresh}
           disabled={subscriptionStatus.loading}
-          className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+          className={APP_DARK_UI.btnGhost}
         >
           {subscriptionStatus.loading ? 'Atualizando…' : 'Atualizar status'}
         </button>
@@ -189,23 +180,12 @@ export const SettingsSubscriptionCenterCard = memo(function SettingsSubscription
             type="button"
             onClick={onOpenBillingPortal}
             disabled={billingPortalBusy}
-            className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            style={{ backgroundColor: BRAND.primary }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = BRAND.primaryHover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = BRAND.primary;
-            }}
+            className={APP_DARK_UI.btnPrimary}
           >
             {billingPortalBusy ? 'Abrindo…' : 'Gerenciar assinatura'}
           </button>
         ) : (
-          <a
-            href="/planos"
-            className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white"
-            style={{ backgroundColor: BRAND.primary }}
-          >
+          <a href="/planos" className={APP_DARK_UI.btnPrimary}>
             Ver planos
           </a>
         )}

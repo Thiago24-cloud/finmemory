@@ -12,7 +12,7 @@ import {
   SettingsSubscriptionCenterCard,
 } from '../components/settings/SettingsAccountPanels';
 import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
-import { BRAND } from '../lib/brandTokens';
+import { APP_DARK_UI, BRAND } from '../lib/brandTokens';
 import { readSettingsAccountCache, writeSettingsAccountCache } from '../lib/settingsAccountCache';
 
 const OpenFinanceConnectPanel = dynamic(() => import('../components/OpenFinanceConnectPanel'), {
@@ -37,9 +37,9 @@ async function fetchWithTimeout(input, init = {}, ms = ACCOUNT_FETCH_TIMEOUT_MS)
 const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, userEmail }) {
   if (!supabaseId || !userEmail) return null;
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-gray-900">Planos FinMemory</h2>
-      <p className="mt-1 text-sm text-gray-500">
+    <div className={APP_DARK_UI.card + ' mb-6 overflow-hidden'}>
+      <h2 className={APP_DARK_UI.sectionTitle}>Planos FinMemory</h2>
+      <p className={APP_DARK_UI.sectionLead}>
         Assinatura no Stripe — Pro, Família ou Enterprise. Os preços vêm do Stripe Checkout.
       </p>
       <Link
@@ -55,7 +55,7 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
           plan="pro"
           userId={supabaseId}
           userEmail={userEmail}
-          className="w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white"
+          className="w-full rounded-lg bg-[#2ECC49] py-2 text-sm font-semibold text-white hover:bg-[#25b340]"
         >
           Assinar Pro — R$ 24,90/mês
         </UpgradePlan>
@@ -63,7 +63,7 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
           plan="familia"
           userId={supabaseId}
           userEmail={userEmail}
-          className="w-full rounded-lg border border-gray-900 bg-white py-2 text-sm font-semibold text-gray-900"
+          className="w-full rounded-lg border border-[#2ECC49]/50 bg-secondary/40 py-2 text-sm font-semibold text-[#2ECC49] hover:bg-secondary/60"
         >
           Assinar Família — R$ 99,90/mês
         </UpgradePlan>
@@ -71,8 +71,7 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
           plan="enterprise"
           userId={supabaseId}
           userEmail={userEmail}
-          className="w-full rounded-lg py-2 text-sm font-semibold text-white"
-          style={{ backgroundColor: BRAND.primary }}
+          className="w-full rounded-lg bg-[#2ECC49] py-2 text-sm font-semibold text-white hover:bg-[#25b340]"
         >
           Assinar Enterprise — R$ 17,90/mês
         </UpgradePlan>
@@ -389,9 +388,9 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className={APP_DARK_UI.page}>
       <div className="max-w-md mx-auto px-5 py-6 pb-[calc(6.25rem+env(safe-area-inset-bottom))]">
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 text-sm mb-6">
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-foreground/70 hover:text-[#2ECC49] text-sm mb-6">
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
 
@@ -400,8 +399,8 @@ export default function SettingsPage() {
             <Settings className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Ajustes</h1>
-            <p className="text-sm text-gray-500">Privacidade e conta</p>
+            <h1 className="text-xl font-semibold text-[#2ECC49]">Ajustes</h1>
+            <p className="text-sm text-foreground/70">Privacidade e conta</p>
           </div>
         </div>
 
@@ -435,25 +434,25 @@ export default function SettingsPage() {
         ) : null}
 
         {pwaUi?.installEntryVisible ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+          <div className={APP_DARK_UI.card + ' overflow-hidden mb-6'}>
             <button
               type="button"
               onClick={() => pwaUi.openInstallAssistant()}
-              className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors text-left text-gray-900"
+              className="w-full flex items-center gap-4 p-0 hover:opacity-90 transition-opacity text-left"
             >
               <Smartphone className="h-5 w-5 text-[#2ECC49]" />
               <div>
-                <span className="font-medium block">Instalar app na tela inicial</span>
-                <span className="text-xs text-gray-500">Atalho como um app — abre em um toque</span>
+                <span className="font-medium block text-[#2ECC49]">Instalar app na tela inicial</span>
+                <span className="text-xs text-foreground/70">Atalho como um app — abre em um toque</span>
               </div>
             </button>
           </div>
         ) : null}
 
         {status === 'authenticated' && session?.user && accountUiReady ? (
-          <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold text-gray-900">Conta</h2>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className={APP_DARK_UI.card + ' mb-6 overflow-hidden'}>
+            <h2 className={APP_DARK_UI.sectionTitle}>Conta</h2>
+            <p className={APP_DARK_UI.sectionLead}>
               Excluir a conta remove os seus dados do FinMemory, conforme a Política de Privacidade.
             </p>
             <button
@@ -505,49 +504,70 @@ export default function SettingsPage() {
         </div>
 
         {session?.user && (
-          <p className="text-center text-gray-500 text-sm mt-6">
+          <p className="text-center text-foreground/60 text-sm mt-6">
             Conectado como {session.user.email}
           </p>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mt-6">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-gray-900">Segurança da conta</h2>
-            <p className="text-sm text-gray-500 mt-1">Ative 2FA (TOTP) para proteger contas sensíveis.</p>
+        <div className={APP_DARK_UI.card + ' overflow-hidden mt-6'}>
+          <div className="p-0 pb-4 border-b border-border">
+            <h2 className={APP_DARK_UI.sectionTitle}>Segurança da conta</h2>
+            <p className={APP_DARK_UI.sectionLead}>Ative 2FA (TOTP) para proteger contas sensíveis.</p>
           </div>
-          <div className="p-4 border-b border-gray-200">
-            <p className="text-sm mb-3">Status 2FA: <span className="font-semibold">{twoFaEnabled ? 'Ativo' : 'Inativo'}</span></p>
+          <div className="py-4 border-b border-border">
+            <p className={APP_DARK_UI.body + ' mb-3'}>
+              Status 2FA:{' '}
+              <span className="font-semibold text-[#2ECC49]">{twoFaEnabled ? 'Ativo' : 'Inativo'}</span>
+            </p>
             {!twoFaEnabled ? (
               <div className="space-y-2">
-                <button type="button" onClick={handleStart2fa} className="w-full rounded-lg py-2 border border-gray-300 text-sm">Iniciar configuração 2FA</button>
+                <button
+                  type="button"
+                  onClick={handleStart2fa}
+                  className={APP_DARK_UI.btnGhost + ' w-full'}
+                >
+                  Iniciar configuração 2FA
+                </button>
                 {totpSecret ? (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-3">
-                    <p className="text-xs text-gray-600">Segredo TOTP (copie para Google Authenticator/Authy):</p>
-                    <p className="font-mono text-xs break-all mt-1">{totpSecret}</p>
+                  <div className="rounded-lg border border-border bg-secondary/50 p-3">
+                    <p className="text-xs text-[#2ECC49]">Segredo TOTP (copie para Google Authenticator/Authy):</p>
+                    <p className="font-mono text-xs break-all mt-1 text-foreground">{totpSecret}</p>
                     <input
                       type="text"
                       value={totpCode}
                       onChange={(e) => setTotpCode(e.target.value)}
                       placeholder="Código de 6 dígitos"
-                      className="w-full mt-2 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      className="w-full mt-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
                     />
-                    <button type="button" onClick={handleEnable2fa} className="w-full mt-2 rounded-lg py-2 bg-[#2ECC49] text-white text-sm font-semibold">Confirmar e ativar</button>
+                    <button
+                      type="button"
+                      onClick={handleEnable2fa}
+                      className="w-full mt-2 rounded-lg py-2 bg-[#2ECC49] text-white text-sm font-semibold hover:bg-[#25b340]"
+                    >
+                      Confirmar e ativar
+                    </button>
                   </div>
                 ) : null}
               </div>
             ) : (
-              <button type="button" onClick={handleDisable2fa} className="w-full rounded-lg py-2 border border-red-200 text-red-600 text-sm">Desativar 2FA</button>
+              <button
+                type="button"
+                onClick={handleDisable2fa}
+                className="w-full rounded-lg py-2 border border-red-500/40 text-red-400 text-sm hover:bg-red-950/30"
+              >
+                Desativar 2FA
+              </button>
             )}
-            {totpMsg ? <p className="text-xs text-gray-600 mt-2">{totpMsg}</p> : null}
+            {totpMsg ? <p className="text-xs text-foreground/70 mt-2">{totpMsg}</p> : null}
           </div>
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-gray-900">Open Finance (Pluggy)</h2>
-            <p className="text-sm text-gray-500 mt-1">
+          <div className="py-4 border-b border-border">
+            <h2 className={APP_DARK_UI.sectionTitle}>Open Finance (Pluggy)</h2>
+            <p className={APP_DARK_UI.sectionLead}>
               1 banco grátis para sempre no plano Grátis. Bancos adicionais exigem Pro, Família ou Enterprise.
               PicPay, Nubank, etc. — movimentações no dashboard após conectar.
             </p>
           </div>
-          <div className="p-4">
+          <div className="pt-4">
             {status === 'authenticated' ? (
               <OpenFinanceConnectPanel
                 onSuccess={() => {
@@ -559,7 +579,7 @@ export default function SettingsPage() {
                 }}
               />
             ) : (
-              <p className="text-sm text-gray-500">Faça login para conectar seu banco.</p>
+              <p className={APP_DARK_UI.body}>Faça login para conectar seu banco.</p>
             )}
           </div>
         </div>
