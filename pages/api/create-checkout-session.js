@@ -6,6 +6,7 @@ import { checkoutPlanOrDefault, stripePriceIdsFromEnv } from '../../lib/stripePl
 import { stripeAppBaseUrl } from '../../lib/stripe/appBaseUrl';
 import { getStripeCheckoutDiagnostics } from '../../lib/stripe/checkoutDiagnostics';
 import { resolvePublicUserId } from '../../lib/resolvePublicUserId';
+import { ensureStripePricePurchasable } from '../../lib/stripe/ensurePricePurchasable';
 
 function parseJsonBody(req) {
   if (typeof req.body === 'object' && req.body !== null) return req.body;
@@ -90,21 +91,20 @@ export default async function handler(req, res) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY.trim());
 
   try {
-    let price;
     try {
-      price = await stripe.prices.retrieve(priceId);
-    } catch (priceErr) {
-      console.error('[stripe/create-checkout-session] price retrieve:', priceId, priceErr?.message);
+      await ensureStripePricePurchasable(stripe, priceId);
+    } catch (catalogErr) {
+      console.error('[stripe/create-checkout-session] catalog:', priceId, catalogErr?.message);
+      if (catalogErr?.code === 'price_inactive' || catalogErr?.code === 'product_inactive') {
+        return res.status(503).json({
+          error: catalogErr.message,
+          code: catalogErr.code,
+        });
+      }
       return res.status(503).json({
         error:
           'Preço do plano inválido no Stripe. Verifique STRIPE_*_PRICE_ID no Cloud Run (modo live/teste igual à STRIPE_SECRET_KEY).',
         code: 'invalid_price_id',
-      });
-    }
-    if (!price.active) {
-      return res.status(503).json({
-        error: 'Este plano está inativo no Stripe. Ative o preço no Dashboard Stripe → Produtos.',
-        code: 'price_inactive',
       });
     }
 
@@ -155,46 +155,52 @@ export default async function handler(req, res) {
       },
     };
 
-    if (uiMode === 'embedded') {
-      const checkoutSession = await stripe.checkout.sessions.create({
-        ...sessionBase,
-        ui_mode: 'embedded',
-        redirect_on_completion: 'if_required',
-        return_url: returnUrl,
-      });
-
-      if (!checkoutSession.client_secret) {
-        return res.status(500).json({
-          error: 'Stripe não devolveu sessão de pagamento. Tente novamente.',
-          code: 'no_client_secret',
+    const openCheckout = async () => {
+      if (uiMode === 'embedded') {
+        const checkoutSession = await stripe.checkout.sessions.create({
+          ...sessionBase,
+          ui_mode: 'embedded',
+          redirect_on_completion: 'if_required',
+          return_url: returnUrl,
         });
+        if (!checkoutSession.client_secret) {
+          const err = new Error('Stripe não devolveu sessão de pagamento. Tente novamente.');
+          err.code = 'no_client_secret';
+          throw err;
+        }
+        return {
+          clientSecret: checkoutSession.client_secret,
+          sessionId: checkoutSession.id,
+          uiMode: 'embedded',
+        };
       }
 
-      return res.status(200).json({
-        clientSecret: checkoutSession.client_secret,
+      const checkoutSession = await stripe.checkout.sessions.create({
+        ...sessionBase,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      });
+      if (!checkoutSession.url) {
+        const err = new Error('Stripe não devolveu URL de pagamento. Tente novamente em instantes.');
+        err.code = 'no_checkout_url';
+        throw err;
+      }
+      return {
+        url: checkoutSession.url,
         sessionId: checkoutSession.id,
-        uiMode: 'embedded',
-      });
+        uiMode: 'hosted',
+      };
+    };
+
+    try {
+      return res.status(200).json(await openCheckout());
+    } catch (sessionErr) {
+      if (!/product is not active/i.test(String(sessionErr?.message || ''))) {
+        throw sessionErr;
+      }
+      await ensureStripePricePurchasable(stripe, priceId);
+      return res.status(200).json(await openCheckout());
     }
-
-    const checkoutSession = await stripe.checkout.sessions.create({
-      ...sessionBase,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
-
-    if (!checkoutSession.url) {
-      return res.status(500).json({
-        error: 'Stripe não devolveu URL de pagamento. Tente novamente em instantes.',
-        code: 'no_checkout_url',
-      });
-    }
-
-    return res.status(200).json({
-      url: checkoutSession.url,
-      sessionId: checkoutSession.id,
-      uiMode: 'hosted',
-    });
   } catch (e) {
     console.error('[stripe/create-checkout-session]', e?.message || e);
     const msg = e?.message || 'Erro ao criar checkout.';
