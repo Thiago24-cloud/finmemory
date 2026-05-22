@@ -3,7 +3,19 @@ module.exports = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx}',
     './components/**/*.{js,ts,jsx,tsx}',
+    './lib/**/*.{js,ts,jsx,tsx}',
     './src/**/*.{js,ts,jsx,tsx}',
+  ],
+  safelist: [
+    'bg-[#0a0f1a]',
+    'bg-[#141c2e]',
+    'bg-[#f8fafc]',
+    'text-[#0f172a]',
+    'text-[#475569]',
+    'text-white/80',
+    'text-white/75',
+    'text-white/82',
+    'border-white/10',
   ],
   darkMode: 'class',
   theme: {

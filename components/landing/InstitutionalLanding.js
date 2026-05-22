@@ -15,7 +15,26 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { CONTACT_EMAIL, LANDING_NAV, PARTNERS_LANDING_URL, PLAY_STORE_URL } from '../../lib/landingConstants';
-import { landingClasses } from '../../lib/landingPalette';
+
+/** Classes literais no ficheiro para o Tailwind incluir no CSS de produção. */
+const L = {
+  sectionDark: 'bg-[#0a0f1a] text-white',
+  sectionLight: 'bg-[#f8fafc] text-[#0f172a]',
+  cardOnLight:
+    'rounded-2xl border border-[#e2e8f0] bg-white text-[#0f172a] shadow-md shadow-black/5',
+  cardOnDark:
+    'rounded-2xl border border-white/10 bg-[#141c2e] text-white shadow-lg shadow-black/25',
+  eyebrow: 'text-xs font-bold uppercase tracking-[0.2em] text-[#2ECC49]',
+  titleOnDark: 'text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight m-0',
+  titleOnLight: 'text-2xl sm:text-3xl lg:text-4xl font-bold text-[#0f172a] leading-tight m-0',
+  bodyOnDark: 'text-white/85 leading-relaxed',
+  bodyOnLight: 'text-[#475569] leading-relaxed',
+  cardTitleLight: 'text-lg font-bold text-[#0f172a] m-0',
+  cardBodyLight: 'text-[#475569] text-sm leading-relaxed m-0',
+  cardTitleDark: 'text-lg font-bold text-white m-0',
+  cardSubDark: 'font-semibold text-white text-sm m-0 mb-1',
+  cardBodyDark: 'text-white/80 text-sm leading-relaxed m-0',
+};
 
 function NavLink({ href, children, onClick, className }) {
   return (
@@ -35,43 +54,38 @@ function NavLink({ href, children, onClick, className }) {
 function SectionTitle({ id, eyebrow, title, className, onDark = false }) {
   return (
     <div id={id} className={cn('scroll-mt-24', className)}>
-      {eyebrow ? <p className={cn(landingClasses.eyebrow, 'mb-3')}>{eyebrow}</p> : null}
-      <h2 className={onDark ? landingClasses.titleOnDark : landingClasses.titleOnLight}>{title}</h2>
+      {eyebrow ? <p className={cn(L.eyebrow, 'mb-3')}>{eyebrow}</p> : null}
+      <h2 className={onDark ? L.titleOnDark : L.titleOnLight}>{title}</h2>
     </div>
   );
 }
 
 function PainCard({ icon: Icon, title, children }) {
   return (
-    <article
-      className={cn(
-        landingClasses.cardDark,
-        'p-6 hover:border-[#2ECC49]/30 transition-colors h-full'
-      )}
-    >
-      <div className="w-11 h-11 rounded-xl bg-[#2ECC49]/20 flex items-center justify-center mb-4">
-        <Icon className="h-5 w-5 text-[#2ECC49]" aria-hidden />
+    <article className={cn(L.cardOnLight, 'p-6 hover:border-[#2ECC49]/40 transition-colors h-full')}>
+      <div className="w-11 h-11 rounded-xl bg-[#2ECC49]/15 flex items-center justify-center mb-4">
+        <Icon className="h-5 w-5 text-[#22a83a]" aria-hidden />
       </div>
-      <h3 className={cn(landingClasses.headingCard, 'mb-2')}>{title}</h3>
-      <p className={landingClasses.captionCard}>{children}</p>
+      <h3 className={cn(L.cardTitleLight, 'mb-2')}>{title}</h3>
+      <p className={L.cardBodyLight}>{children}</p>
     </article>
   );
 }
 
 function ProfileColumn({ emoji, title, items }) {
   return (
-    <div className={cn(landingClasses.cardDark, 'p-6 lg:p-8 h-full')}>
+    <div className={cn(L.cardOnLight, 'p-6 lg:p-8 h-full')}>
       <p className="text-2xl mb-2" aria-hidden>
         {emoji}
       </p>
-      <h3 className="text-xl font-bold text-white mb-5 m-0">{title}</h3>
+      <h3 className="text-xl font-bold text-[#0f172a] mb-5 m-0">{title}</h3>
       <ul className="space-y-4 m-0 p-0 list-none">
         {items.map((item) => (
           <li key={item.title} className="flex gap-3">
             <span className="mt-1.5 w-2 h-2 rounded-full bg-[#2ECC49] shrink-0" aria-hidden />
             <div>
-              <p className={landingClasses.subheadingCard}>{item.title}</p>
-              <p className={landingClasses.captionCard}>{item.body}</p>
+              <p className="font-semibold text-[#0f172a] text-sm m-0 mb-1">{item.title}</p>
+              <p className={L.cardBodyLight}>{item.body}</p>
             </div>
           </li>
         ))}
@@ -82,21 +96,16 @@ function ProfileColumn({ emoji, title, items }) {
 
 function PillarCard({ title, body }) {
   return (
-    <article className="rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-white border border-[#bbf7d0]/60 p-6 h-full">
-      <h3 className="text-lg font-bold text-[#0f172a] mb-3 m-0">{title}</h3>
-      <p className="text-[#475569] text-sm leading-relaxed m-0">{body}</p>
+    <article className="rounded-2xl bg-white border border-white/15 p-6 h-full shadow-md shadow-black/20">
+      <h3 className={cn(L.cardTitleLight, 'mb-3')}>{title}</h3>
+      <p className={L.cardBodyLight}>{body}</p>
     </article>
   );
 }
 
-function MetricItem({ label, onDark = false }) {
+function MetricItem({ label }) {
   return (
-    <li
-      className={cn(
-        'flex gap-3 items-start text-sm',
-        onDark ? 'text-white/82' : 'text-[#334155]'
-      )}
-    >
+    <li className="flex gap-3 items-start text-sm text-[#334155]">
       <ChevronRight className="h-4 w-4 text-[#2ECC49] shrink-0 mt-0.5" aria-hidden />
       <span>{label}</span>
     </li>
@@ -162,7 +171,6 @@ export default function InstitutionalLanding() {
 
   return (
     <div className="min-h-screen bg-[#fafbfc] text-[#0f172a] scroll-smooth">
-      {/* HEADER */}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/10 bg-[#0a0f1a]/90 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <a href="#" className="flex items-center gap-2.5 shrink-0">
@@ -236,7 +244,6 @@ export default function InstitutionalLanding() {
       </header>
 
       <main>
-        {/* HERO */}
         <section className="relative pt-28 pb-20 sm:pt-32 sm:pb-28 overflow-hidden bg-[#0a0f1a]">
           <div
             className="absolute inset-0 opacity-40"
@@ -268,8 +275,7 @@ export default function InstitutionalLanding() {
           </div>
         </section>
 
-        {/* MANIFESTO */}
-        <section className={cn('py-20 sm:py-28', landingClasses.sectionDark)}>
+        <section className={cn('py-20 sm:py-28', L.sectionDark)}>
           <div className="max-w-3xl mx-auto px-4 sm:px-6">
             <SectionTitle
               id="historia"
@@ -277,7 +283,7 @@ export default function InstitutionalLanding() {
               eyebrow="A Nossa História"
               title="Do Balcão na Oscar Freire à Infraestrutura de Inteligência do Varejo Brasileiro."
             />
-            <div className={cn('mt-10 space-y-5 text-base sm:text-lg', landingClasses.bodyOnDark)}>
+            <div className={cn('mt-10 space-y-5 text-base sm:text-lg', L.bodyOnDark)}>
               <p className="m-0">
                 O FinMemory não nasceu em uma sala de reuniões isolada ou através de suposições de
                 mercado. Ele nasceu na linha de frente do varejo físico.
@@ -317,8 +323,7 @@ export default function InstitutionalLanding() {
           </div>
         </section>
 
-        {/* PROBLEMA + SOLUÇÃO (Ecossistema) */}
-        <section id="ecossistema" className={cn('scroll-mt-24 py-20 sm:py-28', landingClasses.sectionLight)}>
+        <section id="ecossistema" className={cn('scroll-mt-24 py-20 sm:py-28', L.sectionLight)}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <SectionTitle
               eyebrow="O Ponto Cego do Mercado"
@@ -370,8 +375,7 @@ export default function InstitutionalLanding() {
           </div>
         </section>
 
-        {/* MODELO DE NEGÓCIOS */}
-        <section id="negocios" className={cn('scroll-mt-24 py-20 sm:py-28', landingClasses.sectionDark)}>
+        <section id="negocios" className={cn('scroll-mt-24 py-20 sm:py-28', L.sectionDark)}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <SectionTitle
               onDark
@@ -396,7 +400,6 @@ export default function InstitutionalLanding() {
           </div>
         </section>
 
-        {/* MOAT */}
         <section className="py-20 sm:py-24 bg-[#0a0f1a]">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#2ECC49] mb-4">
@@ -419,8 +422,7 @@ export default function InstitutionalLanding() {
           </div>
         </section>
 
-        {/* INVESTIMENTO */}
-        <section id="investimento" className="scroll-mt-24 py-20 sm:py-28 bg-[#f0fdf4]">
+        <section id="investimento" className="scroll-mt-24 py-20 sm:py-28 bg-[#f0fdf4] text-[#0f172a]">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <SectionTitle
               eyebrow="Tração & Tecnologia"
@@ -429,26 +431,20 @@ export default function InstitutionalLanding() {
             />
 
             <div className="grid lg:grid-cols-2 gap-10">
-              <div className={cn(landingClasses.cardDark, 'p-6 sm:p-8')}>
+              <div className={cn(L.cardOnLight, 'p-6 sm:p-8')}>
                 <div className="flex items-center gap-2 mb-5">
                   <BarChart3 className="h-5 w-5 text-[#2ECC49]" aria-hidden />
-                  <h3 className={landingClasses.headingCard}>Métricas & Stack</h3>
+                  <h3 className={L.cardTitleLight}>Métricas & Stack</h3>
                 </div>
                 <ul className="space-y-3 m-0 p-0 list-none">
-                  <MetricItem
-                    onDark
-                    label="Aplicativo publicado e funcional na Google Play (Next.js 15, Supabase, Google Cloud Run e IA)."
-                  />
-                  <MetricItem
-                    onDark
-                    label="Contrato e integração ativa em produção com Open Finance (Pluggy) e robôs de leitura em tempo real dos maiores players do mercado (Dia, Assaí, Atacadão, Sonda, etc.)."
-                  />
+                  <MetricItem label="Aplicativo publicado e funcional na Google Play (Next.js 15, Supabase, Google Cloud Run e IA)." />
+                  <MetricItem label="Contrato e integração ativa em produção com Open Finance (Pluggy) e robôs de leitura em tempo real dos maiores players do mercado (Dia, Assaí, Atacadão, Sonda, etc.)." />
                 </ul>
               </div>
 
-              <div className={cn(landingClasses.cardDark, 'p-6 sm:p-8 border-[#2ECC49]/25')}>
-                <h3 className="text-lg font-bold m-0 mb-4">A Oportunidade de Investimento</h3>
-                <p className="text-white/80 text-sm leading-relaxed m-0 mb-4">
+              <div className={cn(L.cardOnDark, 'p-6 sm:p-8')}>
+                <h3 className={cn(L.cardTitleDark, 'mb-4')}>A Oportunidade de Investimento</h3>
+                <p className={cn(L.cardBodyDark, 'm-0 mb-4')}>
                   Estamos abrindo nossa rodada <strong className="text-white">Seed de R$ 500.000</strong>{' '}
                   (para 8% a 10% de equity), sob um Valuation Pré-money de{' '}
                   <strong className="text-white">R$ 5.000.000</strong>.
@@ -475,7 +471,6 @@ export default function InstitutionalLanding() {
         </section>
       </main>
 
-      {/* FOOTER */}
       <footer className="bg-[#0a0f1a] text-white py-14 px-4 sm:px-6">
         <div className="max-w-3xl mx-auto text-center">
           <blockquote className="text-lg sm:text-xl font-medium text-white/90 leading-relaxed m-0 mb-10 border-l-4 border-[#2ECC49] pl-5 text-left sm:text-center sm:border-l-0 sm:pl-0 sm:italic">
