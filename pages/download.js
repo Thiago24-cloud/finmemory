@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 
-import { PLAY_STORE_URL } from '../lib/landingConstants';
 const APP_STORE_URL = 'https://finmemory.com.br';
 
 function detectOS() {
@@ -17,16 +16,10 @@ export default function DownloadPage() {
   const [os, setOs] = useState(null);
 
   useEffect(() => {
-    const detected = detectOS();
-    setOs(detected);
-    if (detected === 'android') {
-      window.location.href = PLAY_STORE_URL;
-    } else if (detected === 'ios') {
-      window.location.href = APP_STORE_URL;
-    }
+    setOs(detectOS());
   }, []);
 
-  const isRedirecting = os === 'android' || os === 'ios';
+  const isRedirecting = false;
 
   return (
     <>
@@ -55,11 +48,17 @@ export default function DownloadPage() {
             {/* Card principal */}
             <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
               <h2 className="text-lg font-semibold text-[#1a1a1a] text-center mb-1">
-                Disponível para celular
+                Use o FinMemory agora
               </h2>
-              <p className="text-[#777] text-sm text-center mb-6">
-                Escaneie o QR Code ou escolha sua plataforma
+              <p className="text-[#777] text-sm text-center mb-4">
+                O app está no navegador — faça login. A Google Play será aberta em breve.
               </p>
+              <Link
+                href="/login"
+                className="mb-6 flex w-full items-center justify-center rounded-xl border-2 border-[#2ECC49] py-3 text-sm font-semibold text-[#22a83a] no-underline hover:bg-[#2ECC49]/10"
+              >
+                Entrar no FinMemory
+              </Link>
 
               {/* QR Code */}
               <div className="flex justify-center mb-6">
@@ -76,20 +75,19 @@ export default function DownloadPage() {
 
               {/* Botões de loja */}
               <div className="flex flex-col gap-3">
-                <a
-                  href={PLAY_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 bg-[#1a1a1a] hover:bg-[#333] text-white rounded-xl px-4 py-3 transition-colors no-underline"
+                <div
+                  className="flex items-center gap-3 rounded-xl border border-[#e0e0e0] bg-[#f5f5f5] px-4 py-3 text-[#888] no-underline"
+                  aria-disabled="true"
+                  title="Publicação na Google Play em breve"
                 >
-                  <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0 fill-white" aria-hidden>
+                  <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0 fill-[#aaa]" aria-hidden>
                     <path d="M3.18 23.76c.37.2.8.22 1.19.04l12.12-6.97-2.54-2.54-10.77 9.47zm-1.5-20.3A1.77 1.77 0 0 0 1.5 4.5v15a1.77 1.77 0 0 0 .18 1.04l.08.08 8.41-8.41v-.2L1.76 3.38l-.08.08zM20.1 10.5l-2.28-1.31-2.84 2.84 2.84 2.84 2.3-1.32a1.78 1.78 0 0 0 0-3.05zm-17.43 12.7 10.77-9.47-2.54-2.54-10.77 9.47 2.54 2.54z" />
                   </svg>
                   <div>
-                    <p className="text-[10px] text-gray-300 leading-none">Disponível no</p>
+                    <p className="text-[10px] leading-none">Em breve no</p>
                     <p className="text-sm font-semibold leading-tight">Google Play</p>
                   </div>
-                </a>
+                </div>
 
                 <a
                   href={APP_STORE_URL}
@@ -110,9 +108,13 @@ export default function DownloadPage() {
 
             {/* Link de volta */}
             <p className="text-center text-sm text-[#777]">
-              Prefere usar no navegador?{' '}
+              Já tem conta?{' '}
+              <Link href="/login" className="text-[#2ECC49] font-medium underline-offset-2 hover:underline">
+                Entrar
+              </Link>
+              {' · '}
               <Link href="/mapa" className="text-[#2ECC49] font-medium underline-offset-2 hover:underline">
-                Abrir web app
+                Mapa de preços
               </Link>
             </p>
           </div>

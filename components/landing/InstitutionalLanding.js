@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { CONTACT_EMAIL, LANDING_NAV, PARTNERS_LANDING_URL, PLAY_STORE_URL } from '../../lib/landingConstants';
+import { CONTACT_EMAIL, LANDING_NAV, PARTNERS_LANDING_URL } from '../../lib/landingConstants';
 
 /** Classes literais no ficheiro para o Tailwind incluir no CSS de produção. */
 const L = {
@@ -118,27 +118,31 @@ function MetricItem({ label, onDark = true }) {
   );
 }
 
-function CtaButton({ href, children, variant = 'primary', className }) {
+function CtaButton({ href, children, variant = 'primary', className, onClick }) {
   const base =
     'inline-flex items-center justify-center gap-2 rounded-xl font-semibold text-sm sm:text-base transition-all active:scale-[0.98]';
   const variants = {
+    /** Ação principal: usar o app (login web/PWA). */
+    primaryOutline:
+      'border-2 border-[#2ECC49] text-[#2ECC49] bg-transparent hover:bg-[#2ECC49]/15 shadow-lg shadow-[#2ECC49]/20 px-6 py-3.5',
     primary: 'bg-[#2ECC49] text-white hover:bg-[#22a83a] shadow-lg shadow-[#2ECC49]/25 px-6 py-3.5',
     outline:
       'border-2 border-white/40 text-white hover:bg-white/10 px-6 py-3.5 backdrop-blur-sm',
     ghost: 'text-[#2ECC49] hover:bg-[#2ECC49]/10 px-4 py-2',
+    muted: 'text-white/55 hover:text-white/80 text-sm font-medium px-2 py-2',
   };
   const isExternal = href.startsWith('http');
   const cls = cn(base, variants[variant], className);
 
   if (isExternal) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cls} onClick={onClick}>
         {children}
       </a>
     );
   }
   return (
-    <a href={href} className={cls}>
+    <a href={href} className={cls} onClick={onClick}>
       {children}
     </a>
   );
@@ -200,12 +204,15 @@ export default function InstitutionalLanding() {
               Sou lojista
             </Link>
             <Link
-              href="/login"
-              className="text-sm font-medium text-white/70 hover:text-white transition-colors"
+              href="/download"
+              className="text-sm font-medium text-white/50 hover:text-white/75 transition-colors"
+              title="Publicação na Google Play em breve"
             >
-              Entrar
+              Play Store em breve
             </Link>
-            <CtaButton href={PLAY_STORE_URL}>Baixar o App</CtaButton>
+            <CtaButton href="/login" variant="primaryOutline">
+              Entrar
+            </CtaButton>
           </div>
 
           <button
@@ -236,14 +243,14 @@ export default function InstitutionalLanding() {
               Sou lojista
             </Link>
             <Link
-              href="/login"
+              href="/download"
               onClick={closeMenu}
-              className="py-2 text-sm font-medium text-white/70"
+              className="py-2 text-sm font-medium text-white/50"
             >
-              Entrar
+              Play Store em breve
             </Link>
-            <CtaButton href={PLAY_STORE_URL} className="w-full mt-1">
-              Baixar o App
+            <CtaButton href="/login" variant="primaryOutline" className="w-full mt-1" onClick={closeMenu}>
+              Entrar
             </CtaButton>
           </nav>
         ) : null}
@@ -272,12 +279,21 @@ export default function InstitutionalLanding() {
               e-commerce resolve a sua semana que vem; o FinMemory resolve os seus próximos 15
               minutos.
             </p>
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-              <CtaButton href={PLAY_STORE_URL}>Baixar o Aplicativo</CtaButton>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-start">
+              <CtaButton href="/login" variant="primaryOutline">
+                Entrar no FinMemory
+              </CtaButton>
               <CtaButton href="#investimento" variant="outline">
                 Área do Investidor / Pitch Deck
               </CtaButton>
             </div>
+            <p className="mt-4 text-sm text-white/55 max-w-xl m-0">
+              Use o app pelo navegador (Entrar). Publicação na Google Play em breve —{' '}
+              <Link href="/download" className="text-[#2ECC49] hover:underline font-medium">
+                saiba mais
+              </Link>
+              .
+            </p>
           </div>
         </section>
 
@@ -484,9 +500,12 @@ export default function InstitutionalLanding() {
             varejo físico.&rdquo;
           </blockquote>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-white/70 mb-6">
-            <CtaButton href={PLAY_STORE_URL} variant="primary" className="text-sm">
-              Google Play
+            <CtaButton href="/login" variant="primaryOutline" className="text-sm">
+              Entrar no app
             </CtaButton>
+            <Link href="/download" className="text-white/50 hover:text-white/80 transition-colors">
+              Google Play (em breve)
+            </Link>
             <a
               href={`mailto:${CONTACT_EMAIL}`}
               className="hover:text-white transition-colors"
