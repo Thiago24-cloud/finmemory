@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { CONTACT_EMAIL, LANDING_NAV, PARTNERS_LANDING_URL, PLAY_STORE_URL } from '../../lib/landingConstants';
+import { landingClasses } from '../../lib/landingPalette';
 
 function NavLink({ href, children, onClick, className }) {
   return (
@@ -31,45 +32,46 @@ function NavLink({ href, children, onClick, className }) {
   );
 }
 
-function SectionTitle({ id, eyebrow, title, className }) {
+function SectionTitle({ id, eyebrow, title, className, onDark = false }) {
   return (
     <div id={id} className={cn('scroll-mt-24', className)}>
-      {eyebrow ? (
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#2ECC49] mb-3">{eyebrow}</p>
-      ) : null}
-      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#0f172a] leading-tight m-0">
-        {title}
-      </h2>
+      {eyebrow ? <p className={cn(landingClasses.eyebrow, 'mb-3')}>{eyebrow}</p> : null}
+      <h2 className={onDark ? landingClasses.titleOnDark : landingClasses.titleOnLight}>{title}</h2>
     </div>
   );
 }
 
 function PainCard({ icon: Icon, title, children }) {
   return (
-    <article className="rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-sm hover:shadow-md transition-shadow h-full">
-      <div className="w-11 h-11 rounded-xl bg-[#2ECC49]/10 flex items-center justify-center mb-4">
-        <Icon className="h-5 w-5 text-[#22a83a]" aria-hidden />
+    <article
+      className={cn(
+        landingClasses.cardDark,
+        'p-6 hover:border-[#2ECC49]/30 transition-colors h-full'
+      )}
+    >
+      <div className="w-11 h-11 rounded-xl bg-[#2ECC49]/20 flex items-center justify-center mb-4">
+        <Icon className="h-5 w-5 text-[#2ECC49]" aria-hidden />
       </div>
-      <h3 className="text-lg font-bold text-[#0f172a] mb-2 m-0">{title}</h3>
-      <p className="text-[#475569] text-sm leading-relaxed m-0">{children}</p>
+      <h3 className={cn(landingClasses.headingCard, 'mb-2')}>{title}</h3>
+      <p className={landingClasses.captionCard}>{children}</p>
     </article>
   );
 }
 
 function ProfileColumn({ emoji, title, items }) {
   return (
-    <div className="rounded-2xl border border-[#e2e8f0] bg-white p-6 lg:p-8 shadow-sm h-full">
+    <div className={cn(landingClasses.cardDark, 'p-6 lg:p-8 h-full')}>
       <p className="text-2xl mb-2" aria-hidden>
         {emoji}
       </p>
-      <h3 className="text-xl font-bold text-[#0f172a] mb-5 m-0">{title}</h3>
+      <h3 className="text-xl font-bold text-white mb-5 m-0">{title}</h3>
       <ul className="space-y-4 m-0 p-0 list-none">
         {items.map((item) => (
           <li key={item.title} className="flex gap-3">
             <span className="mt-1.5 w-2 h-2 rounded-full bg-[#2ECC49] shrink-0" aria-hidden />
             <div>
-              <p className="font-semibold text-[#0f172a] text-sm m-0 mb-1">{item.title}</p>
-              <p className="text-[#64748b] text-sm leading-relaxed m-0">{item.body}</p>
+              <p className={landingClasses.subheadingCard}>{item.title}</p>
+              <p className={landingClasses.captionCard}>{item.body}</p>
             </div>
           </li>
         ))}
@@ -87,9 +89,14 @@ function PillarCard({ title, body }) {
   );
 }
 
-function MetricItem({ label }) {
+function MetricItem({ label, onDark = false }) {
   return (
-    <li className="flex gap-3 items-start text-sm text-[#334155]">
+    <li
+      className={cn(
+        'flex gap-3 items-start text-sm',
+        onDark ? 'text-white/82' : 'text-[#334155]'
+      )}
+    >
       <ChevronRight className="h-4 w-4 text-[#2ECC49] shrink-0 mt-0.5" aria-hidden />
       <span>{label}</span>
     </li>
@@ -262,14 +269,15 @@ export default function InstitutionalLanding() {
         </section>
 
         {/* MANIFESTO */}
-        <section className="py-20 sm:py-28 bg-white">
+        <section className={cn('py-20 sm:py-28', landingClasses.sectionDark)}>
           <div className="max-w-3xl mx-auto px-4 sm:px-6">
             <SectionTitle
               id="historia"
+              onDark
               eyebrow="A Nossa História"
               title="Do Balcão na Oscar Freire à Infraestrutura de Inteligência do Varejo Brasileiro."
             />
-            <div className="mt-10 space-y-5 text-[#475569] leading-relaxed text-base sm:text-lg">
+            <div className={cn('mt-10 space-y-5 text-base sm:text-lg', landingClasses.bodyOnDark)}>
               <p className="m-0">
                 O FinMemory não nasceu em uma sala de reuniões isolada ou através de suposições de
                 mercado. Ele nasceu na linha de frente do varejo físico.
@@ -300,7 +308,7 @@ export default function InstitutionalLanding() {
                 madrugada para rodar três ou quatro atacados em busca de preço. Quando volta, perde
                 horas digitando notas fiscais ou alimentando planilhas manuais.
               </p>
-              <p className="m-0 font-medium text-[#0f172a]">
+              <p className="m-0 font-medium text-white">
                 Percebendo isso, nós pivotamos a nossa tecnologia. O FinMemory evoluiu de um
                 aplicativo de finanças para se tornar a infraestrutura de inteligência de compra,
                 abastecimento e gestão do pequeno varejo brasileiro.
@@ -310,7 +318,7 @@ export default function InstitutionalLanding() {
         </section>
 
         {/* PROBLEMA + SOLUÇÃO (Ecossistema) */}
-        <section id="ecossistema" className="scroll-mt-24 py-20 sm:py-28 bg-[#f8fafc]">
+        <section id="ecossistema" className={cn('scroll-mt-24 py-20 sm:py-28', landingClasses.sectionLight)}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <SectionTitle
               eyebrow="O Ponto Cego do Mercado"
@@ -363,9 +371,10 @@ export default function InstitutionalLanding() {
         </section>
 
         {/* MODELO DE NEGÓCIOS */}
-        <section id="negocios" className="scroll-mt-24 py-20 sm:py-28 bg-white">
+        <section id="negocios" className={cn('scroll-mt-24 py-20 sm:py-28', landingClasses.sectionDark)}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <SectionTitle
+              onDark
               eyebrow="Modelo de Negócios"
               title="Como o FinMemory gera valor e receita recorrente."
               className="text-center max-w-3xl mx-auto mb-12"
@@ -420,18 +429,24 @@ export default function InstitutionalLanding() {
             />
 
             <div className="grid lg:grid-cols-2 gap-10">
-              <div className="rounded-2xl bg-white border border-[#e2e8f0] p-6 sm:p-8 shadow-sm">
+              <div className={cn(landingClasses.cardDark, 'p-6 sm:p-8')}>
                 <div className="flex items-center gap-2 mb-5">
                   <BarChart3 className="h-5 w-5 text-[#2ECC49]" aria-hidden />
-                  <h3 className="text-lg font-bold text-[#0f172a] m-0">Métricas & Stack</h3>
+                  <h3 className={landingClasses.headingCard}>Métricas & Stack</h3>
                 </div>
                 <ul className="space-y-3 m-0 p-0 list-none">
-                  <MetricItem label="Aplicativo publicado e funcional na Google Play (Next.js 15, Supabase, Google Cloud Run e IA)." />
-                  <MetricItem label="Contrato e integração ativa em produção com Open Finance (Pluggy) e robôs de leitura em tempo real dos maiores players do mercado (Dia, Assaí, Atacadão, Sonda, etc.)." />
+                  <MetricItem
+                    onDark
+                    label="Aplicativo publicado e funcional na Google Play (Next.js 15, Supabase, Google Cloud Run e IA)."
+                  />
+                  <MetricItem
+                    onDark
+                    label="Contrato e integração ativa em produção com Open Finance (Pluggy) e robôs de leitura em tempo real dos maiores players do mercado (Dia, Assaí, Atacadão, Sonda, etc.)."
+                  />
                 </ul>
               </div>
 
-              <div className="rounded-2xl bg-[#0a0f1a] text-white p-6 sm:p-8">
+              <div className={cn(landingClasses.cardDark, 'p-6 sm:p-8 border-[#2ECC49]/25')}>
                 <h3 className="text-lg font-bold m-0 mb-4">A Oportunidade de Investimento</h3>
                 <p className="text-white/80 text-sm leading-relaxed m-0 mb-4">
                   Estamos abrindo nossa rodada <strong className="text-white">Seed de R$ 500.000</strong>{' '}
