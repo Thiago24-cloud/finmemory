@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isBillingRoute } from '../lib/billingRoutes';
 import { detectInstallContext } from '../lib/pwa-install';
 import { trackEvent } from '../lib/analytics';
 
@@ -109,6 +110,7 @@ export function usePWAInstall() {
         return { ...base, canUseNativePrompt: true };
       });
       if (dismissed || installed || ctx.platform === 'desktop') return;
+      if (isBillingRoute(window.location.pathname || '')) return;
       if (delayedShowTimer != null) {
         window.clearTimeout(delayedShowTimer);
         delayedShowTimer = null;
@@ -121,8 +123,13 @@ export function usePWAInstall() {
       return () => window.removeEventListener('beforeinstallprompt', handler);
     }
 
+    if (isBillingRoute(window.location.pathname || '')) {
+      return () => window.removeEventListener('beforeinstallprompt', handler);
+    }
     const delayMs = visits >= 2 ? 5000 : 35000;
-    delayedShowTimer = window.setTimeout(() => setShowAssistant(true), delayMs);
+    delayedShowTimer = window.setTimeout(() => {
+      if (!isBillingRoute(window.location.pathname || '')) setShowAssistant(true);
+    }, delayMs);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);

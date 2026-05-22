@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '../../lib/supabaseAdmin';
 import { checkoutPlanOrDefault, stripePriceIdsFromEnv } from '../../lib/stripePlanPrice';
 import { stripeAppBaseUrl } from '../../lib/stripe/appBaseUrl';
 import { getStripeCheckoutDiagnostics } from '../../lib/stripe/checkoutDiagnostics';
+import { resolvePublicUserId } from '../../lib/resolvePublicUserId';
 
 function parseJsonBody(req) {
   if (typeof req.body === 'object' && req.body !== null) return req.body;
@@ -57,9 +58,8 @@ export default async function handler(req, res) {
   }
 
   const session = await getServerSession(req, res, authOptions);
-  const userId = session?.user?.supabaseId;
   const email = session?.user?.email;
-  if (!userId || !email) {
+  if (!email) {
     return res.status(401).json({
       error: 'Faça login para assinar um plano FinMemory.',
       code: 'auth_required',
@@ -77,6 +77,14 @@ export default async function handler(req, res) {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return res.status(500).json({ error: 'Supabase admin não configurado.' });
+  }
+
+  const userId = await resolvePublicUserId(session, supabase);
+  if (!userId) {
+    return res.status(401).json({
+      error: 'Conta não encontrada. Saia e entre novamente.',
+      code: 'user_not_found',
+    });
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY.trim());

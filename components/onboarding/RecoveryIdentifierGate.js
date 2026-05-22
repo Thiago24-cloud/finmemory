@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { RecoveryIdentifierModal } from './RecoveryIdentifierModal';
+import { isBillingRoute } from '../../lib/billingRoutes';
 
 /**
  * Depois do nome/foto (`ProfileFirstLoginGate`), obriga pelo menos celular OU CPF.
  */
 export function RecoveryIdentifierGate({ children }) {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const [checked, setChecked] = useState(false);
   const [needsRecovery, setNeedsRecovery] = useState(false);
@@ -45,7 +48,9 @@ export function RecoveryIdentifierGate({ children }) {
   return (
     <>
       {children}
-      {checked && needsRecovery ? <RecoveryIdentifierModal open onComplete={onDone} /> : null}
+      {checked && needsRecovery && !isBillingRoute(router.pathname) ? (
+        <RecoveryIdentifierModal open onComplete={onDone} />
+      ) : null}
     </>
   );
 }

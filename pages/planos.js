@@ -9,15 +9,10 @@ import { BRAND } from '../lib/brandTokens';
 
 /** Base comum: hover “acende” azul em todos os planos (não só no Pro). */
 const cardBase =
-  'rounded-2xl bg-white p-5 flex flex-col border border-gray-200 shadow-sm ' +
-  'transition-all duration-300 ease-out ' +
-  'hover:scale-[1.02] hover:shadow-xl hover:ring-2 hover:ring-blue-400/65 hover:border-blue-200 ' +
-  'motion-reduce:transition-none motion-reduce:hover:scale-100';
+  'rounded-2xl bg-white p-5 flex flex-col border border-gray-200 shadow-sm';
 
 /** Pro: destaque suave em repouso; no hover o azul intensifica como os outros. */
-const cardPro =
-  `${cardBase} relative border-blue-200 ring-1 ring-blue-300/50 ` +
-  'hover:ring-blue-500 hover:border-blue-400 hover:shadow-blue-500/15';
+const cardPro = `${cardBase} relative border-blue-200 ring-1 ring-blue-300/50`;
 
 function Li({ children }) {
   return (
@@ -131,7 +126,7 @@ export default function PlanosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 pb-24">
+    <div className="min-h-screen bg-gray-50 text-gray-900 pb-8">
       <div className="max-w-6xl mx-auto px-4 py-6">
         <Link
           href="/settings"
@@ -143,8 +138,8 @@ export default function PlanosPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Planos FinMemory</h1>
           <p className="mt-1 text-gray-600 text-sm max-w-2xl">
-            Compare o que inclui cada nível. O pagamento abre em{' '}
-            <strong className="text-gray-800">finmemory.com.br/checkout</strong> (formulário Stripe embutido, sem sair do site).
+            Compare o que inclui cada nível. Ao assinar, você é redirecionado ao{' '}
+            <strong className="text-gray-800">pagamento seguro Stripe</strong> e volta aos Ajustes quando concluir.
           </p>
           {userReady ? (
             <p
@@ -155,13 +150,6 @@ export default function PlanosPage() {
             </p>
           ) : null}
         </div>
-
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-6">
-          Se o checkout não abrir, valide o ambiente: execute <code className="text-xs">npm run validate-env</code> e
-          confirme <code className="text-xs">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>,{' '}
-          <code className="text-xs">STRIPE_SECRET_KEY</code>, <code className="text-xs">STRIPE_WEBHOOK_SECRET</code> e
-          os Price IDs do Stripe.
-        </p>
 
         {/* Modal upsell (cadeado no plano Grátis) */}
         {upsell ? (

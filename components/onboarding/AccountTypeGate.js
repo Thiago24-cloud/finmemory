@@ -39,7 +39,8 @@ export function AccountTypeGate({ children }) {
     loading &&
     path !== '/escolher-perfil' &&
     path !== '/login' &&
-    path !== '/planos';
+    path !== '/planos' &&
+    path !== '/checkout';
 
   if (blocking) {
     return (

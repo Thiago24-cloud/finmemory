@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import PWAInstallAssistant from './PWAInstallAssistant';
+import { isBillingRoute } from '../lib/billingRoutes';
 
 const PWAInstallUIContext = createContext(
   /** @type {{ openInstallAssistant: () => void; installEntryVisible: boolean } | null} */ (null)
@@ -20,6 +22,8 @@ export function usePWAInstallUIOptional() {
 }
 
 export default function PWAInstallProvider({ children }) {
+  const router = useRouter();
+  const onBillingPage = isBillingRoute(router.pathname || '');
   const {
     context,
     showAssistant,
@@ -49,12 +53,17 @@ export default function PWAInstallProvider({ children }) {
     };
   }, [showAssistant]);
 
+  useEffect(() => {
+    if (onBillingPage && showAssistant) setShowAssistant(false);
+  }, [onBillingPage, showAssistant, setShowAssistant]);
+
   const openInstallAssistant = useCallback(() => {
     if (!context) return;
     if (context.isStandalone) return;
     if (context.platform === 'desktop') return;
+    if (onBillingPage) return;
     setShowAssistant(true);
-  }, [context, setShowAssistant]);
+  }, [context, onBillingPage, setShowAssistant]);
 
   const installEntryVisible = Boolean(
     context &&
@@ -74,7 +83,7 @@ export default function PWAInstallProvider({ children }) {
   return (
     <PWAInstallUIContext.Provider value={value}>
       {children}
-      {showAssistant && context ? (
+      {showAssistant && context && !onBillingPage ? (
         <PWAInstallAssistant
           context={context}
           onTriggerNative={triggerNativePrompt}

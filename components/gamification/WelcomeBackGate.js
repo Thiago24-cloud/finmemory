@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { WelcomeBackModal } from './WelcomeBackModal';
 import { useUserRole } from '../../contexts/UserRoleContext';
+import { isBillingRoute } from '../../lib/billingRoutes';
 
 const SESSION_STORAGE_KEY = 'finmemory_session_check_v1';
 
@@ -25,7 +26,7 @@ export function WelcomeBackGate({ children }) {
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.supabaseId) return;
     if (needsSelection) return;
-    if (skipPaths.includes(router.pathname)) return;
+    if (skipPaths.includes(router.pathname) || isBillingRoute(router.pathname)) return;
     if (typeof window === 'undefined') return;
     if (ranRef.current) return;
     if (window.sessionStorage.getItem(SESSION_STORAGE_KEY)) return;
@@ -82,7 +83,7 @@ export function WelcomeBackGate({ children }) {
     <>
       {children}
       <WelcomeBackModal
-        open={open}
+        open={open && !isBillingRoute(router.pathname)}
         displayName={payload?.display_name || session?.user?.name?.split(/\s+/)[0] || 'Jogador'}
         currentStreak={payload?.current_streak ?? 0}
         bonusCopy={

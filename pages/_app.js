@@ -26,6 +26,7 @@ import AppMainBottomNav from '../components/AppMainBottomNav';
 import PageTransitionLayout from '../components/PageTransitionLayout';
 import { GA_MEASUREMENT_ID, isGaAllowedHost } from '../lib/analytics';
 import { capturePosthog, hasPosthogProjectKey } from '../lib/posthogClient';
+import { isBillingRoute } from '../lib/billingRoutes';
 import { isMerchantPanelPage, isPublicMarketingPage } from '../lib/marketingRoutes';
 import '../styles/globals.css';
 
@@ -143,6 +144,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
   const pathname = router.pathname || '';
   const marketing = isPublicMarketingPage(pathname);
   const merchantPanel = isMerchantPanelPage(pathname);
+  const billing = isBillingRoute(pathname);
 
   useEffect(() => {
     capturePosthog('$pageview');
@@ -152,6 +154,13 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
   }, [router.events]);
 
   if (!router.isReady) {
+    if (billing) {
+      return (
+        <SessionProvider session={session}>
+          <Component {...pageProps} />
+        </SessionProvider>
+      );
+    }
     if (marketing) {
       return (
         <MarketingAppShell session={session}>
@@ -191,6 +200,24 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
     );
   }
 
+  if (billing) {
+    return (
+      <SafePostHogProvider>
+        <ErrorBoundary>
+          <SessionProvider session={session}>
+            <PostHogIdentify />
+            <DeployRecovery />
+            <Toaster richColors position="top-center" />
+            <Component {...pageProps} />
+            <ClientOnly>
+              <SafeGoogleAnalytics />
+            </ClientOnly>
+          </SessionProvider>
+        </ErrorBoundary>
+      </SafePostHogProvider>
+    );
+  }
+
   return (
     <SafePostHogProvider>
     <ErrorBoundary>
@@ -209,13 +236,9 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
             <AnalyticsProvider>
               <MissionsTodayProvider>
                 <MapCartProvider>
-                  {pathname === '/planos' ? (
+                  <PageTransitionLayout>
                     <Component {...pageProps} />
-                  ) : (
-                    <PageTransitionLayout>
-                      <Component {...pageProps} />
-                    </PageTransitionLayout>
-                  )}
+                  </PageTransitionLayout>
                   <FeatureUsageRecorder />
                   <OnboardingGuideGate />
                   <AppMainBottomNav />

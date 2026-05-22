@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import Router from 'next/router';
+import { isBillingRoute } from '../lib/billingRoutes';
 
 /**
  * Após novo deploy no Cloud Run, o browser pode pedir chunks ou
@@ -22,6 +23,8 @@ export function DeployRecovery() {
 
     const syncDeployRevision = async () => {
       if (typeof window === 'undefined') return;
+      const path = Router.pathname || window.location.pathname || '';
+      if (isBillingRoute(path)) return;
       try {
         const r = await fetch('/api/health', { cache: 'no-store', credentials: 'same-origin' });
         if (!r.ok) return;

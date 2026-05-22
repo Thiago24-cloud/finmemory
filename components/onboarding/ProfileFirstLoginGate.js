@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { ProfileFirstLoginModal } from './ProfileFirstLoginModal';
 import { useUserRole } from '../../contexts/UserRoleContext';
+import { isBillingRoute } from '../../lib/billingRoutes';
 
 /**
  * Abre o questionário de primeiro login uma vez (quando o servidor indica needsOnboarding).
@@ -69,6 +70,7 @@ export function ProfileFirstLoginGate({ children }) {
       {checked &&
         needsOnboarding &&
         !needsSelection &&
+        !isBillingRoute(router.pathname) &&
         router.pathname !== '/escolher-perfil' && (
         <ProfileFirstLoginModal
           open

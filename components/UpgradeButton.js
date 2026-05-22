@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 
 /**
- * Inicia Checkout Stripe (FinMemory planos pagos). O utilizador tem de estar logado; o servidor usa a sessão NextAuth.
- * Fluxo: /checkout?plan=… (Stripe embutido no site — menos piscar que redirect para checkout.stripe.com).
+ * Checkout Stripe hospedado (checkout.stripe.com) — fluxo estável em mobile e PWA.
+ * Sessão NextAuth no servidor; não usa página /checkout embutida.
  */
 export default function UpgradeButton({
   className = '',
@@ -14,25 +14,46 @@ export default function UpgradeButton({
 }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
-  const navigatingRef = useRef(false);
+  const busyRef = useRef(false);
 
   const onClick = useCallback(async () => {
-    if (navigatingRef.current) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setErr('');
     setLoading(true);
+
+    const callbackPath =
+      typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search || ''}`
+        : '/planos';
+
     try {
-      const callbackPath =
-        typeof window !== 'undefined'
-          ? `/checkout?plan=${encodeURIComponent(plan)}`
-          : '/checkout';
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ plan, uiMode: 'hosted' }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-      if (typeof window === 'undefined') return;
+      if (!res.ok) {
+        if (res.status === 401 && typeof window !== 'undefined') {
+          window.location.href = `/login?callbackUrl=${encodeURIComponent(callbackPath)}`;
+          return;
+        }
+        const detail = Array.isArray(data.issues) && data.issues[0] ? ` (${data.issues[0]})` : '';
+        throw new Error((data.error || 'Não foi possível iniciar o pagamento.') + detail);
+      }
 
-      navigatingRef.current = true;
-      window.location.replace(callbackPath);
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      throw new Error('O Stripe não devolveu o link de pagamento. Tente novamente.');
     } catch (e) {
       console.error('[stripe/upgrade-button]', e);
-      navigatingRef.current = false;
+      busyRef.current = false;
       setErr(e?.message || 'Erro ao abrir pagamento');
       setLoading(false);
     }
@@ -41,7 +62,7 @@ export default function UpgradeButton({
   return (
     <div>
       <button type="button" className={className} onClick={onClick} disabled={loading}>
-        {loading ? 'A abrir…' : children || 'Assinar FinMemory'}
+        {loading ? 'A abrir pagamento…' : children || 'Assinar FinMemory'}
       </button>
       {err ? (
         <p className="mt-1 text-sm text-red-600" role="alert">
