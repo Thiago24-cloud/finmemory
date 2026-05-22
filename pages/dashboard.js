@@ -1081,22 +1081,6 @@ export default function Dashboard() {
                       'esta conta'}
                   </p>
                 )}
-                {!openFinance.loading && openFinance.data?.month && (
-                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                    <div className="rounded-xl bg-primary/10 border border-primary/20 px-3 py-2">
-                      <p className="text-muted-foreground mb-0.5">Receitas (mês)</p>
-                      <p className="text-primary font-semibold">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(openFinance.data.month.incomeTotal || 0)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2">
-                      <p className="text-muted-foreground mb-0.5">Despesas (mês)</p>
-                      <p className="text-red-400 font-semibold">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(openFinance.data.month.expenseTotal || 0)}
-                      </p>
-                    </div>
-                  </div>
-                )}
                 <p className="text-xs text-muted-foreground">
                   Movimentos aparecem juntos em <strong className="text-foreground">Histórico</strong> abaixo.
                 </p>
