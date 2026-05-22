@@ -11,6 +11,7 @@ module.exports = {
     'bg-[#141c2e]',
     'bg-[#f8fafc]',
     'text-[#0f172a]',
+    'text-[#2ECC49]',
     'text-[#475569]',
     'text-white/80',
     'text-white/75',

@@ -29,11 +29,12 @@ const L = {
   titleOnLight: 'text-2xl sm:text-3xl lg:text-4xl font-bold text-[#0f172a] leading-tight m-0',
   bodyOnDark: 'text-white/85 leading-relaxed',
   bodyOnLight: 'text-[#475569] leading-relaxed',
-  cardTitleLight: 'text-lg font-bold text-[#0f172a] m-0',
+  /** Subtítulos dos cards — verde marca (legível em fundo escuro). */
+  cardSubtitle: 'text-lg font-bold text-[#2ECC49] m-0',
+  cardSubtitleLg: 'text-xl font-bold text-[#2ECC49] m-0',
+  itemSubtitle: 'font-semibold text-[#2ECC49] text-sm m-0 mb-1',
   cardBodyLight: 'text-[#475569] text-sm leading-relaxed m-0',
-  cardTitleDark: 'text-lg font-bold text-white m-0',
-  cardSubDark: 'font-semibold text-white text-sm m-0 mb-1',
-  cardBodyDark: 'text-white/80 text-sm leading-relaxed m-0',
+  cardBodyDark: 'text-white/85 text-sm leading-relaxed m-0',
 };
 
 function NavLink({ href, children, onClick, className }) {
@@ -62,30 +63,30 @@ function SectionTitle({ id, eyebrow, title, className, onDark = false }) {
 
 function PainCard({ icon: Icon, title, children }) {
   return (
-    <article className={cn(L.cardOnLight, 'p-6 hover:border-[#2ECC49]/40 transition-colors h-full')}>
-      <div className="w-11 h-11 rounded-xl bg-[#2ECC49]/15 flex items-center justify-center mb-4">
-        <Icon className="h-5 w-5 text-[#22a83a]" aria-hidden />
+    <article className={cn(L.cardOnDark, 'p-6 hover:border-[#2ECC49]/35 transition-colors h-full')}>
+      <div className="w-11 h-11 rounded-xl bg-[#2ECC49]/20 flex items-center justify-center mb-4">
+        <Icon className="h-5 w-5 text-[#2ECC49]" aria-hidden />
       </div>
-      <h3 className={cn(L.cardTitleLight, 'mb-2')}>{title}</h3>
-      <p className={L.cardBodyLight}>{children}</p>
+      <h3 className={cn(L.cardSubtitle, 'mb-2')}>{title}</h3>
+      <p className={L.cardBodyDark}>{children}</p>
     </article>
   );
 }
 
 function ProfileColumn({ emoji, title, items }) {
   return (
-    <div className={cn(L.cardOnLight, 'p-6 lg:p-8 h-full')}>
+    <div className={cn(L.cardOnDark, 'p-6 lg:p-8 h-full')}>
       <p className="text-2xl mb-2" aria-hidden>
         {emoji}
       </p>
-      <h3 className="text-xl font-bold text-[#0f172a] mb-5 m-0">{title}</h3>
+      <h3 className={cn(L.cardSubtitleLg, 'mb-5')}>{title}</h3>
       <ul className="space-y-4 m-0 p-0 list-none">
         {items.map((item) => (
           <li key={item.title} className="flex gap-3">
             <span className="mt-1.5 w-2 h-2 rounded-full bg-[#2ECC49] shrink-0" aria-hidden />
             <div>
-              <p className="font-semibold text-[#0f172a] text-sm m-0 mb-1">{item.title}</p>
-              <p className={L.cardBodyLight}>{item.body}</p>
+              <p className={L.itemSubtitle}>{item.title}</p>
+              <p className={L.cardBodyDark}>{item.body}</p>
             </div>
           </li>
         ))}
@@ -96,16 +97,21 @@ function ProfileColumn({ emoji, title, items }) {
 
 function PillarCard({ title, body }) {
   return (
-    <article className="rounded-2xl bg-white border border-white/15 p-6 h-full shadow-md shadow-black/20">
-      <h3 className={cn(L.cardTitleLight, 'mb-3')}>{title}</h3>
-      <p className={L.cardBodyLight}>{body}</p>
+    <article className={cn(L.cardOnDark, 'p-6 h-full')}>
+      <h3 className={cn(L.cardSubtitle, 'mb-3')}>{title}</h3>
+      <p className={L.cardBodyDark}>{body}</p>
     </article>
   );
 }
 
-function MetricItem({ label }) {
+function MetricItem({ label, onDark = true }) {
   return (
-    <li className="flex gap-3 items-start text-sm text-[#334155]">
+    <li
+      className={cn(
+        'flex gap-3 items-start text-sm',
+        onDark ? 'text-white/85' : 'text-[#334155]'
+      )}
+    >
       <ChevronRight className="h-4 w-4 text-[#2ECC49] shrink-0 mt-0.5" aria-hidden />
       <span>{label}</span>
     </li>
@@ -431,10 +437,10 @@ export default function InstitutionalLanding() {
             />
 
             <div className="grid lg:grid-cols-2 gap-10">
-              <div className={cn(L.cardOnLight, 'p-6 sm:p-8')}>
+              <div className={cn(L.cardOnDark, 'p-6 sm:p-8')}>
                 <div className="flex items-center gap-2 mb-5">
                   <BarChart3 className="h-5 w-5 text-[#2ECC49]" aria-hidden />
-                  <h3 className={L.cardTitleLight}>Métricas & Stack</h3>
+                  <h3 className={L.cardSubtitle}>Métricas & Stack</h3>
                 </div>
                 <ul className="space-y-3 m-0 p-0 list-none">
                   <MetricItem label="Aplicativo publicado e funcional na Google Play (Next.js 15, Supabase, Google Cloud Run e IA)." />
@@ -443,7 +449,7 @@ export default function InstitutionalLanding() {
               </div>
 
               <div className={cn(L.cardOnDark, 'p-6 sm:p-8')}>
-                <h3 className={cn(L.cardTitleDark, 'mb-4')}>A Oportunidade de Investimento</h3>
+                <h3 className={cn(L.cardSubtitle, 'mb-4')}>A Oportunidade de Investimento</h3>
                 <p className={cn(L.cardBodyDark, 'm-0 mb-4')}>
                   Estamos abrindo nossa rodada <strong className="text-white">Seed de R$ 500.000</strong>{' '}
                   (para 8% a 10% de equity), sob um Valuation Pré-money de{' '}
