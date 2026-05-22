@@ -7,6 +7,12 @@ import {
   disambiguateDuplicateDisplayNames,
   enrichBankAccountForDisplay,
 } from '../../../lib/bankAccountDisplay';
+import {
+  canAddBankConnection,
+  countBankConnections,
+  getOpenFinanceBankLimit,
+  getUserPlanSlug,
+} from '../../../lib/openFinanceLimits';
 
 /** Mês civil em America/Sao_Paulo (YYYY-MM-DD início e fim). */
 function brazilCurrentMonthRange() {
@@ -190,12 +196,28 @@ export default async function handler(req, res) {
     account_name: accountNameById[t.bank_account_id] || null,
   }));
 
+  let limits = { max: 1, used: 0, canConnectMore: true, plan: 'free' };
+  try {
+    const plan = await getUserPlanSlug(supabase, userId);
+    const used = await countBankConnections(supabase, userId);
+    const max = getOpenFinanceBankLimit(plan);
+    limits = {
+      plan,
+      max,
+      used,
+      canConnectMore: canAddBankConnection(plan, used),
+    };
+  } catch (limErr) {
+    console.warn('[open-finance/summary] limits:', limErr?.message || limErr);
+  }
+
   return res.status(200).json({
     ok: true,
     syncing,
     connections: connections || [],
     accounts: accountsFiltered,
     recentTransactions: transactionsWithAccount,
+    limits,
     month: {
       start: monthStart,
       end: monthEnd,

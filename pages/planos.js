@@ -71,12 +71,12 @@ const UPSELL_COPY = {
     plan: 'pro',
     cta: 'Desbloquear no Pro',
   },
-  openFinance: {
-    title: 'Open Finance',
+  openFinanceMulti: {
+    title: 'Mais bancos no Open Finance',
     body:
-      'Ligue os seus bancos com segurança e deixe de lançar tudo à mão. Disponível a partir do plano Pro.',
+      'No plano Grátis já pode ligar 1 banco sem prazo. Para 2 ou mais bancos (Nubank + PicPay, etc.), assine Pro ou Família.',
     plan: 'pro',
-    cta: 'Assinar Pro',
+    cta: 'Ver planos pagos',
   },
 };
 
@@ -215,8 +215,11 @@ export default function PlanosPage() {
               <Li>3 scans NFC-e por mês</Li>
               <Li>Histórico de 30 dias</Li>
               <Li>Carrinho de compras</Li>
+              <Li>Open Finance — 1 banco (sem prazo)</Li>
               <LiLocked onUnlock={() => setUpsell(UPSELL_COPY.radar)}>Radar de ofertas (perto de si)</LiLocked>
-              <LiLocked onUnlock={() => setUpsell(UPSELL_COPY.openFinance)}>Open Finance</LiLocked>
+              <LiLocked onUnlock={() => setUpsell(UPSELL_COPY.openFinanceMulti)}>
+                Mais bancos Open Finance
+              </LiLocked>
             </ul>
             <button
               type="button"

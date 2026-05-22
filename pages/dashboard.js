@@ -118,7 +118,7 @@ export default function Dashboard() {
   const [restoringId, setRestoringId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { can: canPlanFeature, loading: planLoading } = usePlan();
-  const canOpenFinance = !planLoading && canPlanFeature('open_finance');
+  const canOpenFinance = status === 'authenticated';
   const [recentPrices, setRecentPrices] = useState([]);
   const [statesData, setStatesData] = useState(null);
   const historyRef = useRef(null);

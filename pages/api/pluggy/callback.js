@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { createPluggyServerClient } from '../../../lib/pluggySyncTransactions';
 import { refreshConnectorAndPruneDuplicates } from '../../../lib/pluggyPruneDuplicateItems';
+import { assertCanAddBankConnection } from '../../../lib/openFinanceLimits';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,6 +38,22 @@ export default async function handler(req, res) {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return res.status(500).json({ error: 'Configuração do servidor incompleta (Supabase).' });
+  }
+
+  try {
+    await assertCanAddBankConnection(supabase, userId, itemId);
+  } catch (e) {
+    if (e?.code === 'open_finance_bank_limit') {
+      return res.status(403).json({
+        error: e.message,
+        code: e.code,
+        limit: e.limit,
+        count: e.count,
+        plan: e.plan,
+      });
+    }
+    console.error('[pluggy/callback] limit check:', e?.message || e);
+    return res.status(500).json({ error: 'Falha ao validar limite de bancos.' });
   }
 
   const nowIso = new Date().toISOString();

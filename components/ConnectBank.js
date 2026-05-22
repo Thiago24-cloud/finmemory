@@ -27,6 +27,11 @@ export default function ConnectBank({ onSuccess, onError }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 403 && data.code === 'open_finance_bank_limit') {
+          const err = new Error(data.error || 'Limite de bancos atingido.');
+          err.code = data.code;
+          throw err;
+        }
         throw new Error(data.error || `Erro ${res.status}`);
       }
       if (!data.accessToken) {
@@ -73,6 +78,12 @@ export default function ConnectBank({ onSuccess, onError }) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          if (res.status === 403 && data.code === 'open_finance_bank_limit') {
+            throw new Error(
+              data.error ||
+                'Limite de bancos do seu plano. Assine Pro ou Família para ligar mais bancos.'
+            );
+          }
           throw new Error(data.error || `Erro ao guardar conexão (${res.status})`);
         }
         try {

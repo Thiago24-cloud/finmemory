@@ -2,6 +2,14 @@ import { PluggyClient } from 'pluggy-sdk';
 import { getServerSession } from 'next-auth/next';
 import { pluggyClientId, pluggyClientSecret } from '../../../lib/pluggyEnv';
 import { authOptions } from '../auth/[...nextauth]';
+import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
+import { resolvePublicUserId } from '../../../lib/resolvePublicUserId';
+import {
+  canAddBankConnection,
+  countBankConnections,
+  getOpenFinanceBankLimit,
+  getUserPlanSlug,
+} from '../../../lib/openFinanceLimits';
 
 /** @param {string | undefined} raw */
 function parseConnectorIdFromEnv(raw) {
@@ -52,6 +60,30 @@ export default async function handler(req, res) {
 
   /** Mesmo id nos webhooks item/* (clientUserId) — preferir UUID Supabase. */
   const pluggyClientUserId = session.user.supabaseId || session.user.email;
+
+  const supabase = getSupabaseAdmin();
+  const userId = supabase ? await resolvePublicUserId(session, supabase) : null;
+  if (supabase && userId) {
+    try {
+      const plan = await getUserPlanSlug(supabase, userId);
+      const used = await countBankConnections(supabase, userId);
+      if (!canAddBankConnection(plan, used)) {
+        const max = getOpenFinanceBankLimit(plan);
+        return res.status(403).json({
+          error:
+            plan === 'free'
+              ? `No plano Grátis pode ligar ${max} banco por tempo ilimitado. Para mais bancos, assine Pro, Família ou Enterprise.`
+              : `Limite de ${max} banco(s) no seu plano.`,
+          code: 'open_finance_bank_limit',
+          limit: max,
+          count: used,
+          plan,
+        });
+      }
+    } catch (e) {
+      console.warn('[pluggy/connect-token] limits:', e?.message || e);
+    }
+  }
 
   const clientId = pluggyClientId();
   const clientSecret = pluggyClientSecret();

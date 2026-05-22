@@ -15,7 +15,9 @@ import { usePWAInstallUIOptional } from '../components/PWAInstallProvider';
 import { BRAND } from '../lib/brandTokens';
 import { readSettingsAccountCache, writeSettingsAccountCache } from '../lib/settingsAccountCache';
 
-const ConnectBank = dynamic(() => import('../components/ConnectBank'), { ssr: false });
+const OpenFinanceConnectPanel = dynamic(() => import('../components/OpenFinanceConnectPanel'), {
+  ssr: false,
+});
 const UpgradePlan = dynamic(() => import('../components/UpgradeButton'), { ssr: false });
 
 const MIN_ACCOUNT_READY_MS = 160;
@@ -541,27 +543,21 @@ export default function SettingsPage() {
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-base font-semibold text-gray-900">Open Finance (Pluggy)</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Conecte seu banco pelo Open Finance (PicPay, Nubank, etc.) para importar movimentações no dashboard.
-              Depois de conectar, as transações sincronizam automaticamente.
+              1 banco grátis para sempre no plano Grátis. Bancos adicionais exigem Pro, Família ou Enterprise.
+              PicPay, Nubank, etc. — movimentações no dashboard após conectar.
             </p>
           </div>
           <div className="p-4">
             {status === 'authenticated' ? (
-              <PlanGuard
-                feature="open_finance"
-                title="Open Finance — Plano Pro"
-                body="Conecte seus bancos e importe movimentações automaticamente. Disponível no plano Pro."
-              >
-                <ConnectBank
-                  onSuccess={() => {
-                    router.push('/dashboard');
-                  }}
-                  onError={(e) => {
-                    const msg = e?.message || 'Falha ao conectar banco.';
-                    if (typeof window !== 'undefined') alert(msg);
-                  }}
-                />
-              </PlanGuard>
+              <OpenFinanceConnectPanel
+                onSuccess={() => {
+                  router.push('/dashboard');
+                }}
+                onError={(e) => {
+                  const msg = e?.message || 'Falha ao conectar banco.';
+                  if (typeof window !== 'undefined') alert(msg);
+                }}
+              />
             ) : (
               <p className="text-sm text-gray-500">Faça login para conectar seu banco.</p>
             )}

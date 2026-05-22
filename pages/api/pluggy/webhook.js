@@ -4,6 +4,7 @@ import { createPluggyServerClient, syncTransactionsForItem } from '../../../lib/
 import { syncOpenFinanceForItem } from '../../../lib/pluggySyncOpenFinance';
 import { refreshConnectorAndPruneDuplicates } from '../../../lib/pluggyPruneDuplicateItems';
 import { autoLinkPluggyTransactionsForUser } from '../../../lib/autoLinkPluggyTransactions';
+import { assertCanAddBankConnection } from '../../../lib/openFinanceLimits';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -185,6 +186,14 @@ async function processWebhookBody(supabase, body) {
         if (!userId) {
           console.warn('[pluggy/webhook] utilizador não encontrado para clientUserId:', clientUserId);
           return;
+        }
+        try {
+          await assertCanAddBankConnection(supabase, userId, itemId);
+        } catch (limErr) {
+          if (limErr?.code === 'open_finance_bank_limit') {
+            console.warn('[pluggy/webhook] bank limit:', limErr.message);
+            return;
+          }
         }
         const pluggy = createPluggyServerClient();
         let pluggyConnectorId = null;
