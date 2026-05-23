@@ -9,6 +9,7 @@ import {
 import { getCachedImageUrlFromDb } from '../../../lib/mapProductImageCache';
 import { resolveOwnerUserId } from '../../../lib/botPromoOwner';
 import { getLatestIngestRejections } from '../../../lib/ingest/rejectionLog';
+import { triggerImageEnrichmentAsync } from '../../../lib/catalog/triggerImageEnrichment';
 
 const GRANDE_SP_CITIES = new Set([
   'sao paulo', 'guarulhos', 'osasco', 'santo andre', 'sao bernardo do campo', 'sao caetano do sul',
@@ -512,6 +513,10 @@ export default async function handler(req, res) {
     }
 
     console.log('[bot-fila approve]', { inserted: rows.length, pending_image: missingImageAfterCache.length, invalid: split.invalid.length });
+
+    if (missingImageAfterCache.length > 0 || split.pendingImage.length > 0) {
+      triggerImageEnrichmentAsync({ filaId: id, mode: 'bot_fila', limit: 60 });
+    }
 
     const remaining = [...missingImageAfterCache, ...split.invalid];
     if (remaining.length > 0) {
