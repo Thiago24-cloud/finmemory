@@ -148,7 +148,7 @@ function CtaButton({ href, children, variant = 'primary', className, onClick }) 
   );
 }
 
-export default function InstitutionalLanding() {
+export default function InstitutionalLanding({ accessNotice = null }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const closeMenu = () => setMenuOpen(false);
@@ -181,6 +181,17 @@ export default function InstitutionalLanding() {
 
   return (
     <div className="min-h-screen bg-[#fafbfc] text-[#0f172a] scroll-smooth">
+      {accessNotice ? (
+        <div
+          role="alert"
+          className="fixed top-16 inset-x-0 z-[60] border-b border-amber-500/40 bg-amber-950/95 px-4 py-3 text-center text-sm text-amber-100"
+        >
+          {accessNotice}{' '}
+          <Link href="/login" className="font-semibold text-[#2ECC49] underline-offset-2 hover:underline">
+            Entrar novamente
+          </Link>
+        </div>
+      ) : null}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/10 bg-[#0a0f1a]/90 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <a href="#" className="flex items-center gap-2.5 shrink-0">

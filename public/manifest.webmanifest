@@ -2,7 +2,7 @@
   "name": "FinMemory",
   "short_name": "FinMemory",
   "description": "Automação financeira e mapa de preços",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

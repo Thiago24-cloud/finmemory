@@ -1,7 +1,16 @@
 import Head from 'next/head';
+import { getServerSession } from 'next-auth/next';
 import InstitutionalLanding from '../components/landing/InstitutionalLanding';
+import { AuthenticatedHomeRedirect } from '../components/landing/AuthenticatedHomeRedirect';
+import { authOptions } from './api/auth/[...nextauth]';
+import { canAccessForSession } from '../lib/access-server';
 
-export default function LandingPage() {
+const ACCESS_NOTICES = {
+  'nao-cadastrado':
+    'Não foi possível abrir o app com esta sessão. Saia e entre novamente ou contacte o suporte em finmemory.oficial@gmail.com.',
+};
+
+export default function LandingPage({ accessNotice }) {
   return (
     <>
       <Head>
@@ -17,7 +26,27 @@ export default function LandingPage() {
           content="Automação financeira, mapa de preços e inteligência para consumidor e varejista."
         />
       </Head>
-      <InstitutionalLanding />
+      <AuthenticatedHomeRedirect />
+      <InstitutionalLanding accessNotice={accessNotice} />
     </>
   );
+}
+
+export async function getServerSideProps(ctx) {
+  const session = await getServerSession(ctx.req, ctx.res, authOptions);
+  const msg = typeof ctx.query?.msg === 'string' ? ctx.query.msg : null;
+
+  if (session?.user?.email && msg !== 'nao-cadastrado') {
+    const allowed = await canAccessForSession(session);
+    if (allowed) {
+      return {
+        redirect: { destination: '/dashboard', permanent: false },
+      };
+    }
+  }
+
+  const accessNotice =
+    msg && ACCESS_NOTICES[msg] ? ACCESS_NOTICES[msg] : null;
+
+  return { props: { accessNotice } };
 }
