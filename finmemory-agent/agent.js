@@ -1663,42 +1663,107 @@ const SCRAPERS = {
 };
 
 async function writeToSupabase(rows, supermarketSlug, runId, nowIso, expireIso) {
+  const scraper = SCRAPERS[supermarketSlug];
   if (IS_DRY_RUN) {
-    log.info(`[DRY-RUN] gravaria ${rows.length} linhas — ${supermarketSlug}`);
+    log.info(`[DRY-RUN] enfileiraria ${rows.length} produtos — ${supermarketSlug}`);
     return;
   }
-  if (!supabase) {
-    log.error(
-      'Supabase não configurado. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (ou SUPABASE_SERVICE_KEY).'
+  if (!rows.length) {
+    log.info(`    ${supermarketSlug}: 0 produtos — nada a enfileirar`);
+    return;
+  }
+
+  const produtos = rows.map((r) => ({
+    nome: r.nome_produto,
+    preco: r.preco,
+    imagem_url: r.imagem_url || null,
+    valid_until: r.validade || null,
+    unidade: r.categoria || null,
+    metadata: {
+      gtin: r.gtin || null,
+      ingest_source: r.ingest_source || `finmemory_agent:${supermarketSlug}`,
+    },
+  }));
+
+  const lat = rows.find((r) => r.lat != null)?.lat ?? null;
+  const lng = rows.find((r) => r.lng != null)?.lng ?? null;
+  if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+    log.warn(
+      `    ${supermarketSlug}: sem lat/lng — use PROMO_FANOUT ou coords da rede; lote ignorado (${rows.length} itens)`
     );
     return;
   }
 
-  const { error: deactivateErr } = await supabase
-    .from('promocoes_supermercados')
-    .update({ ativo: false })
-    .eq('supermercado', supermarketSlug)
-    .eq('ativo', true);
+  const storeName = scraper?.label || supermarketSlug;
+  const origem = `finmemory_agent:${supermarketSlug}`;
 
-  if (deactivateErr) {
-    log.warn(`Desativar lote anterior (${supermarketSlug}): ${deactivateErr.message}`);
-  }
+  const appBase =
+    process.env.FINMEMORY_APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL;
+  const secret =
+    process.env.CRON_SECRET ||
+    process.env.DIA_IMPORT_SECRET ||
+    process.env.CATALOG_ENRICH_SECRET;
 
-  if (!rows.length) return;
-
-  const chunkSize = 400;
-  const rowsForDb = await resolveProductIdsForPromoRows(rows);
-  for (let i = 0; i < rowsForDb.length; i += chunkSize) {
-    const slice = rowsForDb.slice(i, i + chunkSize);
-    const { error: insertErr } = await supabase
-      .from('promocoes_supermercados')
-      .insert(slice);
-    if (insertErr) {
-      throw new Error(`Supabase insert falhou (${supermarketSlug}): ${insertErr.message}`);
+  if (appBase && secret) {
+    const res = await fetch(`${String(appBase).replace(/\/$/, '')}/api/scrapers/enqueue-batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-cron-secret': secret,
+      },
+      body: JSON.stringify({
+        origem,
+        storeName,
+        storeLat: Number(lat),
+        storeLng: Number(lng),
+        produtos,
+        artifacts: {
+          run_id: runId,
+          agent_key: supermarketSlug,
+          expira_em: expireIso,
+          atualizado_em: nowIso,
+        },
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(`enqueue-batch HTTP ${res.status}: ${json.error || res.statusText}`);
     }
+    log.info(
+      `✅ fila pendente ${json.filaId} — ${produtos.length} produtos — ${supermarketSlug} (aprovar em /admin/bot-fila)`
+    );
+    return;
   }
 
-  log.info(`✅ ${rowsForDb.length} linhas — ${supermarketSlug} — TTL ${ENV.TTL_HOURS}h`);
+  if (!supabase) {
+    log.error(
+      'Configure FINMEMORY_APP_URL + CRON_SECRET (enqueue HTTP) ou SUPABASE_URL + service role.'
+    );
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('bot_promocoes_fila')
+    .insert({
+      store_name: storeName,
+      store_lat: Number(lat),
+      store_lng: Number(lng),
+      produtos,
+      origem,
+      status: 'pendente',
+      artifacts: { run_id: runId, agent_key: supermarketSlug },
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    throw new Error(`bot_promocoes_fila insert (${supermarketSlug}): ${error.message}`);
+  }
+  log.info(
+    `✅ fila pendente ${data.id} — ${produtos.length} produtos — ${supermarketSlug} (Supabase direto)`
+  );
 }
 
 async function runScraper(key, context, runId, now, expireAt, chainCoords = {}) {

@@ -130,7 +130,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const produtos = mapOfertasToProdutosFila(ofertas, sundayFallbackYmd);
+      const produtos = mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls);
 
       if (produtos.length === 0) {
         one.error = 'Nenhuma oferta extraída das imagens';
@@ -178,6 +178,7 @@ export default async function handler(req, res) {
       one.offersTotal = published.offersTotal;
       one.invalidPrice = published.invalidPrice;
       one.note = published.note;
+      one.autoPublished = published.autoPublished;
       one.finishDate = finishDateIso;
       results.push(one);
     } catch (e) {

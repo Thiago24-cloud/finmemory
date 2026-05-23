@@ -5,7 +5,7 @@
  * Uso:
  *   node -r dotenv/config scripts/enrich-product-images.mjs
  *   node -r dotenv/config scripts/enrich-product-images.mjs --fila-id=UUID
- *   node -r dotenv/config scripts/enrich-product-images.mjs --limit=20
+ *   node -r dotenv/config scripts/enrich-product-images.mjs --mode=price_points --days=7
  */
 import { config } from 'dotenv';
 import { resolve } from 'path';
@@ -28,6 +28,11 @@ const filaId = filaArg ? filaArg.split('=')[1] : null;
 const limitArg = process.argv.find((a) => a.startsWith('--limit='));
 const limit = limitArg ? Number(limitArg.split('=')[1]) : 40;
 
+const modeArg = process.argv.find((a) => a.startsWith('--mode='));
+const mode = modeArg ? modeArg.split('=')[1] : (filaId ? 'bot_fila' : 'promocoes');
+const daysArg = process.argv.find((a) => a.startsWith('--days='));
+const days = daysArg ? Number(daysArg.split('=')[1]) : 7;
+
 if (!secret) {
   console.error('Defina CATALOG_ENRICH_SECRET ou CRON_SECRET no .env.local');
   process.exit(1);
@@ -35,7 +40,7 @@ if (!secret) {
 
 const body = filaId
   ? { filaId, mode: 'bot_fila', limit, async: false }
-  : { mode: 'promocoes', limit, async: false };
+  : { mode, limit, days, async: false };
 
 const res = await fetch(`${base}/api/catalog/enrich-product-images`, {
   method: 'POST',

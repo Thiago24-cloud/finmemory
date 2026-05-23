@@ -10,6 +10,7 @@ import { getCachedImageUrlFromDb } from '../../../lib/mapProductImageCache';
 import { resolveOwnerUserId } from '../../../lib/botPromoOwner';
 import { getLatestIngestRejections } from '../../../lib/ingest/rejectionLog';
 import { triggerImageEnrichmentAsync } from '../../../lib/catalog/triggerImageEnrichment';
+import { afterMapPricePointsInsert } from '../../../lib/catalog/afterMapPricePointsInsert';
 
 const GRANDE_SP_CITIES = new Set([
   'sao paulo', 'guarulhos', 'osasco', 'santo andre', 'sao bernardo do campo', 'sao caetano do sul',
@@ -510,6 +511,11 @@ export default async function handler(req, res) {
     if (rows.length > 0) {
       const { error: insertErr } = await supabase.from('price_points').insert(rows);
       if (insertErr) return res.status(500).json({ error: `Erro ao publicar no mapa: ${insertErr.message}` });
+      afterMapPricePointsInsert({
+        rows,
+        storeName: item.store_name,
+        source: 'bot_fila_aprovado',
+      });
     }
 
     console.log('[bot-fila approve]', { inserted: rows.length, pending_image: missingImageAfterCache.length, invalid: split.invalid.length });

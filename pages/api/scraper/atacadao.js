@@ -145,6 +145,7 @@ export default async function handler(req, res) {
       one.offersTotal = published.offersTotal;
       one.invalidPrice = published.invalidPrice;
       one.note = published.note;
+      one.autoPublished = published.autoPublished;
       one.vtexProductsTotal = vtexProducts.length;
       results.push(one);
     } catch (e) {

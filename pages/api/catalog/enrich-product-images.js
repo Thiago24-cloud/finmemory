@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { checkCatalogEnrichSecret } from '../../../lib/catalog/checkCatalogEnrichSecret.js';
 import { enrichBotFilaItemImages } from '../../../lib/catalog/enrichBotFilaImages.js';
+import { enrichPricePointsImages } from '../../../lib/catalog/enrichPricePointsImages.js';
 import { processImageSync } from '../../../lib/catalog/processImageSync.js';
 
 function getSupabase() {
@@ -15,7 +16,8 @@ function getSupabase() {
  * Body:
  *   { filaId } — enriquece produtos da bot_promocoes_fila
  *   { mode: 'promocoes', limit?: number } — promocoes_supermercados sem imagem
- *   { async?: true } — responde 202 e processa em background (só em filaId/promocoes no mesmo request)
+ *   { mode: 'price_points', limit?: number, days?: number, storeName?, source? } — pontos do mapa
+ *   { async?: true } — responde 202 e processa em background
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -36,9 +38,18 @@ export default async function handler(req, res) {
   const limitRaw = Number(req.body?.limit ?? req.query?.limit ?? 40);
   const limit = Math.min(120, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 40));
 
+  const daysRaw = Number(req.body?.days ?? req.query?.days ?? 7);
+  const days = Math.min(30, Math.max(1, Number.isFinite(daysRaw) ? daysRaw : 7));
+  const storeName = req.body?.storeName || req.query?.storeName || undefined;
+  const source = req.body?.source || req.query?.source || undefined;
+
   const run = async () => {
     if (mode === 'bot_fila' && filaId) {
       return enrichBotFilaItemImages(supabase, String(filaId), { maxProducts: limit });
+    }
+
+    if (mode === 'price_points') {
+      return enrichPricePointsImages(supabase, { limit, days, storeName, source });
     }
 
     const nowIso = new Date().toISOString();

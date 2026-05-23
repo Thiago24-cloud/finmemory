@@ -1,29 +1,13 @@
-import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { geocodeAddress } from '../../../lib/geocode';
+import { extractOffersFromHtmlAnthropic } from '../../../lib/diaScraper/scraperDiaCore.js';
 import {
   INGEST_SOURCE_DIA_STORE_PAGE,
   enqueuePromocoes,
   resolveIngestProvider,
   ProviderValidationError,
 } from '../../../lib/ingest';
-
-const { buildDiaOffersExtractionPrompt } = require('../../../lib/diaOffersGptPrompt.js');
-
-function getOpenAI() {
-  if (!process.env.OPENAI_API_KEY) return null;
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
-
-function extractJsonPayload(text) {
-  if (!text) return null;
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-  return cleaned.slice(start, end + 1);
-}
 
 function stripHtmlToText(html) {
   if (!html) return '';
@@ -69,8 +53,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'storeUrl (string) é obrigatório' });
   }
 
-  const openai = getOpenAI();
-  if (!openai) return res.status(500).json({ error: 'OPENAI_API_KEY não configurada' });
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada' });
 
   const url = storeUrl.trim();
 
@@ -103,19 +87,8 @@ export default async function handler(req, res) {
     const flyerAssetUrls = extractFlyerAssetUrls(html);
     const truncated = text.slice(0, 25000); // evita estouro de tokens
 
-    // 2) Extrai promoções com GPT (prompt partilhado com jobs/agent.js — ver lib/diaOffersGptPrompt.js)
-    const extractionPrompt = buildDiaOffersExtractionPrompt(truncated);
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: extractionPrompt }],
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-    });
-
-    const raw = completion?.choices?.[0]?.message?.content || '';
-    let jsonStr = extractJsonPayload(raw) || raw;
-    const parsed = JSON.parse(jsonStr);
+    // 2) Extrai promoções com Anthropic (prompt em lib/diaOffersGptPrompt.js)
+    const parsed = await extractOffersFromHtmlAnthropic(anthropicKey, truncated);
 
     const offers = Array.isArray(parsed?.offers) ? parsed.offers : [];
     const storeNameForGeo = String(parsed?.store_name || '').trim();
