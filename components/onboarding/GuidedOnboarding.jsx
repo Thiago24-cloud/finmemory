@@ -89,6 +89,14 @@ export function GuidedOnboarding({ userId, steps, mode = 'intro', onComplete }) 
     setModalOpen(true);
   }, []);
 
+  const handleTargetMissing = useCallback(() => {
+    if (stepIndex < steps.length - 1) {
+      setStepIndex((i) => i + 1);
+      return;
+    }
+    void finish();
+  }, [finish, stepIndex, steps.length]);
+
   const handleModalNext = useCallback(() => {
     setModalOpen(false);
 
@@ -123,6 +131,7 @@ export function GuidedOnboarding({ userId, steps, mode = 'intro', onComplete }) 
         targetId={step.targetId}
         handPlacement={step.handPlacement || 'bottom'}
         onTargetActivate={handleTargetActivate}
+        onTargetMissing={handleTargetMissing}
       />
       <OnboardingPremiumModal
         open={modalOpen}
