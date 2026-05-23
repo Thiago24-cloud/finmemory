@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
-import { DIA_SCRAPER_STORES } from '../../../lib/diaScraper/storesCatalog.js';
+import { resolveDiaScraperStores } from '../../../lib/diaScraper/fetchDiaCatalogStores.js';
 import {
   SCRAPER_DIA_ORIGEM,
   extractOffersViaVision,
@@ -28,7 +28,10 @@ function requireCronSecret(req) {
 
 /**
  * POST /api/scraper/dia
- * Body opcional: { storeIds?: string[] } — ids do catálogo (`lib/diaScraper/storesCatalog.js`). Omite = todas as lojas.
+ * Body opcional:
+ *   { storeIds?: string[] } — lojas específicas
+ *   { all?: true } — todas as lojas SP do site (lento; use com cuidado)
+ *   { batchSize?: number, batchIndex?: number } — lote rotativo (padrão do cron)
  * Query: ?secret= — se DIA_IMPORT_SECRET estiver definido.
  */
 export default async function handler(req, res) {
@@ -60,13 +63,30 @@ export default async function handler(req, res) {
   }
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const requestedIds = Array.isArray(body.storeIds) ? body.storeIds.map(String) : null;
-  const stores = requestedIds?.length
-    ? DIA_SCRAPER_STORES.filter((s) => requestedIds.includes(s.id))
-    : DIA_SCRAPER_STORES;
 
-  if (requestedIds?.length && stores.length === 0) {
-    return res.status(400).json({ error: 'Nenhum storeIds corresponde ao catálogo', requestedIds });
+  let catalogMeta;
+  try {
+    catalogMeta = await resolveDiaScraperStores({
+      storeIds: Array.isArray(body.storeIds) ? body.storeIds.map(String) : undefined,
+      all: body.all === true,
+      batchSize: body.batchSize,
+      batchIndex: body.batchIndex,
+    });
+  } catch (e) {
+    return res.status(502).json({ error: `Catálogo DIA: ${e?.message || 'falha ao listar lojas'}` });
+  }
+
+  const stores = catalogMeta.stores || [];
+  if (Array.isArray(body.storeIds) && body.storeIds.length && stores.length === 0) {
+    return res.status(400).json({
+      error: 'Nenhum storeIds corresponde ao catálogo oficial',
+      requestedIds: body.storeIds,
+      catalogTotal: catalogMeta.catalogTotal,
+    });
+  }
+
+  if (!stores.length) {
+    return res.status(502).json({ error: 'Catálogo DIA vazio', catalogTotal: catalogMeta.catalogTotal });
   }
 
   const runId = randomUUID();
@@ -192,6 +212,9 @@ export default async function handler(req, res) {
     success: okCount === results.length,
     runId,
     sundayFallbackYmd,
+    catalogTotal: catalogMeta.catalogTotal,
+    catalogMode: catalogMeta.mode,
+    batchSize: catalogMeta.batchSize || stores.length,
     storesProcessed: results.length,
     storesOk: okCount,
     results,

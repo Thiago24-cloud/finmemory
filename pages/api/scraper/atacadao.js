@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
-import { ATACADAO_SCRAPER_STORES } from '../../../lib/atacadaoScraper/storesCatalog.js';
+import { resolveAtacadaoScraperStores } from '../../../lib/atacadaoScraper/fetchAtacadaoCatalogStores.js';
 import {
   SCRAPER_ATACADAO_ORIGEM,
   fetchAllStoreProducts,
@@ -26,7 +26,7 @@ function requireCronSecret(req) {
 
 /**
  * POST /api/scraper/atacadao
- * Body opcional: { storeIds?: string[] } — ids do catálogo. Omite = todas as lojas.
+ * Body opcional: { storeIds?, all?, batchSize?, batchIndex? } — ver resolveAtacadaoScraperStores
  * Query: ?secret= — se ATACADAO_IMPORT_SECRET estiver definido.
  */
 export default async function handler(req, res) {
@@ -53,13 +53,30 @@ export default async function handler(req, res) {
   }
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const requestedIds = Array.isArray(body.storeIds) ? body.storeIds.map(String) : null;
-  const stores = requestedIds?.length
-    ? ATACADAO_SCRAPER_STORES.filter((s) => requestedIds.includes(s.id))
-    : ATACADAO_SCRAPER_STORES;
 
-  if (requestedIds?.length && stores.length === 0) {
-    return res.status(400).json({ error: 'Nenhum storeIds corresponde ao catálogo', requestedIds });
+  let catalogMeta;
+  try {
+    catalogMeta = await resolveAtacadaoScraperStores({
+      storeIds: Array.isArray(body.storeIds) ? body.storeIds.map(String) : undefined,
+      all: body.all === true,
+      batchSize: body.batchSize,
+      batchIndex: body.batchIndex,
+    });
+  } catch (e) {
+    return res.status(502).json({ error: `Catálogo Atacadão: ${e?.message || 'falha ao listar lojas'}` });
+  }
+
+  const stores = catalogMeta.stores || [];
+  if (Array.isArray(body.storeIds) && body.storeIds.length && stores.length === 0) {
+    return res.status(400).json({
+      error: 'Nenhum storeIds corresponde ao catálogo',
+      requestedIds: body.storeIds,
+      catalogTotal: catalogMeta.catalogTotal,
+    });
+  }
+
+  if (!stores.length) {
+    return res.status(502).json({ error: 'Catálogo Atacadão vazio', catalogTotal: catalogMeta.catalogTotal });
   }
 
   const runId = randomUUID();
@@ -159,6 +176,9 @@ export default async function handler(req, res) {
     success: okCount === results.length,
     runId,
     sundayFallbackYmd,
+    catalogTotal: catalogMeta.catalogTotal,
+    catalogMode: catalogMeta.mode,
+    batchSize: catalogMeta.batchSize || stores.length,
     storesProcessed: results.length,
     storesOk: okCount,
     results,

@@ -13,7 +13,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
-import { DIA_SCRAPER_STORES } from '../lib/diaScraper/storesCatalog.js';
+import { resolveDiaScraperStores } from '../lib/diaScraper/fetchDiaCatalogStores.js';
 import {
   extractOffersViaVision,
   fetchDiaPageDataJson,
@@ -31,8 +31,9 @@ config({ path: resolve(process.cwd(), '.env') });
 config({ path: resolve(process.cwd(), '.env.local'), override: true });
 
 const storeArg = process.argv.find((a) => a.startsWith('--store-id='));
-const storeId = storeArg ? storeArg.split('=')[1] : DIA_SCRAPER_STORES[0]?.id;
+const storeId = storeArg ? storeArg.split('=')[1] : null;
 const useHttp = process.argv.includes('--http');
+const runAll = process.argv.includes('--all');
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 if (!apiKey) {
@@ -40,10 +41,15 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const store = DIA_SCRAPER_STORES.find((s) => s.id === storeId);
+const { stores: catalogStores, catalogTotal } = await resolveDiaScraperStores({
+  storeIds: storeId ? [storeId] : undefined,
+  all: runAll,
+  batchSize: runAll ? undefined : 1,
+});
+const store = catalogStores[0];
 if (!store) {
-  console.error(`Loja não encontrada: ${storeId}`);
-  console.error('Ids:', DIA_SCRAPER_STORES.map((s) => s.id).join(', '));
+  console.error('Loja não encontrada:', storeId || '(primeira do lote)');
+  console.error('Catálogo total:', catalogTotal);
   process.exit(1);
 }
 
