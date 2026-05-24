@@ -1,5 +1,7 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
+import FacebookProvider from 'next-auth/providers/facebook';
 import { verifyPassword, isScryptPasswordHash } from '../../../lib/passwordAuth';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { verifyTotpCode } from '../../../lib/tokens';
@@ -8,10 +10,10 @@ import { normalizeEmail } from '../../../lib/securityPolicy';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 import { FINMEMORY_CREDENTIAL_ERROR, credentialLoginRejected } from '../../../lib/finmemoryLoginErrorCodes';
 import { ensureMerchantStoreLink } from '../../../lib/merchant/ensureMerchantStoreLink';
-import { normalizeAccountType, ACCOUNT_TYPE_VAREJISTA } from '../../../lib/userType';
+import { ensureOAuthUser } from '../../../lib/auth/ensureOAuthUser';
 
-async function attachMerchantStoreToToken(token, supabase, userId, accountType) {
-  if (!token || !supabase || !userId || normalizeAccountType(accountType) !== ACCOUNT_TYPE_VAREJISTA) {
+async function attachMerchantStoreToToken(token, supabase, userId) {
+  if (!token || !supabase || !userId) {
     if (token) {
       token.merchantStoreId = null;
       token.merchantStoreName = null;
@@ -27,6 +29,32 @@ async function attachMerchantStoreToToken(token, supabase, userId, accountType) 
     token.merchantStoreId = null;
     token.merchantStoreName = null;
   }
+}
+
+function buildOAuthProviders() {
+  /** @type {import('next-auth/providers').Provider[]} */
+  const providers = [];
+
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    providers.push(
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        authorization: { params: { prompt: 'select_account' } },
+      })
+    );
+  }
+
+  if (process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET) {
+    providers.push(
+      FacebookProvider({
+        clientId: process.env.FACEBOOK_CLIENT_ID,
+        clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+      })
+    );
+  }
+
+  return providers;
 }
 
 const DEFAULT_GOOGLE_PLAY_REVIEWER_EMAILS = ['thiagochimzie4@gmail.com', 'thiagochimezie44@gmail.com'];
@@ -62,6 +90,8 @@ export const authOptions = {
   trustHost: true,
   // Credentials Provider funciona de forma estável com estratégia JWT.
   adapter: undefined,
+  // Vincula Google/Facebook a conta existente com o mesmo email (email/senha).
+  allowDangerousEmailAccountLinking: true,
   // Cookies: sem domain para link do Cloud Run; nomes sem __Host- para evitar CSRF falhar atrás de proxy.
   // secure ativo só em HTTPS — em http://localhost o browser recusa cookies secure e o CSRF quebra.
   useSecureCookies: _isHttps,
@@ -78,6 +108,7 @@ export const authOptions = {
     state: { options: { httpOnly: true, sameSite: 'lax', path: '/', secure: _isHttps, maxAge: 900 } }
   },
   providers: [
+    ...buildOAuthProviders(),
     CredentialsProvider({
       name: 'Email e senha',
       credentials: {
@@ -237,6 +268,8 @@ export const authOptions = {
       if (user?.name) token.name = user.name;
       if (user?.image) token.picture = user.image;
 
+      if (user?.supabaseId) token.supabaseId = user.supabaseId;
+
       const supabase = getSupabaseAdmin();
       if (email && supabase) {
         try {
@@ -253,7 +286,7 @@ export const authOptions = {
             if (data.name) token.name = data.name;
             if (data.avatar_url) token.picture = data.avatar_url;
             token.account_type = data.account_type || 'consumidor';
-            await attachMerchantStoreToToken(token, supabase, data.id, token.account_type);
+            await attachMerchantStoreToToken(token, supabase, data.id);
           } else if (error) {
             // plano/plano_ativo columns may not exist yet — fallback to basic query
             console.warn('jwt callback: extended query failed, trying fallback:', error?.message);
@@ -281,14 +314,14 @@ export const authOptions = {
         if (session.image !== undefined) token.picture = session.image;
         if (typeof session.account_type === 'string') token.account_type = session.account_type;
         if (token.supabaseId && supabase) {
-          await attachMerchantStoreToToken(token, supabase, token.supabaseId, token.account_type);
+          await attachMerchantStoreToToken(token, supabase, token.supabaseId);
         }
       }
 
       return token;
     },
 
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
       try {
         if (isGooglePlayReviewerEmail(user?.email)) {
           return true;
@@ -298,6 +331,27 @@ export const authOptions = {
           console.warn('[auth] signIn bloqueado (lista de acesso):', user?.email);
           return false;
         }
+
+        const provider = account?.provider;
+        if (provider === 'google' || provider === 'facebook') {
+          const supabase = getSupabaseAdmin();
+          if (!supabase) {
+            console.error('[auth] signIn OAuth: Supabase indisponível');
+            return false;
+          }
+          const oauthUser = await ensureOAuthUser(supabase, {
+            email: user.email,
+            name: user.name || profile?.name,
+            image: user.image || profile?.picture || profile?.image,
+            provider,
+            providerAccountId: account.providerAccountId,
+          });
+          user.id = oauthUser.id;
+          user.supabaseId = oauthUser.id;
+          if (oauthUser.name) user.name = oauthUser.name;
+          console.info('[auth][oauth]', { provider, email: user.email, isNew: oauthUser.isNew });
+        }
+
         console.log('🔐 NextAuth SignIn callback –', user?.email);
         return true;
       } catch (err) {

@@ -18,7 +18,7 @@ const NAV = [
   { href: '#cadastro', label: 'Cadastrar loja' },
 ];
 
-export function PartnersLandingPage() {
+export function PartnersLandingPage({ socialProviders = [] }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -104,7 +104,7 @@ export function PartnersLandingPage() {
         <PartnersBenefitsGrid />
         <PartnersHowItWorks />
         <PartnersPickupSection />
-        <PartnersOnboardingForm />
+        <PartnersOnboardingForm socialProviders={socialProviders} />
       </main>
 
       <footer className="border-t border-white/10 py-10 px-4">

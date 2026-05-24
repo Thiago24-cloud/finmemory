@@ -1,12 +1,12 @@
 import { hashPassword, verifyPassword, isScryptPasswordHash } from '../../../lib/passwordAuth';
 import { createPartnerStoreForUser } from '../../../lib/partners/createPartnerStoreForUser';
+import { documentTaxIdConflict } from '../../../lib/partners/documentTaxIdConflict';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { geocodeAddress } from '../../../lib/geocode';
 import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { sendSecurityEmail } from '../../../lib/securityEmail';
 import { isValidEmail, normalizeEmail, validatePasswordStrength } from '../../../lib/securityPolicy';
 import { isValidCpfOrCnpj, normalizeTaxIdDigits } from '../../../lib/validateTaxId';
-import { ACCOUNT_TYPE_VAREJISTA } from '../../../lib/userType';
 import { syncMerchantStoreBindings } from '../../../lib/merchant/syncMerchantStoreBindings';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 
@@ -138,22 +138,14 @@ export default async function handler(req, res) {
     });
   }
 
-  const { data: existingDoc } = await supabase
-    .from('merchant_store_profiles')
-    .select('id')
-    .eq('document_tax_id', documentTaxId)
-    .maybeSingle();
-  if (existingDoc?.id) {
-    return res.status(409).json({ error: 'Este CPF/CNPJ já está vinculado a uma loja parceira.' });
-  }
-
-  const { data: existingCnpjStore } = await supabase
-    .from('stores')
-    .select('id')
-    .eq('cnpj', documentTaxId)
-    .maybeSingle();
-  if (existingCnpjStore?.id) {
-    return res.status(409).json({ error: 'Este CPF/CNPJ já está cadastrado em outra loja no mapa.' });
+  const docConflict = await documentTaxIdConflict(supabase, documentTaxId, '');
+  if (docConflict.blocked) {
+    return res.status(409).json({
+      error:
+        docConflict.reason === 'store_cnpj'
+          ? 'Este CPF/CNPJ já está cadastrado em outra loja no mapa.'
+          : 'Este CPF/CNPJ já está vinculado a uma loja parceira.',
+    });
   }
 
   const passwordHash = hashPassword(password);
@@ -161,14 +153,10 @@ export default async function handler(req, res) {
   let userId = null;
 
   try {
-    const signupNow = new Date().toISOString();
     const userInsert = {
       email: normalizedEmail,
       name: responsibleName,
       google_id: null,
-      account_type: ACCOUNT_TYPE_VAREJISTA,
-      account_type_selected_at: signupNow,
-      account_type_chosen_explicitly: true,
       access_token: null,
       refresh_token: null,
       token_expiry: null,

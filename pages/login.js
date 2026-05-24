@@ -7,8 +7,9 @@ import { validatePasswordStrength } from '../lib/securityPolicy';
 import { FINMEMORY_CREDENTIAL_ERROR } from '../lib/finmemoryLoginErrorCodes';
 import { messageForCredentialLogin } from '../lib/loginErrorMessages';
 import { capturePosthog, identifyPosthog } from '../lib/posthogClient';
+import { SocialLoginButtons } from '../components/auth/SocialLoginButtons';
 
-export default function LoginPage() {
+export default function LoginPage({ socialProviders = [] }) {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [mode, setMode] = useState('login');
@@ -326,9 +327,13 @@ export default function LoginPage() {
 
           <p className="text-[11px] text-center text-gray-600 mb-3 leading-relaxed">
             {mode === 'signup'
-              ? 'Cadastro rápido: só email e senha. Você entra já e completa dados de segurança no onboarding.'
-              : null}
+              ? 'Cadastro rápido: Google, Facebook ou email e senha. Você entra já e completa dados de segurança no onboarding.'
+              : 'Entre com Google, Facebook ou email e senha.'}
           </p>
+
+          {!resetToken ? (
+            <SocialLoginButtons providers={socialProviders} callbackUrl={callbackUrl} disabled={busy} />
+          ) : null}
 
           <input
             type="email"
@@ -508,4 +513,13 @@ export default function LoginPage() {
       </div>
     </>
   );
+}
+
+export async function getServerSideProps() {
+  const { getEnabledSocialProviders } = await import('../lib/auth/getSocialProviders');
+  return {
+    props: {
+      socialProviders: getEnabledSocialProviders(),
+    },
+  };
 }

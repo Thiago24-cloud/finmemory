@@ -1,12 +1,17 @@
 import Head from 'next/head';
 import { PartnersLandingPage } from '../components/landing/partners/PartnersLandingPage';
+import { getEnabledSocialProviders } from '../lib/auth/getSocialProviders';
 
 /** Evita SSG estático que pode quebrar hidratação com useSession no formulário. */
 export async function getServerSideProps() {
-  return { props: {} };
+  return {
+    props: {
+      socialProviders: getEnabledSocialProviders(),
+    },
+  };
 }
 
-export default function ParceirosPage() {
+export default function ParceirosPage({ socialProviders }) {
   return (
     <>
       <Head>
@@ -23,7 +28,7 @@ export default function ParceirosPage() {
         />
         <link rel="canonical" href="https://finmemory.com.br/parceiros" />
       </Head>
-      <PartnersLandingPage />
+      <PartnersLandingPage socialProviders={socialProviders} />
     </>
   );
 }

@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { PARTNERS_FORM } from '../../../lib/partners/landingCopy';
+import { SocialLoginButtons } from '../../auth/SocialLoginButtons';
 
 const INITIAL = {
   responsibleName: '',
@@ -18,7 +19,7 @@ const INITIAL = {
   passwordConfirm: '',
 };
 
-export function PartnersOnboardingForm() {
+export function PartnersOnboardingForm({ socialProviders = [] }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const loggedIn = status === 'authenticated' && Boolean(session?.user?.email);
@@ -132,6 +133,15 @@ export function PartnersOnboardingForm() {
             </p>
           ) : (
             <>
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-4">
+                <p className="text-xs text-white/60 m-0 mb-3 text-center">Entre ou crie conta em um clique</p>
+                <SocialLoginButtons
+                  providers={socialProviders}
+                  callbackUrl="/parceiros#cadastro"
+                  disabled={loading}
+                  variant="dark"
+                />
+              </div>
               <Field label="E-mail" name="email" type="email" value={form.email} onChange={onChange} required placeholder="contato@sualoja.com.br" autoComplete="email" />
               <Field label="Senha" name="password" type="password" value={form.password} onChange={onChange} required autoComplete="new-password" />
               <Field label="Confirmar senha" name="passwordConfirm" type="password" value={form.passwordConfirm} onChange={onChange} required autoComplete="new-password" />
