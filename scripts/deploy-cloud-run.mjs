@@ -34,6 +34,10 @@ const mapbox =
   process.env._MAPBOX_ACCESS_TOKEN?.trim() ||
   '';
 const stripePublishable = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || '';
+const publicAccess =
+  process.env.NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS?.trim() ||
+  process.env.FINMEMORY_PUBLIC_ACCESS?.trim() ||
+  '1';
 
 if (!supabaseUrl || !supabaseAnon) {
   console.error(
@@ -68,6 +72,7 @@ const substitutions = [
   `_NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnon}`,
   `_MAPBOX_ACCESS_TOKEN=${mapbox}`,
   `_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${stripePublishable}`,
+  `_NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS=${publicAccess}`,
 ].join(',');
 
 console.log(`[deploy-cloud-run] Projeto GCP: ${GCP_PROJECT}`);

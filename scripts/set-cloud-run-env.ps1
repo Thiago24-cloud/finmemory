@@ -57,7 +57,9 @@ $required = @(
     # Stripe — server-side runtime (não embutidas no bundle)
     "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
     "STRIPE_PLUS_PRICE_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_FAMILIA_PRICE_ID", "STRIPE_ENTERPRISE_PRICE_ID",
-    "FINMEMORY_PUBLIC_ACCESS"
+    "FINMEMORY_PUBLIC_ACCESS",
+    "FINMEMORY_PRIVATE_BETA_EMAILS",
+    "FINMEMORY_RESTRICTED_FEATURE_EMAILS"
 )
 # Garantir callback Google = NEXTAUTH_URL + /api/auth/callback/google
 $vars["GOOGLE_REDIRECT_URI"] = $vars["NEXTAUTH_URL"].TrimEnd('/') + "/api/auth/callback/google"
