@@ -40,7 +40,7 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
     <div className={APP_DARK_UI.card + ' mb-6 overflow-hidden'}>
       <h2 className={APP_DARK_UI.sectionTitle}>Planos FinMemory</h2>
       <p className={APP_DARK_UI.sectionLead}>
-        Assinatura no Stripe — Pro, Família ou Enterprise. Os preços vêm do Stripe Checkout.
+        Assinatura no Stripe — Pro ou Família. Os preços vêm do Stripe Checkout.
       </p>
       <Link
         href="/planos"
@@ -66,14 +66,6 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
           className="w-full rounded-lg border border-[#2ECC49]/50 bg-secondary/40 py-2 text-sm font-semibold text-[#2ECC49] hover:bg-secondary/60"
         >
           Assinar Família — R$ 99,90/mês
-        </UpgradePlan>
-        <UpgradePlan
-          plan="enterprise"
-          userId={supabaseId}
-          userEmail={userEmail}
-          className="w-full rounded-lg bg-[#2ECC49] py-2 text-sm font-semibold text-white hover:bg-[#25b340]"
-        >
-          Assinar Enterprise — R$ 17,90/mês
         </UpgradePlan>
       </div>
     </div>

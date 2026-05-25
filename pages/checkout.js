@@ -57,11 +57,11 @@ export default function CheckoutRedirectPage() {
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
       <div className="max-w-lg mx-auto px-4 py-8 w-full flex-1 flex flex-col">
         <Link
-          href="/planos"
+          href={plan === 'enterprise' ? '/settings' : '/planos'}
           className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
-          Voltar aos planos
+          {plan === 'enterprise' ? 'Voltar aos ajustes' : 'Voltar aos planos'}
         </Link>
 
         <h1 className="text-xl font-bold text-gray-900">A abrir pagamento seguro</h1>

@@ -33,6 +33,7 @@ function parseUiModeFromBody(req) {
 /**
  * POST /api/create-checkout-session
  * Body JSON opcional: { "plan": "pro" | "familia" | "enterprise" } (default pro).
+ * Enterprise não aparece em /planos — use link direto /checkout?plan=enterprise ou POST com plan=enterprise.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -134,7 +135,8 @@ export default async function handler(req, res) {
 
     const returnUrl = `${origin}/settings?stripe=success&plan=${encodeURIComponent(plan)}&session_id={CHECKOUT_SESSION_ID}`;
     const successUrl = `${origin}/settings?stripe=success&plan=${encodeURIComponent(plan)}`;
-    const cancelUrl = `${origin}/planos?stripe=cancel`;
+    const cancelUrl =
+      plan === 'enterprise' ? `${origin}/settings?stripe=cancel` : `${origin}/planos?stripe=cancel`;
 
     const sessionBase = {
       mode: 'subscription',

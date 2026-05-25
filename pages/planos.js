@@ -203,7 +203,7 @@ export default function PlanosPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Free */}
           <div className={cardBase}>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Grátis</p>
@@ -228,34 +228,6 @@ export default function PlanosPage() {
             >
               Plano atual
             </button>
-          </div>
-
-          {/* Enterprise */}
-          <div className={cardBase}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Enterprise</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">
-              R$ 17,90<span className="text-sm font-normal text-gray-500"> / mês</span>
-            </p>
-            <ul className="mt-4 space-y-2 flex-1">
-              <Li>Tudo do Pro</Li>
-              <Li>Open Finance — até 3 bancos conectados</Li>
-              <Li>Onboarding guiado pelo escritório parceiro</Li>
-              <Li>Acesso exclusivo via link do contador</Li>
-              <Li>Canal de distribuição para escritórios</Li>
-              <Li>Comissão de 25% ao parceiro contador</Li>
-            </ul>
-            {userReady ? (
-              <UpgradeBtn
-                plan="enterprise"
-                userId={sessionUser.supabaseId}
-                userEmail={sessionUser.email}
-                className="mt-6 w-full rounded-lg bg-gradient-to-r from-gray-900 to-gray-800 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-gray-800 hover:to-gray-900"
-              >
-                Assinar Enterprise
-              </UpgradeBtn>
-            ) : (
-              <PlanCtaPlaceholder />
-            )}
           </div>
 
           {/* Pro — “Mais popular” + mesma linguagem de hover que os outros */}
