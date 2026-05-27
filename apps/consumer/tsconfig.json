@@ -1,0 +1,69 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@finmemory/shared": [
+        "../../packages/shared/src/index.ts"
+      ],
+      "@finmemory/shared/*": [
+        "../../packages/shared/src/*"
+      ],
+      "@finmemory/ui": [
+        "../../packages/ui-components/src/index.ts"
+      ],
+      "@finmemory/ui/*": [
+        "../../packages/ui-components/src/*"
+      ],
+      "@finmemory/shared/validation": [
+        "../../packages/shared/src/validation/index.ts"
+      ],
+      "@finmemory/shared/format": [
+        "../../packages/shared/src/format/index.ts"
+      ],
+      "@finmemory/shared/auth": [
+        "../../packages/shared/src/auth/index.ts"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "strictNullChecks": true
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src",
+    "supabase/functions",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "_smart-receipt-scanner"
+  ]
+}

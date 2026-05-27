@@ -13,7 +13,7 @@ const compat = new FlatCompat({
 const eslintConfig = [
   {
     ignores: [
-      '.next/**',
+      'apps/consumer/.next/**',
       'node_modules/**',
       'out/**',
       'dist/**',
