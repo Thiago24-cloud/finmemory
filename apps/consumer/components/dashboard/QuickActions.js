@@ -62,14 +62,11 @@ export function QuickActions({ className }) {
   const { data: session } = useSession();
   const restrictedFeaturesAllowed = canUseRestrictedFeatures(session?.user?.email);
 
-  const actions = SECONDARY_ACTIONS.map((action) => {
-    if (
-      restrictedFeaturesAllowed ||
-      !['/scan-product', '/partnership', '/shopping-list'].includes(action.href)
-    ) {
-      return action;
-    }
-    return { ...action, href: '/em-breve' };
+  const restrictedPaths = ['/scan-product', '/shopping-list'];
+
+  const actions = SECONDARY_ACTIONS.filter((action) => {
+    if (restrictedFeaturesAllowed) return true;
+    return !restrictedPaths.includes(action.href);
   });
 
   const secondaryBtn =

@@ -41,6 +41,8 @@
     "pluggy:fix-webhook-secrets": "node -r dotenv/config scripts/fix-pluggy-webhook-secrets.js",
     "pluggy:resync-transacoes-institution": "node scripts/resync-pluggy-transacoes-institution.mjs",
     "deploy:cloud-run": "node scripts/deploy-cloud-run.mjs",
+    "deploy:cloud-run:retailer": "node scripts/deploy-cloud-run-retailer.mjs",
+    "set-cloud-run-env:retailer": "powershell -ExecutionPolicy Bypass -File scripts/set-cloud-run-env-retailer.ps1",
     "deploy:promo-agent-all": "node scripts/deploy-promo-agent-all.mjs",
     "promo:scheduler:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-promo-scheduler.ps1",
     "promo:scheduler:setup:sh": "bash scripts/setup-promo-scheduler.sh",

@@ -31,6 +31,7 @@ npm run build        # build + verify standalone (consumer)
 npm run build:retailer
 npm run build:all    # consumer + retailer
 npm run start        # next start
+npm run deploy:cloud-run:retailer
 ```
 
 ## Variáveis de ambiente
@@ -51,7 +52,9 @@ O `Dockerfile` na raiz:
 2. `WORKDIR apps/consumer` → `npm run build`
 3. Runner: `node apps/consumer/server.js` (standalone aninhado)
 
-`npm run deploy:cloud-run` inalterado na raiz.
+Deploys na raiz:
+- `npm run deploy:cloud-run` (consumer)
+- `npm run deploy:cloud-run:retailer` (retailer)
 
 ## Pacotes compartilhados
 
@@ -95,6 +98,23 @@ Variável opcional: `NEXT_PUBLIC_RETAILER_APP_URL` — URL pública do app lojis
 
 Restaurar arquivos do git HEAD: `node scripts/restore-retailer-app.mjs`
 
+## Fase 5 — RBAC + Realtime (✅)
+
+### RBAC (`@finmemory/shared/rbac`)
+- `resolveAppRoleFromSession`, `canOpenMerchantPanel`, `isMerchantSession`
+- Guards reutilizáveis para consumer e retailer
+
+### Realtime — pedidos pick-up
+- Migration `20260527120000_pedidos_loja_realtime.sql` (publicação `supabase_realtime`)
+- `GET /api/supabase/realtime-token` — JWT curto (NextAuth → Supabase RLS)
+- Painel lojista: `usePedidosLojaRealtime` (substitui polling 25s; fallback 90s)
+- Consumidor `/pedido/[id]`: `usePedidoRealtime` (fallback polling 60s)
+
+**Env obrigatória para Realtime:**
+```env
+SUPABASE_JWT_SECRET=...   # Supabase → Settings → API → JWT Secret
+```
+
 ## Fases
 
 | Fase | Status |
@@ -104,7 +124,7 @@ Restaurar arquivos do git HEAD: `node scripts/restore-retailer-app.mjs`
 | 2 | ✅ App em `apps/consumer` |
 | 3 | ✅ Remover legado lojista do consumer |
 | 4 | ✅ `apps/retailer` |
-| 5 | ⏳ RBAC + Realtime |
+| 5 | ✅ RBAC + Realtime (pedidos) |
 
 ## Fase 1 — módulos extraídos
 

@@ -9,6 +9,7 @@ import { completeDailyMission } from '../lib/completeDailyMission';
 import { shareAppInviteLink } from '../lib/shareAppInvite';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
+import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 import { cn } from '../lib/utils';
 
 export async function getServerSideProps(ctx) {
@@ -20,6 +21,9 @@ export async function getServerSideProps(ctx) {
     const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
+    }
+    if (!canUseRestrictedFeatures(session.user.email)) {
+      return { redirect: { destination: '/em-breve', permanent: false } };
     }
     return { props: {} };
   } catch {

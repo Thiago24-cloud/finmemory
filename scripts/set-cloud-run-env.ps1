@@ -30,20 +30,17 @@ if (-not $vars["NEXTAUTH_SECRET"]) {
     Write-Host "NEXTAUTH_SECRET gerado e adicionado ao .env.local" -ForegroundColor Green
 }
 
-# URL canónica: domínio público (checkout/OAuth) tem prioridade sobre *.run.app
-$canonicalApp = $vars["NEXT_PUBLIC_APP_URL"]
-if ($canonicalApp -and $canonicalApp -match '^https?://') {
-    $vars["NEXTAUTH_URL"] = $canonicalApp.TrimEnd('/')
-    Write-Host "NEXTAUTH_URL = NEXT_PUBLIC_APP_URL ($($vars['NEXTAUTH_URL']))" -ForegroundColor Cyan
-} elseif (-not $vars["NEXTAUTH_URL"]) {
-    $runUrl = gcloud run services describe finmemory --region=southamerica-east1 --project=$FINMEMORY_GCP_PROJECT --format="value(status.url)" 2>$null
-    if ($runUrl) {
-        $vars["NEXTAUTH_URL"] = $runUrl.TrimEnd('/')
-    } else {
-        $vars["NEXTAUTH_URL"] = "https://finmemory-836908221936.southamerica-east1.run.app"
-        Write-Host "Aviso: gcloud describe falhou; usando NEXTAUTH_URL fallback fixo." -ForegroundColor Yellow
-    }
+# URL canónica do consumer (finmemory.com.br) — nunca usar parceiros neste serviço
+$consumerBase = 'https://finmemory.com.br'
+$appUrl = $vars['NEXT_PUBLIC_APP_URL']
+if ($appUrl -and $appUrl -match '^https?://' -and $appUrl -notmatch 'parceiros\.') {
+  $consumerBase = $appUrl.TrimEnd('/')
+} elseif ($appUrl -match 'parceiros\.') {
+  Write-Host "Aviso: .env.local tem URL parceiros; Cloud Run finmemory usa $consumerBase" -ForegroundColor Yellow
 }
+$vars['NEXTAUTH_URL'] = $consumerBase
+$vars['NEXT_PUBLIC_APP_URL'] = $consumerBase
+Write-Host "NEXTAUTH_URL = $consumerBase (servico consumer finmemory)" -ForegroundColor Cyan
 
 # Chaves necessárias para o Cloud Run (auth + Supabase + Mapbox + Stripe)
 $required = @(
@@ -54,12 +51,15 @@ $required = @(
     "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN",
     "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_RETAILER_APP_URL",
+    "SUPABASE_JWT_SECRET",
     # Stripe — server-side runtime (não embutidas no bundle)
     "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
     "STRIPE_PLUS_PRICE_ID", "STRIPE_PRO_PRICE_ID", "STRIPE_FAMILIA_PRICE_ID", "STRIPE_ENTERPRISE_PRICE_ID",
     "FINMEMORY_PUBLIC_ACCESS",
     "FINMEMORY_PRIVATE_BETA_EMAILS",
-    "FINMEMORY_RESTRICTED_FEATURE_EMAILS"
+    "FINMEMORY_RESTRICTED_FEATURE_EMAILS",
+    "NEXT_PUBLIC_RESTRICTED_FEATURE_EMAILS"
 )
 # Garantir callback Google = NEXTAUTH_URL + /api/auth/callback/google
 $vars["GOOGLE_REDIRECT_URI"] = $vars["NEXTAUTH_URL"].TrimEnd('/') + "/api/auth/callback/google"
@@ -70,6 +70,12 @@ if (-not $vars["FINMEMORY_PUBLIC_ACCESS"]) {
     $vars["FINMEMORY_PUBLIC_ACCESS"] = "1"
 }
 $vars.Remove("FINMEMORY_LOCKDOWN_SINGLE_USER") | Out-Null
+if (-not $vars["NEXT_PUBLIC_RETAILER_APP_URL"]) {
+    $vars["NEXT_PUBLIC_RETAILER_APP_URL"] = "https://parceiros.finmemory.com.br"
+}
+# Rollout gradual: mapa, lista, missões, código de barras — só allowlist (não depende de PUBLIC_ACCESS)
+$vars['FINMEMORY_RESTRICTED_FEATURE_EMAILS'] = 'finmemory.oficial@gmail.com,nickzila2709@gmail.com'
+$vars['NEXT_PUBLIC_RESTRICTED_FEATURE_EMAILS'] = $vars['FINMEMORY_RESTRICTED_FEATURE_EMAILS']
 $envMap = @{}
 foreach ($k in $required) {
     if ($vars[$k]) {

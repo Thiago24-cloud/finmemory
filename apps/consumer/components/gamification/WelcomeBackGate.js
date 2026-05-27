@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { WelcomeBackModal } from './WelcomeBackModal';
 import { useUserRole } from '../../contexts/UserRoleContext';
 import { isBillingRoute } from '../../lib/billingRoutes';
+import { canUseRestrictedFeatures } from '../../lib/restrictedFeatureAccess';
 
 const SESSION_STORAGE_KEY = 'finmemory_session_check_v1';
 
@@ -76,8 +77,10 @@ export function WelcomeBackGate({ children }) {
   const goMissions = useCallback(() => {
     setOpen(false);
     void dismiss();
-    router.push('/missoes');
-  }, [dismiss, router]);
+    if (canUseRestrictedFeatures(session?.user?.email)) {
+      router.push('/missoes');
+    }
+  }, [dismiss, router, session?.user?.email]);
 
   return (
     <>

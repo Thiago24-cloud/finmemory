@@ -43,14 +43,12 @@ export function DashboardQuickAccess({ className, onExtrato }) {
   const { data: session } = useSession();
   const allowed = canUseRestrictedFeatures(session?.user?.email);
 
-  const LOCKED = ['/mapa', '/scan-product', '/shopping-list', '/partnership'];
-  const hrefOrLock = (path, realHref) =>
-    allowed || !LOCKED.includes(path) ? realHref : '/em-breve';
+  const RESTRICTED_KEYS = new Set(['mapa', 'lista', 'barcode', 'missoes']);
 
   const items = [
     {
       key: 'mapa',
-      href: hrefOrLock('/mapa', '/mapa'),
+      href: '/mapa',
       label: 'Caça-Preço',
       Icon: Map,
       tile: 'bg-gradient-to-br from-sky-900/70 to-[#1E2A3A] border-sky-500/35 text-sky-300',
@@ -93,7 +91,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
     },
     {
       key: 'lista',
-      href: hrefOrLock('/shopping-list', '/shopping-list'),
+      href: '/shopping-list',
       label: 'Lista',
       Icon: List,
       tile: 'bg-gradient-to-br from-emerald-950/60 to-[#1E2A3A] border-emerald-500/25 text-emerald-300',
@@ -109,14 +107,14 @@ export function DashboardQuickAccess({ className, onExtrato }) {
     },
     {
       key: 'barcode',
-      href: hrefOrLock('/scan-product', '/scan-product'),
+      href: '/scan-product',
       label: 'Código de barras',
       Icon: ScanBarcode,
       tile: 'bg-gradient-to-br from-red-950/70 to-[#1E2A3A] border-red-500/40 text-red-300',
       labelClass: 'text-red-300',
       title: QUICK_ACTION_TITLE.barcode,
     },
-  ];
+  ].filter((item) => allowed || !RESTRICTED_KEYS.has(item.key));
 
   return (
     <section className={cn('px-5', className)} aria-label="Acesso rápido">
@@ -172,7 +170,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[11px]">
         <Link
-          href={hrefOrLock('/partnership', '/partnership')}
+          href="/partnership"
           className="font-medium text-muted-foreground hover:text-primary transition-colors"
         >
           <span className="inline-flex items-center gap-1">

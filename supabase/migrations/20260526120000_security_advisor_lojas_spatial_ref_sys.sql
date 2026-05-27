@@ -30,7 +30,10 @@ REVOKE ALL ON TABLE public.lojas FROM anon;
 REVOKE ALL ON TABLE public.lojas FROM authenticated;
 
 -- ---------------------------------------------------------------------------
--- 2) PostGIS spatial_ref_sys — catálogo de sistema; RLS fechado para anon/authenticated
+-- 2) PostGIS spatial_ref_sys — tabela de sistema (owner: supabase_admin).
+--    Não é possível ENABLE ROW LEVEL SECURITY como postgres (42501).
+--    Workaround Supabase: revogar acesso de anon/authenticated na API REST.
+--    Ref: https://github.com/supabase/supabase/issues/29122
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -39,21 +42,7 @@ BEGIN
     RETURN;
   END IF;
 
-  EXECUTE 'ALTER TABLE public.spatial_ref_sys ENABLE ROW LEVEL SECURITY';
-
-  EXECUTE 'DROP POLICY IF EXISTS spatial_ref_sys_deny_anon ON public.spatial_ref_sys';
-  EXECUTE $pol$
-    CREATE POLICY spatial_ref_sys_deny_anon ON public.spatial_ref_sys
-      FOR ALL TO anon
-      USING (false)
-      WITH CHECK (false)
-  $pol$;
-
-  EXECUTE 'DROP POLICY IF EXISTS spatial_ref_sys_deny_authenticated ON public.spatial_ref_sys';
-  EXECUTE $pol$
-    CREATE POLICY spatial_ref_sys_deny_authenticated ON public.spatial_ref_sys
-      FOR ALL TO authenticated
-      USING (false)
-      WITH CHECK (false)
-  $pol$;
+  REVOKE ALL ON TABLE public.spatial_ref_sys FROM PUBLIC;
+  REVOKE ALL ON TABLE public.spatial_ref_sys FROM anon;
+  REVOKE ALL ON TABLE public.spatial_ref_sys FROM authenticated;
 END $$;

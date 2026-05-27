@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Loader2, Clock, CheckCircle2 } from 'lucide-react';
 import { pedidoTrackApi } from '../../lib/merchant/painelApiPaths';
+import { usePedidoRealtime } from '../../hooks/usePedidoRealtime';
 
 const STATUS_PT = {
   pendente: 'Aguardando a loja',
@@ -49,9 +50,11 @@ export default function PedidoTrackPage() {
     }
     if (authStatus !== 'authenticated' || !id) return;
     load();
-    const t = setInterval(load, 15000);
+    const t = setInterval(load, 60000);
     return () => clearInterval(t);
   }, [authStatus, id, load, router]);
+
+  usePedidoRealtime(typeof id === 'string' ? id : null, load);
 
   const done = order?.status === 'concluido' || order?.status === 'cancelado';
 

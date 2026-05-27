@@ -274,7 +274,10 @@ export function MerchantPanel() {
 
             <MerchantStripeSection />
 
-            <MerchantOrdersSection tempoPreparoMedio={ctx?.store?.tempo_preparo_medio ?? 15} />
+            <MerchantOrdersSection
+              lojaId={ctx?.store?.id}
+              tempoPreparoMedio={ctx?.store?.tempo_preparo_medio ?? 15}
+            />
 
             <section className="mt-8">
               <div className="flex items-center justify-between gap-3">

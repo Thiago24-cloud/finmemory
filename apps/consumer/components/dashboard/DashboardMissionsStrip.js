@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Swords } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useMissionsToday } from '../missions/MissionsTodayContext';
+import { useSession } from 'next-auth/react';
+import { canUseRestrictedFeatures } from '../../lib/restrictedFeatureAccess';
 
 /**
  * Barra fina de progresso — só visual (completed/total). Liga a /missoes.
@@ -51,8 +53,10 @@ export function DashboardMissionsProgress({ completed, total, className }) {
  * Versão que lê o mesmo estado que BottomNav / dashboard (MissionsTodayProvider).
  */
 export function DashboardMissionsStrip({ className }) {
+  const { data: session } = useSession();
+  const allowed = canUseRestrictedFeatures(session?.user?.email);
   const { missions } = useMissionsToday();
-  if (!missions?.length) return null;
+  if (!allowed || !missions?.length) return null;
   const completed = missions.filter((m) => m.completed).length;
   return (
     <DashboardMissionsProgress completed={completed} total={missions.length} className={className} />

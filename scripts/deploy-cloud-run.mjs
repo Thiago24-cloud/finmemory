@@ -38,6 +38,16 @@ const publicAccess =
   process.env.NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS?.trim() ||
   process.env.FINMEMORY_PUBLIC_ACCESS?.trim() ||
   '1';
+const retailerAppUrl =
+  process.env.NEXT_PUBLIC_RETAILER_APP_URL?.trim() || 'https://parceiros.finmemory.com.br';
+
+/** gcloud --substitutions usa vírgula como separador; valores com vírgula exigem delimitador alternativo (;). */
+function formatGcloudSubstitutions(pairs) {
+  const needsAlt = pairs.some(([, value]) => String(value).includes(','));
+  const sep = needsAlt ? ';' : ',';
+  const body = pairs.map(([key, value]) => `${key}=${value}`).join(sep);
+  return needsAlt ? `^;^${body}` : body;
+}
 
 if (!supabaseUrl || !supabaseAnon) {
   console.error(
@@ -66,14 +76,15 @@ try {
   process.exit(1);
 }
 
-const substitutions = [
-  `_COMMIT_SHA=${commitSha}`,
-  `_NEXT_PUBLIC_SUPABASE_URL=${supabaseUrl}`,
-  `_NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnon}`,
-  `_MAPBOX_ACCESS_TOKEN=${mapbox}`,
-  `_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${stripePublishable}`,
-  `_NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS=${publicAccess}`,
-].join(',');
+const substitutions = formatGcloudSubstitutions([
+  ['_COMMIT_SHA', commitSha],
+  ['_NEXT_PUBLIC_SUPABASE_URL', supabaseUrl],
+  ['_NEXT_PUBLIC_SUPABASE_ANON_KEY', supabaseAnon],
+  ['_MAPBOX_ACCESS_TOKEN', mapbox],
+  ['_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', stripePublishable],
+  ['_NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS', publicAccess],
+  ['_NEXT_PUBLIC_RETAILER_APP_URL', retailerAppUrl],
+]);
 
 console.log(`[deploy-cloud-run] Projeto GCP: ${GCP_PROJECT}`);
 

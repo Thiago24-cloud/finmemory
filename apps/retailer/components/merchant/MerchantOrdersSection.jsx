@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Clock, Loader2, ChefHat, CheckCircle2, PackageCheck, XCircle } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchant/merchantApiErrorMessage';
+import { usePedidosLojaRealtime } from '../../hooks/usePedidosLojaRealtime';
 
 const STATUS_LABEL = {
   pendente: { label: 'Novo', className: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
@@ -81,7 +82,7 @@ function OrderActions({ order, onAction, busy }) {
   return null;
 }
 
-export function MerchantOrdersSection({ tempoPreparoMedio = 15 }) {
+export function MerchantOrdersSection({ lojaId, tempoPreparoMedio = 15 }) {
   const [orders, setOrders] = useState([]);
   const [activeCount, setActiveCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -118,9 +119,11 @@ export function MerchantOrdersSection({ tempoPreparoMedio = 15 }) {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 25000);
+    const t = setInterval(load, 90000);
     return () => clearInterval(t);
   }, [load]);
+
+  usePedidosLojaRealtime(lojaId, load);
 
   const onAction = async (pedidoId, status) => {
     setActionId(pedidoId);
@@ -155,7 +158,7 @@ export function MerchantOrdersSection({ tempoPreparoMedio = 15 }) {
             Pedidos para retirada
           </h2>
           <p className="text-xs text-white/45 mt-1 m-0">
-            ETA padrão: ~{tempoPreparoMedio} min ao iniciar o preparo · atualiza a cada 25s
+            ETA padrão: ~{tempoPreparoMedio} min ao iniciar o preparo · atualiza em tempo real
           </p>
         </div>
         {activeCount > 0 ? (

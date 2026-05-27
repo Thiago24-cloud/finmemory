@@ -18,7 +18,8 @@ export function BottomNav() {
   const { shoppingBagTotals } = useMapCart();
   const bagCount = Number(shoppingBagTotals?.itemsCount || 0);
   const restrictedFeaturesAllowed = canUseRestrictedFeatures(session?.user?.email);
-  const mapHref = restrictedFeaturesAllowed ? '/mapa' : '/em-breve';
+  const mapHref = '/mapa';
+  const missoesHref = '/missoes';
   const { hasIncompleteMissions } = useMissionsToday();
 
   useEffect(() => {
@@ -44,18 +45,20 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-[100] isolate glass dark:bg-[#0d1219]/95 dark:backdrop-blur-2xl border-t border-border/50 dark:border-border safe-area-bottom">
       <div className="max-w-md mx-auto relative flex items-end justify-between h-[4.5rem] px-2 pb-1">
         <div className="flex flex-1 justify-start items-end gap-0.5 sm:gap-1 pl-0.5">
-          <button type="button" onClick={() => router.push(mapHref)} className={tabBtn(pathname === '/mapa')}>
-            <Map className={cn('h-5 w-5 transition-transform', pathname === '/mapa' && 'scale-110')} />
-            {bagCount > 0 ? (
-              <span className="absolute -top-1 right-0 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white shadow-sm">
-                {bagCount > 99 ? '99+' : bagCount}
-              </span>
-            ) : null}
-            <span className={cn('text-[10px]', pathname === '/mapa' ? 'font-bold' : 'font-medium')}>{BOTTOM_NAV.map}</span>
-            {pathname === '/mapa' && (
-              <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
-            )}
-          </button>
+          {restrictedFeaturesAllowed ? (
+            <button type="button" onClick={() => router.push(mapHref)} className={tabBtn(pathname === '/mapa')}>
+              <Map className={cn('h-5 w-5 transition-transform', pathname === '/mapa' && 'scale-110')} />
+              {bagCount > 0 ? (
+                <span className="absolute -top-1 right-0 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white shadow-sm">
+                  {bagCount > 99 ? '99+' : bagCount}
+                </span>
+              ) : null}
+              <span className={cn('text-[10px]', pathname === '/mapa' ? 'font-bold' : 'font-medium')}>{BOTTOM_NAV.map}</span>
+              {pathname === '/mapa' && (
+                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
+              )}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
@@ -76,24 +79,26 @@ export function BottomNav() {
         <div className="w-20 shrink-0 pointer-events-none" aria-hidden />
 
         <div className="flex flex-1 justify-end items-end gap-0.5 sm:gap-1 pr-0.5">
-          <button
-            type="button"
-            onClick={() => router.push('/missoes')}
-            className={tabBtn(pathname === '/missoes')}
-          >
-            <div className="relative">
-              <Swords className={cn('h-5 w-5 transition-transform', pathname === '/missoes' && 'scale-110')} />
-              {hasIncompleteMissions && pathname !== '/missoes' && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          {restrictedFeaturesAllowed ? (
+            <button
+              type="button"
+              onClick={() => router.push(missoesHref)}
+              className={tabBtn(pathname === '/missoes')}
+            >
+              <div className="relative">
+                <Swords className={cn('h-5 w-5 transition-transform', pathname === '/missoes' && 'scale-110')} />
+                {hasIncompleteMissions && pathname !== '/missoes' && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                )}
+              </div>
+              <span className={cn('text-[10px]', pathname === '/missoes' ? 'font-bold' : 'font-medium')}>
+                Missões
+              </span>
+              {pathname === '/missoes' && (
+                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
               )}
-            </div>
-            <span className={cn('text-[10px]', pathname === '/missoes' ? 'font-bold' : 'font-medium')}>
-              Missões
-            </span>
-            {pathname === '/missoes' && (
-              <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
-            )}
-          </button>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => router.push('/settings')}
