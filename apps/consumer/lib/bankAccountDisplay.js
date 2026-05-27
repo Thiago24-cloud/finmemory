@@ -2,7 +2,7 @@
  * Nomes e cores de contas/cartões Pluggy no dashboard.
  * Padrão: "{Banco} Crédito" | "{Banco} Débito" — saldo vermelho (crédito) ou verde (débito).
  */
-import { getBankTheme } from './bankThemes';
+import { getBankTheme, getBalanceColorOnCardBackground } from './bankThemes';
 import { isCreditLikeAccount } from './simuladorHintsBalance';
 
 export const ACCOUNT_KIND_CREDITO = 'credito';
@@ -102,12 +102,20 @@ export function formatBankAccountDisplayNameMinimal(params = {}) {
 /**
  * @param {'credito' | 'debito'} accountKind
  * @param {number | string | null | undefined} balance
+ * @param {string | null | undefined} cardBackgroundHex — fundo do cartão (evita saldo verde em fundo verde)
  */
-export function getBalanceDisplayColor(accountKind, balance) {
-  if (accountKind === ACCOUNT_KIND_CREDITO) return BALANCE_COLOR_CREDITO;
-  const n = Number(balance);
-  if (Number.isFinite(n) && n < 0) return BALANCE_COLOR_DEBITO_NEG;
-  return BALANCE_COLOR_DEBITO;
+export function getBalanceDisplayColor(accountKind, balance, cardBackgroundHex = null) {
+  const semantic =
+    accountKind === ACCOUNT_KIND_CREDITO
+      ? BALANCE_COLOR_CREDITO
+      : Number.isFinite(Number(balance)) && Number(balance) < 0
+        ? BALANCE_COLOR_DEBITO_NEG
+        : BALANCE_COLOR_DEBITO;
+
+  const bg = cardBackgroundHex ? String(cardBackgroundHex).trim() : null;
+  if (!bg) return semantic;
+
+  return getBalanceColorOnCardBackground(bg, accountKind, balance, semantic);
 }
 
 /**
@@ -127,11 +135,19 @@ export function enrichBankAccountForDisplay(account) {
     connectorPrimaryColor: account.connector_primary_color,
   };
 
+  const theme = getBankTheme({
+    bankIdentity: name,
+    connectorName: account.connector_name,
+    connectorId: account.connector_id,
+    connectorImageUrl: account.connector_image_url,
+    connectorPrimaryColor: account.connector_primary_color,
+  });
+
   return {
     ...account,
     display_name: formatBankAccountDisplayName(displayParams),
     account_kind: accountKind,
-    balance_display_color: getBalanceDisplayColor(accountKind, account.balance),
+    balance_display_color: getBalanceDisplayColor(accountKind, account.balance, theme.bgColor),
     bank_brand_label: resolveBankBrandLabel(displayParams),
   };
 }

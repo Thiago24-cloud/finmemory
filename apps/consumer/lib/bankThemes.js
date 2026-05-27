@@ -142,6 +142,70 @@ function getContrastingTextColor(bgHex) {
   return yiq >= 160 ? '#111827' : '#FFFFFF';
 }
 
+function relativeLuminance({ r, g, b }) {
+  const srgb = [r, g, b].map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+}
+
+/** WCAG contrast ratio entre duas cores hex (1–21). */
+export function getContrastRatio(hexA, hexB) {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  if (!a || !b) return 21;
+  const l1 = relativeLuminance(a);
+  const l2 = relativeLuminance(b);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+const MIN_BALANCE_CONTRAST = 4.5;
+
+/**
+ * Cor do saldo no cartão: mantém verde/vermelho semântico quando há contraste;
+ * senão usa branco (fundo escuro) ou tons escuros (fundo claro) — ex. PicPay verde + saldo verde.
+ * @param {string} bgHex — cor de fundo do cartão
+ * @param {'credito' | 'debito'} accountKind
+ * @param {number | string | null | undefined} balance
+ * @param {string} [semanticColor] — verde débito / vermelho crédito padrão
+ */
+export function getBalanceColorOnCardBackground(
+  bgHex,
+  accountKind,
+  balance,
+  semanticColor = null
+) {
+  const bg = normalizeHexColor(bgHex) || DEFAULT_BANK_THEME.bgColor;
+  const isCredit = accountKind === 'credito';
+  const n = Number(balance);
+  const isNegative = Number.isFinite(n) && n < 0;
+
+  const semantic =
+    semanticColor ||
+    (isCredit
+      ? '#EF4444'
+      : isNegative
+        ? '#EF4444'
+        : '#22C55E');
+
+  if (getContrastRatio(semantic, bg) >= MIN_BALANCE_CONTRAST) {
+    return semantic;
+  }
+
+  const darkBg = getContrastingTextColor(bg) === '#FFFFFF';
+
+  if (darkBg) {
+    if (isCredit || isNegative) return '#FEE2E2';
+    return '#FFFFFF';
+  }
+
+  if (isCredit || isNegative) return '#991B1B';
+  return '#14532D';
+}
+
 function buildRingColor(bgHex) {
   const rgb = hexToRgb(bgHex);
   if (!rgb) return DEFAULT_BANK_THEME.ringColor;

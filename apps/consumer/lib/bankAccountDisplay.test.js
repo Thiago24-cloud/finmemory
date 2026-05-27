@@ -55,4 +55,14 @@ describe('bankAccountDisplay', () => {
     expect(getBalanceDisplayColor(ACCOUNT_KIND_DEBITO, 1200)).toBe('#22C55E');
     expect(getBalanceDisplayColor(ACCOUNT_KIND_DEBITO, -10)).toBe('#EF4444');
   });
+
+  it('saldo com contraste no fundo do cartão (PicPay verde)', () => {
+    const picpayBg = '#21C25E';
+    expect(getBalanceDisplayColor(ACCOUNT_KIND_DEBITO, 4.2, picpayBg)).toBe('#FFFFFF');
+    expect(getBalanceDisplayColor(ACCOUNT_KIND_DEBITO, -1, picpayBg)).toBe('#FEE2E2');
+  });
+
+  it('saldo mantém verde semântico em fundo escuro neutro', () => {
+    expect(getBalanceDisplayColor(ACCOUNT_KIND_DEBITO, 100, '#334155')).toBe('#22C55E');
+  });
 });

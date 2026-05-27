@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { Loader2, LayoutGrid } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getBankTheme } from '../../lib/bankThemes';
+import { getBalanceDisplayColor, inferAccountKind } from '../../lib/bankAccountDisplay';
 import { useCalculatorDockOptional } from './CalculatorDockContext';
 
 /**
@@ -126,11 +127,15 @@ export function OpenFinanceBankCarousel({
                 connectorImageUrl: a.connector_image_url,
                 connectorPrimaryColor: a.connector_primary_color,
               });
-              const balanceColor =
-                a.balance_display_color ||
-                (a.account_kind === 'credito' ? '#EF4444' : '#22C55E');
               const balanceNum =
                 a.balance != null && Number.isFinite(Number(a.balance)) ? Number(a.balance) : null;
+              const accountKind =
+                a.account_kind || inferAccountKind(a.account_type, a.name);
+              const balanceColor = getBalanceDisplayColor(
+                accountKind,
+                balanceNum,
+                theme.bgColor
+              );
               const bal =
                 balanceNum != null
                   ? new Intl.NumberFormat('pt-BR', {
@@ -229,7 +234,7 @@ export function OpenFinanceBankCarousel({
                   </div>
                   <div className="flex items-end justify-between gap-2 mt-2 min-h-[1.75rem]">
                     <p
-                      className="text-base font-bold tabular-nums m-0 leading-tight truncate min-w-0 flex-1"
+                      className="text-base font-bold tabular-nums m-0 leading-tight truncate min-w-0 flex-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
                       style={{ color: balanceColor }}
                     >
                       {bal}
