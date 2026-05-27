@@ -4,7 +4,7 @@
  * @typedef {{ kind: 'logo'; uri: string; backgroundColor?: string | null } | { kind: 'wallet' }} ResolvedInstitutionAsset
  */
 
-import { getBankTheme } from "./bankThemes.js";
+import { getBankTheme, bankThemes } from "./bankThemes.js";
 import { getBankSimpleIconSlug } from "./bankBrandLogo.js";
 
 /** @param {string} s */
@@ -102,63 +102,75 @@ export function normalizeTransactionForInstitution(tx) {
   };
 }
 
+/** @returns {boolean} */
+function isKnownBankTheme(theme) {
+  if (!theme?.key) return false;
+  if (theme.key === 'default') return false;
+  if (String(theme.key).startsWith('connector-')) return false;
+  return Boolean(bankThemes[theme.key]);
+}
+
+/** @param {ReturnType<typeof getBankTheme>} theme @param {string | null | undefined} pluggyLogo @param {string | null | undefined} institutionName */
+function buildLogoAsset(theme, pluggyLogo, institutionName) {
+  const known = isKnownBankTheme(theme);
+  const slug = getBankSimpleIconSlug(institutionName ?? '');
+
+  let uri = null;
+  let logoPad = 'light';
+
+  if (known && theme.logoUrl) {
+    uri = theme.logoUrl;
+    logoPad = 'brand';
+  } else if (slug) {
+    uri = `https://cdn.simpleicons.org/${slug}/${theme.textColor === '#111827' ? '003DA5' : 'ffffff'}`;
+    logoPad = 'brand';
+  } else if (pluggyLogo) {
+    uri = pluggyLogo;
+    logoPad = 'light';
+  } else if (theme.logoUrl) {
+    uri = theme.logoUrl;
+    logoPad = 'brand';
+  }
+
+  if (!uri) return null;
+
+  return {
+    kind: 'logo',
+    uri,
+    backgroundColor: theme.bgColor,
+    logoScale: theme.logoScale ?? 1,
+    logoPad,
+    monogram: theme.label || institutionName || null,
+    textColor: theme.textColor,
+  };
+}
+
 /** @param {Parameters<typeof normalizeTransactionForInstitution>[0]} input */
 function resolveFromNormalizedInput(input) {
   const custom = sanitizeHttpsOrRelative(input.customIconUrl);
-  if (custom) return { kind: "logo", uri: custom };
+  if (custom) {
+    return { kind: 'logo', uri: custom, logoPad: 'light', logoScale: 1 };
+  }
 
   const useCreditIssuer = looksLikeCreditPayment(input.formaPagamento);
   const issuerOnly = sanitizeHttpsOrRelative(input.creditInstitutionLogoUrl);
   const institutionOnly = sanitizeHttpsOrRelative(input.institutionLogoUrl);
-
-  if (useCreditIssuer && issuerOnly) {
-    const themeCredit = getBankTheme({
-      bankIdentity: input.creditInstitutionName || input.institutionName,
-      connectorName: input.creditInstitutionName || input.institutionName,
-      connectorId: input.institutionConnectorId,
-      connectorImageUrl: issuerOnly,
-    });
-    return {
-      kind: "logo",
-      uri: issuerOnly,
-      backgroundColor: themeCredit.bgColor,
-    };
-  }
-
-  if (institutionOnly) {
-    const theme = getBankTheme({
-      bankIdentity: input.institutionName,
-      connectorName: input.institutionName,
-      connectorId: input.institutionConnectorId,
-      connectorImageUrl: institutionOnly,
-    });
-    return {
-      kind: "logo",
-      uri: institutionOnly,
-      backgroundColor: theme.bgColor,
-    };
-  }
+  const pluggyLogo = useCreditIssuer && issuerOnly ? issuerOnly : institutionOnly;
+  const displayName = useCreditIssuer
+    ? input.creditInstitutionName || input.institutionName
+    : input.institutionName;
 
   const theme = getBankTheme({
-    bankIdentity: input.institutionName,
-    connectorName: input.institutionName,
+    bankIdentity: displayName,
+    connectorName: displayName,
     connectorId: input.institutionConnectorId,
-    connectorImageUrl: null,
+    connectorImageUrl: pluggyLogo,
   });
-  if (theme.logoUrl) {
-    return { kind: "logo", uri: theme.logoUrl, backgroundColor: theme.bgColor };
-  }
 
-  const slug = getBankSimpleIconSlug(input.institutionName ?? "");
-  if (slug) {
-    return {
-      kind: "logo",
-      uri: `https://cdn.simpleicons.org/${slug}`,
-      backgroundColor: "#f1f5f9",
-    };
-  }
+  const logoAsset = buildLogoAsset(theme, pluggyLogo, displayName);
+  if (logoAsset) return logoAsset;
 
-  return { kind: "wallet" };
+  return { kind: 'wallet' };
 }
 
 /**

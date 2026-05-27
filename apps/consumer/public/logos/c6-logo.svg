@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" role="img" aria-labelledby="title">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
   <title>C6 Bank</title>
-  <rect width="160" height="64" rx="12" fill="none"/>
-  <text x="80" y="40" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="700" fill="#FFFFFF">C6</text>
+  <rect width="64" height="64" rx="14" fill="#1A1A1A"/>
+  <rect x="8" y="8" width="48" height="48" rx="10" fill="#242424" stroke="#F4E628" stroke-width="1.5"/>
+  <text x="32" y="41" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800" fill="#FFFFFF">C6</text>
 </svg>

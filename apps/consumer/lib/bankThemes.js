@@ -31,10 +31,10 @@ export const bankThemes = {
     key: 'c6',
     label: 'C6',
     logoUrl: '/logos/c6-logo.svg',
-    logoScale: 1.22,
-    bgColor: '#212121',
+    logoScale: 1,
+    bgColor: '#1A1A1A',
     textColor: '#FFFFFF',
-    ringColor: 'rgba(255, 255, 255, 0.22)',
+    ringColor: 'rgba(244, 230, 40, 0.55)',
   },
   inter: {
     key: 'inter',
@@ -44,6 +44,60 @@ export const bankThemes = {
     bgColor: '#FF7A00',
     textColor: '#FFFFFF',
     ringColor: 'rgba(255, 122, 0, 0.45)',
+  },
+  itau: {
+    key: 'itau',
+    label: 'Itaú',
+    logoUrl: null,
+    logoScale: 0.88,
+    bgColor: '#EC7000',
+    textColor: '#FFFFFF',
+    ringColor: 'rgba(236, 112, 0, 0.45)',
+  },
+  bradesco: {
+    key: 'bradesco',
+    label: 'Bradesco',
+    logoUrl: null,
+    logoScale: 0.88,
+    bgColor: '#CC092F',
+    textColor: '#FFFFFF',
+    ringColor: 'rgba(204, 9, 47, 0.45)',
+  },
+  santander: {
+    key: 'santander',
+    label: 'Santander',
+    logoUrl: null,
+    logoScale: 0.88,
+    bgColor: '#EC0000',
+    textColor: '#FFFFFF',
+    ringColor: 'rgba(236, 0, 0, 0.45)',
+  },
+  bancodobrasil: {
+    key: 'bancodobrasil',
+    label: 'Banco do Brasil',
+    logoUrl: null,
+    logoScale: 0.88,
+    bgColor: '#FECC00',
+    textColor: '#003DA5',
+    ringColor: 'rgba(254, 204, 0, 0.55)',
+  },
+  caixa: {
+    key: 'caixa',
+    label: 'Caixa',
+    logoUrl: null,
+    logoScale: 0.88,
+    bgColor: '#005CA9',
+    textColor: '#FFFFFF',
+    ringColor: 'rgba(0, 92, 169, 0.45)',
+  },
+  mercadopago: {
+    key: 'mercadopago',
+    label: 'Mercado Pago',
+    logoUrl: null,
+    logoScale: 0.88,
+    bgColor: '#00BCFF',
+    textColor: '#FFFFFF',
+    ringColor: 'rgba(0, 188, 255, 0.45)',
   },
 };
 
@@ -101,6 +155,12 @@ function inferThemeKey(...parts) {
   if (text.includes('picpay')) return 'picpay';
   if (text.includes('c6') || text.includes('c6 bank')) return 'c6';
   if (text.includes('inter')) return 'inter';
+  if (text.includes('itau') || text.includes('itaú')) return 'itau';
+  if (text.includes('bradesco')) return 'bradesco';
+  if (text.includes('santander')) return 'santander';
+  if (text.includes('banco do brasil') || text.includes('banco brasil')) return 'bancodobrasil';
+  if (text.includes('caixa')) return 'caixa';
+  if (text.includes('mercado pago') || text.includes('mercadopago')) return 'mercadopago';
   return null;
 }
 

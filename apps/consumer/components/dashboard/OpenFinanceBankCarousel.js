@@ -203,7 +203,7 @@ export function OpenFinanceBankCarousel({
                 >
                   <div className="flex items-start gap-2 min-h-[2.25rem]">
                     {showLogo ? (
-                      <span className="shrink-0 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center p-1.5 backdrop-blur-[2px]">
+                      <span className="shrink-0 w-10 h-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={logoUrl}
