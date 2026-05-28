@@ -368,10 +368,10 @@ export default async function handler(req, res) {
       const maxNames = stateWide
         ? Math.min(8, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES_STATE || '8', 10) || 8)
         : q.length >= 2
-          ? Math.min(36, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES_SEARCH || '28', 10) || 28)
-          : Math.min(32, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES || '24', 10) || 24);
+          ? Math.min(320, Math.max(points.length, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES_SEARCH || '220', 10) || 220))
+          : Math.min(260, Math.max(points.length, Number.parseInt(process.env.MAP_POINTS_MAX_OFF_NAMES || '180', 10) || 180));
       const useCse =
-        process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
+        process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK !== '0' &&
         Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
       try {
         await enrichMapPointsImageUrls(points, {

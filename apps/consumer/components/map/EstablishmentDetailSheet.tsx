@@ -111,10 +111,16 @@ function categoryEmojiFromRaw(categoryRaw: string): string {
 
 function ProductCardThumb({ categoryRaw, imageUrl }: { categoryRaw: string; imageUrl?: string }) {
   const [failed, setFailed] = useState(false);
-  const [lowQuality, setLowQuality] = useState(false);
-  const img = imageUrl ? getMapOptimizedProductCardImageSrc(imageUrl) : '';
+  const [img, setImg] = useState(imageUrl ? getMapOptimizedProductCardImageSrc(imageUrl) : '');
+  const [triedOriginal, setTriedOriginal] = useState(false);
   const emoji = categoryEmojiFromRaw(categoryRaw);
-  if (!img || failed || lowQuality) {
+  useEffect(() => {
+    setImg(imageUrl ? getMapOptimizedProductCardImageSrc(imageUrl) : '');
+    setTriedOriginal(false);
+    setFailed(false);
+  }, [imageUrl]);
+
+  if (!img || failed) {
     return (
       <div
         className="flex h-full w-full items-center justify-center rounded-xl border border-[#39FF14]/25 bg-[#0a0f0a] text-[2.25rem] leading-none"
@@ -131,11 +137,13 @@ function ProductCardThumb({ categoryRaw, imageUrl }: { categoryRaw: string; imag
       alt=""
       className="h-full w-full rounded-xl bg-white object-contain p-1"
       loading="lazy"
-      onError={() => setFailed(true)}
-      onLoad={(e) => {
-        const w = e.currentTarget.naturalWidth || 0;
-        const h = e.currentTarget.naturalHeight || 0;
-        if (w < 260 || h < 260) setLowQuality(true);
+      onError={() => {
+        if (!triedOriginal && imageUrl && img !== imageUrl) {
+          setImg(imageUrl);
+          setTriedOriginal(true);
+          return;
+        }
+        setFailed(true);
       }}
     />
   );
@@ -643,7 +651,7 @@ export default function EstablishmentDetailSheet({
                         >
                           {badge.label}
                         </span>
-                        <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-zinc-100 p-2">
+                        <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-zinc-100">
                           <ProductCardThumb categoryRaw={p.categoryRaw} imageUrl={p.imageUrl} />
                         </div>
                         <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">

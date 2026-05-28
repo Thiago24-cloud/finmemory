@@ -84,7 +84,7 @@ export default function ShopOffersSnapCarousel({ offers, wazeUi, formatPriceSlot
         {offers.map((offer) => {
           const url = offer.promo_image_url;
           const imgOk = url && isDisplayableImageUrl(url);
-          const imgSrc = imgOk ? getMapOptimizedProductCardImageSrc(url) : '';
+          const optimizedSrc = imgOk ? getMapOptimizedProductCardImageSrc(url) : '';
           const name = String(offer.product_name || 'Produto').slice(0, 80);
           const priceNode = formatPriceSlot ? (
             formatPriceSlot(offer)
@@ -107,19 +107,12 @@ export default function ShopOffersSnapCarousel({ offers, wazeUi, formatPriceSlot
               style={{ scrollSnapAlign: 'start' }}
             >
               <div
-                className={`relative h-[120px] w-full shrink-0 overflow-hidden p-2 ${
+                className={`relative h-[120px] w-full shrink-0 overflow-hidden ${
                   wazeUi ? 'bg-[#161922]' : 'bg-zinc-100'
                 }`}
               >
                 {imgOk ? (
-                  <img
-                    src={imgSrc || url}
-                    alt=""
-                    className="h-full w-full rounded-xl bg-white object-contain p-1"
-                    loading="lazy"
-                    decoding="async"
-                    referrerPolicy="no-referrer"
-                  />
+                  <CardImageWithFallback optimizedSrc={optimizedSrc} originalSrc={url} />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center rounded-xl border border-[#39FF14]/25 bg-[#0a0f0a] text-4xl">
                     {categoryFallbackGlyph(offer.category)}
@@ -159,5 +152,32 @@ export default function ShopOffersSnapCarousel({ offers, wazeUi, formatPriceSlot
         </div>
       ) : null}
     </div>
+  );
+}
+
+function CardImageWithFallback({ optimizedSrc, originalSrc }) {
+  const [src, setSrc] = useState(optimizedSrc || originalSrc || '');
+  const [triedOriginal, setTriedOriginal] = useState(false);
+
+  useEffect(() => {
+    setSrc(optimizedSrc || originalSrc || '');
+    setTriedOriginal(false);
+  }, [optimizedSrc, originalSrc]);
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="h-full w-full rounded-xl bg-white object-contain"
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => {
+        if (!triedOriginal && originalSrc && src !== originalSrc) {
+          setSrc(originalSrc);
+          setTriedOriginal(true);
+        }
+      }}
+    />
   );
 }

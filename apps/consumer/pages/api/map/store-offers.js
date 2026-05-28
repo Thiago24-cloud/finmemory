@@ -452,12 +452,12 @@ export default async function handler(req, res) {
 
     if (process.env.MAP_POINTS_OFF_ENRICH !== '0') {
       const useCse =
-        process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
+        process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK !== '0' &&
         Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
       try {
-        const cap = Number.parseInt(process.env.MAP_STORE_OFFERS_MAX_NAMES || '150', 10) || 150;
+        const cap = Number.parseInt(process.env.MAP_STORE_OFFERS_MAX_NAMES || '260', 10) || 260;
         await enrichMapPointsImageUrls(offers, {
-          maxUniqueNames: Math.min(200, Math.max(offers.length, cap)),
+          maxUniqueNames: Math.min(320, Math.max(offers.length, cap)),
           concurrency: 4,
           useGoogleCse: useCse,
           nameForSearch: (p) => productNameForThumbnailSearch(p.product_name),

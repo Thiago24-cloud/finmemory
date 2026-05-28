@@ -62,11 +62,15 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
 }) {
   const url = offer.promo_image_url;
   const imgOk = url && isDisplayableImageUrl(url);
-  const imgSrc = imgOk ? getMapOptimizedProductCardImageSrc(url) : '';
+  const optimizedSrc = imgOk ? getMapOptimizedProductCardImageSrc(url) : '';
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgSrc, setImgSrc] = useState(optimizedSrc || url || '');
+  const [triedOriginal, setTriedOriginal] = useState(false);
   useEffect(() => {
     setImgLoaded(false);
-  }, [imgSrc, url]);
+    setImgSrc(optimizedSrc || url || '');
+    setTriedOriginal(false);
+  }, [optimizedSrc, url]);
   const hint = storeNameHint || offer.store_name || '';
   const name = String(displayPromoProductName(offer.product_name, hint) || 'Produto').slice(0, 80);
   const priceNode = formatPriceLabel(offer);
@@ -80,7 +84,7 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
       style={{ scrollSnapAlign: 'start' }}
     >
       <div
-        className={`relative aspect-square w-full shrink-0 overflow-hidden p-2 ${
+        className={`relative aspect-square w-full shrink-0 overflow-hidden ${
           wazeUi ? 'bg-[#161922]' : 'bg-zinc-100'
         }`}
       >
@@ -101,7 +105,14 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
               loading="lazy"
               decoding="async"
               onLoad={() => setImgLoaded(true)}
-              onError={() => setImgLoaded(true)}
+              onError={() => {
+                if (!triedOriginal && url && imgSrc !== url) {
+                  setImgSrc(url);
+                  setTriedOriginal(true);
+                  return;
+                }
+                setImgLoaded(true);
+              }}
             />
           </>
         ) : (
