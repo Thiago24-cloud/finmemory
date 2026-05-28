@@ -229,7 +229,8 @@ export default async function handler(req, res) {
         artifacts: {
           source_page_url: store.storeUrl,
           run_id: runId,
-          cnpj: store.cnpj,
+          cnpj: store.cnpj || null,
+          dia_store_number: store.storeNumber || null,
           finish_date: finishDateIso,
           images_found: imageUrls.length,
           image_urls: imageUrls,

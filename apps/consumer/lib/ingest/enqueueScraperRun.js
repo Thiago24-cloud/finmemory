@@ -1,9 +1,8 @@
-import { enqueuePromocoes } from './enqueuePromocoes.js';
 import { splitProdutosByPublishReadiness } from '../promoQueueProcessing.js';
-import { autoPublishQueueItem } from './autoPublishQueueItem.js';
+import { publishScraperToMap } from './publishScraperToMap.js';
 
 /**
- * Enfileira lote do scraper com status `pendente` (nunca publica no mapa).
+ * Scraper → mapa direto (sem fila pendente no admin).
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {{
@@ -20,6 +19,7 @@ import { autoPublishQueueItem } from './autoPublishQueueItem.js';
  *   isStatewide?: boolean,
  *   produtos: object[],
  *   artifacts?: Record<string, unknown>,
+ *   priceSource?: string,
  * }} payload
  */
 export async function enqueueScraperRun(supabase, payload) {
@@ -38,52 +38,22 @@ export async function enqueueScraperRun(supabase, payload) {
     },
   };
 
-  const queued = await enqueuePromocoes(supabase, {
-    storeName: payload.storeName,
-    storeAddress: payload.storeAddress ?? null,
-    storeLat: payload.storeLat,
-    storeLng: payload.storeLng,
-    localityScope: payload.localityScope,
-    localityCity: payload.localityCity ?? null,
-    localityRegion: payload.localityRegion ?? null,
-    localityState: payload.localityState || 'SP',
-    dddCode: payload.dddCode ?? null,
-    isStatewide: Boolean(payload.isStatewide),
-    produtos,
+  const published = await publishScraperToMap(supabase, {
+    ...payload,
     artifacts,
-    origem: payload.origem,
+    priceSource: payload.priceSource || payload.origem,
   });
 
-  if (!queued.ok) {
-    return { ok: false, error: queued.error };
-  }
-
-  const { data: queueRow, error: queueFetchErr } = await supabase
-    .from('bot_promocoes_fila')
-    .select('*')
-    .eq('id', queued.filaId)
-    .single();
-  if (queueFetchErr || !queueRow) {
-    return { ok: false, error: queueFetchErr?.message || 'Não foi possível carregar item enfileirado' };
-  }
-
-  const autoPublished = await autoPublishQueueItem(supabase, queueRow, {
-    reviewerEmail: 'scraper-auto@finmemory.local',
-  });
-  if (!autoPublished.ok) {
-    return { ok: false, error: `Falha na publicação automática: ${autoPublished.error}` };
+  if (!published.ok) {
+    return { ok: false, error: published.error };
   }
 
   return {
     ok: true,
-    filaId: queued.filaId,
-    status: 'aprovado',
+    filaId: published.filaId,
+    status: published.status,
     produtosTotal: produtos.length,
-    inserted: autoPublished.inserted || 0,
-    readiness: {
-      ready: split.ready.length,
-      pendingImage: split.pendingImage.length,
-      invalid: split.invalid.length,
-    },
+    inserted: published.inserted || 0,
+    readiness: published.readiness,
   };
 }

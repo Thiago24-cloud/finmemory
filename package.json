@@ -35,6 +35,7 @@
     "promo:p2": "npm run prioridade2 --prefix finmemory-agent",
     "promo:dia": "npm run dia --prefix finmemory-agent",
     "promo:dia:sp-estado": "node scripts/run-dia-estado-sp.mjs",
+    "scraper:dia:grande-sp": "node -r dotenv/config scripts/run-dia-grande-sp-all.mjs --http",
     "promo:regional": "npm run regional --prefix finmemory-agent",
     "promo:sonda": "npm run sonda --prefix finmemory-agent",
     "pluggy:register-webhook": "node -r dotenv/config scripts/register-pluggy-webhook.js",

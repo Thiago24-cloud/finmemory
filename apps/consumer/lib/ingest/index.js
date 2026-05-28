@@ -9,6 +9,7 @@ export {
 export { writePricePointsPromoRun } from './writePricePointsPromo.js';
 export { enqueuePromocoes } from './enqueuePromocoes.js';
 export { enqueueScraperRun } from './enqueueScraperRun.js';
+export { publishScraperToMap } from './publishScraperToMap.js';
 export { validateUnifiedProviderItem } from './utils/validator.js';
 export {
   ProviderValidationError,

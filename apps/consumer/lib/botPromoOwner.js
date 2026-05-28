@@ -28,7 +28,11 @@ export async function isUserIdPresent(supabase, userId) {
 }
 
 export async function resolveOwnerUserId(supabase, reviewerEmail) {
-  const envCandidateNames = ['BOT_PROMO_OWNER_USER_ID', 'MAP_QUICK_ADD_BOT_USER_ID'];
+  const envCandidateNames = [
+    'BOT_PROMO_OWNER_USER_ID',
+    'MAP_QUICK_ADD_BOT_USER_ID',
+    'DIA_BOT_USER_ID',
+  ];
   const envCandidates = envCandidateNames.map((name) => ({
     name,
     value: String(process.env[name] || '').trim(),

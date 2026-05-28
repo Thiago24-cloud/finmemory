@@ -7,7 +7,7 @@ import {
 } from '../ingest/run.js';
 import { geocodeAddress } from '../geocode.js';
 import { createRequire } from 'module';
-import { splitProdutosByPublishReadiness } from '../promoQueueProcessing.js';
+import { splitProdutosByPublishReadiness, normalizeQueuedProduto } from '../promoQueueProcessing.js';
 import { afterMapPricePointsInsert } from '../catalog/afterMapPricePointsInsert.js';
 
 const require = createRequire(import.meta.url);
@@ -364,25 +364,30 @@ export async function insertApprovedFilaAndPublishScraperDia(supabase, filaRow, 
   }
 
   const split = splitProdutosByPublishReadiness(produtos);
-  if (split.ready.length === 0) {
+  const publishable = (Array.isArray(produtos) ? produtos : [])
+    .map((p) => normalizeQueuedProduto(p))
+    .filter((p) => Number.isFinite(p.price) && p.price > 0 && p.name);
+  if (!publishable.length) {
     return {
       ok: true,
       filaId: insertedFila?.id,
       inserted: 0,
-      note: 'Fila gravada; nenhum produto com preço e imagem para o mapa',
+      note: 'Fila gravada; nenhum produto com preço válido para o mapa',
       readiness: {
-        ready: 0,
+        ready: split.ready.length,
         pendingImage: split.pendingImage.length,
         invalid: split.invalid.length,
       },
     };
   }
 
+  const cnpjDigits = String(artifacts?.cnpj || artifacts?.store_cnpj || '').replace(/\D/g, '');
   const { error: storeRpcErr } = await supabase.rpc('find_or_create_store', {
     p_name: store_name,
     p_address: store_address || '',
     p_lat: store_lat,
     p_lng: store_lng,
+    p_cnpj: cnpjDigits.length >= 14 ? cnpjDigits : null,
   });
   if (storeRpcErr) {
     return { ok: false, step: 'find_or_create_store', error: storeRpcErr.message, filaId: insertedFila?.id };
@@ -405,7 +410,7 @@ export async function insertApprovedFilaAndPublishScraperDia(supabase, filaRow, 
     return { ok: false, step: 'price_points_delete', error: delErr.message, filaId: insertedFila?.id };
   }
 
-  const rows = split.ready.map((p) => {
+  const rows = publishable.map((p) => {
     const originalPrice = Number(p?.raw?.original_price ?? p?.raw?.preco_de);
     const discountPercent =
       Number.isFinite(originalPrice) && originalPrice > 0 && Number(p.price) > 0 && Number(p.price) < originalPrice

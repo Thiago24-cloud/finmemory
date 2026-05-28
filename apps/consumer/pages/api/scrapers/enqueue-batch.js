@@ -78,7 +78,8 @@ export default async function handler(req, res) {
       status: result.status,
       produtosTotal: result.produtosTotal,
       readiness: result.readiness,
-      note: 'Aprovar em /admin/bot-fila antes de publicar no mapa',
+      publicadosNoMapa: result.inserted || 0,
+      note: 'Publicação automática no mapa concluída',
     });
   } catch (e) {
     console.error('[scrapers/enqueue-batch]', e?.message || e);

@@ -1,3 +1,5 @@
+import { filterDiaStoresByRegion } from './filterDiaStoresRegion.js';
+
 export const DIA_LOJAS_PAGE_DATA_URL = 'https://www.dia.com.br/page-data/lojas/page-data.json';
 
 const DIA_UA =
@@ -28,8 +30,10 @@ export function mapDiaNodeToScraperStore(node) {
   const uf = String(node?.uf || node?.state || 'SP').trim();
 
   const addressParts = [address, district, city, uf].filter(Boolean);
+  const storeNumber = node?.storeNumber != null ? Number(node.storeNumber) : null;
   return {
     id: slugToId(slug),
+    slug,
     storeUrl: `https://www.dia.com.br/lojas/${slug}/`,
     storeName: `DIA — ${city} (${name}${address ? `, ${address}` : ''})`,
     addressForGeocode: `${addressParts.join(', ')}, Brasil`,
@@ -37,6 +41,8 @@ export function mapDiaNodeToScraperStore(node) {
     lat: Number.isFinite(lat) ? lat : null,
     lng: Number.isFinite(lng) ? lng : null,
     cep: String(node?.cep || '').replace(/\D/g, '') || null,
+    cnpj: String(node?.cnpj || node?.document || '').replace(/\D/g, '') || null,
+    storeNumber: Number.isFinite(storeNumber) ? storeNumber : null,
   };
 }
 
@@ -54,14 +60,18 @@ export async function fetchDiaScraperStoresFromOfficial() {
 
   const json = await res.json();
   const nodes = json?.result?.data?.lojas?.nodes || [];
-  const stores = nodes
-    .filter((n) => {
-      const slug = String(n?.slug || '');
-      const uf = String(n?.uf || n?.state || '').toUpperCase();
-      return n?.status !== false && (slug.startsWith('sp-') || uf === 'SP');
-    })
-    .map(mapDiaNodeToScraperStore)
-    .filter((s) => s.id && s.storeUrl);
+  const region = String(process.env.SCRAPER_DIA_REGION || 'grande_sp').trim().toLowerCase();
+  const stores = filterDiaStoresByRegion(
+    nodes
+      .filter((n) => {
+        const slug = String(n?.slug || '');
+        const uf = String(n?.uf || n?.state || '').toUpperCase();
+        return n?.status !== false && (slug.startsWith('sp-') || uf === 'SP');
+      })
+      .map(mapDiaNodeToScraperStore)
+      .filter((s) => s.id && s.storeUrl),
+    region === 'all_sp' ? 'all_sp' : 'grande_sp'
+  );
 
   stores.sort((a, b) => a.city.localeCompare(b.city, 'pt-BR') || a.storeName.localeCompare(b.storeName, 'pt-BR'));
 
@@ -113,7 +123,7 @@ export async function resolveDiaScraperStores(opts = {}) {
     return { stores: all, catalogTotal: all.length, mode: 'all' };
   }
 
-  const batchSize = Number(opts.batchSize || process.env.SCRAPER_DIA_BATCH_SIZE || 15);
+  const batchSize = Number(opts.batchSize || process.env.SCRAPER_DIA_BATCH_SIZE || 25);
   const stores = pickScraperStoreBatch(all, {
     batchSize,
     batchIndex: opts.batchIndex,
