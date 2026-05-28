@@ -66,10 +66,12 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgSrc, setImgSrc] = useState(optimizedSrc || url || '');
   const [triedOriginal, setTriedOriginal] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   useEffect(() => {
     setImgLoaded(false);
     setImgSrc(optimizedSrc || url || '');
     setTriedOriginal(false);
+    setImgFailed(false);
   }, [optimizedSrc, url]);
   const hint = storeNameHint || offer.store_name || '';
   const name = String(displayPromoProductName(offer.product_name, hint) || 'Produto').slice(0, 80);
@@ -88,7 +90,7 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
           wazeUi ? 'bg-[#161922]' : 'bg-zinc-100'
         }`}
       >
-        {imgOk ? (
+        {imgOk && !imgFailed ? (
           <>
             <div
               className={`absolute inset-0 animate-pulse ${wazeUi ? 'bg-[#252a38]' : 'bg-gray-200'} ${
@@ -99,7 +101,7 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
             <img
               src={imgSrc || url}
               alt=""
-              className={`relative z-[1] h-full w-full rounded-xl bg-white object-contain p-1 transition-opacity duration-200 ${
+              className={`relative z-[1] h-full w-full rounded-xl bg-white object-cover object-center transition-opacity duration-200 ${
                 imgLoaded ? 'opacity-100' : 'opacity-0'
               }`}
               loading="lazy"
@@ -111,7 +113,7 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
                   setTriedOriginal(true);
                   return;
                 }
-                setImgLoaded(true);
+                setImgFailed(true);
               }}
             />
           </>

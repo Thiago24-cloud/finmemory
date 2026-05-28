@@ -10,6 +10,7 @@ import {
 import { getThumbnailMatchRulesCached, listMatchingThumbnailRules } from './mapThumbnailMatchRules';
 import { getMapQuickAddSupabase } from './mapQuickAddCore';
 import { validateMapProductImageUrl, visionEnabled } from './validateMapProductImageVision';
+import { isLowQualityProductImageUrl } from './mapProductImageQuality.js';
 
 function isLikelyImageUrl(url) {
   if (!url || typeof url !== 'string') return false;
@@ -553,17 +554,21 @@ export async function fetchGoogleCseImageByName(name, storeName, opts = {}) {
   const cseId = process.env.GOOGLE_CSE_ID;
   if (!apiKey || !cseId) return null;
 
+  const planOpts =
+    opts.price != null || opts.unit != null
+      ? { price: opts.price, unit: opts.unit }
+      : {};
   const plan =
     Array.isArray(opts.queries) && opts.queries.length
-      ? { googleQueries: opts.queries }
-      : await buildThumbnailImagePlanAsync(name, storeName);
+      ? { googleQueries: opts.queries, visionLabel: opts.productLabelForVision || name }
+      : await buildThumbnailImagePlanAsync(name, storeName, planOpts);
 
   const queries =
     plan.googleQueries?.length > 0
       ? plan.googleQueries
       : [buildLegacySearchTerms(name, storeName)].filter(Boolean);
 
-  const visionLabel = opts.productLabelForVision || name;
+  const visionLabel = opts.productLabelForVision || plan.visionLabel || name;
   const useVision = visionEnabled();
 
   for (const q of queries) {
@@ -579,7 +584,10 @@ export async function fetchGoogleCseImageByName(name, storeName, opts = {}) {
       const link = it?.link || null;
       if (!link || !isLikelyImageUrl(link) || isBlockedThumbnailImageUrl(link)) continue;
       if (useVision) {
-        const ok = await validateMapProductImageUrl(link, visionLabel);
+        const ok = await validateMapProductImageUrl(link, visionLabel, {
+          price: opts.price,
+          unit: opts.unit,
+        });
         if (!ok) continue;
       }
       return link;
@@ -592,8 +600,11 @@ export async function fetchGoogleCseImageByName(name, storeName, opts = {}) {
 /**
  * Open Food Facts → Google CSE (sem regra do painel nem cache map_product_image_cache).
  */
-export async function resolveThumbnailFromExternalApisOnly(name, storeName, useGoogleCse) {
-  const plan = await buildThumbnailImagePlanAsync(name, storeName);
+export async function resolveThumbnailFromExternalApisOnly(name, storeName, useGoogleCse, opts = {}) {
+  const plan = await buildThumbnailImagePlanAsync(name, storeName, {
+    price: opts.price,
+    unit: opts.unit,
+  });
 
   let url = await fetchOpenFoodFactsImageByName(name, {
     skip: plan.skipOpenFoodFacts,
@@ -604,7 +615,9 @@ export async function resolveThumbnailFromExternalApisOnly(name, storeName, useG
   if (!url && useGoogleCse) {
     url = await fetchGoogleCseImageByName(name, storeName, {
       queries: plan.googleQueries,
-      productLabelForVision: name,
+      productLabelForVision: plan.visionLabel || name,
+      price: opts.price,
+      unit: opts.unit,
     });
     src = 'google_cse';
   }
@@ -697,15 +710,16 @@ export async function findDirectThumbnailRuleImageUrl(productName, storeName) {
  * Resolve OFF → CSE com o mesmo plano (queries contextuais, skip OFF em fast food quando aplicável).
  * 1º regra do painel com image_url; 2º/3º OFF e CSE.
  */
-export async function fetchExternalProductImageResolved(name, storeName, useGoogleCse) {
+export async function fetchExternalProductImageResolved(name, storeName, useGoogleCse, opts = {}) {
   const direct = await findDirectThumbnailRuleImageUrl(name, storeName);
   if (direct) return { url: direct, source: 'thumbnail_rule' };
-  return resolveThumbnailFromExternalApisOnly(name, storeName, useGoogleCse);
+  return resolveThumbnailFromExternalApisOnly(name, storeName, useGoogleCse, opts);
 }
 
 export function isValidResolvedImage(url) {
   if (!url || typeof url !== 'string') return false;
   const t = url.trim();
   if (/^data:/i.test(t)) return false;
+  if (isLowQualityProductImageUrl(t)) return false;
   return isLikelyImageUrl(t) && !isBlockedThumbnailImageUrl(t);
 }

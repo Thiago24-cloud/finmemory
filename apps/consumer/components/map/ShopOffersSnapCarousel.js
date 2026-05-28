@@ -112,7 +112,11 @@ export default function ShopOffersSnapCarousel({ offers, wazeUi, formatPriceSlot
                 }`}
               >
                 {imgOk ? (
-                  <CardImageWithFallback optimizedSrc={optimizedSrc} originalSrc={url} />
+                  <CardImageWithFallback
+                    optimizedSrc={optimizedSrc}
+                    originalSrc={url}
+                    category={offer.category}
+                  />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center rounded-xl border border-[#39FF14]/25 bg-[#0a0f0a] text-4xl">
                     {categoryFallbackGlyph(offer.category)}
@@ -155,20 +159,30 @@ export default function ShopOffersSnapCarousel({ offers, wazeUi, formatPriceSlot
   );
 }
 
-function CardImageWithFallback({ optimizedSrc, originalSrc }) {
+function CardImageWithFallback({ optimizedSrc, originalSrc, category }) {
   const [src, setSrc] = useState(optimizedSrc || originalSrc || '');
   const [triedOriginal, setTriedOriginal] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setSrc(optimizedSrc || originalSrc || '');
     setTriedOriginal(false);
+    setFailed(false);
   }, [optimizedSrc, originalSrc]);
+
+  if (failed || !src) {
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-xl border border-[#39FF14]/25 bg-[#0a0f0a] text-4xl">
+        {categoryFallbackGlyph(category)}
+      </div>
+    );
+  }
 
   return (
     <img
       src={src}
       alt=""
-      className="h-full w-full rounded-xl bg-white object-contain"
+      className="h-full w-full rounded-xl bg-white object-cover object-center"
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
@@ -176,7 +190,9 @@ function CardImageWithFallback({ optimizedSrc, originalSrc }) {
         if (!triedOriginal && originalSrc && src !== originalSrc) {
           setSrc(originalSrc);
           setTriedOriginal(true);
+          return;
         }
+        setFailed(true);
       }}
     />
   );

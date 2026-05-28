@@ -1,0 +1,48 @@
+---
+description: Imagens do mapa — preço + unidade + Gemini/Google CSE (veracidade tamanho vs preço)
+globs:
+  - apps/consumer/lib/mapProductImage*.js
+  - apps/consumer/lib/externalProductImages.js
+  - apps/consumer/lib/enrichMapPointImages.js
+  - apps/consumer/lib/validateMapProductImageVision.js
+---
+
+# Mapa — agente de imagens (nome + preço + unidade)
+
+## Problema
+
+Miniatura só pelo **nome** erra tamanho/quantidade: "Bolo de Abacaxi" a R$ 10 ≠ bolo inteiro de festa; "Sabão em pó" 2,4 kg ≠ sabonete; "Pera" a R$ 1,50 ≠ quilo.
+
+## Pipeline no código
+
+1. **Cérebro (heurística)** — `apps/consumer/lib/mapProductImagePriceAwarePlan.js` → `inferImageQualifiersFromPrice({ nome, preco, unidade })`
+2. **Busca** — `buildThumbnailImagePlanAsync(nome, loja, { price, unit })` em `mapProductImageSearchPlan.js` → Google CSE / Open Food Facts via `externalProductImages.js`
+3. **Filtro visual** — `validateMapProductImageVision.js` (Prompt 3: fundo branco, veracidade tamanho vs preço)
+
+## Variáveis de ambiente
+
+| Variável | Efeito |
+|----------|--------|
+| `MAP_PRODUCT_IMAGE_PRICE_AWARE` | `0` desliga heurística de preço (padrão: ligado) |
+| `MAP_PRODUCT_IMAGE_GEMINI_REFINE` | `1` + `GEMINI_API_KEY` → Gemini refina termos de busca |
+| `MAP_PRODUCT_IMAGE_GEMINI_MODEL` | ex. `gemini-2.0-flash` |
+| `GOOGLE_API_KEY` + `GOOGLE_CSE_ID` | busca de imagens Google |
+| `MAP_PRODUCT_IMAGE_VISION_VALIDATE` | `1` valida candidatos antes de aceitar |
+| `MAP_PRODUCT_IMAGE_VISION_PROVIDER` | `gemini` ou `openai` |
+
+## Regras de decisão (resumo)
+
+- **Limpeza**: preço alto + kg grande → pacote grande; preço baixo → unidade/pequeno.
+- **Hortifruti**: preço baixo ou "un" → uma fruta; /kg ou preço alto → quilo/bandeja.
+- **Padaria**: &lt; R$ 15 → fatia/individual; R$ 35+ → bolo inteiro grande.
+- **Busca**: qualificadores `fundo branco`, `embalagem`, tamanho na query — não só marca.
+
+## Ao implementar / rodar lote
+
+- Entrada mínima: `{ nome, preco, unidade?, store_name? }`.
+- Não publicar imagem que falhe validação visual quando `MAP_PRODUCT_IMAGE_VISION_VALIDATE=1`.
+- Preferir editar módulos existentes; não duplicar pipeline paralelo em Python salvo script pontual de batch.
+
+## Script de alinhamento (coordenadas/lojas)
+
+`node scripts/fix-sonda-map-visible.mjs` — só Sonda; para imagens, estender ou criar batch que chame `fetchExternalProductImageResolved` com `price`/`unit`.

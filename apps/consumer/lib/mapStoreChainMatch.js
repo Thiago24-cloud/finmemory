@@ -130,6 +130,8 @@ export const inferChainSlugFromStoreDisplayName = inferChainSlugFromPromoStoreNa
 export function isLikelyNonProductScraperTitle(name) {
   const n = normalizeMapChainText(name);
   if (!n || n.length < 2) return true;
+  if (n === 'por') return true;
+  if (/^\d+\s*%\s*off$/.test(n)) return true;
   if (/\bmumble\b/.test(n)) return true;
   if (/\bclick\s+and\s+collect\b/.test(n)) return true;
   /* Scrapers gravam linhas de serviço (ex.: "Mambo — Clique e Retire") como "produto". */

@@ -378,6 +378,7 @@ export default async function handler(req, res) {
           maxUniqueNames: maxNames,
           concurrency: stateWide ? 3 : 4,
           useGoogleCse: useCse,
+          nameForSearch: (p) => p.product_name,
         });
       } catch (e) {
         console.warn('enrichMapPointsImageUrls:', e.message);

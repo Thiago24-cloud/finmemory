@@ -9,6 +9,10 @@
 
 import { collectCanonicalsFromDbRules, getThumbnailMatchRulesCached } from './mapThumbnailMatchRules';
 import { normalizeMapChainText } from './mapStoreChainMatch';
+import {
+  buildPriceAwareImageContext,
+  mergePriceAwareIntoGoogleQueries,
+} from './mapProductImagePriceAwarePlan.js';
 
 /** Alinhado a lib/mapProductImageCache.js — manter coerente ao alterar. */
 export function normProductImageKey(name) {
@@ -296,8 +300,9 @@ export function inferSupermarketProductHint(productRaw, ctx) {
 /**
  * @param {string} productName — já sem sufixo fan-out (usar productNameForThumbnailSearch)
  * @param {string} storeName
+ * @param {{ price?: number|null, unit?: string|null }} [opts]
  */
-export async function buildThumbnailImagePlanAsync(productName, storeName) {
+export async function buildThumbnailImagePlanAsync(productName, storeName, opts = {}) {
   const product = String(productName || '').trim();
   const store = String(storeName || '').trim();
   const productNorm = normalizeForMatch(product);
@@ -334,7 +339,24 @@ export async function buildThumbnailImagePlanAsync(productName, storeName) {
   const skipOpenFoodFacts = shouldSkipOpenFoodFacts(ctx, product, productNorm);
   const openFoodFactsQuery = skipOpenFoodFacts ? null : product;
 
-  const googleQueries = buildGoogleQueries(googleCtx, store, product);
+  let googleQueries = buildGoogleQueries(googleCtx, store, product);
+  let visionLabel = product;
+  let priceAware = null;
+
+  if (opts.price != null || opts.unit) {
+    priceAware = await buildPriceAwareImageContext(product, store, {
+      price: opts.price,
+      unit: opts.unit,
+    });
+    visionLabel = priceAware.visionLabel || product;
+    googleQueries = mergePriceAwareIntoGoogleQueries(googleQueries, priceAware.qualifiers);
+    if (priceAware.gemini?.searchQueries?.length) {
+      googleQueries = mergePriceAwareIntoGoogleQueries(
+        priceAware.gemini.searchQueries,
+        priceAware.qualifiers
+      );
+    }
+  }
 
   return {
     retailContext: ctx,
@@ -342,5 +364,7 @@ export async function buildThumbnailImagePlanAsync(productName, storeName) {
     skipOpenFoodFacts,
     openFoodFactsQuery,
     googleQueries,
+    visionLabel,
+    priceAware,
   };
 }

@@ -1,0 +1,139 @@
+{
+  "description": "Unidades Sonda — pin no endereço do usuário; ofertas via CEP da loja em Lojas Físicas (sonda.com.br → delivery). matchQuality: exact | street | proximate | pin_only",
+  "units": [
+    {
+      "id": "agua-branca",
+      "label": "Água Branca",
+      "address": "Av. Francisco Matarazzo, 3100, Água Branca, São Paulo, SP",
+      "city": "São Paulo",
+      "siteCep": "05001000",
+      "siteAddressNote": "Site: Av. Francisco Matarazzo, 892",
+      "matchQuality": "street"
+    },
+    {
+      "id": "pompeia",
+      "label": "Pompéia",
+      "address": "Av. Pompéia, 1925, Pompéia, São Paulo, SP",
+      "city": "São Paulo",
+      "siteCep": "05033060",
+      "siteAddressNote": "Site: Rua Guaicurus, 1469 (Lapa — mais próximo que Mooca)",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "vila-romana",
+      "label": "Vila Romana",
+      "address": "R. Tito, 765, Vila Romana, São Paulo, SP",
+      "city": "São Paulo",
+      "siteCep": "05033070",
+      "siteAddressNote": "Site: Rua Carlos Vicari, 155",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "edgar-faco",
+      "label": "Edgar Facó",
+      "address": "Av. Edgard Facó, 1374, Vila Clarice, São Paulo, SP",
+      "city": "São Paulo",
+      "siteCep": "02924000",
+      "siteAddressNote": "Site: Av. General Edgar Facó, 360",
+      "matchQuality": "street"
+    },
+    {
+      "id": "aruja",
+      "label": "Arujá",
+      "address": "Av. João Manoel, 1100, Centro, Arujá, SP",
+      "city": "Arujá",
+      "pinOnly": true,
+      "pinOnlyReason": "Sem loja em Lojas Físicas no site — só cadastro no mapa (sem promo do site)"
+    },
+    {
+      "id": "barueri",
+      "label": "Barueri",
+      "address": "R. Gen. de Divisão Pedro Rodrigues da Silva, 400, Nova Aldeinha, Barueri, SP",
+      "city": "Barueri",
+      "siteCep": "06440180",
+      "siteAddressNote": "Site: Rua General de Divisão Pedro Rodrigues da Silva, 400",
+      "matchQuality": "exact"
+    },
+    {
+      "id": "carapicuiba",
+      "label": "Carapicuíba",
+      "address": "Av. Inocêncio Seráfico, 2200, Vila Dirce, Carapicuíba, SP",
+      "city": "Carapicuíba",
+      "siteCep": "06364000",
+      "siteAddressNote": "Site: Estrada da Fazendinha, 1199",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "guarulhos-vila-rio",
+      "label": "Guarulhos (Vila Rio)",
+      "address": "Av. Benjamin Harris Hunnicutt, 1200, Vila Rio de Janeiro, Guarulhos, SP",
+      "city": "Guarulhos",
+      "siteCep": "07063170",
+      "siteAddressNote": "Site: Av. Dr. Timóteo Penteado, 4255",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "guarulhos-vila-galvao",
+      "label": "Guarulhos (Vila Galvão)",
+      "address": "Av. Sete de Setembro, 2013, Vila Galvão, Guarulhos, SP",
+      "city": "Guarulhos",
+      "siteCep": "07124543",
+      "siteAddressNote": "Site: Avenida Rosa Molina Pannocchia, 331",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "guarulhos-vila-barros",
+      "label": "Guarulhos (Vila Barros)",
+      "address": "Av. Otávio Braga de Mesquita, 1421, Vila Barros, Guarulhos, SP",
+      "city": "Guarulhos",
+      "siteCep": "07191000",
+      "siteAddressNote": "Site: Av. Otávio Braga de Mesquita, 1450",
+      "matchQuality": "street"
+    },
+    {
+      "id": "sbc-centro",
+      "label": "São Bernardo (Centro)",
+      "address": "R. Marechal Deodoro, 1195, Centro, São Bernardo do Campo, SP",
+      "city": "São Bernardo do Campo",
+      "siteCep": "09625050",
+      "siteAddressNote": "Site: Av. Caminho do Mar, 3115",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "sbc-rudge-ramos",
+      "label": "São Bernardo (Rudge Ramos)",
+      "address": "R. Rio Branco, 408, Rudge Ramos, São Bernardo do Campo, SP",
+      "city": "São Bernardo do Campo",
+      "siteCep": "09751020",
+      "siteAddressNote": "Site: Av. Pereira Barreto, 1500",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "sao-caetano-centro",
+      "label": "São Caetano (Centro)",
+      "address": "R. Manoel Coelho, 800, Centro, São Caetano do Sul, SP",
+      "city": "São Caetano do Sul",
+      "siteCep": "09572300",
+      "siteAddressNote": "Site: Rua Boa Vista, 1133",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "sao-caetano-loja2",
+      "label": "São Caetano (Loja 2)",
+      "address": "R. Rio Grande do Sul, 1261, Santa Paula, São Caetano do Sul, SP",
+      "city": "São Caetano do Sul",
+      "siteCep": "09550051",
+      "siteAddressNote": "Site: Av. Goias, 2905",
+      "matchQuality": "proximate"
+    },
+    {
+      "id": "sao-vicente",
+      "label": "São Vicente",
+      "address": "Av. Antônio Emmerich, 1070, Vila Melo, São Vicente, SP",
+      "city": "São Vicente",
+      "siteCep": "11310071",
+      "siteAddressNote": "Site: Rua Jacob Emerick, 249",
+      "matchQuality": "proximate"
+    }
+  ]
+}

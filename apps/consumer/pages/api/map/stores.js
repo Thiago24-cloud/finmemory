@@ -501,7 +501,7 @@ export default async function handler(req, res) {
       }
       if (process.env.MAP_STORES_OFF_ENRICH !== '0' && allPreview.length > 0) {
         const useCse =
-          process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK === '1' &&
+          process.env.MAP_POINTS_GOOGLE_CSE_FALLBACK !== '0' &&
           Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID);
         const cap = Number.parseInt(process.env.MAP_STORES_MAX_OFF_NAMES || '150', 10) || 150;
         await enrichMapPointsImageUrls(allPreview, {

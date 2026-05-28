@@ -8,6 +8,10 @@ import {
   findDirectThumbnailRuleImageUrl,
   isValidResolvedImage,
 } from './externalProductImages';
+import {
+  isLowQualityProductImageUrl,
+  isScraperSiteProductImageUrl,
+} from './mapProductImageQuality.js';
 
 const CACHE = new Map();
 const CACHE_MAX = 500;
@@ -20,17 +24,20 @@ function normName(s) {
     .slice(0, 200);
 }
 
-/** True quando não há URL ou quando aponta para PDF/encarte (o card precisa de foto de produto). */
+/** True quando não há URL, encarte/PDF, ou miniatura inútil (placeholder / ícone minúsculo). */
 export function needsThumbnailEnrichment(url) {
   if (!url || typeof url !== 'string') return true;
+  if (isLowQualityProductImageUrl(url) || isScraperSiteProductImageUrl(url)) return true;
   const u = url.trim().toLowerCase();
   if (u.includes('.pdf') || /[?&]format=pdf\b/.test(u)) return true;
   return /\/encarte\/|encarte\.|tablo[ií]de|folheto|ofertas\/pdf|\/folheto\//i.test(u);
 }
 
-async function resolveImageUrl(productName, storeName, useCse) {
-  const key = normName(productName);
-  if (!key) return null;
+async function resolveImageUrl(productName, storeName, useCse, opts = {}) {
+  const priceKey = opts.price != null ? String(opts.price) : '';
+  const unitKey = normName(opts.unit || '');
+  if (!normName(productName)) return null;
+  const key = `${normName(productName)}\0${priceKey}\0${unitKey}`;
   if (CACHE.has(key)) {
     const c = CACHE.get(key);
     return c || null;
@@ -39,7 +46,8 @@ async function resolveImageUrl(productName, storeName, useCse) {
   const { url } = await fetchExternalProductImageResolved(
     productName,
     storeName || '',
-    useCse
+    useCse,
+    { price: opts.price, unit: opts.unit }
   );
 
   if (CACHE.size >= CACHE_MAX) {
@@ -93,13 +101,17 @@ export async function enrichMapPointsImageUrls(points, opts = {}) {
   for (const p of points) {
     if (!needsThumbnailEnrichment(p.promo_image_url)) continue;
     const searchName = String(nameForSearch(p) || p.product_name || '').trim();
-    const key = normName(searchName);
+    const price = p.price != null ? Number(p.price) : null;
+    const unit = p.unit || p.unidade || null;
+    const key = `${normName(searchName)}\0${price ?? ''}\0${normName(unit || '')}`;
     if (!key || seen.has(key)) continue;
     seen.add(key);
     need.push({
       key,
       product_name: searchName,
       store_name: p.store_name || '',
+      price,
+      unit,
     });
     if (need.length >= maxUnique) break;
   }
@@ -113,7 +125,10 @@ export async function enrichMapPointsImageUrls(points, opts = {}) {
       const ix = next++;
       if (ix >= need.length) return;
       const item = need[ix];
-      const url = await resolveImageUrl(item.product_name, item.store_name, useCse);
+      const url = await resolveImageUrl(item.product_name, item.store_name, useCse, {
+        price: item.price,
+        unit: item.unit,
+      });
       if (url) urlByKey.set(item.key, url);
     }
   }
@@ -123,7 +138,9 @@ export async function enrichMapPointsImageUrls(points, opts = {}) {
   for (const p of points) {
     if (!needsThumbnailEnrichment(p.promo_image_url)) continue;
     const searchName = String(nameForSearch(p) || p.product_name || '').trim();
-    const key = normName(searchName);
+    const price = p.price != null ? Number(p.price) : null;
+    const unit = p.unit || p.unidade || null;
+    const key = `${normName(searchName)}\0${price ?? ''}\0${normName(unit || '')}`;
     let u = urlByKey.get(key);
     if (!u && CACHE.has(key)) u = CACHE.get(key);
     if (u) p.promo_image_url = u;

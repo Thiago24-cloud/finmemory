@@ -9,9 +9,9 @@ export function getMapOptimizedProductCardImageSrc(url) {
   const source = clean.replace(/^https?:\/\//i, '');
   const wsrv = new URL('https://wsrv.nl/');
   wsrv.searchParams.set('url', source);
-  wsrv.searchParams.set('w', '900');
-  wsrv.searchParams.set('h', '900');
-  wsrv.searchParams.set('fit', 'contain');
+  wsrv.searchParams.set('w', '480');
+  wsrv.searchParams.set('h', '480');
+  wsrv.searchParams.set('fit', 'cover');
   wsrv.searchParams.set('bg', 'ffffff');
   wsrv.searchParams.set('q', '90');
   wsrv.searchParams.set('output', 'webp');

@@ -112,6 +112,35 @@ export async function publishScraperToMap(supabase, payload) {
     return { ok: false, error: storeRpcErr.message, filaId: insertedFila?.id };
   }
 
+  // Pin laranja: nome exato em public.stores (find_or_create pode fundir com outra filial).
+  const { data: exactStore } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('name', payload.storeName)
+    .maybeSingle();
+  if (exactStore?.id) {
+    await supabase
+      .from('stores')
+      .update({
+        lat: payload.storeLat,
+        lng: payload.storeLng,
+        address: payload.storeAddress || null,
+        type: 'supermarket',
+        active: true,
+      })
+      .eq('id', exactStore.id);
+  } else {
+    await supabase.from('stores').insert({
+      name: payload.storeName,
+      type: 'supermarket',
+      address: payload.storeAddress || null,
+      lat: payload.storeLat,
+      lng: payload.storeLng,
+      active: true,
+      needs_review: false,
+    });
+  }
+
   const replaceHours = Math.max(
     1,
     Math.min(parseInt(String(payload.replaceHours || process.env.SCRAPER_DIA_REPLACE_HOURS || '24'), 10) || 24, 168)

@@ -8,5 +8,6 @@ export const MAP_PUBLIC_PRICE_POINT_SOURCES = [
   'community_manual',
   'scraper_dia',
   'scraper_atacadao',
+  'scraper_sonda',
   'merchant_panel',
 ];

@@ -5,12 +5,21 @@
  * @param {string} query - Ex: "Drogasil, São Paulo, Brasil"
  * @returns {{ lat: number, lng: number } | null}
  */
-export async function geocodeAddress(query) {
+export async function geocodeAddress(query, options = {}) {
   const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   if (!token || !query || String(query).trim().length < 2) return null;
 
   const q = encodeURIComponent(String(query).trim());
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${q}.json?access_token=${token}&limit=1&country=BR`;
+  const params = new URLSearchParams({
+    access_token: token,
+    limit: '1',
+    country: 'BR',
+  });
+  if (options.bbox) params.set('bbox', options.bbox);
+  if (options.proximity?.lng != null && options.proximity?.lat != null) {
+    params.set('proximity', `${options.proximity.lng},${options.proximity.lat}`);
+  }
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${q}.json?${params}`;
 
   try {
     const res = await fetch(url);
@@ -25,3 +34,7 @@ export async function geocodeAddress(query) {
     return null;
   }
 }
+
+/** Grande SP — evita geocode em outra cidade com nome de rua parecido (ex. Pompéia). */
+export const GRANDE_SP_GEOCODE_BBOX = '-47.15,-24.05,-46.0,-23.15';
+export const SAO_PAULO_CITY_PROXIMITY = { lng: -46.6333, lat: -23.5505 };
