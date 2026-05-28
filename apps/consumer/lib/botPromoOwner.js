@@ -27,29 +27,59 @@ export async function isUserIdPresent(supabase, userId) {
   return !error && Boolean(data?.id);
 }
 
+/** Conta técnica em public.users — ver scripts/ensure-bot-promo-owner.mjs */
+export const BOT_PROMO_OWNER_EMAIL = 'scraper-auto@finmemory.local';
+
+async function resolveEnvOwnerCandidate(supabase, name, value) {
+  if (!value) {
+    console.log('[botPromoOwner] env var ausente:', name);
+    return null;
+  }
+  if (isUuid(value)) {
+    const found = await isUserIdPresent(supabase, value);
+    if (found) {
+      console.log('[botPromoOwner] user_id resolvido via env var:', name);
+      return value;
+    }
+    console.log('[botPromoOwner] env var presente mas UUID não encontrado em users:', name);
+    return null;
+  }
+  if (value.includes('@')) {
+    const id = await findUserIdByEmail(supabase, value);
+    if (id) {
+      console.warn(
+        '[botPromoOwner]',
+        name,
+        'está como e-mail; use UUID (npm run promo:ensure-bot-owner). user_id=',
+        id
+      );
+      return id;
+    }
+    console.log('[botPromoOwner] env var é e-mail mas não existe em users:', name);
+  } else {
+    console.log('[botPromoOwner] env var inválida (nem UUID nem e-mail):', name);
+  }
+  return null;
+}
+
 export async function resolveOwnerUserId(supabase, reviewerEmail) {
   const envCandidateNames = [
     'BOT_PROMO_OWNER_USER_ID',
     'MAP_QUICK_ADD_BOT_USER_ID',
     'DIA_BOT_USER_ID',
   ];
-  const envCandidates = envCandidateNames.map((name) => ({
-    name,
-    value: String(process.env[name] || '').trim(),
-  }));
 
-  for (const c of envCandidates) {
-    if (!c.value) {
-      console.log('[botPromoOwner] env var ausente:', c.name);
-      continue;
-    }
+  for (const name of envCandidateNames) {
+    const value = String(process.env[name] || '').trim();
     // eslint-disable-next-line no-await-in-loop
-    const found = await isUserIdPresent(supabase, c.value);
-    if (found) {
-      console.log('[botPromoOwner] user_id resolvido via env var:', c.name);
-      return c.value;
-    }
-    console.log('[botPromoOwner] env var presente mas user_id não encontrado em users:', c.name);
+    const id = await resolveEnvOwnerCandidate(supabase, name, value);
+    if (id) return id;
+  }
+
+  const dedicatedBotId = await findUserIdByEmail(supabase, BOT_PROMO_OWNER_EMAIL);
+  if (dedicatedBotId) {
+    console.log('[botPromoOwner] user_id resolvido via conta técnica', BOT_PROMO_OWNER_EMAIL);
+    return dedicatedBotId;
   }
 
   const reviewerId = await findUserIdByEmail(supabase, reviewerEmail);

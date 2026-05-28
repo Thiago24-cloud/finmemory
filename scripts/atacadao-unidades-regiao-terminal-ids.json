@@ -1,0 +1,34 @@
+{
+  "description": "Atacadão SP — IDs oficiais VTEX (sellerId numérico) na região das unidades DIA do terminal",
+  "officialSellerIds": [
+    "133",
+    "48",
+    "810",
+    "35",
+    "229",
+    "678",
+    "943",
+    "612",
+    "655",
+    "6",
+    "20"
+  ],
+  "storeIds": [
+    "ipiranga",
+    "itaquera",
+    "vila-maria",
+    "sao-miguel-paulista",
+    "interlagos",
+    "maua",
+    "sao-bernardo-do-campo",
+    "carapicuiba",
+    "barueri-tambore",
+    "taipas",
+    "rio-das-pedras",
+    "jacui"
+  ],
+  "notInOfficialCatalog": [
+    "rio-das-pedras",
+    "jacui"
+  ]
+}

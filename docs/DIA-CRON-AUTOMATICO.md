@@ -28,7 +28,9 @@ Confira também no `.env.local`:
 |----------|----------|
 | `ANTHROPIC_API_KEY` | Extração das ofertas (obrigatório no servidor) |
 | `DIA_IMPORT_SECRET` | Protege `/api/scraper/dia` |
-| `DIA_BOT_USER_ID` ou `BOT_PROMO_OWNER_USER_ID` | Publicar no mapa sem admin |
+| `BOT_PROMO_OWNER_USER_ID` | UUID da conta técnica (`npm run promo:ensure-bot-owner`) — **não** use e-mail de admin |
+
+Opcional: o mesmo UUID em `DIA_BOT_USER_ID` e `MAP_QUICK_ADD_BOT_USER_ID`.
 
 ## Passo 2 — GitHub Secrets (só 2)
 

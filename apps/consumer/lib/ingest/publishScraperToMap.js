@@ -106,7 +106,7 @@ export async function publishScraperToMap(supabase, payload) {
     p_address: payload.storeAddress || '',
     p_lat: payload.storeLat,
     p_lng: payload.storeLng,
-    p_cnpj: cnpjDigits.length >= 14 ? cnpjDigits : null,
+    p_cnpj: cnpjDigits && cnpjDigits.length >= 14 ? cnpjDigits : null,
   });
   if (storeRpcErr) {
     return { ok: false, error: storeRpcErr.message, filaId: insertedFila?.id };

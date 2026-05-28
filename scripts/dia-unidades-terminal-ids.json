@@ -1,0 +1,25 @@
+{
+  "description": "IDs do catálogo oficial DIA (fetchDiaCatalogStores) alinhados à lista do terminal / unidades_dia_sp",
+  "storeIds": [
+    "sp-sao-paulo-vila-formosa-r-vale-formoso-129",
+    "sp-sao-paulo-cambuci-avenida-lins-de-vasconcelos-733",
+    "sp-sao-paulo-sao-paulo-vila-gustavo-9589",
+    "sp-sao-paulo-sao-paulo-vl-gomes-cardim-56",
+    "sp-sao-paulo-sao-paulo-cidade-lider-64",
+    "sp-sao-paulo-paraiso-rua-abilio-soares-753",
+    "sp-sao-paulo-sao-paulo-jabaquara-9923",
+    "sp-osasco-osasco-vl-quitauna-9850",
+    "sp-osasco-osasco-vl-menck-152",
+    "sp-francisco-morato-francisco-morato-jd-prof-francisco-morato-13",
+    "sp-santo-andre-santo-andre-jd-teles-de-menezes-99",
+    "sp-sao-paulo-pinheiros-rua-fradique-coutinho-1256",
+    "sp-sao-paulo-sao-paulo-sumarezinho-206",
+    "sp-sao-paulo-pinheiros-526"
+  ],
+  "notInOfficialCatalog": [
+    {
+      "label": "Itinguçu — Rua Itinguçu, 1446",
+      "note": "Não aparece no catálogo dia.com.br (183 lojas Grande SP). Import manual ou nova URL se abrir filial."
+    }
+  ]
+}

@@ -8,8 +8,8 @@
  */
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import { resolveOwnerUserId } from '../lib/botPromoOwner.js';
-import { splitProdutosByPublishReadiness } from '../lib/promoQueueProcessing.js';
+import { resolveOwnerUserId, BOT_PROMO_OWNER_EMAIL } from '../apps/consumer/lib/botPromoOwner.js';
+import { splitProdutosByPublishReadiness } from '../apps/consumer/lib/promoQueueProcessing.js';
 function normalizeMapProductImageKey(name) {
   return String(name || '')
     .trim()
@@ -32,8 +32,7 @@ if (!url || !key) {
 }
 
 const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-const reviewerEmail = process.env.AUTH_TEST_EMAIL || 'finmemory.oficial@gmail.com';
-const ownerUserId = await resolveOwnerUserId(supabase, reviewerEmail);
+const ownerUserId = await resolveOwnerUserId(supabase, BOT_PROMO_OWNER_EMAIL);
 
 if (!ownerUserId) {
   console.error('ERRO: owner user_id não resolvido. Configure BOT_PROMO_OWNER_USER_ID ou MAP_QUICK_ADD_BOT_USER_ID.');
