@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getMapProductImageSrcForImg } from '../../lib/mapImageProxy';
+import { getMapOptimizedProductCardImageSrc } from '../../lib/mapProductCardImage';
 
 const CARD_W = 160;
 const GAP = 10;
@@ -84,7 +84,7 @@ export default function ShopOffersSnapCarousel({ offers, wazeUi, formatPriceSlot
         {offers.map((offer) => {
           const url = offer.promo_image_url;
           const imgOk = url && isDisplayableImageUrl(url);
-          const imgSrc = imgOk ? getMapProductImageSrcForImg(url) : '';
+          const imgSrc = imgOk ? getMapOptimizedProductCardImageSrc(url) : '';
           const name = String(offer.product_name || 'Produto').slice(0, 80);
           const priceNode = formatPriceSlot ? (
             formatPriceSlot(offer)
@@ -107,21 +107,21 @@ export default function ShopOffersSnapCarousel({ offers, wazeUi, formatPriceSlot
               style={{ scrollSnapAlign: 'start' }}
             >
               <div
-                className={`relative h-[120px] w-full shrink-0 overflow-hidden ${
-                  wazeUi ? 'bg-[#161922]' : 'bg-gray-100'
+                className={`relative h-[120px] w-full shrink-0 overflow-hidden p-2 ${
+                  wazeUi ? 'bg-[#161922]' : 'bg-zinc-100'
                 }`}
               >
                 {imgOk ? (
                   <img
                     src={imgSrc || url}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="h-full w-full rounded-xl bg-white object-contain p-1"
                     loading="lazy"
                     decoding="async"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-4xl">
+                  <div className="flex h-full w-full items-center justify-center rounded-xl border border-[#39FF14]/25 bg-[#0a0f0a] text-4xl">
                     {categoryFallbackGlyph(offer.category)}
                   </div>
                 )}

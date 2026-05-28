@@ -1,5 +1,6 @@
 import { enqueuePromocoes } from './enqueuePromocoes.js';
 import { splitProdutosByPublishReadiness } from '../promoQueueProcessing.js';
+import { autoPublishQueueItem } from './autoPublishQueueItem.js';
 
 /**
  * Enfileira lote do scraper com status `pendente` (nunca publica no mapa).
@@ -57,11 +58,28 @@ export async function enqueueScraperRun(supabase, payload) {
     return { ok: false, error: queued.error };
   }
 
+  const { data: queueRow, error: queueFetchErr } = await supabase
+    .from('bot_promocoes_fila')
+    .select('*')
+    .eq('id', queued.filaId)
+    .single();
+  if (queueFetchErr || !queueRow) {
+    return { ok: false, error: queueFetchErr?.message || 'Não foi possível carregar item enfileirado' };
+  }
+
+  const autoPublished = await autoPublishQueueItem(supabase, queueRow, {
+    reviewerEmail: 'scraper-auto@finmemory.local',
+  });
+  if (!autoPublished.ok) {
+    return { ok: false, error: `Falha na publicação automática: ${autoPublished.error}` };
+  }
+
   return {
     ok: true,
     filaId: queued.filaId,
-    status: 'pendente',
+    status: 'aprovado',
     produtosTotal: produtos.length,
+    inserted: autoPublished.inserted || 0,
     readiness: {
       ready: split.ready.length,
       pendingImage: split.pendingImage.length,

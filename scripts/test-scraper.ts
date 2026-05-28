@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Teste mínimo do pipeline scraper -> bot_promocoes_fila (status pendente).
+ * Teste mínimo do pipeline scraper -> auto-publicação no mapa.
  *
  * Uso:
  *   node -r dotenv/config scripts/test-scraper.ts
  *   node -r dotenv/config scripts/test-scraper.ts --dry-run
  */
 import { createClient } from '@supabase/supabase-js';
-import { enqueuePromocoes } from '../apps/consumer/lib/ingest/enqueuePromocoes.js';
+import { enqueueScraperRun } from '../apps/consumer/lib/ingest/enqueueScraperRun.js';
 
 const dryRun = process.argv.includes('--dry-run');
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -53,9 +53,9 @@ if (!url || !key) {
 const supabase = createClient(url, key, { auth: { persistSession: false } });
 
 const beforeMap = new Date(Date.now() - 60_000).toISOString();
-const queued = await enqueuePromocoes(supabase, payload);
+const queued = await enqueueScraperRun(supabase, payload);
 if (!queued.ok || !queued.filaId) {
-  console.error('enqueuePromocoes falhou:', queued.error || 'filaId ausente');
+  console.error('enqueueScraperRun falhou:', queued.error || 'filaId ausente');
   process.exit(2);
 }
 
@@ -68,8 +68,8 @@ if (filaErr || !fila) {
   console.error('Não leu fila:', filaErr?.message || 'registro ausente');
   process.exit(3);
 }
-if (fila.status !== 'pendente') {
-  console.error(`Status incorreto: ${fila.status} (esperado pendente)`);
+if (fila.status !== 'aprovado') {
+  console.error(`Status incorreto: ${fila.status} (esperado aprovado)`);
   process.exit(4);
 }
 
@@ -80,8 +80,8 @@ const { count: mapCount, error: mapErr } = await supabase
   .gte('created_at', beforeMap);
 if (mapErr) {
   console.warn('Aviso: não verificou price_points:', mapErr.message);
-} else if ((mapCount || 0) > 0) {
-  console.error(`ERRO: ${mapCount} price_points criados direto (deveria ser 0)`);
+} else if ((mapCount || 0) === 0) {
+  console.error('ERRO: nenhum price_point foi criado pelo fluxo automático');
   process.exit(5);
 }
 

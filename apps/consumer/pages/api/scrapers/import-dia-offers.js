@@ -4,10 +4,10 @@ import { geocodeAddress } from '../../../lib/geocode';
 import { extractOffersFromHtmlAnthropic } from '../../../lib/diaScraper/scraperDiaCore.js';
 import {
   INGEST_SOURCE_DIA_STORE_PAGE,
-  enqueuePromocoes,
   resolveIngestProvider,
   ProviderValidationError,
 } from '../../../lib/ingest';
+import { enqueueScraperRun } from '../../../lib/ingest/enqueueScraperRun.js';
 
 function stripHtmlToText(html) {
   if (!html) return '';
@@ -131,7 +131,8 @@ export default async function handler(req, res) {
       });
     }
 
-    const queued = await enqueuePromocoes(supabase, {
+    const queued = await enqueueScraperRun(supabase, {
+      origem: providerPayload.origem || INGEST_SOURCE_DIA_STORE_PAGE,
       storeName: providerPayload.storeName,
       storeAddress: providerPayload.storeAddress || null,
       storeLat: providerPayload.storeLat,
@@ -148,11 +149,10 @@ export default async function handler(req, res) {
         flyer_asset_urls: flyerAssetUrls,
         run_id: runId,
       },
-      origem: providerPayload.origem || INGEST_SOURCE_DIA_STORE_PAGE,
     });
 
     if (!queued.ok) {
-      return res.status(500).json({ error: `Erro ao enfileirar: ${queued.error}` });
+      return res.status(500).json({ error: `Erro na publicação automática: ${queued.error}` });
     }
 
     return res.status(200).json({
@@ -162,7 +162,8 @@ export default async function handler(req, res) {
       storeName: providerPayload.storeName,
       offersExtracted: offers.length,
       produtosEnfileirados: produtos.length,
-      note: 'Enviado para fila de aprovação em /admin/bot-fila',
+      publicadosNoMapa: queued.inserted || 0,
+      note: 'Publicação automática concluída para itens válidos',
     });
   } catch (e) {
     if (e instanceof ProviderValidationError) {

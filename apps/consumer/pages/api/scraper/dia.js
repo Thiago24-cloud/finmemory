@@ -251,7 +251,8 @@ export default async function handler(req, res) {
       one.offersTotal = produtos.length;
       one.status = queued.status;
       one.readiness = queued.readiness;
-      one.note = 'Enfileirado como pendente; aprovação manual em /admin/bot-fila';
+      one.note = 'Publicado automaticamente no mapa após validação do scraper';
+      one.inserted = queued.inserted || 0;
       one.finishDate = finishDateIso;
       one.thumbnailUrl = imageUrls[0] || null;
       one.storeMappedByCoords = storeMatch || null;

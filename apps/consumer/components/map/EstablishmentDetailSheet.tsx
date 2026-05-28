@@ -6,7 +6,7 @@ import { CheckCircle2, Instagram, Loader2, Search, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
-import { getMapProductImageSrcForImg } from '../../lib/mapImageProxy';
+import { getMapOptimizedProductCardImageSrc } from '../../lib/mapProductCardImage';
 import { displayPromoProductName } from '../../lib/mapOfferDisplay';
 import FilterChips from './FilterChips';
 import { clearStoreOffersCache } from '../../lib/mapStoreOffersCache';
@@ -111,12 +111,13 @@ function categoryEmojiFromRaw(categoryRaw: string): string {
 
 function ProductCardThumb({ categoryRaw, imageUrl }: { categoryRaw: string; imageUrl?: string }) {
   const [failed, setFailed] = useState(false);
-  const img = imageUrl ? getMapProductImageSrcForImg(imageUrl) : '';
+  const [lowQuality, setLowQuality] = useState(false);
+  const img = imageUrl ? getMapOptimizedProductCardImageSrc(imageUrl) : '';
   const emoji = categoryEmojiFromRaw(categoryRaw);
-  if (!img || failed) {
+  if (!img || failed || lowQuality) {
     return (
       <div
-        className="flex h-full w-full items-center justify-center bg-zinc-800 text-[2.25rem] leading-none"
+        className="flex h-full w-full items-center justify-center rounded-xl border border-[#39FF14]/25 bg-[#0a0f0a] text-[2.25rem] leading-none"
         aria-hidden
       >
         {emoji}
@@ -128,9 +129,14 @@ function ProductCardThumb({ categoryRaw, imageUrl }: { categoryRaw: string; imag
     <img
       src={img}
       alt=""
-      className="h-full w-full object-cover"
+      className="h-full w-full rounded-xl bg-white object-contain p-1"
       loading="lazy"
       onError={() => setFailed(true)}
+      onLoad={(e) => {
+        const w = e.currentTarget.naturalWidth || 0;
+        const h = e.currentTarget.naturalHeight || 0;
+        if (w < 260 || h < 260) setLowQuality(true);
+      }}
     />
   );
 }
@@ -637,7 +643,7 @@ export default function EstablishmentDetailSheet({
                         >
                           {badge.label}
                         </span>
-                        <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-zinc-800">
+                        <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-zinc-100 p-2">
                           <ProductCardThumb categoryRaw={p.categoryRaw} imageUrl={p.imageUrl} />
                         </div>
                         <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">

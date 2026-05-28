@@ -97,11 +97,11 @@ export function MerchantProductForm({ onSaved, onCancel }) {
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="relative shrink-0 w-full sm:w-32 h-32 rounded-xl border-2 border-dashed border-white/20 bg-[#0a0a10] flex flex-col items-center justify-center gap-2 hover:border-[#39FF14]/50 transition-colors overflow-hidden"
+          className="relative shrink-0 w-full sm:w-32 h-32 rounded-2xl border-2 border-dashed border-white/20 bg-white flex flex-col items-center justify-center gap-2 hover:border-[#39FF14]/50 transition-colors overflow-hidden p-2"
         >
           {form.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={form.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={form.image_url} alt="" className="absolute inset-0 w-full h-full object-contain rounded-xl bg-white p-2" />
           ) : (
             <>
               {uploading ? (

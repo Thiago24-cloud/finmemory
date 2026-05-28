@@ -1,6 +1,11 @@
 import { requireMerchantApi } from '../../../../lib/merchant/requireMerchantApi';
 import { mapProdutoRowToApi } from '../../../../lib/merchant/mapProdutoRow';
 import { publishMerchantProductToMap } from '../../../../lib/merchant/publishMerchantProductToMap';
+import { resolveOptimizedProductImage } from '../../../../lib/merchant/optimizedProductImage';
+
+function isMissingOptimizedColumnError(error) {
+  return /image_optimized_url/i.test(String(error?.message || ''));
+}
 
 /**
  * PATCH /api/merchant/products/[id] — atualiza preço, foto, oferta relâmpago, disponibilidade.
@@ -22,14 +27,27 @@ export default async function handler(req, res) {
   const { supabase, userId, store } = auth;
   const lojaId = store.id;
 
-  const { data: existing, error: fetchErr } = await supabase
+  let { data: existing, error: fetchErr } = await supabase
     .from('produtos_loja')
     .select(
-      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, status_disponivel'
+      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, image_optimized_url, status_disponivel'
     )
     .eq('id', productId)
     .eq('loja_id', lojaId)
     .maybeSingle();
+
+  if (fetchErr && isMissingOptimizedColumnError(fetchErr)) {
+    const retry = await supabase
+      .from('produtos_loja')
+      .select(
+        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, status_disponivel'
+      )
+      .eq('id', productId)
+      .eq('loja_id', lojaId)
+      .maybeSingle();
+    existing = retry.data;
+    fetchErr = retry.error;
+  }
 
   if (fetchErr) {
     return res.status(500).json({ error: fetchErr.message });
@@ -69,6 +87,18 @@ export default async function handler(req, res) {
     patch.url_imagem = url;
   }
 
+  const nextName = patch.nome ?? existing.nome;
+  const nextImageUrl = patch.url_imagem ?? existing.url_imagem;
+  if (patch.nome != null || patch.url_imagem != null || body.refresh_image === true) {
+    const resolvedImage = await resolveOptimizedProductImage({
+      productName: nextName,
+      imageUrl: nextImageUrl,
+      allowSearchByName: true,
+    });
+    if (resolvedImage.sourceUrl) patch.url_imagem = resolvedImage.sourceUrl;
+    patch.image_optimized_url = resolvedImage.optimizedUrl || null;
+  }
+
   if (typeof body.em_oferta === 'boolean') {
     patch.em_oferta = body.em_oferta;
   }
@@ -77,15 +107,31 @@ export default async function handler(req, res) {
     patch.status_disponivel = body.status_disponivel;
   }
 
-  const { data: row, error: updErr } = await supabase
+  let { data: row, error: updErr } = await supabase
     .from('produtos_loja')
     .update(patch)
     .eq('id', productId)
     .eq('loja_id', lojaId)
     .select(
-      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, status_disponivel, created_at, updated_at'
+      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, image_optimized_url, status_disponivel, created_at, updated_at'
     )
     .single();
+
+  if (updErr && isMissingOptimizedColumnError(updErr)) {
+    const retryPatch = { ...patch };
+    delete retryPatch.image_optimized_url;
+    const retry = await supabase
+      .from('produtos_loja')
+      .update(retryPatch)
+      .eq('id', productId)
+      .eq('loja_id', lojaId)
+      .select(
+        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, status_disponivel, created_at, updated_at'
+      )
+      .single();
+    row = retry.data;
+    updErr = retry.error;
+  }
 
   if (updErr) {
     return res.status(500).json({ error: updErr.message });

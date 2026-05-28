@@ -16,6 +16,7 @@ export function mapProdutoRowToApi(row) {
     quantidade_estoque: row.quantidade_estoque,
     image_url: row.url_imagem,
     url_imagem: row.url_imagem,
+    image_optimized_url: row.image_optimized_url || null,
     active: row.status_disponivel,
     status_disponivel: row.status_disponivel,
     created_at: row.created_at,

@@ -8,7 +8,7 @@ import {
   openGoogleMapsSearchQuery,
   openWazeSearchByAddress,
 } from '../../lib/mapDirections';
-import { getMapProductImageSrcForImg } from '../../lib/mapImageProxy';
+import { getMapOptimizedProductCardImageSrc } from '../../lib/mapProductCardImage';
 import { displayPromoProductName, promoCategoryBadgeLabel } from '../../lib/mapOfferDisplay';
 import { getMapOfferSeenPresentation } from '../../lib/mapOfferSeenLabel';
 
@@ -62,7 +62,7 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
 }) {
   const url = offer.promo_image_url;
   const imgOk = url && isDisplayableImageUrl(url);
-  const imgSrc = imgOk ? getMapProductImageSrcForImg(url) : '';
+  const imgSrc = imgOk ? getMapOptimizedProductCardImageSrc(url) : '';
   const [imgLoaded, setImgLoaded] = useState(false);
   useEffect(() => {
     setImgLoaded(false);
@@ -80,8 +80,8 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
       style={{ scrollSnapAlign: 'start' }}
     >
       <div
-        className={`relative aspect-square w-full shrink-0 overflow-hidden ${
-          wazeUi ? 'bg-[#161922]' : 'bg-gray-100'
+        className={`relative aspect-square w-full shrink-0 overflow-hidden p-2 ${
+          wazeUi ? 'bg-[#161922]' : 'bg-zinc-100'
         }`}
       >
         {imgOk ? (
@@ -95,7 +95,7 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
             <img
               src={imgSrc || url}
               alt=""
-              className={`relative z-[1] h-full w-full object-cover transition-opacity duration-200 ${
+              className={`relative z-[1] h-full w-full rounded-xl bg-white object-contain p-1 transition-opacity duration-200 ${
                 imgLoaded ? 'opacity-100' : 'opacity-0'
               }`}
               loading="lazy"
@@ -105,7 +105,7 @@ const ShopOfferSnapCard = memo(function ShopOfferSnapCard({
             />
           </>
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-emerald-600/90">
+          <div className="flex h-full w-full items-center justify-center rounded-xl border border-[#39FF14]/25 bg-[#0a0f0a]">
             <ShoppingCart className="h-10 w-10 text-white/90" aria-hidden />
           </div>
         )}

@@ -370,11 +370,18 @@ async function fetchGoogleCseImageOnce(query) {
 function collectCseImageLinks(items, max, seen) {
   const out = [];
   const set = seen || new Set();
+  const minW = Number.parseInt(process.env.MAP_CSE_MIN_IMG_WIDTH || '700', 10) || 700;
+  const minH = Number.parseInt(process.env.MAP_CSE_MIN_IMG_HEIGHT || '700', 10) || 700;
   for (const it of items || []) {
     const link = it?.link || null;
     if (!link || typeof link !== 'string') continue;
     const t = link.trim();
     if (!/^https:\/\//i.test(t)) continue;
+    const iw = Number(it?.image?.width || 0);
+    const ih = Number(it?.image?.height || 0);
+    if (Number.isFinite(iw) && Number.isFinite(ih) && iw > 0 && ih > 0) {
+      if (iw < minW || ih < minH) continue;
+    }
     if (!isLikelyImageUrl(t) || isBlockedThumbnailImageUrl(t)) continue;
     const dedupeKey = t.split('?')[0];
     if (set.has(dedupeKey)) continue;

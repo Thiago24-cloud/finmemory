@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Valida pipeline scraper → bot_promocoes_fila (status pendente), sem publicar no mapa.
+ * Valida pipeline scraper → bot_promocoes_fila com publicação automática no mapa.
  *
  * Uso:
  *   node -r dotenv/config scripts/test-scraper.mjs
@@ -11,7 +11,7 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
-import { enqueuePromocoes } from '../apps/consumer/lib/ingest/enqueuePromocoes.js';
+import { enqueueScraperRun } from '../apps/consumer/lib/ingest/enqueueScraperRun.js';
 
 config({ path: resolve(process.cwd(), '.env') });
 config({ path: resolve(process.cwd(), '.env.local'), override: true });
@@ -61,7 +61,7 @@ if (dryRun) {
 
 const beforeMap = new Date(Date.now() - 60_000).toISOString();
 
-const queued = await enqueuePromocoes(supabase, payload);
+const queued = await enqueueScraperRun(supabase, payload);
 if (!queued.ok) {
   console.error('enqueuePromocoes falhou:', queued.error);
   process.exit(2);
@@ -78,8 +78,8 @@ if (filaErr || !fila) {
   process.exit(3);
 }
 
-if (fila.status !== 'pendente') {
-  console.error(`Status incorreto: ${fila.status} (esperado pendente)`);
+if (fila.status !== 'aprovado') {
+  console.error(`Status incorreto: ${fila.status} (esperado aprovado)`);
   process.exit(4);
 }
 
@@ -96,8 +96,8 @@ const { count: mapCount, error: mapErr } = await supabase
 
 if (mapErr) {
   console.warn('Aviso: não verificou price_points:', mapErr.message);
-} else if (mapCount > 0) {
-  console.error(`ERRO: ${mapCount} price_points criados direto pelo teste (deveria ser 0)`);
+} else if ((mapCount || 0) === 0) {
+  console.error('ERRO: nenhum price_point foi criado pelo fluxo automático');
   process.exit(6);
 }
 
@@ -116,4 +116,4 @@ console.log(
   )
 );
 
-console.log('PASS — scraper enfileira como pendente; mapa só após aprovação admin.');
+console.log('PASS — scraper publicou automaticamente no mapa.');
