@@ -15,6 +15,8 @@ export function MerchantPanel() {
   const { data: session } = useSession();
   const [ctx, setCtx] = useState(null);
   const [products, setProducts] = useState([]);
+  const [mapStatus, setMapStatus] = useState(null);
+  const [publishingBatch, setPublishingBatch] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -68,8 +70,14 @@ export function MerchantPanel() {
         }
       }
 
-      const prodRes = await fetch(painelApi.products);
-      const prodData = await prodRes.json().catch(() => ({}));
+      const [prodRes, mapStatusRes] = await Promise.all([
+        fetch(painelApi.products),
+        fetch(painelApi.mapStatus),
+      ]);
+      const [prodData, mapStatusData] = await Promise.all([
+        prodRes.json().catch(() => ({})),
+        mapStatusRes.json().catch(() => ({})),
+      ]);
 
       if (!ctxRes.ok) {
         logMerchantApiFailure('context', ctxRes, ctxData);
@@ -117,6 +125,12 @@ export function MerchantPanel() {
       } else {
         setProducts(prodData.products || []);
       }
+
+      if (mapStatusRes.ok) {
+        setMapStatus(mapStatusData);
+      } else {
+        setMapStatus(null);
+      }
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.warn('[MerchantPanel] load', err);
       setError('Erro de rede. Verifique a conexão e tente de novo.');
@@ -160,6 +174,36 @@ export function MerchantPanel() {
 
   const onProductUpdated = (updated) => {
     setProducts((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+  };
+
+  const publishOffersBatch = async () => {
+    setPublishingBatch(true);
+    setError('');
+    try {
+      const res = await fetch(painelApi.mapPublishBatch, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ only_flash_offer: true, limit: 100 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          formatMerchantApiError(res, data, 'Não foi possível publicar ofertas no mapa.')
+        );
+        return;
+      }
+      const published = Number(data?.published || 0);
+      const failed = Number(data?.failed || 0);
+      const skipped = Number(data?.skipped || 0);
+      setSuccess(
+        `Publicação em lote concluída: ${published} publicada(s), ${failed} falha(s), ${skipped} ignorada(s).`
+      );
+      await load();
+    } catch {
+      setError('Erro de rede ao publicar ofertas em lote.');
+    } finally {
+      setPublishingBatch(false);
+    }
   };
 
   const storeName = ctx?.store?.name || session?.user?.merchantStoreName || 'Sua loja';
@@ -270,6 +314,40 @@ export function MerchantPanel() {
                 {' · '}
                 Ofertas ativas aparecem por ~3 dias para quem está a até ~3 km.
               </p>
+            </section>
+
+            <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h2 className="text-sm font-bold m-0 text-white/90">Visibilidade e publicação no mapa</h2>
+                <button
+                  type="button"
+                  onClick={() => void publishOffersBatch()}
+                  disabled={publishingBatch || ctx?.store?.needs_review}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[#39FF14]/40 text-[#39FF14] px-3 py-2 text-xs font-semibold hover:bg-[#39FF14]/10 disabled:opacity-50"
+                >
+                  {publishingBatch ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+                  Publicar ofertas em lote
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="m-0 text-white/50">Produtos</p>
+                  <p className="m-0 mt-1 font-semibold">{mapStatus?.total_products ?? products.length}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="m-0 text-white/50">Prontos p/ oferta</p>
+                  <p className="m-0 mt-1 font-semibold">{mapStatus?.flash_ready_products ?? flashCount}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="m-0 text-white/50">Promoções ativas</p>
+                  <p className="m-0 mt-1 font-semibold">{mapStatus?.active_promotions ?? 0}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="m-0 text-white/50">Publicações 7d</p>
+                  <p className="m-0 mt-1 font-semibold">{mapStatus?.map_publications_last_7d ?? 0}</p>
+                </div>
+              </div>
             </section>
 
             <MerchantStripeSection />

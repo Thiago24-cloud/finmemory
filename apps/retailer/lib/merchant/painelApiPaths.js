@@ -4,6 +4,8 @@ export const PAINEL_API_BASE = '/api/parceiros/painel';
 export const painelApi = {
   context: `${PAINEL_API_BASE}/context`,
   products: `${PAINEL_API_BASE}/products`,
+  mapStatus: `${PAINEL_API_BASE}/map/status`,
+  mapPublishBatch: `${PAINEL_API_BASE}/map/publish-batch`,
   pedidos: `${PAINEL_API_BASE}/pedidos`,
   pedido: (id) => `${PAINEL_API_BASE}/pedidos/${id}`,
   repairLink: `${PAINEL_API_BASE}/repair-link`,

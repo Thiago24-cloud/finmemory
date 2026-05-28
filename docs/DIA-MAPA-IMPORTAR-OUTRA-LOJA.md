@@ -29,7 +29,7 @@ No serviço **finmemory**, conferir:
 
 | Variável | Motivo |
 |----------|--------|
-| `OPENAI_API_KEY` | Extração das ofertas na página |
+| `ANTHROPIC_API_KEY` | Extração das ofertas na página |
 | `SUPABASE_SERVICE_ROLE_KEY` | Insert/delete em `price_points` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Client Supabase |
 | `DIA_IMPORT_SECRET` | (Opcional) Se definido, o POST precisa do mesmo segredo |
@@ -127,7 +127,7 @@ Inserir linhas em `price_points` com:
 | Sintoma | Causa provável |
 |---------|-----------------|
 | 403 no POST | `DIA_IMPORT_SECRET` errado ou ausente no header/query |
-| `OPENAI_API_KEY não configurada` | Env ausente no Cloud Run |
+| `ANTHROPIC_API_KEY não configurada` | Env ausente no Cloud Run |
 | Ofertas no painel mas não no mapa | TTL 24h expirado; ou busca no topo filtrando (código atual carrega todos e filtra no cliente — após deploy recente) |
 | Pin laranja mas lista vazia | `store_name` dos `price_points` ≠ `stores.name` ou coords muito longe |
 | Poucas ofertas extraídas | HTML da página mudou; revisar prompt/modelo em `import-dia-offers.js` |

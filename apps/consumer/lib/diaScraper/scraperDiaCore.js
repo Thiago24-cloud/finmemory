@@ -100,7 +100,7 @@ export async function fetchImageAsBase64(url) {
  * @param {string} apiKey
  * @param {string[]} imageUrls  up to DIA_VISION_BATCH_SIZE URLs
  * @param {string|null} finishDateIso  YYYY-MM-DD
- * @returns {Promise<Array<{nome:string,preco:number|null,unidade:string,valid_until:string|null}>>}
+ * @returns {Promise<Array<{nome:string,preco:number|null,preco_promocional?:number|null,preco_unitario?:number|null,unidade:string,valid_until:string|null}>>}
  */
 async function callVisionBatch(apiKey, imageUrls, finishDateIso) {
   const downloaded = await Promise.all(
@@ -124,12 +124,14 @@ async function callVisionBatch(apiKey, imageUrls, finishDateIso) {
     text: `Você analisa cartões de oferta do Supermercado DIA (Brasil).
 Para cada uma das ${valid.length} imagens acima, extraia:
 - "nome": nome do produto (ex: "Alface-Crespa")
-- "preco": número decimal com o preço "Por" / promocional em destaque (ex: 2.99). Se não visível, null.
+- "preco_promocional": número decimal do preço "Por" / promocional em destaque (ex: 2.99). Se não visível, null.
+- "preco_unitario": número decimal do preço unitário (ex: 9.99/kg, 3.49/un), quando houver no cartão. Se não visível, null.
+- "preco": manter igual ao "preco_promocional" para compatibilidade do pipeline.
 - "unidade": embalagem/quantidade visível no cartão (ex: "1 un.", "500g"). Se não visível, "".
 - "valid_until": "${finishDateIso || ''}"
 
 Responda APENAS com JSON válido, sem markdown, sem texto fora do JSON:
-{"ofertas":[{"nome":"...","preco":2.99,"unidade":"1 un.","valid_until":"${finishDateIso || ''}"}]}
+{"ofertas":[{"nome":"...","preco_promocional":2.99,"preco_unitario":9.99,"preco":2.99,"unidade":"1 un.","valid_until":"${finishDateIso || ''}"}]}
 Deve ter exatamente ${valid.length} itens na array, na mesma ordem das imagens.`,
   });
 
@@ -209,8 +211,15 @@ export async function extractOffersFromHtmlAnthropic(apiKey, truncatedPlainText)
 
 export async function extractOffersViaVision(apiKey, allImageUrls, finishDateIso) {
   const allOfertas = [];
+  const batchDelayMs = Math.max(0, Number(process.env.SCRAPER_DIA_BATCH_DELAY_MS || 220));
   for (let i = 0; i < allImageUrls.length; i += DIA_VISION_BATCH_SIZE) {
     const batch = allImageUrls.slice(i, i + DIA_VISION_BATCH_SIZE);
+    if (i > 0 && batchDelayMs > 0) {
+      // Delay curto para evitar rajadas no OCR vision.
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, batchDelayMs));
+    }
+    // eslint-disable-next-line no-await-in-loop
     const ofertas = await callVisionBatch(apiKey, batch, finishDateIso);
     allOfertas.push(...ofertas);
   }
@@ -264,8 +273,9 @@ export async function resolveStoreLatLng(store) {
  * @param {Array} ofertas
  * @param {string} sundayFallbackYmd
  * @param {string[]} [imageUrls] URLs do tabloide (mesma ordem do vision batch)
+ * @param {string} [extractedAtIso]
  */
-export function mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls = []) {
+export function mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls = [], extractedAtIso) {
   const list = Array.isArray(ofertas) ? ofertas : [];
   const imgs = Array.isArray(imageUrls) ? imageUrls : [];
   /** @type {object[]} */
@@ -273,7 +283,9 @@ export function mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls =
   for (let i = 0; i < list.length; i += 1) {
     const o = list[i];
     const nome = String(o?.nome || '').trim();
-    const precoNum = parsePriceBR(o?.preco);
+    const precoPromocionalNum = parsePriceBR(o?.preco_promocional ?? o?.preco);
+    const precoUnitarioNum = parsePriceBR(o?.preco_unitario);
+    const precoNum = precoPromocionalNum;
     const unidade = o?.unidade != null ? String(o.unidade).trim() : '';
     let validUntil = toIsoDateOnly(o?.valid_until);
     if (!validUntil) validUntil = sundayFallbackYmd;
@@ -290,6 +302,10 @@ export function mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls =
       metadata: {
         extraction_strategy: 'scraper_dia_haiku_vision',
         source: SCRAPER_DIA_ORIGEM,
+        extracted_at: extractedAtIso || new Date().toISOString(),
+        preco_promocional: precoPromocionalNum,
+        preco_unitario: precoUnitarioNum,
+        image_url: imagemUrl,
       },
     });
   }

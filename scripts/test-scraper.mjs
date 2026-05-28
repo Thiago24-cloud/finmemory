@@ -11,7 +11,7 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
-import { enqueuePromocoes } from '../lib/ingest/enqueuePromocoes.js';
+import { enqueuePromocoes } from '../apps/consumer/lib/ingest/enqueuePromocoes.js';
 
 config({ path: resolve(process.cwd(), '.env') });
 config({ path: resolve(process.cwd(), '.env.local'), override: true });
@@ -21,7 +21,12 @@ const dryRun = process.argv.includes('--dry-run');
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+if (dryRun) {
+  console.log('DRY-RUN ativo: validação de payload sem conexão com Supabase.');
+}
+
 if (!url || !key) {
+  if (dryRun) process.exit(0);
   console.error('Faltam NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY');
   process.exit(1);
 }

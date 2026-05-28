@@ -5,14 +5,13 @@ import {
   SCRAPER_DIA_ORIGEM,
   extractOffersViaVision,
   fetchDiaPageDataJson,
-  insertApprovedFilaAndPublishScraperDia,
   mapOfertasToProdutosFila,
   nextSundayYmdBrazil,
   resolveStoreLatLng,
   toIsoDateOnly,
   inferLocalityForCity,
 } from '../../../lib/diaScraper/scraperDiaCore.js';
-import { resolveOwnerUserId } from '../../../lib/botPromoOwner.js';
+import { enqueueScraperRun } from '../../../lib/ingest/enqueueScraperRun.js';
 
 function requireCronSecret(req) {
   const importSecret = process.env.DIA_IMPORT_SECRET;
@@ -54,14 +53,6 @@ export default async function handler(req, res) {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const ownerUserId = await resolveOwnerUserId(supabase, null);
-  if (!ownerUserId) {
-    return res.status(500).json({
-      error:
-        'Configure BOT_PROMO_OWNER_USER_ID ou MAP_QUICK_ADD_BOT_USER_ID com UUID válido em public.users para publicar no mapa.',
-    });
-  }
-
   const body = req.body && typeof req.body === 'object' ? req.body : {};
 
   let catalogMeta;
@@ -91,9 +82,64 @@ export default async function handler(req, res) {
 
   const runId = randomUUID();
   const sundayFallbackYmd = nextSundayYmdBrazil();
-  const results = [];
+  const results = new Array(stores.length);
+  const concurrency = Math.max(1, Math.min(6, Number(body.concurrency || process.env.SCRAPER_DIA_CONCURRENCY || 2)));
+  const storeDelayMs = Math.max(0, Number(body.storeDelayMs || process.env.SCRAPER_DIA_STORE_DELAY_MS || 350));
 
-  for (const store of stores) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const normalizeAddress = (value) =>
+    String(value || '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s*,\s*/g, ', ')
+      .trim();
+  const distanceKm = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+  const maybeMatchStoreByCoords = async (storeName, lat, lng) => {
+    const latMin = lat - 0.012;
+    const latMax = lat + 0.012;
+    const lngMin = lng - 0.012;
+    const lngMax = lng + 0.012;
+    const nameToken = String(storeName || 'DIA').slice(0, 40);
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name, lat, lng, address')
+      .ilike('name', `%${nameToken.split(' ')[0] || 'DIA'}%`)
+      .gte('lat', latMin)
+      .lte('lat', latMax)
+      .gte('lng', lngMin)
+      .lte('lng', lngMax)
+      .limit(20);
+    if (error || !Array.isArray(data) || data.length === 0) return null;
+    let best = null;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const row of data) {
+      const d = distanceKm(lat, lng, Number(row.lat), Number(row.lng));
+      if (d < bestDist) {
+        bestDist = d;
+        best = row;
+      }
+    }
+    if (!best || bestDist > 0.6) return null;
+    return {
+      storeId: best.id,
+      storeName: best.name,
+      lat: Number(best.lat),
+      lng: Number(best.lng),
+      address: best.address || null,
+      distanceKm: Number(bestDist.toFixed(4)),
+    };
+  };
+
+  let cursor = 0;
+  async function processStore(index) {
+    const store = stores[index];
     const one = {
       storeId: store.id,
       storeName: store.storeName,
@@ -105,8 +151,8 @@ export default async function handler(req, res) {
       const coords = await resolveStoreLatLng(store);
       if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
         one.error = 'Geocoding não retornou lat/lng';
-        results.push(one);
-        continue;
+        results[index] = one;
+        return;
       }
 
       let pageData;
@@ -114,15 +160,15 @@ export default async function handler(req, res) {
         pageData = await fetchDiaPageDataJson(store.storeUrl);
       } catch (e) {
         one.error = `page-data.json: ${e?.message || 'falha ao buscar dados da loja'}`;
-        results.push(one);
-        continue;
+        results[index] = one;
+        return;
       }
 
       const tabloide = pageData?.result?.data?.tabloide;
       if (!tabloide) {
         one.error = 'page-data.json sem campo tabloide';
-        results.push(one);
-        continue;
+        results[index] = one;
+        return;
       }
 
       const offerItems = Array.isArray(tabloide.offer) ? tabloide.offer : [];
@@ -137,8 +183,8 @@ export default async function handler(req, res) {
 
       if (imageUrls.length === 0) {
         one.error = 'Nenhuma imagem de oferta encontrada no page-data.json';
-        results.push(one);
-        continue;
+        results[index] = one;
+        return;
       }
 
       let ofertas;
@@ -146,32 +192,39 @@ export default async function handler(req, res) {
         ofertas = await extractOffersViaVision(apiKey, imageUrls, finishDateIso);
       } catch (e) {
         one.error = `Haiku vision: ${e?.message || 'falha na extração'}`;
-        results.push(one);
-        continue;
+        results[index] = one;
+        return;
       }
 
-      const produtos = mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls);
+      const extractedAt = new Date().toISOString();
+      const produtos = mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls, extractedAt);
 
       if (produtos.length === 0) {
         one.error = 'Nenhuma oferta extraída das imagens';
         one.imagesFound = imageUrls.length;
         one.ofertasRaw = ofertas.length;
-        results.push(one);
-        continue;
+        results[index] = one;
+        return;
       }
 
+      const storeMatch = await maybeMatchStoreByCoords(store.storeName, coords.lat, coords.lng);
+      const resolvedStoreName = storeMatch?.storeName || store.storeName;
+      const resolvedLat = Number.isFinite(storeMatch?.lat) ? storeMatch.lat : coords.lat;
+      const resolvedLng = Number.isFinite(storeMatch?.lng) ? storeMatch.lng : coords.lng;
+      const resolvedAddress = normalizeAddress(storeMatch?.address || store.addressForGeocode);
       const loc = inferLocalityForCity(store.city);
-      const filaRow = {
-        store_name: store.storeName,
-        store_address: store.addressForGeocode,
-        store_lat: coords.lat,
-        store_lng: coords.lng,
-        locality_scope: loc.locality_scope,
-        locality_city: loc.locality_city,
-        locality_region: loc.locality_region,
-        locality_state: loc.locality_state,
-        ddd_code: loc.ddd_code,
-        is_statewide: loc.is_statewide,
+      const queued = await enqueueScraperRun(supabase, {
+        origem: SCRAPER_DIA_ORIGEM,
+        storeName: resolvedStoreName,
+        storeAddress: resolvedAddress,
+        storeLat: resolvedLat,
+        storeLng: resolvedLng,
+        localityScope: loc.locality_scope,
+        localityCity: loc.locality_city,
+        localityRegion: loc.locality_region,
+        localityState: loc.locality_state,
+        dddCode: loc.ddd_code,
+        isStatewide: loc.is_statewide,
         produtos,
         artifacts: {
           source_page_url: store.storeUrl,
@@ -179,33 +232,47 @@ export default async function handler(req, res) {
           cnpj: store.cnpj,
           finish_date: finishDateIso,
           images_found: imageUrls.length,
+          image_urls: imageUrls,
+          thumbnail_url: imageUrls[0] || null,
+          extracted_at: extractedAt,
+          store_address_normalized: resolvedAddress,
+          matched_store: storeMatch,
           origem: SCRAPER_DIA_ORIGEM,
         },
-      };
-
-      const published = await insertApprovedFilaAndPublishScraperDia(supabase, filaRow, ownerUserId);
-      if (!published.ok) {
-        one.error = published.error;
-        one.step = published.step;
-        one.filaId = published.filaId;
-        results.push(one);
-        continue;
+      });
+      if (!queued.ok) {
+        one.error = queued.error;
+        results[index] = one;
+        return;
       }
 
       one.ok = true;
-      one.filaId = published.filaId;
-      one.inserted = published.inserted;
-      one.offersTotal = published.offersTotal;
-      one.invalidPrice = published.invalidPrice;
-      one.note = published.note;
-      one.autoPublished = published.autoPublished;
+      one.filaId = queued.filaId;
+      one.offersTotal = produtos.length;
+      one.status = queued.status;
+      one.readiness = queued.readiness;
+      one.note = 'Enfileirado como pendente; aprovação manual em /admin/bot-fila';
       one.finishDate = finishDateIso;
-      results.push(one);
+      one.thumbnailUrl = imageUrls[0] || null;
+      one.storeMappedByCoords = storeMatch || null;
+      results[index] = one;
     } catch (e) {
       one.error = e?.message || 'Erro desconhecido';
-      results.push(one);
+      results[index] = one;
     }
   }
+
+  async function worker() {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= stores.length) return;
+      if (index > 0 && storeDelayMs > 0) await sleep(storeDelayMs);
+      // eslint-disable-next-line no-await-in-loop
+      await processStore(index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, stores.length) }, () => worker()));
 
   const okCount = results.filter((r) => r.ok).length;
   return res.status(200).json({
@@ -217,6 +284,8 @@ export default async function handler(req, res) {
     batchSize: catalogMeta.batchSize || stores.length,
     storesProcessed: results.length,
     storesOk: okCount,
+    concurrency,
+    storeDelayMs,
     results,
   });
 }

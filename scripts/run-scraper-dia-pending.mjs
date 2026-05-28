@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Executa scraper DIA (unidades do catálogo) e publica no mapa automaticamente.
+ * Executa scraper DIA (unidades do catálogo) e enfileira em pendente para aprovação.
  *
  * Uso:
  *   node -r dotenv/config scripts/run-scraper-dia-pending.mjs
@@ -13,19 +13,18 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
-import { resolveDiaScraperStores } from '../lib/diaScraper/fetchDiaCatalogStores.js';
+import { resolveDiaScraperStores } from '../apps/consumer/lib/diaScraper/fetchDiaCatalogStores.js';
 import {
   extractOffersViaVision,
   fetchDiaPageDataJson,
-  insertApprovedFilaAndPublishScraperDia,
   mapOfertasToProdutosFila,
   nextSundayYmdBrazil,
   resolveStoreLatLng,
   toIsoDateOnly,
   inferLocalityForCity,
   SCRAPER_DIA_ORIGEM,
-} from '../lib/diaScraper/scraperDiaCore.js';
-import { resolveOwnerUserId } from '../lib/botPromoOwner.js';
+} from '../apps/consumer/lib/diaScraper/scraperDiaCore.js';
+import { enqueueScraperRun } from '../apps/consumer/lib/ingest/enqueueScraperRun.js';
 
 config({ path: resolve(process.cwd(), '.env') });
 config({ path: resolve(process.cwd(), '.env.local'), override: true });
@@ -83,14 +82,58 @@ if (!url || !key) {
 const supabase = createClient(url, key);
 const runId = randomUUID();
 const sundayFallbackYmd = nextSundayYmdBrazil();
+const normalizeAddress = (value) =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*,\s*/g, ', ')
+    .trim();
+const distanceKm = (lat1, lng1, lat2, lng2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
-const ownerUserId = await resolveOwnerUserId(supabase, null);
-if (!ownerUserId) {
-  console.error('Configure BOT_PROMO_OWNER_USER_ID ou MAP_QUICK_ADD_BOT_USER_ID');
-  process.exit(2);
-}
+const maybeMatchStoreByCoords = async (storeName, lat, lng) => {
+  const latMin = lat - 0.012;
+  const latMax = lat + 0.012;
+  const lngMin = lng - 0.012;
+  const lngMax = lng + 0.012;
+  const nameToken = String(storeName || 'DIA').slice(0, 40);
+  const { data, error } = await supabase
+    .from('stores')
+    .select('id, name, lat, lng, address')
+    .ilike('name', `%${nameToken.split(' ')[0] || 'DIA'}%`)
+    .gte('lat', latMin)
+    .lte('lat', latMax)
+    .gte('lng', lngMin)
+    .lte('lng', lngMax)
+    .limit(20);
+  if (error || !Array.isArray(data) || data.length === 0) return null;
+  let best = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const row of data) {
+    const d = distanceKm(lat, lng, Number(row.lat), Number(row.lng));
+    if (d < bestDist) {
+      bestDist = d;
+      best = row;
+    }
+  }
+  if (!best || bestDist > 0.6) return null;
+  return {
+    storeId: best.id,
+    storeName: best.name,
+    lat: Number(best.lat),
+    lng: Number(best.lng),
+    address: best.address || null,
+    distanceKm: Number(bestDist.toFixed(4)),
+  };
+};
 
-console.log(`Scraper DIA → mapa automático | loja: ${store.storeName} (${store.id})`);
+console.log(`Scraper DIA → fila pendente | loja: ${store.storeName} (${store.id})`);
 
 const coords = await resolveStoreLatLng(store);
 if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
@@ -120,50 +163,60 @@ if (!imageUrls.length) {
 }
 
 const ofertas = await extractOffersViaVision(apiKey, imageUrls, finishDateIso);
-const produtos = mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls);
+const extractedAt = new Date().toISOString();
+const produtos = mapOfertasToProdutosFila(ofertas, sundayFallbackYmd, imageUrls, extractedAt);
 if (!produtos.length) {
   console.error('Nenhum produto extraído');
   process.exit(5);
 }
 
+const storeMatch = await maybeMatchStoreByCoords(store.storeName, coords.lat, coords.lng);
+const resolvedStoreName = storeMatch?.storeName || store.storeName;
+const resolvedLat = Number.isFinite(storeMatch?.lat) ? storeMatch.lat : coords.lat;
+const resolvedLng = Number.isFinite(storeMatch?.lng) ? storeMatch.lng : coords.lng;
+const resolvedAddress = normalizeAddress(storeMatch?.address || store.addressForGeocode);
 const loc = inferLocalityForCity(store.city);
-const published = await insertApprovedFilaAndPublishScraperDia(
-  supabase,
-  {
-    store_name: store.storeName,
-    store_address: store.addressForGeocode,
-    store_lat: coords.lat,
-    store_lng: coords.lng,
-    locality_scope: loc.locality_scope,
-    locality_city: loc.locality_city,
-    locality_region: loc.locality_region,
-    locality_state: loc.locality_state,
-    ddd_code: loc.ddd_code,
-    is_statewide: loc.is_statewide,
-    produtos,
-    artifacts: {
-      source_page_url: store.storeUrl,
-      run_id: runId,
-      cnpj: store.cnpj,
-      finish_date: finishDateIso,
-      images_found: imageUrls.length,
-      origem: SCRAPER_DIA_ORIGEM,
-      cli: 'run-scraper-dia-pending.mjs',
-    },
+const queued = await enqueueScraperRun(supabase, {
+  origem: SCRAPER_DIA_ORIGEM,
+  storeName: resolvedStoreName,
+  storeAddress: resolvedAddress,
+  storeLat: resolvedLat,
+  storeLng: resolvedLng,
+  localityScope: loc.locality_scope,
+  localityCity: loc.locality_city,
+  localityRegion: loc.locality_region,
+  localityState: loc.locality_state,
+  dddCode: loc.ddd_code,
+  isStatewide: loc.is_statewide,
+  produtos,
+  artifacts: {
+    source_page_url: store.storeUrl,
+    run_id: runId,
+    cnpj: store.cnpj,
+    finish_date: finishDateIso,
+    images_found: imageUrls.length,
+    image_urls: imageUrls,
+    origem: SCRAPER_DIA_ORIGEM,
+    extracted_at: extractedAt,
+    thumbnail_url: imageUrls[0] || null,
+    store_address_normalized: resolvedAddress,
+    matched_store: storeMatch,
+    cli: 'run-scraper-dia-pending.mjs',
   },
-  ownerUserId
-);
+});
 
-console.log(JSON.stringify(published, null, 2));
-if (!published.ok) process.exit(6);
+console.log(JSON.stringify(queued, null, 2));
+if (!queued.ok) process.exit(6);
 
-const { count: mapCount } = await supabase
-  .from('price_points')
-  .select('id', { count: 'exact', head: true })
-  .eq('store_name', store.storeName)
-  .eq('source', 'scraper_dia')
-  .gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString());
+const { data: fila, error: filaErr } = await supabase
+  .from('bot_promocoes_fila')
+  .select('id, status, origem')
+  .eq('id', queued.filaId)
+  .maybeSingle();
 
-console.log(
-  `OK — filaId ${published.filaId} | ${published.inserted ?? 0} no mapa | ${produtos.length} extraídos | price_points recentes: ${mapCount ?? 0}`
-);
+if (filaErr || !fila) {
+  console.error('Não leu fila recém-criada:', filaErr?.message || 'registro ausente');
+  process.exit(7);
+}
+
+console.log(`OK — filaId ${fila.id} | status ${fila.status} | ${produtos.length} extraídos`);

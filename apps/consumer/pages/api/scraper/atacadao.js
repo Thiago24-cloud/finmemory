@@ -4,13 +4,12 @@ import { resolveAtacadaoScraperStores } from '../../../lib/atacadaoScraper/fetch
 import {
   SCRAPER_ATACADAO_ORIGEM,
   fetchAllStoreProducts,
-  insertApprovedFilaAndPublishScraperAtacadao,
   mapVtexProductsToProdutosFila,
   nextSundayYmdBrazil,
   resolveAtacadaoStoreLatLng,
   inferLocalityForCity,
 } from '../../../lib/atacadaoScraper/scraperAtacadaoCore.js';
-import { resolveOwnerUserId } from '../../../lib/botPromoOwner.js';
+import { enqueueScraperRun } from '../../../lib/ingest/enqueueScraperRun.js';
 
 function requireCronSecret(req) {
   const importSecret = process.env.ATACADAO_IMPORT_SECRET;
@@ -44,14 +43,6 @@ export default async function handler(req, res) {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const ownerUserId = await resolveOwnerUserId(supabase, null);
-  if (!ownerUserId) {
-    return res.status(500).json({
-      error:
-        'Configure BOT_PROMO_OWNER_USER_ID ou MAP_QUICK_ADD_BOT_USER_ID com UUID válido em public.users para publicar no mapa.',
-    });
-  }
-
   const body = req.body && typeof req.body === 'object' ? req.body : {};
 
   let catalogMeta;
@@ -125,17 +116,18 @@ export default async function handler(req, res) {
       }
 
       const loc = inferLocalityForCity(store.city);
-      const filaRow = {
-        store_name: store.storeName,
-        store_address: store.addressForGeocode,
-        store_lat: coords.lat,
-        store_lng: coords.lng,
-        locality_scope: loc.locality_scope,
-        locality_city: loc.locality_city,
-        locality_region: loc.locality_region,
-        locality_state: loc.locality_state,
-        ddd_code: loc.ddd_code,
-        is_statewide: loc.is_statewide,
+      const queued = await enqueueScraperRun(supabase, {
+        origem: SCRAPER_ATACADAO_ORIGEM,
+        storeName: store.storeName,
+        storeAddress: store.addressForGeocode,
+        storeLat: coords.lat,
+        storeLng: coords.lng,
+        localityScope: loc.locality_scope,
+        localityCity: loc.locality_city,
+        localityRegion: loc.locality_region,
+        localityState: loc.locality_state,
+        dddCode: loc.ddd_code,
+        isStatewide: loc.is_statewide,
         produtos,
         artifacts: {
           source: 'vtex_catalog_api',
@@ -144,25 +136,21 @@ export default async function handler(req, res) {
           cep: store.cep,
           vtex_products_total: vtexProducts.length,
           origem: SCRAPER_ATACADAO_ORIGEM,
+          extracted_at: new Date().toISOString(),
         },
-      };
-
-      const published = await insertApprovedFilaAndPublishScraperAtacadao(supabase, filaRow, ownerUserId);
-      if (!published.ok) {
-        one.error = published.error;
-        one.step = published.step;
-        one.filaId = published.filaId;
+      });
+      if (!queued.ok) {
+        one.error = queued.error;
         results.push(one);
         continue;
       }
 
       one.ok = true;
-      one.filaId = published.filaId;
-      one.inserted = published.inserted;
-      one.offersTotal = published.offersTotal;
-      one.invalidPrice = published.invalidPrice;
-      one.note = published.note;
-      one.autoPublished = published.autoPublished;
+      one.filaId = queued.filaId;
+      one.offersTotal = produtos.length;
+      one.status = queued.status;
+      one.readiness = queued.readiness;
+      one.note = 'Enfileirado como pendente; aprovação manual em /admin/bot-fila';
       one.vtexProductsTotal = vtexProducts.length;
       results.push(one);
     } catch (e) {
