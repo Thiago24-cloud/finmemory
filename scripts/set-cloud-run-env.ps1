@@ -105,6 +105,26 @@ foreach ($k in $r2Optional) {
     if ($vars[$k]) { $envMap[$k] = $vars[$k] }
 }
 
+# Scrapers / crons (Anthropic no servidor — GitHub Actions só chama POST /api/scraper/dia)
+$scraperOptional = @(
+    "ANTHROPIC_API_KEY",
+    "DIA_IMPORT_SECRET",
+    "CRON_SECRET",
+    "BOT_PROMO_OWNER_USER_ID",
+    "DIA_BOT_USER_ID",
+    "MAP_QUICK_ADD_BOT_USER_ID",
+    "SCRAPER_DIA_REGION",
+    "SCRAPER_DIA_BATCH_SIZE",
+    "GOOGLE_API_KEY",
+    "GOOGLE_CSE_ID"
+)
+foreach ($k in $scraperOptional) {
+    if ($vars[$k]) { $envMap[$k] = $vars[$k] }
+}
+if (-not $envMap["SCRAPER_DIA_REGION"]) {
+    $envMap["SCRAPER_DIA_REGION"] = "grande_sp"
+}
+
 if ($envMap.Count -eq 0) {
     Write-Host "Nenhuma variavel para atualizar." -ForegroundColor Red
     exit 1
