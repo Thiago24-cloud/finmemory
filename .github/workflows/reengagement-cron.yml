@@ -1,4 +1,4 @@
-# Cron diário: push para usuários inativos 48h+ (requer CRON_SECRET no GitHub + Cloud Run)
+# Cron diário: push para usuários inativos 48h+ (requer secrets no GitHub + Cloud Run)
 name: Reengagement inactive users
 
 on:
@@ -9,16 +9,38 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: POST reengagement-inactive
         env:
-          APP_URL: ${{ secrets.FINMEMORY_APP_URL }}
+          FINMEMORY_APP_URL: ${{ secrets.FINMEMORY_APP_URL }}
+          APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "Defina secrets FINMEMORY_APP_URL e CRON_SECRET no repositório."
+          set -euo pipefail
+          BASE_URL="${FINMEMORY_APP_URL:-${APP_URL:-}}"
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::Defina o secret FINMEMORY_APP_URL ou APP_URL no repositório (Settings → Secrets → Actions)."
+            echo "Exemplo: https://finmemory-836908221936.southamerica-east1.run.app"
             exit 1
           fi
-          curl -fsS -X POST \
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Defina o secret CRON_SECRET (mesmo valor do Cloud Run) em Settings → Secrets → Actions."
+            exit 1
+          fi
+          BASE_URL="${BASE_URL%/}"
+          echo "Chamando ${BASE_URL}/api/cron/reengagement-inactive"
+          http_code=$(curl -sS -o /tmp/reengage-body.json -w "%{http_code}" -X POST \
             -H "x-cron-secret: ${CRON_SECRET}" \
-            "${APP_URL%/}/api/cron/reengagement-inactive"
+            -H "Content-Type: application/json" \
+            --max-time 120 \
+            "${BASE_URL}/api/cron/reengagement-inactive") || {
+            echo "::error::curl falhou (rede ou URL inválida)"
+            exit 1
+          }
+          echo "HTTP ${http_code}"
+          cat /tmp/reengage-body.json
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Cron retornou HTTP ${http_code}"
+            exit 1
+          fi
