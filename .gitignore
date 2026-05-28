@@ -107,6 +107,7 @@ Testes do FinMemory.mp4
 finmemory-service-account.json
 android/keystore
 android/keystore.properties
+.tmp-run-env*.json
 # Firebase em android/app — inclui cópias (ex.: google-services (4).json)
 android/app/google-services*.json
 supabase/.temp/
