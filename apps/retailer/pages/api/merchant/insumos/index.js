@@ -22,16 +22,19 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const includeInactive = req.query?.include_inactive === '1';
+    const includePending = req.query?.include_pending === '1';
     let query = supabase
       .from('insumos_loja')
       .select(
-        'id, loja_id, nome, ean, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, created_at, updated_at'
+        'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, created_at, updated_at'
       )
       .eq('loja_id', lojaId)
       .order('nome', { ascending: true })
       .limit(500);
 
-    if (!includeInactive) {
+    if (includePending) {
+      query = query.in('status_revisao', ['aprovado', 'pendente']);
+    } else if (!includeInactive) {
       query = query.eq('ativo', true);
     }
 
@@ -48,14 +51,16 @@ export default async function handler(req, res) {
     }
 
     const insumos = (data || []).map(mapInsumoRowToApi);
-    const abaixoMinimo = insumos.filter((i) => i.abaixo_minimo).length;
+    const abaixoMinimo = insumos.filter((i) => i.abaixo_minimo && i.ativo).length;
+    const pendenteRevisao = insumos.filter((i) => i.status_revisao === 'pendente').length;
 
     return res.status(200).json({
       insumos,
       store_id: lojaId,
       loja_id: lojaId,
-      total: insumos.length,
+      total: insumos.filter((i) => i.ativo).length,
       abaixo_minimo: abaixoMinimo,
+      pendente_revisao: pendenteRevisao,
     });
   }
 
@@ -110,10 +115,11 @@ export default async function handler(req, res) {
         custo_medio: custoMedio != null ? Math.round(custoMedio * 100) / 100 : null,
         recorrente,
         ativo: true,
+        status_revisao: 'aprovado',
         updated_at: nowIso,
       })
       .select(
-        'id, loja_id, nome, ean, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, created_at, updated_at'
+        'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, created_at, updated_at'
       )
       .single();
 

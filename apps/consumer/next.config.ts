@@ -57,6 +57,8 @@ const nextConfig: NextConfig = {
         destination: `${retailer}/historico-inventario-varejo`,
         permanent: false,
       },
+      { source: '/mapa-precos', destination: '/mapa', permanent: true },
+      { source: '/mapa-precos/:path*', destination: '/mapa', permanent: true },
     ];
   },
   // iOS/Safari + reverse proxy PostHog (mesmo origin → menos bloqueios)
@@ -78,7 +80,6 @@ const nextConfig: NextConfig = {
       '/',
       '/login',
       '/mapa',
-      '/mapa-precos',
       '/dashboard',
       '/cartoes',
       '/add-receipt',
@@ -95,25 +96,8 @@ const nextConfig: NextConfig = {
       '/listas',
       '/simulador',
     ];
-    const retailerEmbed = retailerAppBaseUrl();
-    const frameAncestors = [
-      "'self'",
-      retailerEmbed,
-      'https://parceiros.finmemory.com.br',
-      'https://finmemory-retailer-836908221936.southamerica-east1.run.app',
-    ].join(' ');
     return [
       ...appPages.map((source) => ({ source, headers: noStore })),
-      {
-        source: '/mapa-precos',
-        headers: [
-          ...noStore,
-          {
-            key: 'Content-Security-Policy',
-            value: `frame-ancestors ${frameAncestors}`,
-          },
-        ],
-      },
       { source: '/_next/data/:path*', headers: noStore },
       { source: '/transaction/:path*', headers: noStore },
     ];

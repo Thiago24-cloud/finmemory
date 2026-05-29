@@ -24,6 +24,8 @@ export default function MapaPrecos({
   /** Centro inicial (ex.: embed do app parceiros). */
   initialMapCenter = null,
   initialMapZoom = null,
+  /** Modo lojista (Parceiros): mapa tela cheia, sem sacola/lista do consumidor. */
+  parceirosMode = false,
 }) {
   return (
     <div className="fixed inset-0 z-0 h-full w-full">
@@ -43,6 +45,7 @@ export default function MapaPrecos({
         onDetailExpandedChange={onDetailExpandedChange}
         initialMapCenter={initialMapCenter}
         initialMapZoom={initialMapZoom}
+        parceirosMode={parceirosMode}
       />
     </div>
   );

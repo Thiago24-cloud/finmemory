@@ -52,6 +52,34 @@ export function subscribePedidosLoja(
   };
 }
 
+/** Lojista: mudanças em produtos/ofertas da loja. */
+export function subscribeProdutosLoja(
+  supabase: SupabaseClient,
+  lojaId: string,
+  onChange: () => void
+): () => void {
+  const id = String(lojaId || '').trim();
+  if (!id) return () => {};
+
+  const channel: RealtimeChannel = supabase
+    .channel(`produtos-loja-${id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'produtos_loja',
+        filter: `loja_id=eq.${id}`,
+      },
+      () => onChange()
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 /** Lojista: mudanças em insumos/estoque da loja. */
 export function subscribeInsumosLoja(
   supabase: SupabaseClient,

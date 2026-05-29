@@ -11,6 +11,7 @@ import { MerchantStripeSection } from './MerchantStripeSection';
 import { MerchantInsumosSection } from './MerchantInsumosSection';
 import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchant/merchantApiErrorMessage';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
+import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
 
 export function MerchantPanel() {
   const { data: session } = useSession();
@@ -144,6 +145,16 @@ export function MerchantPanel() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useProdutosLojaRealtime(ctx?.store?.id, load);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [load]);
 
   useEffect(() => {

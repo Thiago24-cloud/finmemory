@@ -16,10 +16,17 @@ export async function ensureMerchantStoreLink(supabase, userId) {
     .from('merchant_store_profiles')
     .select('store_id, business_name, onboarding_status, responsible_name')
     .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!profileErr && profile?.store_id) {
     storeId = profile.store_id;
+  } else if (profileErr) {
+    const msg = String(profileErr.message || '');
+    if (!msg.includes('PGRST116')) {
+      console.warn('[ensureMerchantStoreLink] merchant_store_profiles:', profileErr.message);
+    }
   }
 
   if (!storeId) {

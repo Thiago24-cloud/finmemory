@@ -1,22 +1,13 @@
-import Head from 'next/head';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './api/auth/[...nextauth]';
-import { MerchantPublicMapEmbed } from '../components/merchant/MerchantPublicMapEmbed';
+import { buildConsumerMapUrl } from '../lib/consumerAppUrl';
 
 /**
- * Mapa de preços público dentro do app lojista (iframe → finmemory.com.br/mapa-precos).
+ * Redireciona para o mapa oficial do consumidor (finmemory.com.br/mapa).
+ * Mesmo componente, pins e promoções — apps diferentes, banco e mapa únicos.
  */
-export default function ParceirosMapaPage() {
-  return (
-    <>
-      <Head>
-        <title>Mapa de preços — FinMemory Parceiros</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="robots" content="noindex" />
-      </Head>
-      <MerchantPublicMapEmbed />
-    </>
-  );
+export default function ParceirosMapaRedirectPage() {
+  return null;
 }
 
 export async function getServerSideProps(ctx) {
@@ -29,5 +20,12 @@ export async function getServerSideProps(ctx) {
       },
     };
   }
-  return { props: {} };
+
+  const { lat, lng, zoom } = ctx.query;
+  return {
+    redirect: {
+      destination: buildConsumerMapUrl({ lat, lng, zoom, from: 'parceiros' }),
+      permanent: false,
+    },
+  };
 }

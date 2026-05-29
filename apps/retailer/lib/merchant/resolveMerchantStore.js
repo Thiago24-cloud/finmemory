@@ -25,17 +25,27 @@ export async function resolveMerchantStore(supabase, userId) {
     console.warn('[resolveMerchantStore] usuarios_loja:', ulErr.message);
   }
 
-  const { data: profileRow, error: profileErr } = await supabase
+  let profileQuery = supabase
     .from('merchant_store_profiles')
     .select('store_id, business_name, onboarding_status, responsible_name')
-    .eq('user_id', userId)
-    .maybeSingle();
+    .eq('user_id', userId);
+
+  if (storeId) {
+    profileQuery = profileQuery.eq('store_id', storeId);
+  } else {
+    profileQuery = profileQuery.order('created_at', { ascending: false }).limit(1);
+  }
+
+  const { data: profileRow, error: profileErr } = await profileQuery.maybeSingle();
 
   if (!profileErr && profileRow) {
     profile = profileRow;
     if (!storeId) storeId = profileRow.store_id || null;
-  } else if (profileErr && !String(profileErr.message || '').includes('merchant_store_profiles')) {
-    console.warn('[resolveMerchantStore] merchant_store_profiles:', profileErr.message);
+  } else if (profileErr) {
+    const msg = String(profileErr.message || '');
+    if (!msg.includes('merchant_store_profiles') && !msg.includes('PGRST116')) {
+      console.warn('[resolveMerchantStore] merchant_store_profiles:', profileErr.message);
+    }
   }
 
   if (!storeId) {

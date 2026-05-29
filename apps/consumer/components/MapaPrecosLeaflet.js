@@ -8,7 +8,7 @@ import 'leaflet/dist/leaflet.css';
 import { useSession } from 'next-auth/react';
 import { useReportUserLocation } from '../lib/hooks/reportUserLocation';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { ShoppingCart, Loader2, Check, X, Navigation, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { openGoogleMapsDirectionsPreferCurrentLocation, openWazeNavigation } from '../lib/mapDirections';
@@ -3174,6 +3174,7 @@ export default function MapaPrecosLeaflet({
   onDetailExpandedChange,
   initialMapCenter = null,
   initialMapZoom,
+  parceirosMode = false,
 }) {
   const theme = getMapThemeById(mapThemeId);
   const resolvedMapCenter = useMemo(() => {
@@ -4835,7 +4836,7 @@ export default function MapaPrecosLeaflet({
         </div>
       ) : null}
 
-      {promoCart.length > 0 && !isMobileMapSheet && (
+      {promoCart.length > 0 && !isMobileMapSheet && !parceirosMode && (
         <div
           style={{ top: chromeTop }}
           className={`absolute z-[1006] flex w-[min(100vw-1rem,280px)] max-h-[min(70vh,440px)] flex-col rounded-xl shadow-xl backdrop-blur-md ${
@@ -4989,7 +4990,7 @@ export default function MapaPrecosLeaflet({
         </div>
       )}
 
-      {isMobileMapSheet && promoCart.length > 0 ? (
+      {isMobileMapSheet && promoCart.length > 0 && !parceirosMode ? (
         <FloatingCartBar
           itemsCount={promoCart.length}
           totalPrice={shoppingBagTotals.totalPrice}
@@ -5002,7 +5003,7 @@ export default function MapaPrecosLeaflet({
         />
       ) : null}
 
-      {isMobileMapSheet && bagSheetOpen && promoCart.length > 0 ? (
+      {isMobileMapSheet && bagSheetOpen && promoCart.length > 0 && !parceirosMode ? (
         <div className="fixed inset-0 z-[1103] bg-black/45 px-3 pb-6 pt-16" onClick={() => setBagSheetOpen(false)}>
           <div
             className="mx-auto flex h-full max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-emerald-400/40 bg-[#0f1117] text-white shadow-2xl"
@@ -5049,7 +5050,7 @@ export default function MapaPrecosLeaflet({
         </div>
       ) : null}
 
-      {selectedItems.length > 0 && (
+      {selectedItems.length > 0 && !parceirosMode && (
         <aside
           style={{
             top: chromeTop,

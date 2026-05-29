@@ -11,11 +11,12 @@ export function getConsumerAppBaseUrl() {
 }
 
 /**
- * Mapa público embutível (mapa-precos) com foco opcional na loja.
- * @param {{ lat?: number|null, lng?: number|null, zoom?: number }} opts
+ * Mapa oficial do consumidor (/mapa) — mesma rota, pins e promoções do app FinMemory.
+ * @param {{ lat?: number|null, lng?: number|null, zoom?: number, from?: string }} opts
  */
-export function buildConsumerPublicMapUrl({ lat, lng, zoom = 16 } = {}) {
-  const params = new URLSearchParams({ embed: '1' });
+export function buildConsumerMapUrl({ lat, lng, zoom = 16, from = 'parceiros' } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
   const latN = Number(lat);
   const lngN = Number(lng);
   if (Number.isFinite(latN) && Number.isFinite(lngN)) {
@@ -23,5 +24,11 @@ export function buildConsumerPublicMapUrl({ lat, lng, zoom = 16 } = {}) {
     params.set('lng', String(lngN));
     params.set('zoom', String(zoom));
   }
-  return `${getConsumerAppBaseUrl()}/mapa-precos?${params.toString()}`;
+  const qs = params.toString();
+  return `${getConsumerAppBaseUrl()}/mapa${qs ? `?${qs}` : ''}`;
+}
+
+/** @deprecated Use buildConsumerMapUrl */
+export function buildConsumerPublicMapUrl(opts) {
+  return buildConsumerMapUrl(opts);
 }

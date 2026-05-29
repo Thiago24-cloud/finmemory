@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   ScanBarcode,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
@@ -27,6 +28,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/S
 import { MapOverlayCategoryChips } from '../components/map/MapOverlayCategoryChips';
 import { StatesUnlockPanel } from '../components/map/StatesUnlockPanel';
 import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
+import { isParceirosMapView } from '../lib/parceirosMapMode';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -36,6 +38,21 @@ const MAP_MAP_PADDING_TOP_PX = 0;
 /** Faixa superior (busca + chips + mascote compacto). */
 const MAP_OVERLAY_TOP_LOGGED_PX = 228;
 const MAP_OVERLAY_TOP_GUEST_PX = 56;
+
+function parseCoord(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function retailerAppUrlForMap() {
+  const runApp =
+    process.env.NEXT_PUBLIC_RETAILER_APP_URL ||
+    process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
+    'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+  const base = String(runApp).replace(/\/$/, '');
+  if (/parceiros\.finmemory\.com\.br/i.test(base)) return base;
+  return base;
+}
 
 export async function getServerSideProps(ctx) {
   try {
@@ -95,8 +112,15 @@ export default function MapaPage() {
   }, []);
 
   const wazeUi = router.isReady && router.query.waze === '1';
-  const mapPaddingTopPx = MAP_MAP_PADDING_TOP_PX;
-  const mapOverlayTopPx = session ? MAP_OVERLAY_TOP_LOGGED_PX : MAP_OVERLAY_TOP_GUEST_PX;
+  const fromParceiros = isParceirosMapView(router);
+  const mapFocusLat = router.isReady ? parseCoord(router.query.lat) : null;
+  const mapFocusLng = router.isReady ? parseCoord(router.query.lng) : null;
+  const mapFocusZoom = router.isReady ? parseCoord(router.query.zoom) : null;
+  const initialMapCenter =
+    mapFocusLat != null && mapFocusLng != null ? [mapFocusLat, mapFocusLng] : null;
+  const parceirosPainelUrl = `${retailerAppUrlForMap()}/parceiros/painel`;
+  const mapPaddingTopPx = fromParceiros ? 0 : MAP_MAP_PADDING_TOP_PX;
+  const mapOverlayTopPx = fromParceiros ? 52 : session ? MAP_OVERLAY_TOP_LOGGED_PX : MAP_OVERLAY_TOP_GUEST_PX;
   /** Onboarding em tela cheia: mapa não monta até o utilizador escolher (evita mapa “por baixo”). */
   const showMapLanding = Boolean(session && mapLandingOpen && !wazeUi);
 
@@ -121,12 +145,16 @@ export default function MapaPage() {
   useEffect(() => {
     if (!session || wazeUi) { setMapLandingOpen(false); return; }
     if (!router.isReady) return;
+    if (router.query.from === 'parceiros') {
+      setMapLandingOpen(false);
+      return;
+    }
     if (router.query.landing === '1') {
       setMapLandingOpen(true);
     } else {
       setMapLandingOpen(false);
     }
-  }, [session, wazeUi, router.isReady, router.query.landing]);
+  }, [session, wazeUi, router.isReady, router.query.landing, router.query.from]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
@@ -217,19 +245,34 @@ export default function MapaPage() {
           <div className="absolute inset-0 w-full h-full">
             <MapaPrecos
               mapThemeId={mapThemeId}
-              searchQuery={debouncedSearch}
+              searchQuery={fromParceiros ? '' : debouncedSearch}
               promoOnly={promoOnly}
               wazeUi={wazeUi}
-              planningMode={planningMode}
-              planningItems={parsedPlanningItems}
+              planningMode={fromParceiros ? false : planningMode}
+              planningItems={fromParceiros ? [] : parsedPlanningItems}
               onPlanningSummaryChange={setPlanningSummary}
               planningActionRequest={planningActionRequest}
               headerOffsetPx={mapPaddingTopPx}
               overlayTopPx={mapOverlayTopPx}
-              planningBottomPadPx={planningBottomPadPx}
+              planningBottomPadPx={fromParceiros ? 0 : planningBottomPadPx}
               onDetailOpenChange={handleDetailOpenChange}
               onDetailExpandedChange={handleDetailExpandedChange}
+              initialMapCenter={initialMapCenter}
+              initialMapZoom={mapFocusZoom ?? undefined}
+              parceirosMode={fromParceiros}
             />
+          </div>
+        ) : null}
+
+        {fromParceiros && !showMapLanding ? (
+          <div className="pointer-events-none absolute top-0 left-0 right-0 z-[45] flex justify-start px-3 pt-[max(10px,env(safe-area-inset-top))]">
+            <a
+              href={parceirosPainelUrl}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-xs font-bold text-[#202124] shadow-[0_1px_3px_rgba(60,64,67,0.2)] hover:bg-[#f8f9fa] no-underline"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Painel Parceiros
+            </a>
           </div>
         ) : null}
 
@@ -307,7 +350,7 @@ export default function MapaPage() {
           </div>
         ) : null}
 
-        {showSharedBanner && (
+        {showSharedBanner && !fromParceiros && (
           <div
             className="absolute left-4 right-4 z-30 bg-[#2ECC49] text-white px-4 py-2.5 rounded-xl text-center text-sm font-medium shadow-lg"
             style={{ top: mapOverlayTopPx + 8 }}
@@ -316,7 +359,7 @@ export default function MapaPage() {
           </div>
         )}
 
-        {session && !showMapLanding ? (
+        {session && !showMapLanding && !fromParceiros ? (
           <div
             className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch pt-[max(8px,env(safe-area-inset-top))] px-3"
             aria-label="Controles do mapa"
@@ -438,7 +481,7 @@ export default function MapaPage() {
 
             </div>
           </div>
-        ) : !session ? (
+        ) : !session && !fromParceiros ? (
           <header className="pointer-events-auto absolute top-0 left-0 right-0 z-20 flex items-center gap-2 px-3 py-2 sm:px-4 rounded-b-2xl border-b border-border bg-secondary/95 backdrop-blur-md shadow-[0_2px_12px_rgba(0,0,0,0.25)]">
             <Link href="/" className="flex items-center gap-2 shrink-0 no-underline">
               <Image src="/logo.png" alt="FinMemory" width={36} height={36} className="object-contain rounded-lg" />
@@ -456,6 +499,8 @@ export default function MapaPage() {
           </header>
         ) : null}
 
+        {!fromParceiros ? (
+        <>
         <Sheet open={showMenuSheet && !showMapLanding} onOpenChange={setShowMenuSheet}>
           <SheetContent side="bottom" className="rounded-t-3xl px-5 pb-10 pt-4 max-h-[85vh] overflow-y-auto bg-card border-[#1E2A3A] text-foreground">
             <SheetHeader className="mb-4">
@@ -553,9 +598,11 @@ export default function MapaPage() {
             </button>
           </SheetContent>
         </Sheet>
+        </>
+        ) : null}
 
         {/* Botão flutuante: estados bloqueados */}
-        {session && !showMapLanding && (
+        {session && !showMapLanding && !fromParceiros ? (
           <button
             type="button"
             onClick={() => setShowStatesPanel(true)}
@@ -566,9 +613,9 @@ export default function MapaPage() {
             <span>Estados</span>
             <span className="text-[10px] font-black text-amber-500">SP ✅</span>
           </button>
-        )}
+        ) : null}
 
-        <StatesUnlockPanel open={showStatesPanel} onClose={() => setShowStatesPanel(false)} />
+        <StatesUnlockPanel open={showStatesPanel && !fromParceiros} onClose={() => setShowStatesPanel(false)} />
 
       </div>
     </>
