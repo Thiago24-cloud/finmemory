@@ -32,6 +32,8 @@ const modeArg = process.argv.find((a) => a.startsWith('--mode='));
 const mode = modeArg ? modeArg.split('=')[1] : (filaId ? 'bot_fila' : 'promocoes');
 const daysArg = process.argv.find((a) => a.startsWith('--days='));
 const days = daysArg ? Number(daysArg.split('=')[1]) : 7;
+const sourceArg = process.argv.find((a) => a.startsWith('--source='));
+const source = sourceArg ? sourceArg.split('=')[1] : undefined;
 
 if (!secret) {
   console.error('Defina CATALOG_ENRICH_SECRET ou CRON_SECRET no .env.local');
@@ -40,7 +42,7 @@ if (!secret) {
 
 const body = filaId
   ? { filaId, mode: 'bot_fila', limit, async: false }
-  : { mode, limit, days, async: false };
+  : { mode, limit, days, source, async: false };
 
 const res = await fetch(`${base}/api/catalog/enrich-product-images`, {
   method: 'POST',

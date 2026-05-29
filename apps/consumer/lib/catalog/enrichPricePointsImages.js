@@ -43,7 +43,7 @@ export async function enrichPricePointsImages(supabase, options = {}) {
       const u = String(r?.image_url || '').trim();
       return !u || !isCatalogR2PublicUrl(u);
     })
-    .filter((r) => !r.tentativa_busca_imagem)
+    .filter((r) => r.tentativa_busca_imagem !== true)
     .slice(0, limit);
 
   const targets = candidates.filter((r) => {

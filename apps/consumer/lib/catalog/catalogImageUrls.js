@@ -26,6 +26,8 @@ export function isCatalogR2PublicUrl(url) {
 export function isLikelyEnrichableProductName(name) {
   const n = String(name || '').trim();
   if (n.length < 4) return false;
+  if (/^\d+\s*%\s*off$/i.test(n)) return false;
+  if (/^por$/i.test(n)) return false;
   if (/^r\$\s*[\d.,]+/i.test(n)) return false;
   if (/^[\d.,]+\s*·/i.test(n)) return false;
   if (/#\s*[a-f0-9]{6,}\b/i.test(n)) return false;

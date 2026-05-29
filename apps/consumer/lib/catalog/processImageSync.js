@@ -2,6 +2,7 @@ import { resolveCosmosImageForProduct } from './cosmosProductImageLookup.js';
 import { ingestRemoteImageToR2 } from './ingestRemoteImageToR2.js';
 import { upsertImageCacheRow, getCachedImageUrlFromDb } from '../mapProductImageCache.js';
 import { isCatalogR2PublicUrl, isLikelyEnrichableProductName } from './catalogImageUrls.js';
+import { isScraperSiteProductImageUrl } from '../mapProductImageQuality.js';
 
 const CACHE_SOURCE_R2 = 'catalog_r2';
 
@@ -49,8 +50,8 @@ export async function processImageSync(supabase, product, options = {}) {
 
   const seed = String(product?.gtin || product?.ean || name).trim();
 
-  /** URL externa (scraper/CDN) → repositório R2 */
-  if (existing && !isCatalogR2PublicUrl(existing)) {
+  /** URL externa (scraper/CDN) → repositório R2 (miniaturas do site da rede vão direto ao Cosmos) */
+  if (existing && !isCatalogR2PublicUrl(existing) && !isScraperSiteProductImageUrl(existing)) {
     const rehostExisting = await ingestRemoteImageToR2(existing, seed);
     if (rehostExisting?.url) {
       await upsertImageCacheRow(supabase, name, rehostExisting.url, CACHE_SOURCE_R2);
@@ -93,8 +94,9 @@ export async function processImageSync(supabase, product, options = {}) {
   }
 
   const r2 = await ingestRemoteImageToR2(cosmos.imageUrl, seed);
-  if (!r2?.url) {
-    console.warn('[processImageSync] R2 falhou; produto sem imagem canónica:', name.slice(0, 80));
+  const finalUrl = r2?.url || cosmos.imageUrl;
+  if (!finalUrl?.startsWith('https://')) {
+    console.warn('[processImageSync] R2 falhou e sem URL Cosmos:', name.slice(0, 80));
     const flagged = await persistTentativaBusca(supabase, product, options);
     return {
       status: 'not_found',
@@ -103,8 +105,6 @@ export async function processImageSync(supabase, product, options = {}) {
       persisted: flagged,
     };
   }
-
-  const finalUrl = r2.url;
 
   if (!options.skipPersist && supabase) {
     await persistEnrichedImage(supabase, product, finalUrl, options);

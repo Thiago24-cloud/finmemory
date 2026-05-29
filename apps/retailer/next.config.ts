@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
     return [
       { source: '/parceiros', headers: noStore },
       { source: '/parceiros/painel', headers: noStore },
+      { source: '/mapa', headers: noStore },
       { source: '/login', headers: noStore },
       { source: '/escolher-perfil', headers: noStore },
     ];

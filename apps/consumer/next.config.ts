@@ -23,6 +23,17 @@ function posthogUpstream() {
   };
 }
 
+function retailerAppBaseUrl(): string {
+  const runApp =
+    process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
+    'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+  const fromEnv =
+    process.env.NEXT_PUBLIC_RETAILER_APP_URL || process.env.NEXT_PUBLIC_FINMEMORY_RETAILER_URL || '';
+  const base =
+    fromEnv && !/parceiros\.finmemory\.com\.br/i.test(fromEnv) ? fromEnv : runApp;
+  return base.replace(/\/$/, '');
+}
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone', // Necessário para Docker/Cloud Run
@@ -34,6 +45,20 @@ const nextConfig: NextConfig = {
   },
   // Evitar que Next.js infira workspace root (ex.: pasta Downloads) e coloque standalone em subpasta
   outputFileTracingRoot: monorepoRoot,
+  /** Lojista vive no app retailer (subdomínio); evita 404 em finmemory.com.br/parceiros */
+  async redirects() {
+    const retailer = retailerAppBaseUrl();
+    return [
+      { source: '/parceiros', destination: `${retailer}/parceiros`, permanent: false },
+      { source: '/parceiros/:path*', destination: `${retailer}/parceiros/:path*`, permanent: false },
+      { source: '/escolher-perfil', destination: `${retailer}/escolher-perfil`, permanent: false },
+      {
+        source: '/historico-inventario-varejo',
+        destination: `${retailer}/historico-inventario-varejo`,
+        permanent: false,
+      },
+    ];
+  },
   // iOS/Safari + reverse proxy PostHog (mesmo origin → menos bloqueios)
   async rewrites() {
     const ph = posthogUpstream();
@@ -53,6 +78,7 @@ const nextConfig: NextConfig = {
       '/',
       '/login',
       '/mapa',
+      '/mapa-precos',
       '/dashboard',
       '/cartoes',
       '/add-receipt',
@@ -69,8 +95,25 @@ const nextConfig: NextConfig = {
       '/listas',
       '/simulador',
     ];
+    const retailerEmbed = retailerAppBaseUrl();
+    const frameAncestors = [
+      "'self'",
+      retailerEmbed,
+      'https://parceiros.finmemory.com.br',
+      'https://finmemory-retailer-836908221936.southamerica-east1.run.app',
+    ].join(' ');
     return [
       ...appPages.map((source) => ({ source, headers: noStore })),
+      {
+        source: '/mapa-precos',
+        headers: [
+          ...noStore,
+          {
+            key: 'Content-Security-Policy',
+            value: `frame-ancestors ${frameAncestors}`,
+          },
+        ],
+      },
       { source: '/_next/data/:path*', headers: noStore },
       { source: '/transaction/:path*', headers: noStore },
     ];

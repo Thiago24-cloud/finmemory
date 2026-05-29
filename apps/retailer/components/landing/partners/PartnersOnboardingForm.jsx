@@ -27,6 +27,7 @@ export function PartnersOnboardingForm({ socialProviders = [] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
+  const [documentReuseConfirm, setDocumentReuseConfirm] = useState(null);
 
   useEffect(() => {
     const email = session?.user?.email;
@@ -40,14 +41,12 @@ export function PartnersOnboardingForm({ socialProviders = [] }) {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  const submitRegistration = async (confirmReusedDocumentTaxId = false) => {
     setError('');
-    if (!loggedIn) {
-      if (form.password !== form.passwordConfirm) {
-        setError('As senhas não coincidem.');
-        return;
-      }
+    setDocumentReuseConfirm(null);
+    if (!loggedIn && form.password !== form.passwordConfirm) {
+      setError('As senhas não coincidem.');
+      return;
     }
 
     setLoading(true);
@@ -58,6 +57,7 @@ export function PartnersOnboardingForm({ socialProviders = [] }) {
         documentTaxId: form.documentTaxId,
         address: form.address,
         addressComplement: form.addressComplement,
+        confirmReusedDocumentTaxId,
       };
 
       const res = await fetch(loggedIn ? '/api/partners/complete-store' : '/api/partners/signup', {
@@ -74,6 +74,14 @@ export function PartnersOnboardingForm({ socialProviders = [] }) {
         ),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 428 && (data.needsDocumentConfirmation || data.code === 'confirm_document_reuse')) {
+        setDocumentReuseConfirm({
+          message:
+            data.error ||
+            'Este CPF/CNPJ já está cadastrado no FinMemory. Confirme que você está autorizado a usá-lo nesta loja.',
+        });
+        return;
+      }
       if (!res.ok) {
         setError(data.error || 'Não foi possível concluir o cadastro.');
         return;
@@ -88,6 +96,11 @@ export function PartnersOnboardingForm({ socialProviders = [] }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    await submitRegistration(false);
   };
 
   if (success) {
@@ -147,6 +160,41 @@ export function PartnersOnboardingForm({ socialProviders = [] }) {
               <Field label="Confirmar senha" name="passwordConfirm" type="password" value={form.passwordConfirm} onChange={onChange} required autoComplete="new-password" />
             </>
           )}
+
+          {documentReuseConfirm ? (
+            <div
+              className="text-sm text-amber-100 bg-amber-500/10 border border-amber-500/35 rounded-xl px-4 py-4 space-y-3"
+              role="alertdialog"
+              aria-labelledby="doc-reuse-title"
+            >
+              <p id="doc-reuse-title" className="font-semibold text-amber-200 m-0">
+                CPF/CNPJ já cadastrado
+              </p>
+              <p className="m-0 text-white/80 leading-relaxed">{documentReuseConfirm.message}</p>
+              <p className="m-0 text-white/55 text-xs">
+                Você só precisa confirmar uma vez por conta. Depois pode cadastrar outras lojas com o mesmo documento
+                normalmente.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => submitRegistration(true)}
+                  className="flex-1 rounded-xl bg-[#39FF14] py-3 font-bold text-[#050508] hover:bg-[#5dff3a] disabled:opacity-60"
+                >
+                  Confirmar e continuar
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setDocumentReuseConfirm(null)}
+                  className="flex-1 rounded-xl border border-white/20 py-3 font-medium text-white/80 hover:bg-white/5 disabled:opacity-60"
+                >
+                  Voltar e corrigir
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {error ? (
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 m-0" role="alert">

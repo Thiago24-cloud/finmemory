@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap } from 'lucide-react';
+import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantOrdersSection } from './MerchantOrdersSection';
 import { MerchantStripeSection } from './MerchantStripeSection';
+import { MerchantInsumosSection } from './MerchantInsumosSection';
 import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchant/merchantApiErrorMessage';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 
@@ -23,6 +24,8 @@ export function MerchantPanel() {
   const [formOpen, setFormOpen] = useState(false);
   const [needsPartnerSignup, setNeedsPartnerSignup] = useState(false);
   const [repairing, setRepairing] = useState(false);
+  const [panelTab, setPanelTab] = useState('ofertas');
+  const [insumosCount, setInsumosCount] = useState(0);
 
   const tryRepairLink = useCallback(async () => {
     setRepairing(true);
@@ -308,7 +311,14 @@ export function MerchantPanel() {
                 </span>
               </div>
               <p className="text-[11px] text-white/40 mt-3 m-0">
-                <Link href="/mapa" className="text-[#39FF14] hover:underline">
+                <Link
+                  href={
+                    ctx?.store?.lat != null && ctx?.store?.lng != null
+                      ? `/mapa?lat=${ctx.store.lat}&lng=${ctx.store.lng}`
+                      : '/mapa'
+                  }
+                  className="text-[#39FF14] hover:underline"
+                >
                   Ver mapa público
                 </Link>
                 {' · '}
@@ -357,7 +367,46 @@ export function MerchantPanel() {
               tempoPreparoMedio={ctx?.store?.tempo_preparo_medio ?? 15}
             />
 
-            <section className="mt-8">
+            <div className="mt-8 flex gap-2 border-b border-white/10 pb-px" role="tablist" aria-label="Seções do painel">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'ofertas'}
+                onClick={() => setPanelTab('ofertas')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'ofertas'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Zap className="h-4 w-4" aria-hidden />
+                Ofertas
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'insumos'}
+                onClick={() => setPanelTab('insumos')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'insumos'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Boxes className="h-4 w-4" aria-hidden />
+                Insumos
+                {insumosCount > 0 ? (
+                  <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{insumosCount}</span>
+                ) : null}
+              </button>
+            </div>
+
+            {panelTab === 'insumos' ? (
+              <div className="mt-4">
+                <MerchantInsumosSection onCountChange={setInsumosCount} />
+              </div>
+            ) : (
+            <section className="mt-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold m-0">Produtos e ofertas</h2>
                 {!formOpen ? (
@@ -405,6 +454,7 @@ export function MerchantPanel() {
                 </ul>
               )}
             </section>
+            )}
           </>
         )}
       </main>

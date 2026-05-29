@@ -72,8 +72,10 @@ function isGooglePlayReviewerEmail(email) {
   return getGooglePlayReviewerEmails().has(normalizeEmail(email));
 }
 
-// Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.
-const DEFAULT_NEXTAUTH_URL = 'https://finmemory.com.br';
+// Base padrão para OAuth/callback no app lojista (não usar finmemory.com.br).
+const DEFAULT_NEXTAUTH_URL =
+  process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
+  'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
 if (typeof process !== 'undefined') {
   const url = process.env.NEXTAUTH_URL || '';
   if (!url || !url.startsWith('http')) {

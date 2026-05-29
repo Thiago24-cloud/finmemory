@@ -5,7 +5,9 @@ $ErrorActionPreference = "Stop"
 $FINMEMORY_GCP_PROJECT = "exalted-entry-480904-s9"
 $SERVICE = "finmemory-retailer"
 $REGION = "southamerica-east1"
-$RETAILER_BASE = "https://parceiros.finmemory.com.br"
+# URL pública do Cloud Run (use até parceiros.finmemory.com.br ter domain mapping + DNS OK)
+$RETAILER_CLOUD_RUN = "https://finmemory-retailer-836908221936.southamerica-east1.run.app"
+$RETAILER_BASE = $RETAILER_CLOUD_RUN
 
 $envLocalPath = Join-Path (Get-Location) ".env.local"
 if (-not (Test-Path $envLocalPath)) {
@@ -32,11 +34,24 @@ function Ensure-Https([string]$url) {
 }
 
 $retailerUrl = Ensure-Https($vars["NEXT_PUBLIC_RETAILER_APP_URL"])
-if (-not $retailerUrl) { $retailerUrl = $RETAILER_BASE }
+if (-not $retailerUrl -or $retailerUrl -match 'parceiros\.finmemory\.com\.br') {
+    $retailerUrl = $RETAILER_CLOUD_RUN
+    Write-Host "Usando Cloud Run retailer (subdominio parceiros ainda sem mapping): $retailerUrl" -ForegroundColor Cyan
+}
 
 $vars["NEXTAUTH_URL"] = $retailerUrl
 $vars["NEXT_PUBLIC_APP_URL"] = $retailerUrl
 $vars["NEXT_PUBLIC_RETAILER_APP_URL"] = $retailerUrl
+if (-not $vars["NEXT_PUBLIC_CONSUMER_APP_URL"]) {
+    $rawConsumer = $vars["NEXT_PUBLIC_FINMEMORY_CONSUMER_URL"]
+    $consumerUrl = if ($rawConsumer -and $rawConsumer.Trim()) {
+        Ensure-Https($rawConsumer.Trim())
+    } else {
+        "https://finmemory.com.br"
+    }
+    $vars["NEXT_PUBLIC_CONSUMER_APP_URL"] = $consumerUrl
+    Write-Host "NEXT_PUBLIC_CONSUMER_APP_URL = $consumerUrl (mapa embutido no painel)" -ForegroundColor Cyan
+}
 $vars["GOOGLE_REDIRECT_URI"] = "$retailerUrl/api/auth/callback/google"
 $vars.Remove("STRIPE_APP_BASE_URL") | Out-Null
 if (-not $vars["FINMEMORY_PUBLIC_ACCESS"]) {
@@ -48,8 +63,9 @@ $required = @(
     "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
     "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_JWT_SECRET",
-    "NEXT_PUBLIC_APP_URL", "NEXT_PUBLIC_RETAILER_APP_URL",
+    "NEXT_PUBLIC_APP_URL", "NEXT_PUBLIC_RETAILER_APP_URL", "NEXT_PUBLIC_CONSUMER_APP_URL",
     "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN",
     "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
     "FINMEMORY_PUBLIC_ACCESS",
     "FINMEMORY_ADMIN_EMAILS"

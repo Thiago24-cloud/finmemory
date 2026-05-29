@@ -1,8 +1,12 @@
 import { hashPassword, verifyPassword, isScryptPasswordHash } from '../../../lib/passwordAuth';
 import { createPartnerStoreForUser } from '../../../lib/partners/createPartnerStoreForUser';
-import { documentTaxIdConflict } from '../../../lib/partners/documentTaxIdConflict';
+import {
+  evaluateDocumentTaxId,
+  saveDocumentReuseAck,
+} from '../../../lib/partners/documentTaxIdPolicy';
+import { documentTaxIdReuseHttpResponse } from '../../../lib/partners/documentTaxIdReuseResponse';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
-import { geocodeAddress } from '../../../lib/geocode';
+import { geocodePartnerStoreAddress } from '../../../lib/geocode';
 import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { sendSecurityEmail } from '../../../lib/securityEmail';
 import { isValidEmail, normalizeEmail, validatePasswordStrength } from '../../../lib/securityPolicy';
@@ -42,6 +46,7 @@ export default async function handler(req, res) {
   const addressComplement = String(body.addressComplement || '').trim().slice(0, 120);
   const email = body.email;
   const password = body.password;
+  const confirmReusedDocumentTaxId = Boolean(body.confirmReusedDocumentTaxId);
 
   if (!responsibleName || responsibleName.length < 3) {
     return res.status(400).json({ error: 'Informe o nome do responsável.' });
@@ -77,11 +82,16 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Muitas tentativas para este e-mail.' });
   }
 
-  const fullAddress = addressComplement ? `${address}, ${addressComplement}, Brasil` : `${address}, Brasil`;
-  const coords = await geocodeAddress(fullAddress);
+  const coords = await geocodePartnerStoreAddress(address, addressComplement);
   if (!coords?.lat || !coords?.lng) {
+    if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN?.trim()) {
+      return res.status(503).json({
+        error: 'Geocodificação indisponível no servidor. Tente novamente em alguns minutos.',
+      });
+    }
     return res.status(400).json({
-      error: 'Não localizamos este endereço no mapa. Confira rua, número, bairro e cidade.',
+      error:
+        'Não localizamos este endereço no mapa. Inclua rua, número, bairro e cidade (ex.: …, Vila X, São Paulo — SP).',
     });
   }
 
@@ -98,13 +108,6 @@ export default async function handler(req, res) {
       .eq('user_id', existingAuth.user_id)
       .maybeSingle();
 
-    if (existingProfile?.id) {
-      return res.status(409).json({
-        error: 'Este e-mail já possui uma loja. Faça login e acesse o painel.',
-        loginUrl: '/login?callbackUrl=%2Fparceiros%2Fpainel',
-      });
-    }
-
     if (!isScryptPasswordHash(existingAuth.password_hash) || !verifyPassword(password, existingAuth.password_hash)) {
       return res.status(401).json({
         error: 'E-mail já cadastrado. Use a mesma senha da sua conta ou faça login em /login.',
@@ -120,9 +123,13 @@ export default async function handler(req, res) {
       addressComplement,
       lat: coords.lat,
       lng: coords.lng,
+      confirmReusedDocumentTaxId,
     });
 
     if (!completed.ok) {
+      if (completed.needsDocumentConfirmation) {
+        return documentTaxIdReuseHttpResponse(res, { message: completed.error });
+      }
       return res.status(completed.status || 500).json({ error: completed.error });
     }
 
@@ -138,15 +145,16 @@ export default async function handler(req, res) {
     });
   }
 
-  const docConflict = await documentTaxIdConflict(supabase, documentTaxId, '');
-  if (docConflict.blocked) {
-    return res.status(409).json({
-      error:
-        docConflict.reason === 'store_cnpj'
-          ? 'Este CPF/CNPJ já está cadastrado em outra loja no mapa.'
-          : 'Este CPF/CNPJ já está vinculado a uma loja parceira.',
-    });
+  const docPolicyNewUser = await evaluateDocumentTaxId(supabase, {
+    documentTaxId,
+    userId: null,
+    confirmReuse: confirmReusedDocumentTaxId,
+  });
+  if (!docPolicyNewUser.allowed) {
+    return documentTaxIdReuseHttpResponse(res, docPolicyNewUser);
   }
+  const mustSaveDocAckAfterSignup =
+    confirmReusedDocumentTaxId && Boolean(docPolicyNewUser.saveAckAfterUserId);
 
   const passwordHash = hashPassword(password);
   const nowIso = new Date().toISOString();
@@ -235,6 +243,10 @@ export default async function handler(req, res) {
     }
 
     await syncMerchantStoreBindings(supabase, userId, storeRow.id);
+
+    if (mustSaveDocAckAfterSignup) {
+      await saveDocumentReuseAck(supabase, userId, documentTaxId);
+    }
 
     const appUrl = process.env.NEXTAUTH_URL || process.env.APP_BASE_URL || 'https://finmemory.com.br';
     const painelPath = '/parceiros/painel';

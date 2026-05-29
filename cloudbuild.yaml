@@ -75,5 +75,5 @@ substitutions:
   _NEXT_PUBLIC_POSTHOG_KEY: ''
   _NEXT_PUBLIC_POSTHOG_HOST: ''
   _NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS: '1'
-  _NEXT_PUBLIC_RETAILER_APP_URL: 'https://parceiros.finmemory.com.br'
+  _NEXT_PUBLIC_RETAILER_APP_URL: 'https://finmemory-retailer-836908221936.southamerica-east1.run.app'
   _NEXT_PUBLIC_RESTRICTED_FEATURE_EMAILS: 'finmemory.oficial@gmail.com,nickzila2709@gmail.com'

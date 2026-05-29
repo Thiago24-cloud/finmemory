@@ -41,7 +41,7 @@ Ou configure manualmente no Cloud Run (`finmemory-retailer`):
 **URL atual do serviço (sem DNS):**
 
 ```text
-https://finmemory-retailer-n7rmjs3dia-rj.a.run.app
+https://finmemory-retailer-836908221936.southamerica-east1.run.app
 ```
 
 ### 3a) Mapear domínio no GCP (recomendado)
@@ -63,12 +63,16 @@ gcloud beta run domain-mappings create \
 
 ### 3b) DNS no provedor (ex.: Cloudflare)
 
+Se `https://parceiros.finmemory.com.br` devolve **404** mas o Cloud Run responde em `https://finmemory-retailer-836908221936.southamerica-east1.run.app/parceiros`, o DNS/proxy está apontando para o serviço errado (ex.: consumer). Corrija:
+
 | Campo | Valor |
 |--------|--------|
 | Tipo | `CNAME` (ou o que o GCP indicar no mapeamento) |
 | Nome | `parceiros` |
 | Destino | host indicado pelo GCP **ou** `finmemory-retailer-n7rmjs3dia-rj.a.run.app` |
 | Proxy | Desligado no primeiro teste (DNS only), depois pode ligar |
+
+Enquanto o subdomínio não estiver certo, `finmemory.com.br/parceiros` redireciona para a URL do Cloud Run `finmemory-retailer` (ver `next.config.ts` do consumer).
 
 Após propagação:
 

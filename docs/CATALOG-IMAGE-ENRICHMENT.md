@@ -59,6 +59,16 @@ npm run catalog:enrich-images
 node -r dotenv/config scripts/enrich-product-images.mjs --mode=price_points --days=7 --limit=60
 ```
 
+### Sonda / scrapers — Cosmos por nome (recomendado)
+
+Requer `COSMOS_API_TOKEN` no `.env.local` (mesmo token do scan de código de barras).
+
+```bash
+npm run map:backfill-images:cosmos -- --source=scraper_sonda --reset-tentativa --limit=40 --rounds=20
+```
+
+Fluxo: **nome** → `GET /products?query=` (ou `GET /gtins/{ean}`) → foto `cdn-cosmos.bluesoft.com.br` → R2 (ou CDN Cosmos se R2 falhar).
+
 ### Via HTTP (cron diário recomendado)
 
 ```bash

@@ -21,6 +21,9 @@ export default function MapaPrecos({
   onDetailExpandedChange,
   /** Espaço reservado acima da BottomNav para o painel “inteligência da lista” (mapa.js). */
   planningBottomPadPx = 0,
+  /** Centro inicial (ex.: embed do app parceiros). */
+  initialMapCenter = null,
+  initialMapZoom = null,
 }) {
   return (
     <div className="fixed inset-0 z-0 h-full w-full">
@@ -38,6 +41,8 @@ export default function MapaPrecos({
         planningBottomPadPx={planningBottomPadPx}
         onDetailOpenChange={onDetailOpenChange}
         onDetailExpandedChange={onDetailExpandedChange}
+        initialMapCenter={initialMapCenter}
+        initialMapZoom={initialMapZoom}
       />
     </div>
   );

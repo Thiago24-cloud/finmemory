@@ -38,8 +38,15 @@ const publicAccess =
   process.env.NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS?.trim() ||
   process.env.FINMEMORY_PUBLIC_ACCESS?.trim() ||
   '1';
+/** URL pública do app lojista no build (redirect /parceiros no consumer). */
+const RETAILER_CLOUD_RUN_URL =
+  process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL?.trim() ||
+  'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+const retailerFromEnv = process.env.NEXT_PUBLIC_RETAILER_APP_URL?.trim() || '';
 const retailerAppUrl =
-  process.env.NEXT_PUBLIC_RETAILER_APP_URL?.trim() || 'https://parceiros.finmemory.com.br';
+  retailerFromEnv && !/parceiros\.finmemory\.com\.br/i.test(retailerFromEnv)
+    ? retailerFromEnv
+    : RETAILER_CLOUD_RUN_URL;
 
 /** gcloud --substitutions usa vírgula como separador; valores com vírgula exigem delimitador alternativo (;). */
 function formatGcloudSubstitutions(pairs) {

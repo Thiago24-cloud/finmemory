@@ -70,8 +70,11 @@ if (-not $vars["FINMEMORY_PUBLIC_ACCESS"]) {
     $vars["FINMEMORY_PUBLIC_ACCESS"] = "1"
 }
 $vars.Remove("FINMEMORY_LOCKDOWN_SINGLE_USER") | Out-Null
-if (-not $vars["NEXT_PUBLIC_RETAILER_APP_URL"]) {
-    $vars["NEXT_PUBLIC_RETAILER_APP_URL"] = "https://parceiros.finmemory.com.br"
+# App lojista: Cloud Run (subdomínio custom só após domain mapping no GCP + DNS)
+$retailerRunUrl = "https://finmemory-retailer-836908221936.southamerica-east1.run.app"
+if (-not $vars["NEXT_PUBLIC_RETAILER_APP_URL"] -or $vars["NEXT_PUBLIC_RETAILER_APP_URL"] -match 'parceiros\.finmemory\.com\.br') {
+    $vars["NEXT_PUBLIC_RETAILER_APP_URL"] = $retailerRunUrl
+    Write-Host "NEXT_PUBLIC_RETAILER_APP_URL = $retailerRunUrl (finmemory-retailer)" -ForegroundColor Cyan
 }
 # Rollout gradual: mapa, lista, missões, código de barras — só allowlist (não depende de PUBLIC_ACCESS)
 $vars['FINMEMORY_RESTRICTED_FEATURE_EMAILS'] = 'finmemory.oficial@gmail.com,nickzila2709@gmail.com'
@@ -116,7 +119,8 @@ $scraperOptional = @(
     "SCRAPER_DIA_REGION",
     "SCRAPER_DIA_BATCH_SIZE",
     "GOOGLE_API_KEY",
-    "GOOGLE_CSE_ID"
+    "GOOGLE_CSE_ID",
+    "COSMOS_API_TOKEN"
 )
 foreach ($k in $scraperOptional) {
     if ($vars[$k]) { $envMap[$k] = $vars[$k] }

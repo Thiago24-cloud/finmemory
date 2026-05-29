@@ -1,10 +1,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
-import { geocodeAddress } from '../../../lib/geocode';
+import { geocodePartnerStoreAddress } from '../../../lib/geocode';
 import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
 import { isValidCpfOrCnpj, normalizeTaxIdDigits } from '../../../lib/validateTaxId';
 import { createPartnerStoreForUser } from '../../../lib/partners/createPartnerStoreForUser';
+import { documentTaxIdReuseHttpResponse } from '../../../lib/partners/documentTaxIdReuseResponse';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../../lib/privateBetaAllowlist';
 import { normalizeEmail } from '../../../lib/securityPolicy';
 
@@ -50,6 +51,7 @@ export default async function handler(req, res) {
   const documentTaxId = normalizeTaxIdDigits(body.documentTaxId);
   const address = String(body.address || '').trim().slice(0, 500);
   const addressComplement = String(body.addressComplement || '').trim().slice(0, 120);
+  const confirmReusedDocumentTaxId = Boolean(body.confirmReusedDocumentTaxId);
 
   if (!responsibleName || responsibleName.length < 3) {
     return res.status(400).json({ error: 'Informe o nome do responsável.' });
@@ -64,11 +66,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Informe o endereço completo do estabelecimento.' });
   }
 
-  const fullAddress = addressComplement ? `${address}, ${addressComplement}, Brasil` : `${address}, Brasil`;
-  const coords = await geocodeAddress(fullAddress);
+  const coords = await geocodePartnerStoreAddress(address, addressComplement);
   if (!coords?.lat || !coords?.lng) {
+    if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN?.trim()) {
+      return res.status(503).json({
+        error: 'Geocodificação indisponível no servidor. Tente novamente em alguns minutos.',
+      });
+    }
     return res.status(400).json({
-      error: 'Não localizamos este endereço no mapa. Confira rua, número, bairro e cidade.',
+      error:
+        'Não localizamos este endereço no mapa. Inclua rua, número, bairro e cidade (ex.: …, Vila X, São Paulo — SP).',
     });
   }
 
@@ -81,9 +88,13 @@ export default async function handler(req, res) {
     addressComplement,
     lat: coords.lat,
     lng: coords.lng,
+    confirmReusedDocumentTaxId,
   });
 
   if (!result.ok) {
+    if (result.needsDocumentConfirmation) {
+      return documentTaxIdReuseHttpResponse(res, { message: result.error });
+    }
     return res.status(result.status || 500).json({ error: result.error });
   }
 

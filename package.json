@@ -64,6 +64,7 @@
     "promo:sonda:unidades-terminal:local": "node scripts/run-sonda-unidades-terminal-local.mjs",
     "map:backfill-images": "node scripts/trigger-backfill-map-images.mjs",
     "map:backfill-images:local": "node scripts/backfill-map-images-local.mjs",
+    "map:backfill-images:cosmos": "node scripts/backfill-map-images-cosmos-local.mjs",
     "promo:test-scraper": "node -r dotenv/config scripts/test-scraper.mjs",
     "promo:test-scraper:ts": "node -r dotenv/config scripts/test-scraper.ts",
     "promo:scraper:dia": "node -r dotenv/config scripts/run-scraper-dia-pending.mjs",

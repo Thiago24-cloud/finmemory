@@ -13,6 +13,12 @@ export const painelApi = {
   uploadImage: `${PAINEL_API_BASE}/products/upload-image`,
   stripeStatus: `${PAINEL_API_BASE}/stripe/status`,
   stripeConnect: `${PAINEL_API_BASE}/stripe/connect`,
+  insumos: `${PAINEL_API_BASE}/insumos`,
+  insumo: (id) => `${PAINEL_API_BASE}/insumos/${id}`,
+  notasEntrada: `${PAINEL_API_BASE}/notas-entrada`,
+  notasEntradaProcessImage: `${PAINEL_API_BASE}/notas-entrada/process-image`,
+  notasEntradaFetchNfce: `${PAINEL_API_BASE}/notas-entrada/fetch-nfce`,
+  notasEntradaConfirm: `${PAINEL_API_BASE}/notas-entrada/confirm`,
 };
 
 /** POST pedido retirada (consumidor logado). */

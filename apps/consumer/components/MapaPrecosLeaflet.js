@@ -153,6 +153,22 @@ function MapShopSheetDragLock({ locked }) {
  * Mobile: pan suave para centrar o pin na área útil do mapa (acima do padding inferior do sheet).
  * Desktop: com sidebar à esquerda, centra na faixa visível à direita do padding esquerdo.
  */
+/** Vista inicial vinda de query (ex.: embed app parceiros ?lat=&lng=). */
+function MapInitialView({ center, zoom }) {
+  const map = useMap();
+  const appliedRef = useRef(false);
+  useEffect(() => {
+    if (!map || appliedRef.current || !Array.isArray(center) || center.length < 2) return;
+    const lat = Number(center[0]);
+    const lng = Number(center[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    appliedRef.current = true;
+    const z = Number.isFinite(zoom) ? zoom : MAP_ZOOM_SINGLE_STORE_FOCUS;
+    map.setView([lat, lng], z, { animate: false });
+  }, [map, center, zoom]);
+  return null;
+}
+
 function MapUsefulAreaPan({ latLng, bottomPadPx, leftPadPx = 0, panTick }) {
   const map = useMap();
   const padRef = useRef(bottomPadPx);
@@ -3156,8 +3172,23 @@ export default function MapaPrecosLeaflet({
   planningBottomPadPx = 0,
   onDetailOpenChange,
   onDetailExpandedChange,
+  initialMapCenter = null,
+  initialMapZoom,
 }) {
   const theme = getMapThemeById(mapThemeId);
+  const resolvedMapCenter = useMemo(() => {
+    if (Array.isArray(initialMapCenter) && initialMapCenter.length >= 2) {
+      const lat = Number(initialMapCenter[0]);
+      const lng = Number(initialMapCenter[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return [lat, lng];
+    }
+    return DEFAULT_MAP_CENTER;
+  }, [initialMapCenter]);
+  const resolvedMapZoom = useMemo(() => {
+    if (Number.isFinite(initialMapZoom)) return initialMapZoom;
+    if (Array.isArray(initialMapCenter) && initialMapCenter.length >= 2) return MAP_ZOOM_SINGLE_STORE_FOCUS;
+    return DEFAULT_MAP_ZOOM;
+  }, [initialMapZoom, initialMapCenter]);
   const mapboxToken =
     typeof process !== 'undefined' ? String(process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '').trim() : '';
 
@@ -4591,8 +4622,8 @@ export default function MapaPrecosLeaflet({
       }`}
     >
       <MapContainer
-        center={DEFAULT_MAP_CENTER}
-        zoom={DEFAULT_MAP_ZOOM}
+        center={resolvedMapCenter}
+        zoom={resolvedMapZoom}
         minZoom={MAP_MIN_ZOOM}
         maxZoom={MAP_MAX_ZOOM}
         maxBounds={SAO_PAULO_STATE_MAX_BOUNDS}
@@ -4601,6 +4632,9 @@ export default function MapaPrecosLeaflet({
         style={mapContainerStyle}
         className={`z-0 finmemory-map-tiles finmemory-map-theme-${theme.id}`}
       >
+        {Array.isArray(initialMapCenter) && initialMapCenter.length >= 2 ? (
+          <MapInitialView center={resolvedMapCenter} zoom={resolvedMapZoom} />
+        ) : null}
         <TileLayer
           attribution={
             tileAttribution ||

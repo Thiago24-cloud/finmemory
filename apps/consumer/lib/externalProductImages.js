@@ -11,6 +11,8 @@ import { getThumbnailMatchRulesCached, listMatchingThumbnailRules } from './mapT
 import { getMapQuickAddSupabase } from './mapQuickAddCore';
 import { validateMapProductImageUrl, visionEnabled } from './validateMapProductImageVision';
 import { isLowQualityProductImageUrl } from './mapProductImageQuality.js';
+import { searchCosmosProductByName } from './catalog/cosmosProductImageLookup.js';
+import { getCosmosToken } from './cosmos.js';
 
 function isLikelyImageUrl(url) {
   if (!url || typeof url !== 'string') return false;
@@ -606,11 +608,24 @@ export async function resolveThumbnailFromExternalApisOnly(name, storeName, useG
     unit: opts.unit,
   });
 
-  let url = await fetchOpenFoodFactsImageByName(name, {
-    skip: plan.skipOpenFoodFacts,
-    queryOverride: plan.openFoodFactsQuery,
-  });
-  let src = 'openfoodfacts';
+  let url = null;
+  let src = null;
+
+  if (getCosmosToken()) {
+    const cosmos = await searchCosmosProductByName(name);
+    if (cosmos?.imageUrl && isValidResolvedImage(cosmos.imageUrl)) {
+      url = cosmos.imageUrl;
+      src = 'cosmos';
+    }
+  }
+
+  if (!url) {
+    url = await fetchOpenFoodFactsImageByName(name, {
+      skip: plan.skipOpenFoodFacts,
+      queryOverride: plan.openFoodFactsQuery,
+    });
+    src = 'openfoodfacts';
+  }
 
   if (!url && useGoogleCse) {
     url = await fetchGoogleCseImageByName(name, storeName, {

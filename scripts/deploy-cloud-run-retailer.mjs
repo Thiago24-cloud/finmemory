@@ -38,11 +38,23 @@ function productionBaseUrl(raw) {
   return url;
 }
 
-const retailerBase = productionBaseUrl(
+const RETAILER_CLOUD_RUN_URL =
+  process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL?.trim() ||
+  'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+const retailerFromEnv =
   process.env.NEXT_PUBLIC_RETAILER_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXTAUTH_URL?.trim() ||
-    'https://parceiros.finmemory.com.br'
+  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+  process.env.NEXTAUTH_URL?.trim() ||
+  '';
+const retailerBase = productionBaseUrl(
+  retailerFromEnv && !/parceiros\.finmemory\.com\.br/i.test(retailerFromEnv)
+    ? retailerFromEnv
+    : RETAILER_CLOUD_RUN_URL
+);
+const consumerBase = productionBaseUrl(
+  process.env.NEXT_PUBLIC_CONSUMER_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_FINMEMORY_CONSUMER_URL?.trim() ||
+    'https://finmemory.com.br'
 );
 
 if (!supabaseUrl || !supabaseAnon) {
@@ -75,6 +87,7 @@ const substitutions = [
   `_NEXT_PUBLIC_POSTHOG_HOST=${posthogHost}`,
   `_NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS=${publicAccess}`,
   `_NEXT_PUBLIC_RETAILER_APP_URL=${retailerBase}`,
+  `_NEXT_PUBLIC_CONSUMER_APP_URL=${consumerBase}`,
 ].join(',');
 
 console.log(`[deploy-cloud-run:retailer] Projeto GCP: ${GCP_PROJECT}`);

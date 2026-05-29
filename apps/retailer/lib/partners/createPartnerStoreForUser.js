@@ -1,5 +1,5 @@
 import { syncMerchantStoreBindings } from '../merchant/syncMerchantStoreBindings';
-import { documentTaxIdConflict } from './documentTaxIdConflict';
+import { evaluateDocumentTaxId } from './documentTaxIdPolicy';
 
 /**
  * Cria store + merchant_store_profiles e vínculos para um user já existente.
@@ -14,26 +14,19 @@ export async function createPartnerStoreForUser(supabase, {
   addressComplement,
   lat,
   lng,
+  confirmReusedDocumentTaxId = false,
 }) {
-  const { data: existingProfile } = await supabase
-    .from('merchant_store_profiles')
-    .select('id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (existingProfile?.id) {
-    return { ok: false, status: 409, error: 'Esta conta já possui uma loja cadastrada.' };
-  }
-
-  const docConflict = await documentTaxIdConflict(supabase, documentTaxId, userId);
-  if (docConflict.blocked) {
+  const docPolicy = await evaluateDocumentTaxId(supabase, {
+    documentTaxId,
+    userId,
+    confirmReuse: Boolean(confirmReusedDocumentTaxId),
+  });
+  if (!docPolicy.allowed) {
     return {
       ok: false,
-      status: 409,
-      error:
-        docConflict.reason === 'store_cnpj'
-          ? 'Este CPF/CNPJ já está cadastrado em outra loja no mapa.'
-          : 'Este CPF/CNPJ já está vinculado a uma loja parceira.',
+      status: 428,
+      needsDocumentConfirmation: true,
+      error: docPolicy.message,
     };
   }
 
