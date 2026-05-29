@@ -7,6 +7,7 @@ import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchan
 import { MerchantInsumoForm } from './MerchantInsumoForm';
 import { MerchantInsumoCard } from './MerchantInsumoCard';
 import { MerchantNotaEntradaFlow } from './MerchantNotaEntradaFlow';
+import { useInsumosLojaRealtime } from '../../hooks/useInsumosLojaRealtime';
 
 function formatBrl(value) {
   if (value == null || Number.isNaN(Number(value))) return '—';
@@ -26,7 +27,7 @@ function formatNotaDate(iso) {
   }
 }
 
-export function MerchantInsumosSection({ onCountChange }) {
+export function MerchantInsumosSection({ lojaId, onCountChange }) {
   const [insumos, setInsumos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -74,6 +75,16 @@ export function MerchantInsumosSection({ onCountChange }) {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useInsumosLojaRealtime(lojaId, load);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [load]);
 
   const onSaved = (insumo) => {

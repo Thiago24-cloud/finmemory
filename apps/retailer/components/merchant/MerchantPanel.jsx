@@ -403,7 +403,7 @@ export function MerchantPanel() {
 
             {panelTab === 'insumos' ? (
               <div className="mt-4">
-                <MerchantInsumosSection onCountChange={setInsumosCount} />
+                <MerchantInsumosSection lojaId={ctx?.store?.id} onCountChange={setInsumosCount} />
               </div>
             ) : (
             <section className="mt-4">

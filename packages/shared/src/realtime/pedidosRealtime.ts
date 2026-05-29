@@ -52,6 +52,44 @@ export function subscribePedidosLoja(
   };
 }
 
+/** Lojista: mudanças em insumos/estoque da loja. */
+export function subscribeInsumosLoja(
+  supabase: SupabaseClient,
+  lojaId: string,
+  onChange: () => void
+): () => void {
+  const id = String(lojaId || '').trim();
+  if (!id) return () => {};
+
+  const channel: RealtimeChannel = supabase
+    .channel(`insumos-loja-${id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'insumos_loja',
+        filter: `loja_id=eq.${id}`,
+      },
+      () => onChange()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notas_entrada_loja',
+        filter: `loja_id=eq.${id}`,
+      },
+      () => onChange()
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 /** Consumidor: acompanhar um pedido específico. */
 export function subscribePedidoById(
   supabase: SupabaseClient,
