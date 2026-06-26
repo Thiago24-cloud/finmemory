@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build -w @finmemory/consumer",
+  "framework": "nextjs",
+  "regions": ["gru1"],
+  "functions": {
+    "pages/api/ocr/process-receipt.js": {
+      "maxDuration": 60
+    }
+  }
+}

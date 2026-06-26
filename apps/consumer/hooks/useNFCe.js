@@ -26,6 +26,43 @@ export function useNFCe() {
     setNotice(null);
   }, []);
 
+  const consultarApenas = useCallback(async (url) => {
+    if (!url || !url.trim()) {
+      setError('URL ou conteúdo do QR é obrigatório');
+      setStatus(STATUS.ERROR);
+      return null;
+    }
+    setError(null);
+    setNotice(null);
+    setStatus(STATUS.CONSULTING);
+
+    try {
+      const res = await fetch('/api/consultar-nfce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Não foi possível consultar a NFC-e');
+        setNotice(null);
+        setStatus(STATUS.ERROR);
+        return null;
+      }
+
+      if (data.aviso) setNotice(data.aviso);
+      setStatus(STATUS.IDLE);
+      return data;
+    } catch (err) {
+      console.error('useNFCe consultarApenas:', err);
+      setError(err.message || 'Erro ao consultar NFC-e');
+      setNotice(null);
+      setStatus(STATUS.ERROR);
+      return null;
+    }
+  }, []);
+
   const consultar = useCallback(async (url, userId) => {
     if (!url || !url.trim()) {
       setError('URL ou conteúdo do QR é obrigatório');
@@ -126,6 +163,7 @@ export function useNFCe() {
     error,
     notice,
     consultar,
+    consultarApenas,
     reset,
     isIdle: status === STATUS.IDLE,
     isConsulting: status === STATUS.CONSULTING,

@@ -7,6 +7,7 @@
  */
 
 import { extractChave44, isValidChaveNfceDv44 } from '../../lib/nfceUrl';
+import { parseNfceXml } from '../../lib/parseNfceXml';
 
 const SEFAZ_DOMAINS = [
   'nfce.fazenda.sp.gov.br',
@@ -47,7 +48,9 @@ const SEFAZ_DOMAINS = [
   'sefaz.se.gov.br',
   'sefaz.to.gov.br',
   'nfe.fazenda.gov.br',
-  'nfce.fazenda.gov.br'
+  'nfce.fazenda.gov.br',
+  'consultapublica.fazenda.sp.gov.br',
+  'fazenda.sp.gov.br'
 ];
 
 function normalizeNfceUrl(qrContent) {
@@ -60,19 +63,92 @@ function normalizeNfceUrl(qrContent) {
       /* keep trimmed */
     }
   }
+
+  const pParam = extractPParam(trimmed);
+  if (pParam) {
+    return `https://www.nfce.fazenda.sp.gov.br/qrcode?p=${encodeURIComponent(pParam)}`;
+  }
+
   const chave44 = extractChave44(trimmed);
   if (chave44 && !/^https?:\/\//i.test(trimmed)) {
-    return `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=${chave44}`;
+    return `https://www.nfce.fazenda.sp.gov.br/qrcode?p=${encodeURIComponent(chave44)}`;
   }
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (/^[pP]=/.test(trimmed)) {
-    return `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?${trimmed}`;
+    const rawP = trimmed.replace(/^[pP]=/, '');
+    return `https://www.nfce.fazenda.sp.gov.br/qrcode?p=${encodeURIComponent(rawP)}`;
   }
   if (/^\d{44}$/.test(trimmed.replace(/\D/g, ''))) {
     const chave = trimmed.replace(/\D/g, '');
-    return `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=${chave}`;
+    return `https://www.nfce.fazenda.sp.gov.br/qrcode?p=${encodeURIComponent(chave)}`;
   }
   return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+}
+
+/** Extrai parâmetro p completo (chave|versão|ambiente|hash) da URL ou texto colado. */
+function extractPParam(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+
+  try {
+    const u = new URL(text);
+    const p = u.searchParams.get('p');
+    if (p && p.length >= 44) return p;
+  } catch (_) {
+    /* não é URL absoluta */
+  }
+
+  const qMatch = text.match(/[?&]p=([^#&\s]+)/i);
+  if (qMatch?.[1]) {
+    try {
+      return decodeURIComponent(qMatch[1]);
+    } catch (_) {
+      return qMatch[1];
+    }
+  }
+
+  const pipeMatch = text.match(/(\d{44}\|[^\s#]+)/);
+  if (pipeMatch?.[1]) return pipeMatch[1];
+
+  return null;
+}
+
+function buildSpFetchUrls(rawInput, normalizedUrl) {
+  const pParam = extractPParam(rawInput) || extractPParam(normalizedUrl);
+  const chave44 = extractChave44(rawInput) || extractChave44(normalizedUrl);
+  const urls = [];
+
+  if (normalizedUrl) urls.push(normalizedUrl);
+  if (rawInput && /^https?:\/\//i.test(String(rawInput).trim())) {
+    urls.push(String(rawInput).trim());
+  }
+
+  if (pParam) {
+    urls.push(`https://www.nfce.fazenda.sp.gov.br/qrcode?p=${encodeURIComponent(pParam)}`);
+    urls.push(`https://www.nfce.fazenda.sp.gov.br/qrcode?p=${pParam}`);
+    urls.push(
+      `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=${encodeURIComponent(pParam)}`
+    );
+  } else if (chave44) {
+    urls.push(`https://www.nfce.fazenda.sp.gov.br/qrcode?p=${encodeURIComponent(chave44)}`);
+    urls.push(
+      `https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=${chave44}`
+    );
+  }
+
+  return [...new Set(urls.filter(Boolean))];
+}
+
+function isGenericConsultaPage(html) {
+  if (!html || typeof html !== 'string') return true;
+  if (html.includes('id="tabResult"') && html.includes('class="valor"')) return false;
+  if (html.includes('txtTopo') && html.includes('txtTit')) return false;
+  return /ConsultaPublica\.aspx/i.test(html) || /id="Conteudo_txtChaveAcesso"/i.test(html);
+}
+
+function isPortalEstablishment(name) {
+  if (!name) return true;
+  return /secretaria\s+da\s+fazenda|governo\s+do\s+estado|consulta\s+nfc-?e|portal\s+sefaz/i.test(name);
 }
 
 function sleep(ms) {
@@ -176,6 +252,9 @@ function normalizeCnpj(value) {
 
 function extractTotalFromText(text) {
   if (!text) return null;
+  const pagarMatch = text.match(/valor\s+a\s+pagar\s*R?\$?\s*:?\s*([\d]{1,3}(?:\.[\d]{3})*,[\d]{2}|[\d]+,[\d]{2})/i);
+  if (pagarMatch?.[1]) return parseMoney(pagarMatch[1]);
+
   const labelMatch = text.match(/(?:valor\s+total|total\s+da\s+nota|total\s+geral)\s*[:\-]?\s*R?\$?\s*([\d.,]+)/i);
   if (labelMatch?.[1]) {
     return parseMoney(labelMatch[1]);
@@ -186,6 +265,91 @@ function extractTotalFromText(text) {
     return parseMoney(last);
   }
   return null;
+}
+
+function extractTotalFromHtml(html) {
+  if (!html) return null;
+  const pagarBlock = html.match(
+    /Valor a pagar R\$:\s*<\/label>\s*<span[^>]*class=["'][^"']*totalNumb[^"']*["'][^>]*>([\d.,]+)/i
+  );
+  if (pagarBlock?.[1]) return parseMoney(pagarBlock[1]);
+
+  const txtMax = html.match(/<span[^>]*class=["'][^"']*totalNumb[^"']*txtMax[^"']*["'][^>]*>([\d.,]+)/i);
+  if (txtMax?.[1]) return parseMoney(txtMax[1]);
+
+  return null;
+}
+
+function extractPaymentFromHtml(html) {
+  if (!html) return '';
+  const m = html.match(/<label[^>]*class=["']tx["'][^>]*>\s*([^<]+?)\s*<\/label>/i);
+  if (!m?.[1]) return extractPaymentFromText(normalizeText(stripHtml(html)));
+  const raw = normalizeText(m[1]);
+  if (/dinheiro/i.test(raw)) return 'Dinheiro';
+  if (/pix/i.test(raw)) return 'PIX';
+  if (/d[eé]bito/i.test(raw)) return 'Débito';
+  if (/cr[eé]dito/i.test(raw)) return 'Cartão de Crédito';
+  return raw.slice(0, 40);
+}
+
+function extractPaymentFromText(text) {
+  if (!text) return '';
+  const m = text.match(/forma\s+de\s+pagamento\s*[:\s]*([^\n]+)/i);
+  if (!m?.[1]) return '';
+  const raw = normalizeText(m[1]);
+  if (/dinheiro/i.test(raw)) return 'Dinheiro';
+  if (/pix/i.test(raw)) return 'PIX';
+  if (/d[eé]bito/i.test(raw)) return 'Débito';
+  if (/cr[eé]dito/i.test(raw)) return 'Cartão de Crédito';
+  return raw.slice(0, 40);
+}
+
+/** Portal SP novo: PRODUTO (Código: N) … Vl. Total X,XX */
+function extractSpPortalItems(plainText) {
+  if (!plainText) return [];
+  const items = [];
+  const seen = new Set();
+  const re =
+    /([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ0-9][A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ0-9\s.\-/]{3,90}?)\s*\(C[oó]digo:\s*\d+\)[\s\S]*?Vl\.\s*Total\s*:?\s*([\d]{1,3}(?:\.[\d]{3})*,[\d]{2}|[\d]+,[\d]{2})/gi;
+  let match;
+  while ((match = re.exec(plainText)) !== null) {
+    const name = normalizeText(match[1]);
+    const price = parseMoney(match[2]);
+    if (!name || name.length < 3 || !Number.isFinite(price) || price <= 0) continue;
+    if (/^(cnpj|cpf|documento|valor|forma|qtd)/i.test(name)) continue;
+    const key = `${name.slice(0, 60)}-${price}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({ name: name.slice(0, 120), price });
+    if (items.length >= 80) break;
+  }
+  return items;
+}
+
+function extractItemsFromDivBlocks(html) {
+  const items = [];
+  const seen = new Set();
+  const blockRe = /<div[^>]*class=["'][^"']*(?:item|produto|det)[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
+  let match;
+  while ((match = blockRe.exec(html)) !== null) {
+    const block = normalizeText(stripHtml(match[1]));
+    const priceMatch = block.match(/Vl\.\s*Total\s*:?\s*([\d.,]+)/i) || block.match(/R\$\s*([\d.,]+)/i);
+    if (!priceMatch) continue;
+    const price = parseMoney(priceMatch[1]);
+    const name = block
+      .replace(/\(C[oó]digo:[^)]+\)/gi, '')
+      .replace(/Qtde\.?:[^V]+/gi, '')
+      .replace(/Vl\.\s*Unit[^V]*/gi, '')
+      .replace(/Vl\.\s*Total.*/gi, '')
+      .trim();
+    if (!name || name.length < 3 || !Number.isFinite(price) || price <= 0) continue;
+    const key = `${name.slice(0, 60)}-${price}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({ name: name.slice(0, 120), price });
+    if (items.length >= 80) break;
+  }
+  return items;
 }
 
 function extractClassLines(html, className) {
@@ -235,16 +399,21 @@ function extractItemRows(html) {
   let match;
   while ((match = rowRegex.exec(html)) !== null) {
     const row = match[1];
-    const descMatch =
-      row.match(/class=["']txtTit["'][^>]*>([\s\S]*?)<\/[^>]+>/i) ||
-      row.match(/<td[^>]*>([^<]{3,})<\/td>/i);
+    if (!row.includes('txtTit')) continue;
+
+    const nameMatch =
+      row.match(/<td[^>]*>[\s\S]*?<span\s+class=["']txtTit["'][^>]*>([\s\S]*?)<\/span>/i) ||
+      row.match(/class=["']txtTit["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
     const priceMatch =
+      row.match(/<span\s+class=["']valor["'][^>]*>([\s\S]*?)<\/span>/i) ||
       row.match(/class=["']txtVlr["'][^>]*>([\s\S]*?)<\/[^>]+>/i) ||
       row.match(/R\$\s*([\d.,]+)/i);
-    if (!descMatch || !priceMatch) continue;
-    const desc = normalizeText(stripHtml(descMatch[1] || descMatch[0]));
+
+    if (!nameMatch || !priceMatch) continue;
+    const desc = normalizeText(stripHtml(nameMatch[1] || nameMatch[0]));
     const price = parseMoney(priceMatch[1] || priceMatch[0]);
-    if (!desc || !Number.isFinite(price) || price < 0) continue;
+    if (!desc || desc.length < 2 || /^vl\.?\s*total$/i.test(desc)) continue;
+    if (!Number.isFinite(price) || price <= 0) continue;
     const key = `${desc.slice(0, 80)}-${price}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -281,7 +450,7 @@ function extractFromHtml(html) {
   if (!html || typeof html !== 'string') return result;
 
   const plainText = normalizeText(stripHtml(html));
-  result.total = extractTotalFromText(plainText);
+  result.total = extractTotalFromHtml(html) ?? extractTotalFromText(plainText);
 
   const dateMatch = plainText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
   if (dateMatch) {
@@ -298,16 +467,19 @@ function extractFromHtml(html) {
   const h1Text = extractTagText(html, 'h1');
   const h2Text = extractTagText(html, 'h2');
 
+  const topoName = topoLines.find((line) => line && !isPortalEstablishment(line) && line.length > 3);
+  if (topoName) result.estabelecimento = topoName;
+
   const candidateLines = [
-    ...topoLines,
     ...emitenteLines,
     h1Text,
     h2Text,
-    titleText
   ].map(normalizeText).filter(Boolean);
 
-  const nameLine = candidateLines.find((line) => !isMetaLine(line));
-  if (nameLine) result.estabelecimento = nameLine;
+  if (!result.estabelecimento) {
+    const nameLine = candidateLines.find((line) => !isMetaLine(line) && !isPortalEstablishment(line));
+    if (nameLine) result.estabelecimento = nameLine;
+  }
 
   const addressLine = candidateLines.find(looksLikeAddress)
     || extractAddressFromText(plainText);
@@ -318,6 +490,29 @@ function extractFromHtml(html) {
     result.itens = itemRows.slice(0, 60);
   }
 
+  if (result.itens.length === 0) {
+    const spItems = extractSpPortalItems(plainText);
+    if (spItems.length > 0) result.itens = spItems;
+  }
+
+  if (result.itens.length === 0) {
+    const divItems = extractItemsFromDivBlocks(html);
+    if (divItems.length > 0) result.itens = divItems;
+  }
+
+  result.forma_pagamento = extractPaymentFromHtml(html) || extractPaymentFromText(plainText);
+
+  if (!result.estabelecimento) {
+    const lines = plainText.split(/\s{2,}|\n/).map(normalizeText).filter((l) => l.length > 4);
+    const cnpjIdx = lines.findIndex((l) => /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/.test(l));
+    if (cnpjIdx > 0) {
+      const candidate = lines[cnpjIdx - 1];
+      if (candidate && !isMetaLine(candidate) && candidate.length < 120) {
+        result.estabelecimento = candidate;
+      }
+    }
+  }
+
   if (!result.estabelecimento) {
     const nameMatch = plainText.match(/(?:raz[aã]o\s+social|nome\s+fantasia|emitente)[\s:]*([^\n]+)/i);
     if (nameMatch?.[1]) {
@@ -326,68 +521,6 @@ function extractFromHtml(html) {
   }
 
   return result;
-}
-
-function parseNfceXml(xmlStr) {
-  try {
-    const { XMLParser } = require('fast-xml-parser');
-    const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true });
-    const parsed = parser.parse(xmlStr);
-    const nfe = parsed?.nfeProc?.NFe?.infNFe
-      || parsed?.NFe?.infNFe
-      || parsed?.retConsSitNFe?.protNFe?.infProt;
-    const infNFe = parsed?.nfeProc?.NFe?.infNFe || parsed?.NFe?.infNFe;
-    if (!infNFe) return null;
-
-    const emit = infNFe?.emit || {};
-    const ide = infNFe?.ide || {};
-    const det = infNFe?.det;
-    const detList = Array.isArray(det) ? det : det ? [det] : [];
-    const total = infNFe?.total?.ICMSTot?.vNF ?? infNFe?.total?.['ICMSTot']?.vNF;
-    const dhEmi = ide?.dhEmi || ide?.dEmi;
-    const enderEmit = emit?.enderEmit || {};
-    let data = '';
-    if (dhEmi) {
-      const match = String(dhEmi).match(/(\d{4})-(\d{2})-(\d{2})/);
-      if (match) data = `${match[1]}-${match[2]}-${match[3]}`;
-    }
-
-    const itens = detList.map((d) => {
-      const prod = d?.prod || {};
-      const desc = prod?.xProd || prod?.xProduto || 'Item';
-      const price = parseMoney(prod?.vProd ?? prod?.vUnCom ?? 0) ?? 0;
-      const cEAN = prod?.cEAN || prod?.cEANTrib || '';
-      const gtinDigits = String(cEAN).replace(/\D/g, '');
-      const gtin =
-        gtinDigits.length >= 8 && gtinDigits.length <= 14 ? gtinDigits : null;
-      const row = { name: String(desc).slice(0, 120), price };
-      if (gtin) row.gtin = gtin;
-      return row;
-    }).filter((i) => i.name && i.price >= 0);
-
-    const nome = emit?.xFant || emit?.xNome || emit?.nome || '';
-    const cnpj = emit?.CNPJ || emit?.cnpj || '';
-    const endereco = buildAddress({
-      logradouro: enderEmit?.xLgr,
-      numero: enderEmit?.nro,
-      complemento: enderEmit?.xCpl,
-      bairro: enderEmit?.xBairro,
-      cidade: enderEmit?.xMun,
-      estado: enderEmit?.UF,
-      cep: enderEmit?.CEP
-    });
-
-    return {
-      estabelecimento: nome ? String(nome).trim() : '',
-      endereco,
-      data,
-      cnpj: cnpj ? normalizeCnpj(String(cnpj).trim()) : '',
-      total: total != null ? parseMoney(total) : null,
-      itens
-    };
-  } catch (_) {
-    return null;
-  }
 }
 
 export default async function handler(req, res) {
@@ -411,9 +544,28 @@ export default async function handler(req, res) {
       dvAviso = 'A chave de 44 dígitos parece incorreta (dígito verificador). Confira se copiou tudo.';
     }
 
-    const response = await fetchNfcePage(urlToFetch);
+    const urlsToTry = buildSpFetchUrls(urlParam, urlToFetch);
+    let text = '';
+    let resolvedUrl = urlToFetch;
+    let lastStatus = 0;
 
-    if (!response.ok) {
+    for (const tryUrl of urlsToTry) {
+      const response = await fetchNfcePage(tryUrl);
+      lastStatus = response.status;
+      if (!response.ok) continue;
+      const body = await response.text();
+      if (!isGenericConsultaPage(body)) {
+        text = body;
+        resolvedUrl = response.url || tryUrl;
+        break;
+      }
+      if (!text) {
+        text = body;
+        resolvedUrl = response.url || tryUrl;
+      }
+    }
+
+    if (!text) {
       return res.status(200).json({
         estabelecimento: '',
         endereco: '',
@@ -422,13 +574,39 @@ export default async function handler(req, res) {
         total: null,
         itens: [],
         nfce_url: urlToFetch,
-        aviso: [dvAviso, `Portal SEFAZ retornou HTTP ${response.status}. Tente novamente.`].filter(Boolean).join(' ')
+        aviso: [dvAviso, `Portal SEFAZ retornou HTTP ${lastStatus || 'erro'}. Tente novamente.`].filter(Boolean).join(' '),
       });
     }
 
-    const contentType = (response.headers.get('content-type') || '').toLowerCase();
-    const text = await response.text();
-    let out = { estabelecimento: '', endereco: '', data: '', cnpj: '', total: null, itens: [], nfce_url: urlToFetch };
+    if (isGenericConsultaPage(text)) {
+      return res.status(200).json({
+        estabelecimento: '',
+        endereco: '',
+        data: '',
+        cnpj: '',
+        total: null,
+        itens: [],
+        nfce_url: urlToFetch,
+        aviso: [
+          dvAviso,
+          'Link incompleto: copie o endereço completo do navegador logo após ler o QR (deve conter ?p= com a chave da nota), ou escaneie o QR dentro do app.',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      });
+    }
+
+    const contentType = (text.includes('<?xml') || text.trimStart().startsWith('<nfe')) ? 'application/xml' : 'text/html';
+    let out = {
+      estabelecimento: '',
+      endereco: '',
+      data: '',
+      cnpj: '',
+      total: null,
+      itens: [],
+      forma_pagamento: '',
+      nfce_url: resolvedUrl,
+    };
 
     if (contentType.includes('xml') || text.trimStart().startsWith('<?xml') || text.trimStart().startsWith('<nfe')) {
       const fromXml = parseNfceXml(text);
@@ -444,6 +622,7 @@ export default async function handler(req, res) {
       out.cnpj = out.cnpj || fromHtml.cnpj || '';
       out.total = out.total != null ? out.total : fromHtml.total;
       out.itens = out.itens?.length ? out.itens : fromHtml.itens || [];
+      out.forma_pagamento = fromHtml.forma_pagamento || '';
     }
 
     if (dvAviso) {

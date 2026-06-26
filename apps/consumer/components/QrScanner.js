@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
+import { scanQrFromImage } from '../lib/scanReceiptQr';
 
 const FILE_INPUT_ID = 'finmemory-qr-file-capture';
 
@@ -152,28 +153,7 @@ export function QrScanner({ onScan, onClose }) {
     };
   }, [mounted, strategy, stopLive]);
 
-  const decodeQrFromImageSource = useCallback(async (img) => {
-    const maxDim = 1600;
-    let w = img.width;
-    let h = img.height;
-    if (!w || !h) return null;
-    if (w > maxDim || h > maxDim) {
-      const s = maxDim / Math.max(w, h);
-      w = Math.floor(w * s);
-      h = Math.floor(h * s);
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(img, 0, 0, w, h);
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const result = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth',
-    });
-    return result?.data ?? null;
-  }, []);
+  const decodeQrFromImageSource = useCallback(async (img) => scanQrFromImage(img), []);
 
   const decodeQrFromFile = useCallback(
     async (file) => {

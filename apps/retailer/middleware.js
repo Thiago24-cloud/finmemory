@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from './lib/privateBetaAllowlist';
 
+function shouldForceHttps(req) {
+  if (process.env.NODE_ENV !== 'production') return false;
+  const host = (req.headers.get('host') || '').split(':')[0].toLowerCase();
+  if (!host || host === 'localhost' || host === '127.0.0.1') return false;
+  const proto = (req.headers.get('x-forwarded-proto') || req.nextUrl.protocol.replace(':', ''))
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  return proto === 'http';
+}
+
+function httpsRedirect(req) {
+  const url = req.nextUrl.clone();
+  url.protocol = 'https:';
+  return NextResponse.redirect(url, 308);
+}
+
 function isPublicApiPath(pathname) {
   if (pathname.startsWith('/api/auth')) return true;
   if (pathname.startsWith('/api/partners/')) return true;
@@ -26,6 +43,8 @@ function isPublicStaticAsset(pathname) {
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
+
+  if (shouldForceHttps(req)) return httpsRedirect(req);
 
   if (isPublicStaticAsset(pathname)) return NextResponse.next();
 

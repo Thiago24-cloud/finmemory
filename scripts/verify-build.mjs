@@ -8,6 +8,11 @@
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
+if (process.env.VERCEL === '1') {
+  console.log('⏭️  verify-build: ignorado no Vercel (sem output standalone).\n');
+  process.exit(0);
+}
+
 console.log('🔍 FinMemory - Verificação do Build Standalone\n');
 
 function resolveConsumerRoot() {

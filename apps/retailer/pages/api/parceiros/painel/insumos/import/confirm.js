@@ -1,1 +1,1 @@
-export { default } from '../../../merchant/insumos/import/confirm';
+export { default } from '../../../../merchant/insumos/import/confirm';

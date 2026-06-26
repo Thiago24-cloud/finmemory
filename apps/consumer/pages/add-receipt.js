@@ -16,6 +16,7 @@ import {
   getMissionActiveContext,
 } from '../lib/missionFollowupNotification';
 import { trackBackendEvent, trackEvent } from '../lib/analytics';
+import { scanQrFromDataUrl } from '../lib/scanReceiptQr';
 import { PurchaseShareExport } from '../components/purchase/PurchaseShareExport';
 
 /**
@@ -41,7 +42,7 @@ async function compressImage(file, maxSizeMB = 1.5) {
         let { width, height } = img;
         
         // Redimensionar se muito grande
-        const maxDimension = 2000;
+        const maxDimension = 2400;
         if (width > maxDimension || height > maxDimension) {
           if (width > height) {
             height = (height / width) * maxDimension;
@@ -89,17 +90,6 @@ const STEPS = {
   SUCCESS: 'success'
 };
 
-// Converte data URL (base64) em File para o scanner de QR
-function dataURLtoFile(dataUrl, filename = 'receipt.jpg') {
-  const arr = dataUrl.split(',');
-  const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
-  const bstr = atob(arr[1] || '');
-  const n = bstr.length;
-  const u8 = new Uint8Array(n);
-  for (let i = 0; i < n; i++) u8[i] = bstr.charCodeAt(i);
-  return new File([u8], filename, { type: mime });
-}
-
 // Indica se o conteúdo do QR pode ser NFC-e (URL SEFAZ, chave 44 dígitos, ou parâmetro p=)
 function looksLikeNfceQr(text) {
   const t = (text || '').trim().replace(/\s+/g, ' ');
@@ -112,15 +102,37 @@ function looksLikeNfceQr(text) {
 }
 
 // Mapeia resposta do /api/consultar-nfce para o formato do formulário (applyNfceData)
+function isWeakNfceConsultResult(json) {
+  if (!json || typeof json !== 'object') return true;
+  const name = String(json.estabelecimento || '');
+  if (isPortalEstablishmentName(name)) return true;
+  const hasItems = Array.isArray(json.itens) && json.itens.length > 0;
+  const hasTotal = json.total != null && Number(json.total) > 0;
+  return !hasItems && !hasTotal;
+}
+
+function isPortalEstablishmentName(name) {
+  return /secretaria\s+da\s+fazenda|governo\s+do\s+estado|consulta\s+nfc-?e/i.test(String(name || ''));
+}
+
+function nfceConsultErrorMessage(json) {
+  if (json?.aviso) return json.aviso;
+  return 'Não encontramos produtos nessa nota. Copie o link completo do navegador (com ?p=...) logo após ler o QR, ou use «Escanear QR» dentro do app.';
+}
+
 function dataFromConsultarNfce(res) {
   const estabelecimento = res.estabelecimento;
   const merchant_name = typeof estabelecimento === 'object' && estabelecimento?.nome
     ? estabelecimento.nome
     : (estabelecimento || '');
+  const merchant_address = typeof estabelecimento === 'object' && estabelecimento?.endereco
+    ? estabelecimento.endereco
+    : (res.endereco || '');
   return {
     date: res.data || '',
     merchant_name: merchant_name || '',
     merchant_cnpj: res.cnpj || '',
+    merchant_address: merchant_address || '',
     total_amount: res.total != null ? String(Number(res.total).toFixed(2)) : '',
     items: Array.isArray(res.itens)
       ? res.itens.map((i) => {
@@ -129,9 +141,141 @@ function dataFromConsultarNfce(res) {
           return row;
         })
       : [],
+    payment_method: res.forma_pagamento || res.payment_method || '',
     receipt_image_url: res.nfce_url || '',
-    nfce_url: res.nfce_url || ''
+    nfce_url: res.nfce_url || '',
   };
+}
+
+function NfceXmlImportBlock({ onImported, onError }) {
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const name = (file.name || '').toLowerCase();
+    if (!name.endsWith('.xml') && file.type && !/xml/i.test(file.type)) {
+      onError?.('Selecione um arquivo .xml da NFC-e.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      onError?.('XML muito grande. Máximo 2MB.');
+      return;
+    }
+
+    setLoading(true);
+    onError?.(null);
+    try {
+      const xml = await file.text();
+      const res = await fetch('/api/ocr/import-nfce-xml', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xml }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        onError?.(json.error || 'Não foi possível importar o XML.');
+        return;
+      }
+      onImported(json.data);
+    } catch (_) {
+      onError?.('Erro ao ler o arquivo XML.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <span className="text-2xl shrink-0" aria-hidden>XML</span>
+        <div>
+          <p className="text-sm text-[#374151] font-semibold m-0">Abrir nota XML</p>
+          <p className="text-xs text-[#6b7280] m-0 mt-1">
+            Envie o arquivo .xml da NFC-e (cupom eletrônico). Produtos, total e loja vêm preenchidos automaticamente.
+          </p>
+        </div>
+      </div>
+      <label
+        htmlFor="finmemory-nfce-xml-input"
+        className={cn(
+          'flex items-center justify-center w-full py-4 px-6 rounded-xl text-base font-semibold cursor-pointer border-2 border-dashed transition-colors',
+          loading
+            ? 'border-[#9ca3af] bg-[#f3f4f6] text-[#6b7280] cursor-wait'
+            : 'border-[#16a34a] bg-white text-[#15803d] hover:bg-[#f0fdf4]'
+        )}
+      >
+        {loading ? 'Lendo XML…' : '📄 Selecionar arquivo XML'}
+      </label>
+      <input
+        id="finmemory-nfce-xml-input"
+        ref={inputRef}
+        type="file"
+        accept=".xml,application/xml,text/xml"
+        className="sr-only"
+        disabled={loading}
+        onChange={handleFile}
+      />
+    </div>
+  );
+}
+
+function NfcePasteUrlBlock({ onConsult, onError }) {
+  const [pasteValue, setPasteValue] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleConsult = async () => {
+    const trimmed = pasteValue.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    onError?.(null);
+    try {
+      const res = await fetch('/api/consultar-nfce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmed }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onError?.(json.error || 'Não foi possível consultar a nota');
+        return;
+      }
+      if (isWeakNfceConsultResult(json)) {
+        onError?.(nfceConsultErrorMessage(json));
+        return;
+      }
+      onConsult(json);
+    } catch (_) {
+      onError?.('Erro de conexão ao consultar a nota.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-3 space-y-2">
+      <p className="text-sm text-[#374151] font-medium m-0">Cole o link da nota (site da Fazenda)</p>
+      <textarea
+        value={pasteValue}
+        onChange={(e) => setPasteValue(e.target.value)}
+        rows={2}
+        placeholder="https://www.nfce.fazenda.sp.gov.br/qrcode?p=…"
+        className="w-full rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm resize-y"
+        disabled={loading}
+      />
+      <button
+        type="button"
+        onClick={handleConsult}
+        disabled={loading || !pasteValue.trim()}
+        className="w-full py-3 rounded-xl font-medium text-white bg-[#16a34a] disabled:opacity-50"
+      >
+        {loading ? 'Consultando na SEFAZ…' : 'Buscar produtos da nota'}
+      </button>
+    </div>
+  );
 }
 
 export default function AddReceipt() {
@@ -203,6 +347,7 @@ export default function AddReceipt() {
     if (!router.isReady) return;
     const t = router.query.tab;
     if (t === 'nfce' || t === 'qr') setScanTab('nfce');
+    if (t === 'xml') setScanTab('xml');
   }, [router.isReady, router.query.tab]);
 
   // Gamificação: overlay +XP e bump de streak ao salvar com sucesso
@@ -233,13 +378,13 @@ export default function AddReceipt() {
 
   const setTab = (tab) => {
     setScanTab(tab);
+    setError(null);
+    setNfceCameraOpen(false);
+    if (!router.isReady) return;
     if (tab === 'foto') {
-      setNfceCameraOpen(false);
-      if (router.isReady) {
-        router.replace({ pathname: '/add-receipt' }, undefined, { shallow: true });
-      }
-    } else if (router.isReady) {
-      router.replace({ pathname: '/add-receipt', query: { tab: 'nfce' } }, undefined, { shallow: true });
+      router.replace({ pathname: '/add-receipt' }, undefined, { shallow: true });
+    } else {
+      router.replace({ pathname: '/add-receipt', query: { tab } }, undefined, { shallow: true });
     }
   };
 
@@ -335,11 +480,44 @@ export default function AddReceipt() {
         ? data.items.map((i) => ({ name: i.name || '', price: Number(i.price) || 0 }))
         : [],
       category: '',
-      payment_method: '',
+      payment_method: data.payment_method || '',
       receipt_image_url: data.receipt_image_url || data.nfce_url || ''
     });
     setStep(STEPS.EDIT);
   };
+
+  // Link aberto via ?url= (ex.: compartilhar do navegador após ler QR nativo)
+  useEffect(() => {
+    if (!router.isReady || step !== STEPS.CAPTURE) return;
+    const rawUrl = router.query.url;
+    if (!rawUrl) return;
+    const url = decodeURIComponent(Array.isArray(rawUrl) ? rawUrl[0] : rawUrl);
+    if (!looksLikeNfceQr(url)) return;
+
+    setScanTab('nfce');
+    setStep(STEPS.PROCESSING);
+    setError(null);
+
+    (async () => {
+      try {
+        const res = await fetch('/api/consultar-nfce', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const json = await res.json();
+        if (res.ok && !isWeakNfceConsultResult(json)) {
+          applyNfceData(dataFromConsultarNfce(json));
+        } else {
+          setError(nfceConsultErrorMessage(json));
+          setStep(STEPS.CAPTURE);
+        }
+      } catch (_) {
+        setError('Erro ao consultar a nota.');
+        setStep(STEPS.CAPTURE);
+      }
+    })();
+  }, [router.isReady, router.query.url, step]);
 
   // Processar nota: tenta ler QR da foto (NFC-e); se não achar ou der erro, usa OCR (visão)
   const processImage = async () => {
@@ -355,38 +533,24 @@ export default function AddReceipt() {
     setStep(STEPS.PROCESSING);
     setError(null);
 
-    // 1) Opcional: tentar QR da foto (não bloqueia o OCR em caso de falha)
+    // 1) Tentar QR da foto (NFC-e na SEFAZ — mais confiável que OCR em notas amassadas)
     if (typeof window !== 'undefined') {
       try {
-        const file = dataURLtoFile(imageBase64, 'receipt.jpg');
-        if (!file || !(file instanceof File)) throw new Error('invalid file');
-        const { Html5Qrcode } = await import('html5-qrcode');
-        const el = document.getElementById('finmemory-qr-file-scan');
-        if (el) {
-          const qr = new Html5Qrcode('finmemory-qr-file-scan');
-          try {
-            const decodedText = await Promise.race([
-              qr.scanFile(file, false),
-              new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-            ]);
-            if (decodedText && looksLikeNfceQr(decodedText)) {
-              const res = await fetch('/api/consultar-nfce', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: decodedText })
-              });
-              const json = await res.json();
-              if (res.ok) {
-                applyNfceData(dataFromConsultarNfce(json));
-                return;
-              }
-            }
-          } finally {
-            try { qr.clear(); } catch (_) {}
+        const decodedText = await scanQrFromDataUrl(imageBase64);
+        if (decodedText && looksLikeNfceQr(decodedText)) {
+          const res = await fetch('/api/consultar-nfce', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: decodedText }),
+          });
+          const json = await res.json();
+          if (res.ok && !isWeakNfceConsultResult(json)) {
+            applyNfceData(dataFromConsultarNfce(json));
+            return;
           }
         }
       } catch (_) {
-        // Qualquer falha no QR → segue para OCR (não bloqueia)
+        // Falha no QR → segue para OCR
       }
     }
 
@@ -404,7 +568,18 @@ export default function AddReceipt() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || result.details || 'Erro ao processar nota fiscal');
+        const err = new Error(result.error || result.details || 'Erro ao processar nota fiscal');
+        err.code = result.code;
+        err.isInvalidReceipt = result.isInvalidReceipt;
+        throw err;
+      }
+
+      if (isWeakNfceConsultResult({
+        estabelecimento: result.data?.merchant_name,
+        total: parseFloat(result.data?.total_amount) || null,
+        itens: result.data?.items,
+      })) {
+        throw new Error('Não identificamos produtos na foto. Use a aba «QR NFC-e» e cole o link completo da SEFAZ.');
       }
 
       setExtractedData(result.data);
@@ -424,8 +599,17 @@ export default function AddReceipt() {
     } catch (err) {
       console.error('Erro no OCR:', err);
       let msg = err.message || 'Erro ao processar. Verifique sua conexão e tente novamente.';
-      if (msg.includes('OpenAI') || msg.includes('configuração do servidor') || msg.includes('API key')) {
-        msg = 'Serviço de leitura da nota não configurado. Configure OPENAI_API_KEY no Cloud Run (veja a dica abaixo) ou use Sincronizar Gmail / Gasto manual.';
+      if (err.isInvalidReceipt) {
+        msg =
+          'Não identificamos a nota na foto. Estique o papel, foque no QR Code no rodapé ou use a aba «QR NFC-e».';
+      } else if (msg.includes('Erro ao processar imagem com IA')) {
+        msg =
+          'A leitura por IA falhou. Tente a aba «QR NFC-e» (mais precisa) ou tire outra foto com a nota esticada e bem iluminada.';
+      } else if (msg.includes('OpenAI') || msg.includes('configuração do servidor') || msg.includes('API key')) {
+        msg =
+          'Serviço de leitura da nota não configurado. Configure OPENAI_API_KEY no servidor ou use a aba «QR NFC-e» / Gasto manual.';
+      } else if (err.code === 'R2_PRODUCTION_REQUIRED') {
+        msg = 'Armazenamento de comprovantes não configurado no servidor. Use a aba «QR NFC-e» enquanto isso.';
       }
       setError(msg);
       setStep(STEPS.PREVIEW);
@@ -591,7 +775,7 @@ export default function AddReceipt() {
     <>
       <Head>
         <title>
-          {scanTab === 'nfce' ? 'QR Code NFC-e | FinMemory' : 'Foto da nota | FinMemory'}
+          {scanTab === 'nfce' ? 'QR Code NFC-e | FinMemory' : scanTab === 'xml' ? 'Importar XML | FinMemory' : 'Foto da nota | FinMemory'}
         </title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
@@ -610,24 +794,24 @@ export default function AddReceipt() {
         </div>
 
         <div className="px-5 pb-8">
-        <div className="flex p-1 rounded-2xl bg-white/15 mb-4 max-w-md mx-auto ring-1 ring-white/20">
+        <div className="flex p-1 rounded-2xl bg-white/15 mb-4 max-w-lg mx-auto ring-1 ring-white/20">
           <button
             type="button"
             onClick={() => setTab('foto')}
             className={cn(
-              'flex-1 py-2.5 px-2 rounded-xl text-sm font-semibold transition-colors',
+              'flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors',
               scanTab === 'foto'
                 ? 'bg-white text-[#1a7f37] shadow-md'
                 : 'text-white/90 hover:bg-white/10'
             )}
           >
-            Foto da nota
+            Foto
           </button>
           <button
             type="button"
             onClick={() => setTab('nfce')}
             className={cn(
-              'flex-1 py-2.5 px-2 rounded-xl text-sm font-semibold transition-colors',
+              'flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors',
               scanTab === 'nfce'
                 ? 'bg-white text-[#1a7f37] shadow-md'
                 : 'text-white/90 hover:bg-white/10'
@@ -635,10 +819,22 @@ export default function AddReceipt() {
           >
             QR NFC-e
           </button>
+          <button
+            type="button"
+            onClick={() => setTab('xml')}
+            className={cn(
+              'flex-1 py-2.5 px-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors',
+              scanTab === 'xml'
+                ? 'bg-white text-[#1a7f37] shadow-md'
+                : 'text-white/90 hover:bg-white/10'
+            )}
+          >
+            XML
+          </button>
         </div>
 
         {/* Erro global */}
-        {error && scanTab === 'foto' && (
+        {error && step !== STEPS.EDIT && step !== STEPS.SAVING && step !== STEPS.SUCCESS && (
           <div className="bg-[#fee2e2] border border-[#fecaca] text-[#dc2626] py-3 px-4 rounded-xl mb-5 text-sm">
             <p className="font-medium mb-1">⚠️ {error}</p>
             {(error.includes('OpenAI') || error.toLowerCase().includes('configuração do servidor')) && (
@@ -649,32 +845,61 @@ export default function AddReceipt() {
           </div>
         )}
 
-        {scanTab === 'nfce' && (
+        {scanTab === 'xml' && step !== STEPS.EDIT && step !== STEPS.SAVING && step !== STEPS.SUCCESS && (
+          <div className="bg-white rounded-[24px] p-6 shadow-lg card-lovable">
+            <NfceXmlImportBlock
+              onImported={(data) => {
+                applyNfceData(dataFromConsultarNfce(data));
+                setStep(STEPS.EDIT);
+              }}
+              onError={setError}
+            />
+            <p className="text-xs text-[#6b7280] mt-4 m-0">
+              O XML costuma vir por e-mail após a compra, ou pode ser baixado em alguns apps de loja. Aceita NFC-e (modelo 65).
+            </p>
+          </div>
+        )}
+
+        {scanTab === 'nfce' && step !== STEPS.EDIT && step !== STEPS.SAVING && step !== STEPS.SUCCESS && (
           <div className="bg-white rounded-[24px] p-6 shadow-lg card-lovable">
             <p className="text-[#666] text-sm mb-4">
-              Aponte a câmera para o <strong>QR Code</strong> impresso na NFC-e. A nota será consultada na SEFAZ, categorizada e salva no FinMemory.
+              Aponte a câmera para o <strong>QR Code</strong> no rodapé da nota, ou cole o link que abre no site da Fazenda.
+              Os produtos e o total aparecem na tela seguinte para você conferir.
             </p>
             {!nfceCameraOpen ? (
               <>
                 <button
                   type="button"
                   onClick={() => setNfceCameraOpen(true)}
-                  className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd]"
+                  className="w-full py-4 px-6 bg-[#e0f2fe] text-[#0369a1] rounded-xl text-base font-medium border-none cursor-pointer hover:bg-[#bae6fd] mb-3"
                 >
                   Escanear QR da NFC-e
                 </button>
+                <NfcePasteUrlBlock
+                  onConsult={(json) => {
+                    applyNfceData(dataFromConsultarNfce(json));
+                    setStep(STEPS.EDIT);
+                  }}
+                  onError={setError}
+                />
                 <p className="text-xs text-[#6b7280] mt-3 m-0">
-                  No telefone, use <strong>tirar foto do QR</strong> (câmera nativa). No computador, pode usar câmera ao vivo ou enviar uma foto do QR.
+                  Dica: se a câmera nativa do celular abriu o site da Fazenda, copie o endereço do navegador e cole acima.
                 </p>
               </>
             ) : (
               <NFCeScanner
-                userId={session?.user?.supabaseId || userId}
-                onSuccess={() => router.push('/dashboard')}
-                onClose={() => {
+                previewMode
+                onData={(json) => {
+                  if (isWeakNfceConsultResult(json)) {
+                    setError(nfceConsultErrorMessage(json));
+                    setNfceCameraOpen(false);
+                    return;
+                  }
+                  applyNfceData(dataFromConsultarNfce(json));
                   setNfceCameraOpen(false);
-                  router.push('/dashboard');
+                  setStep(STEPS.EDIT);
                 }}
+                onClose={() => setNfceCameraOpen(false)}
               />
             )}
           </div>
@@ -731,9 +956,6 @@ export default function AddReceipt() {
           </div>
         )}
 
-        {/* Container para o scanner de QR da foto (off-screen; lib exige elemento no DOM) */}
-        <div id="finmemory-qr-file-scan" className="absolute w-[1px] h-[1px] opacity-0 pointer-events-none left-[-9999px] top-0" aria-hidden="true" />
-
         {/* STEP: PREVIEW */}
         {scanTab === 'foto' && step === STEPS.PREVIEW && imagePreview && (
           <div className="bg-white rounded-[24px] p-6 text-center card-lovable">
@@ -772,7 +994,7 @@ export default function AddReceipt() {
         )}
 
         {/* STEP: PROCESSING */}
-        {scanTab === 'foto' && step === STEPS.PROCESSING && (
+        {step === STEPS.PROCESSING && (
           <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
             <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#2ECC49] rounded-full animate-spin mx-auto mb-6" />
             <h2 className="text-xl text-[#333] m-0 mb-2">Lendo sua nota fiscal...</h2>
@@ -782,8 +1004,8 @@ export default function AddReceipt() {
           </div>
         )}
 
-        {/* STEP: EDIT */}
-        {scanTab === 'foto' && step === STEPS.EDIT && (
+        {/* STEP: EDIT — foto ou NFC-e */}
+        {step === STEPS.EDIT && (
           <div className="bg-white rounded-[24px] p-6 card-lovable">
             <h2 className="text-xl text-[#333] m-0 mb-1">Confira os dados</h2>
             <p className="text-sm text-[#666] m-0 mb-4">
@@ -1060,7 +1282,7 @@ export default function AddReceipt() {
         )}
 
         {/* STEP: SAVING */}
-        {scanTab === 'foto' && step === STEPS.SAVING && (
+        {step === STEPS.SAVING && (
           <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
             <div className="w-12 h-12 border-4 border-[#e5e7eb] border-t-[#2ECC49] rounded-full animate-spin mx-auto mb-6" />
             <h2 className="text-xl text-[#333] m-0">Salvando transação...</h2>
@@ -1068,7 +1290,7 @@ export default function AddReceipt() {
         )}
 
         {/* STEP: SUCCESS */}
-        {scanTab === 'foto' && step === STEPS.SUCCESS && (
+        {step === STEPS.SUCCESS && (
           <div className="bg-white rounded-[24px] py-16 px-6 text-center card-lovable">
             <div className="text-6xl mb-4">✅</div>
             <h2 className="text-2xl text-[#059669] m-0 mb-2">Nota fiscal salva!</h2>

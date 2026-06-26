@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "exalted-entry-480904-s9"
-  }
+  },
+  "targets": {
+    "exalted-entry-480904-s9": {
+      "hosting": {
+        "consumer": [
+          "exalted-entry-480904-s9"
+        ],
+        "retailer": [
+          "finmemory-parceiros"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

@@ -1,15 +1,32 @@
 {
-  "hosting": {
-    "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "source": "**",
-        "run": {
-          "serviceId": "finmemory",
-          "region": "southamerica-east1"
+  "hosting": [
+    {
+      "target": "consumer",
+      "public": "public",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "finmemory",
+            "region": "southamerica-east1"
+          }
         }
-      }
-    ]
-  }
+      ]
+    },
+    {
+      "target": "retailer",
+      "public": "public",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "finmemory-retailer",
+            "region": "southamerica-east1"
+          }
+        }
+      ]
+    }
+  ]
 }
