@@ -36,6 +36,10 @@ ENV NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS=$NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS
 ENV NEXT_PUBLIC_RETAILER_APP_URL=$NEXT_PUBLIC_RETAILER_APP_URL
 ENV NEXT_PUBLIC_CONSUMER_APP_URL=$NEXT_PUBLIC_CONSUMER_APP_URL
 
+WORKDIR /app
+RUN node scripts/vision/copy-ort-wasm.mjs && node scripts/vision/export-demo-classifier-onnx.mjs
+
+WORKDIR /app/apps/retailer
 RUN npm run build
 
 FROM node:22-alpine AS runner

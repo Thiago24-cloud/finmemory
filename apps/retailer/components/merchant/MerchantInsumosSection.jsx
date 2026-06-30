@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Boxes, AlertTriangle, FileText, Upload } from 'lucide-react';
+import { Loader2, Plus, Boxes, AlertTriangle, FileText, Upload, ScanBarcode } from 'lucide-react';
+import Link from 'next/link';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchant/merchantApiErrorMessage';
 import { MerchantInsumoForm } from './MerchantInsumoForm';
@@ -194,6 +195,13 @@ export function MerchantInsumosSection({ lojaId, onCountChange }) {
             <FileText className="h-4 w-4" aria-hidden />
             Entrada por nota fiscal
           </button>
+          <Link
+            href="/parceiros/painel/estoque/camera"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-white/90 hover:bg-white/[0.08]"
+          >
+            <ScanBarcode className="h-4 w-4 text-[#39FF14]" aria-hidden />
+            Câmera (entrada/saída)
+          </Link>
         </div>
         {stats.pendente_revisao > 0 ? (
           <p className="text-xs text-amber-200/90 mt-3 m-0 flex items-center gap-1.5">

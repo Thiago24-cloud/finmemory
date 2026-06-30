@@ -12,7 +12,8 @@
     "./realtime/pedidos": "./src/realtime/pedidosRealtime.ts",
     "./validation": "./src/validation/index.ts",
     "./format": "./src/format/index.ts",
-    "./auth": "./src/auth/index.ts"
+    "./auth": "./src/auth/index.ts",
+    "./payments/cielo": "./src/payments/cielo/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4"

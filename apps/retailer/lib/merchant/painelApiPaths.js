@@ -22,6 +22,8 @@ export const painelApi = {
   notasEntradaProcessImage: `${PAINEL_API_BASE}/notas-entrada/process-image`,
   notasEntradaFetchNfce: `${PAINEL_API_BASE}/notas-entrada/fetch-nfce`,
   notasEntradaConfirm: `${PAINEL_API_BASE}/notas-entrada/confirm`,
+  estoqueScan: `${PAINEL_API_BASE}/estoque/scan`,
+  estoqueDetect: `${PAINEL_API_BASE}/estoque/detect`,
 };
 
 /** POST pedido retirada (consumidor logado). */

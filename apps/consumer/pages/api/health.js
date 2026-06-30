@@ -1,4 +1,5 @@
 import { getStripeCheckoutDiagnostics } from '../../lib/stripe/checkoutDiagnostics';
+import { getCieloPaymentDiagnostics } from '../../lib/cielo/cieloDiagnostics';
 
 /**
  * Health Check Endpoint
@@ -78,6 +79,13 @@ export default async function handler(req, res) {
     if (!stripeDiag.ok) {
       if (health.status === 'ok') health.status = 'degraded';
       health.checks.stripeCheckoutIssues = stripeDiag.issues;
+    }
+
+    const cieloDiag = getCieloPaymentDiagnostics();
+    health.checks.cieloPayments = cieloDiag.checks;
+    if (!cieloDiag.ok) {
+      if (health.status === 'ok') health.status = 'degraded';
+      health.checks.cieloPaymentsIssues = cieloDiag.issues;
     }
   }
 

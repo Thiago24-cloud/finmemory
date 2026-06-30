@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [PendingSaleEntity::class],
-    version = 1,
+    entities = [PendingSaleEntity::class, InsumoCacheEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class RetailerDatabase : RoomDatabase() {
 
     abstract fun pendingSaleDao(): PendingSaleDao
+    abstract fun insumoCacheDao(): InsumoCacheDao
 
     companion object {
         fun build(context: Context): RetailerDatabase =

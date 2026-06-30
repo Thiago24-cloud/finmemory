@@ -12,8 +12,9 @@ pids/
 *.pid
 *.seed
 
-# Build / production
-dist/
+# ONNX Runtime WASM (gerado por npm run vision:setup -w @finmemory/retailer)
+apps/retailer/public/ort/
+
 build/
 .next/
 .out/

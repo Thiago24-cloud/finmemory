@@ -35,6 +35,18 @@ const nextConfig: NextConfig = {
       { source: '/mapa', headers: securePages },
       { source: '/login', headers: securePages },
       { source: '/escolher-perfil', headers: securePages },
+      {
+        source: '/parceiros/painel/estoque/camera',
+        headers: [
+          ...securePages,
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
+        ],
+      },
+      {
+        source: '/ort/:path*',
+        headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'same-origin' }],
+      },
     ];
   },
 };

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "format": "classification",
+  "inputSize": 320,
+  "inputName": "images",
+  "outputName": "logits",
+  "classes": [
+    {
+      "label": "arroz 5kg",
+      "ean": "7891234567890",
+      "hint": "Demo: superfícies avermelhadas / marrom claro"
+    },
+    {
+      "label": "feijao preto 1kg",
+      "ean": "7891234567891",
+      "hint": "Demo: superfícies verdes / escuras"
+    },
+    {
+      "label": "oleo soja 900ml",
+      "ean": "7891234567892",
+      "hint": "Demo: superfícies amarelas / douradas"
+    }
+  ]
+}
