@@ -1,14 +1,14 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
-import { resolvePublicUserId } from '../../../lib/resolvePublicUserId';
+import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { resolvePublicUserId } from '../../../../lib/resolvePublicUserId';
 import {
   buildCieloMerchantOrderId,
   getCieloConfigFromEnv,
   getCieloService,
 } from '@finmemory/shared/payments/cielo';
-import { getCieloPaymentDiagnostics } from '../../../lib/cielo/cieloDiagnostics';
-import { persistCieloPayment } from '../../../lib/cielo/persistCieloPayment';
+import { getCieloPaymentDiagnostics } from '../../../../lib/cielo/cieloDiagnostics';
+import { persistCieloPayment } from '../../../../lib/cielo/persistCieloPayment';
 
 function parseJsonBody(req) {
   if (typeof req.body === 'object' && req.body !== null) return req.body;

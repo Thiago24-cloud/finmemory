@@ -1,9 +1,9 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../auth/[...nextauth]';
-import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { getSupabaseAdmin } from '../../../../../lib/supabaseAdmin';
 import { getCieloService } from '@finmemory/shared/payments/cielo';
-import { getCieloPaymentDiagnostics } from '../../../../lib/cielo/cieloDiagnostics';
-import { updateCieloPaymentStatus } from '../../../../lib/cielo/persistCieloPayment';
+import { getCieloPaymentDiagnostics } from '../../../../../lib/cielo/cieloDiagnostics';
+import { updateCieloPaymentStatus } from '../../../../../lib/cielo/persistCieloPayment';
 import { getCieloStatusLabel } from '@finmemory/shared/payments/cielo';
 
 /**
