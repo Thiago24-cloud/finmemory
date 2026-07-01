@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ListChecks } from 'lucide-react';
+import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ListChecks, Receipt } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantOrdersSection } from './MerchantOrdersSection';
@@ -15,6 +15,7 @@ import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
 import { buildConsumerMapUrl } from '../../lib/consumerAppUrl';
 import { ParceirosMapFrame } from './ParceirosMapFrame';
 import { MerchantListaComprasSection } from './MerchantListaComprasSection';
+import { MerchantVendasSection } from './MerchantVendasSection';
 
 export function MerchantPanel() {
   const { data: session } = useSession();
@@ -438,6 +439,20 @@ export function MerchantPanel() {
               <button
                 type="button"
                 role="tab"
+                aria-selected={panelTab === 'vendas'}
+                onClick={() => setPanelTab('vendas')}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'vendas'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Receipt className="h-4 w-4" aria-hidden />
+                Vendas
+              </button>
+              <button
+                type="button"
+                role="tab"
                 aria-selected={panelTab === 'mapa'}
                 onClick={() => setPanelTab('mapa')}
                 className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
@@ -492,6 +507,10 @@ export function MerchantPanel() {
                     setPanelTab('mapa');
                   }}
                 />
+              </div>
+            ) : panelTab === 'vendas' ? (
+              <div className="mt-4">
+                <MerchantVendasSection lojaId={ctx?.store?.id} />
               </div>
             ) : panelTab === 'insumos' ? (
               <div className="mt-4">

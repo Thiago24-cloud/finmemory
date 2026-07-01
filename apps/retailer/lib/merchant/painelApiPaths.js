@@ -25,6 +25,11 @@ export const painelApi = {
   estoqueScan: `${PAINEL_API_BASE}/estoque/scan`,
   estoqueDetect: `${PAINEL_API_BASE}/estoque/detect`,
   listaComprasCompare: `${PAINEL_API_BASE}/lista-compras/compare`,
+  vendas: `${PAINEL_API_BASE}/vendas`,
+  vendasResumo: `${PAINEL_API_BASE}/vendas/resumo`,
+  paymentsStatus: `${PAINEL_API_BASE}/payments/status`,
+  paymentsSimulate: `${PAINEL_API_BASE}/payments/simulate`,
+  paymentsWebhook: `${PAINEL_API_BASE}/payments/webhook`,
 };
 
 /** POST pedido retirada (consumidor logado). */
