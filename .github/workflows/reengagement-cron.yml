@@ -1,4 +1,4 @@
-# Cron diário: push para usuários inativos 48h+ (requer secrets no GitHub + Cloud Run)
+# Cron diário: push para usuários inativos 48h+ (requer secrets no GitHub + Cloud Run consumer)
 name: Reengagement inactive users
 
 on:
@@ -13,25 +13,32 @@ jobs:
     steps:
       - name: POST reengagement-inactive
         env:
+          CONSUMER_APP_URL: ${{ secrets.CONSUMER_APP_URL }}
           FINMEMORY_APP_URL: ${{ secrets.FINMEMORY_APP_URL }}
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DIA_IMPORT_SECRET: ${{ secrets.DIA_IMPORT_SECRET }}
+          ATACADAO_IMPORT_SECRET: ${{ secrets.ATACADAO_IMPORT_SECRET }}
         run: |
           set -euo pipefail
-          BASE_URL="${FINMEMORY_APP_URL:-${APP_URL:-}}"
+          BASE_URL="${CONSUMER_APP_URL:-${FINMEMORY_APP_URL:-${APP_URL:-}}}"
+          SECRET="${CRON_SECRET:-${DIA_IMPORT_SECRET:-${ATACADAO_IMPORT_SECRET:-}}}"
           if [ -z "$BASE_URL" ]; then
-            echo "::error::Defina o secret FINMEMORY_APP_URL ou APP_URL no repositório (Settings → Secrets → Actions)."
-            echo "Exemplo: https://finmemory-836908221936.southamerica-east1.run.app"
-            exit 1
-          fi
-          if [ -z "$CRON_SECRET" ]; then
-            echo "::error::Defina o secret CRON_SECRET (mesmo valor do Cloud Run) em Settings → Secrets → Actions."
+            echo "::error::Defina CONSUMER_APP_URL=https://finmemory.com.br em Settings → Secrets → Actions."
             exit 1
           fi
           BASE_URL="${BASE_URL%/}"
+          if echo "$BASE_URL" | grep -qiE 'parceiros\.finmemory|finmemory-retailer'; then
+            echo "::error::Use CONSUMER_APP_URL (finmemory.com.br), não parceiros."
+            exit 1
+          fi
+          if [ -z "$SECRET" ]; then
+            echo "::error::Defina CRON_SECRET ou DIA_IMPORT_SECRET (mesmo valor do Cloud Run consumer)."
+            exit 1
+          fi
           echo "Chamando ${BASE_URL}/api/cron/reengagement-inactive"
           http_code=$(curl -sS -o /tmp/reengage-body.json -w "%{http_code}" -X POST \
-            -H "x-cron-secret: ${CRON_SECRET}" \
+            -H "x-cron-secret: ${SECRET}" \
             -H "Content-Type: application/json" \
             --max-time 120 \
             "${BASE_URL}/api/cron/reengagement-inactive") || {

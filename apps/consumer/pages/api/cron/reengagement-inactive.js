@@ -6,7 +6,10 @@ const COOLDOWN_HOURS = 24;
 const BATCH_LIMIT = 200;
 
 function requireCronSecret(req) {
-  const secret = process.env.CRON_SECRET?.trim();
+  const secret =
+    process.env.CRON_SECRET?.trim() ||
+    process.env.DIA_IMPORT_SECRET?.trim() ||
+    process.env.ATACADAO_IMPORT_SECRET?.trim();
   if (!secret) return { ok: true };
   const provided =
     req.headers['x-cron-secret'] ||

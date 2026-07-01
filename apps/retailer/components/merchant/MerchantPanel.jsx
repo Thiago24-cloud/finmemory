@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes } from 'lucide-react';
+import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ListChecks } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantOrdersSection } from './MerchantOrdersSection';
@@ -12,6 +12,9 @@ import { MerchantInsumosSection } from './MerchantInsumosSection';
 import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchant/merchantApiErrorMessage';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
+import { buildConsumerMapUrl } from '../../lib/consumerAppUrl';
+import { ParceirosMapFrame } from './ParceirosMapFrame';
+import { MerchantListaComprasSection } from './MerchantListaComprasSection';
 
 export function MerchantPanel() {
   const { data: session } = useSession();
@@ -27,6 +30,7 @@ export function MerchantPanel() {
   const [repairing, setRepairing] = useState(false);
   const [panelTab, setPanelTab] = useState('ofertas');
   const [insumosCount, setInsumosCount] = useState(0);
+  const [customMapEmbedUrl, setCustomMapEmbedUrl] = useState(null);
 
   const tryRepairLink = useCallback(async () => {
     setRepairing(true);
@@ -223,6 +227,47 @@ export function MerchantPanel() {
   const storeName = ctx?.store?.name || session?.user?.merchantStoreName || 'Sua loja';
   const flashCount = products.filter((p) => p.em_oferta).length;
   const address = ctx?.store?.address || ctx?.store?.formatted_address;
+  const defaultMapEmbedUrl =
+    ctx?.store?.lat != null && ctx?.store?.lng != null
+      ? buildConsumerMapUrl({
+          lat: ctx.store.lat,
+          lng: ctx.store.lng,
+          zoom: 16,
+          from: 'parceiros',
+          embed: true,
+        })
+      : buildConsumerMapUrl({ from: 'parceiros', embed: true });
+
+  if (panelTab === 'mapa' && !loading) {
+    const activeMapUrl = customMapEmbedUrl || defaultMapEmbedUrl;
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#e8e4de]">
+        <header className="z-10 shrink-0 border-b border-[#dadce0] bg-[#0a0a10]/95 backdrop-blur">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-widest text-[#39FF14]/80 font-bold m-0">
+                FinMemory Parceiros
+              </p>
+              <h1 className="text-base font-bold m-0 truncate text-white">Mapa de preços</h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setCustomMapEmbedUrl(null);
+                setPanelTab('lista');
+              }}
+              className="shrink-0 rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5"
+            >
+              Voltar ao painel
+            </button>
+          </div>
+        </header>
+        <div className="relative min-h-0 flex-1">
+          <ParceirosMapFrame mapUrl={activeMapUrl} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#050508] text-white">
@@ -322,16 +367,13 @@ export function MerchantPanel() {
                 </span>
               </div>
               <p className="text-[11px] text-white/40 mt-3 m-0">
-                <Link
-                  href={
-                    ctx?.store?.lat != null && ctx?.store?.lng != null
-                      ? `/mapa?lat=${ctx.store.lat}&lng=${ctx.store.lng}`
-                      : '/mapa'
-                  }
-                  className="text-[#39FF14] hover:underline"
+                <button
+                  type="button"
+                  onClick={() => setPanelTab('mapa')}
+                  className="text-[#39FF14] hover:underline font-semibold bg-transparent border-0 p-0 cursor-pointer"
                 >
-                  Ver mapa público
-                </Link>
+                  Abrir mapa de preços
+                </button>
                 {' · '}
                 Ofertas ativas aparecem por ~3 dias para quem está a até ~3 km.
               </p>
@@ -378,7 +420,35 @@ export function MerchantPanel() {
               tempoPreparoMedio={ctx?.store?.tempo_preparo_medio ?? 15}
             />
 
-            <div className="mt-8 flex gap-2 border-b border-white/10 pb-px" role="tablist" aria-label="Seções do painel">
+            <div className="mt-8 flex gap-2 border-b border-white/10 pb-px overflow-x-auto" role="tablist" aria-label="Seções do painel">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'lista'}
+                onClick={() => setPanelTab('lista')}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'lista'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <ListChecks className="h-4 w-4" aria-hidden />
+                Lista
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'mapa'}
+                onClick={() => setPanelTab('mapa')}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'mapa'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Map className="h-4 w-4" aria-hidden />
+                Mapa
+              </button>
               <button
                 type="button"
                 role="tab"
@@ -412,11 +482,22 @@ export function MerchantPanel() {
               </button>
             </div>
 
-            {panelTab === 'insumos' ? (
+            {panelTab === 'lista' ? (
+              <div className="mt-4">
+                <MerchantListaComprasSection
+                  storeLat={ctx?.store?.lat}
+                  storeLng={ctx?.store?.lng}
+                  onOpenMap={(url) => {
+                    setCustomMapEmbedUrl(url);
+                    setPanelTab('mapa');
+                  }}
+                />
+              </div>
+            ) : panelTab === 'insumos' ? (
               <div className="mt-4">
                 <MerchantInsumosSection lojaId={ctx?.store?.id} onCountChange={setInsumosCount} />
               </div>
-            ) : (
+            ) : panelTab === 'ofertas' ? (
             <section className="mt-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold m-0">Produtos e ofertas</h2>
@@ -465,7 +546,7 @@ export function MerchantPanel() {
                 </ul>
               )}
             </section>
-            )}
+            ) : null}
           </>
         )}
       </main>

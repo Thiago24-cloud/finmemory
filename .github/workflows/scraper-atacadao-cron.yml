@@ -2,36 +2,73 @@ name: Scraper Atacadão — Cron Semanal
 
 on:
   schedule:
-    # Todo domingo às 03:00 BRT (= 06:00 UTC) — 1h após o scraper DIA
     - cron: '0 6 * * 0'
-  workflow_dispatch: # permite rodar manualmente no GitHub Actions UI
+  workflow_dispatch:
 
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Chamar POST /api/scraper/atacadao
+        env:
+          CONSUMER_APP_URL: ${{ secrets.CONSUMER_APP_URL }}
+          FINMEMORY_APP_URL: ${{ secrets.FINMEMORY_APP_URL }}
+          APP_URL: ${{ secrets.APP_URL }}
+          RETAILER_APP_URL: ${{ secrets.RETAILER_APP_URL }}
+          PARCEIROS_APP_URL: ${{ secrets.PARCEIROS_APP_URL }}
+          ATACADAO_IMPORT_SECRET: ${{ secrets.ATACADAO_IMPORT_SECRET }}
+          DIA_IMPORT_SECRET: ${{ secrets.DIA_IMPORT_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          echo "Iniciando scraper Atacadão — $(date -u)"
-          response=$(curl -s -w "\n%{http_code}" \
-            -X POST "${{ secrets.APP_URL }}/api/scraper/atacadao" \
+          set -euo pipefail
+          BASE_URL="${CONSUMER_APP_URL:-${FINMEMORY_APP_URL:-${APP_URL:-}}}"
+          RETAILER_URL="${RETAILER_APP_URL:-${PARCEIROS_APP_URL:-}}"
+          SECRET="${ATACADAO_IMPORT_SECRET:-${DIA_IMPORT_SECRET:-${CRON_SECRET:-}}}"
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::Defina CONSUMER_APP_URL=https://finmemory.com.br"
+            exit 1
+          fi
+          if [ -z "$SECRET" ]; then
+            echo "::error::Defina ATACADAO_IMPORT_SECRET (ou DIA_IMPORT_SECRET / CRON_SECRET)."
+            exit 1
+          fi
+          BASE_URL="${BASE_URL%/}"
+          if echo "$BASE_URL" | grep -qiE 'parceiros\.finmemory|finmemory-retailer|finmemory-parceiros'; then
+            echo "::error::Scrapers no consumer ($BASE_URL errado). Use CONSUMER_APP_URL=finmemory.com.br"
+            exit 1
+          fi
+          echo "Consumer (scrapers): $BASE_URL"
+          [ -n "$RETAILER_URL" ] && echo "Parceiros (health only): ${RETAILER_URL%/}"
+          response=$(curl -sS -w "\n%{http_code}" \
+            -X POST "${BASE_URL}/api/scraper/atacadao" \
             -H "Content-Type: application/json" \
-            -H "x-cron-secret: ${{ secrets.ATACADAO_IMPORT_SECRET }}" \
-            -d '{}' \
-            --max-time 1500)
+            -H "x-cron-secret: ${SECRET}" \
+            -d '{"batchSize":12,"batchIndex":0}' \
+            --max-time 2400) || {
+            echo "::error::curl falhou"
+            exit 1
+          }
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n -1)
           echo "HTTP $http_code"
           echo "$body" | python3 -m json.tool 2>/dev/null || echo "$body"
+          if [ "$http_code" = "404" ]; then
+            echo "::error::HTTP 404 — CONSUMER_APP_URL deve ser finmemory.com.br"
+            exit 1
+          fi
           if [ "$http_code" != "200" ]; then
             echo "::error::Scraper retornou HTTP $http_code"
             exit 1
           fi
-          success=$(echo "$body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('success',''))" 2>/dev/null)
-          stores_ok=$(echo "$body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('storesOk',0))" 2>/dev/null)
-          stores_total=$(echo "$body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('storesProcessed',0))" 2>/dev/null)
-          echo "success=$success | storesOk=$stores_ok/$stores_total"
-          if [ "$success" != "True" ] && [ "$success" != "true" ]; then
-            echo "::warning::success=false — verifique lojas com erro acima"
+          stores_ok=$(echo "$body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('storesOk',0))" 2>/dev/null || echo "0")
+          echo "storesOk=$stores_ok"
+          if [ "$stores_ok" = "0" ]; then
+            echo "::error::Nenhuma loja importada"
+            exit 1
+          fi
+          if [ -n "$RETAILER_URL" ]; then
+            RURL="${RETAILER_URL%/}"
+            rh=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 30 "${RURL}/api/health" || echo "000")
+            echo "Parceiros ${RURL}/api/health → HTTP ${rh}"
           fi

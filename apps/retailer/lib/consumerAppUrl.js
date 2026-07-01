@@ -12,11 +12,24 @@ export function getConsumerAppBaseUrl() {
 
 /**
  * Mapa oficial do consumidor (/mapa) — mesma rota, pins e promoções do app FinMemory.
- * @param {{ lat?: number|null, lng?: number|null, zoom?: number, from?: string }} opts
+ * @param {{ lat?: number|null, lng?: number|null, zoom?: number, from?: string, embed?: boolean, lista?: string|string[] }} opts
  */
-export function buildConsumerMapUrl({ lat, lng, zoom = 16, from = 'parceiros' } = {}) {
+export function buildConsumerMapUrl({
+  lat,
+  lng,
+  zoom = 16,
+  from = 'parceiros',
+  embed = false,
+  lista,
+} = {}) {
   const params = new URLSearchParams();
   if (from) params.set('from', from);
+  if (embed) params.set('embed', '1');
+  if (lista) {
+    const raw = Array.isArray(lista) ? lista.join(',') : String(lista);
+    const trimmed = raw.trim();
+    if (trimmed) params.set('lista', trimmed);
+  }
   const latN = Number(lat);
   const lngN = Number(lng);
   if (Number.isFinite(latN) && Number.isFinite(lngN)) {

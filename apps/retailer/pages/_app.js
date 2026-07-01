@@ -35,7 +35,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
     );
   }
 
-  if (merchantPanel || pathname.startsWith('/historico-inventario')) {
+  if (merchantPanel || pathname.startsWith('/historico-inventario') || pathname === '/mapa') {
     return (
       <MerchantAppShell session={session}>
         <Component {...pageProps} />

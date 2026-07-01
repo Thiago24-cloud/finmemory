@@ -38,8 +38,9 @@ Repositório → **Settings → Secrets and variables → Actions → New reposi
 
 | Secret | Valor |
 |--------|--------|
-| `APP_URL` | `https://finmemory-836908221936.southamerica-east1.run.app` |
-| `DIA_IMPORT_SECRET` | **Igual** ao do `.env.local` / Cloud Run |
+| `APP_URL` | **`https://finmemory.com.br`** (app **consumidor** — **não** use `parceiros.finmemory.com.br`) |
+| `FINMEMORY_APP_URL` | (opcional) mesmo URL do consumer |
+| `DIA_IMPORT_SECRET` | **Igual** ao do `.env.local` / Cloud Run **consumer** |
 
 (Opcional: `FINMEMORY_APP_URL` em vez de `APP_URL`.)
 
@@ -53,4 +54,6 @@ Antes o cron mandava **um lote** por domingo (~25 lojas). Agora são **até 8 lo
 
 ## Atacadão
 
-Cron separado: `.github/workflows/scraper-atacadao-cron.yml` (domingo 03:00 BRT). Mesmo `APP_URL` + secret `ATACADAO_IMPORT_SECRET` se usar.
+Cron separado: `.github/workflows/scraper-atacadao-cron.yml` (domingo 03:00 BRT). Mesmo `APP_URL` (**consumer**) + `ATACADAO_IMPORT_SECRET` (ou `DIA_IMPORT_SECRET` / `CRON_SECRET`).
+
+**Diagnóstico:** `node -r dotenv/config scripts/github-scraper-secrets-check.mjs`

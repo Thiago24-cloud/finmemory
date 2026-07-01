@@ -56,6 +56,11 @@ function retailerAppUrlForMap() {
 
 export async function getServerSideProps(ctx) {
   try {
+    /** Embed no app Parceiros (iframe em parceiros.finmemory.com.br) — mapa público, sem login consumidor. */
+    if (ctx.query?.from === 'parceiros') {
+      return { props: {} };
+    }
+
     const session = await getServerSession(ctx.req, ctx.res, authOptions);
     if (!session?.user?.email) {
       return { redirect: { destination: '/login?callbackUrl=/mapa', permanent: false } };
@@ -113,6 +118,18 @@ export default function MapaPage() {
 
   const wazeUi = router.isReady && router.query.waze === '1';
   const fromParceiros = isParceirosMapView(router);
+  const embedInParceirosApp = fromParceiros && router.query?.embed === '1';
+  const parceirosPlanningItems = useMemo(() => {
+    if (!fromParceiros || !router.isReady) return [];
+    const raw = router.query.lista;
+    if (typeof raw !== 'string' || !raw.trim()) return [];
+    return raw
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+  }, [fromParceiros, router.isReady, router.query.lista]);
+  const parceirosPlanningMode = fromParceiros && parceirosPlanningItems.length > 0;
   const mapFocusLat = router.isReady ? parseCoord(router.query.lat) : null;
   const mapFocusLng = router.isReady ? parseCoord(router.query.lng) : null;
   const mapFocusZoom = router.isReady ? parseCoord(router.query.zoom) : null;
@@ -248,8 +265,8 @@ export default function MapaPage() {
               searchQuery={fromParceiros ? '' : debouncedSearch}
               promoOnly={promoOnly}
               wazeUi={wazeUi}
-              planningMode={fromParceiros ? false : planningMode}
-              planningItems={fromParceiros ? [] : parsedPlanningItems}
+              planningMode={parceirosPlanningMode || (!fromParceiros && planningMode)}
+              planningItems={fromParceiros ? parceirosPlanningItems : parsedPlanningItems}
               onPlanningSummaryChange={setPlanningSummary}
               planningActionRequest={planningActionRequest}
               headerOffsetPx={mapPaddingTopPx}
@@ -264,7 +281,7 @@ export default function MapaPage() {
           </div>
         ) : null}
 
-        {fromParceiros && !showMapLanding ? (
+        {fromParceiros && !embedInParceirosApp && !showMapLanding ? (
           <div className="pointer-events-none absolute top-0 left-0 right-0 z-[45] flex justify-start px-3 pt-[max(10px,env(safe-area-inset-top))]">
             <a
               href={parceirosPainelUrl}

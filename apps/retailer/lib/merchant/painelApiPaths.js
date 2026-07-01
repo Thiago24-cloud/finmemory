@@ -24,6 +24,7 @@ export const painelApi = {
   notasEntradaConfirm: `${PAINEL_API_BASE}/notas-entrada/confirm`,
   estoqueScan: `${PAINEL_API_BASE}/estoque/scan`,
   estoqueDetect: `${PAINEL_API_BASE}/estoque/detect`,
+  listaComprasCompare: `${PAINEL_API_BASE}/lista-compras/compare`,
 };
 
 /** POST pedido retirada (consumidor logado). */

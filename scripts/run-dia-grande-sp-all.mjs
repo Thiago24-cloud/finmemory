@@ -23,8 +23,11 @@ const maxBatches = Math.max(1, Number(maxBatchesArg?.split('=')[1] || 999));
 
 const base =
   process.env.FINMEMORY_APP_URL?.trim() ||
-  process.env.NEXTAUTH_URL?.trim() ||
-  'http://localhost:3000';
+  process.env.NEXT_PUBLIC_CONSUMER_APP_URL?.trim() ||
+  (process.env.NEXTAUTH_URL?.trim() && !/parceiros\.finmemory/i.test(process.env.NEXTAUTH_URL)
+    ? process.env.NEXTAUTH_URL.trim()
+    : '') ||
+  'https://finmemory.com.br';
 const secret = process.env.DIA_IMPORT_SECRET || process.env.CRON_SECRET || '';
 
 async function runHttpBatch(batchIndex) {

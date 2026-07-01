@@ -1,5 +1,3 @@
-# Domingo 02:00 BRT (05:00 UTC): scraper DIA Grande SP → mapa automático (produção).
-# A API Anthropic roda no Cloud Run (ANTHROPIC_API_KEY lá). O GitHub só dispara HTTP.
 name: Scraper DIA — Cron Semanal
 
 on:
@@ -8,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       max_batches:
-        description: 'Quantos lotes rodar (padrão 8 ≈ todas as lojas Grande SP)'
+        description: 'Quantos lotes rodar (padrão 18 ≈ Grande SP com batch 10)'
         required: false
-        default: '8'
+        default: '18'
 
 jobs:
   run-scraper:
@@ -19,25 +17,36 @@ jobs:
     steps:
       - name: Scraper DIA — todos os lotes Grande SP
         env:
-          APP_URL: ${{ secrets.APP_URL }}
+          CONSUMER_APP_URL: ${{ secrets.CONSUMER_APP_URL }}
           FINMEMORY_APP_URL: ${{ secrets.FINMEMORY_APP_URL }}
+          APP_URL: ${{ secrets.APP_URL }}
+          RETAILER_APP_URL: ${{ secrets.RETAILER_APP_URL }}
+          PARCEIROS_APP_URL: ${{ secrets.PARCEIROS_APP_URL }}
           DIA_IMPORT_SECRET: ${{ secrets.DIA_IMPORT_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          MAX_BATCHES: ${{ github.event.inputs.max_batches || '8' }}
+          MAX_BATCHES: ${{ github.event.inputs.max_batches || '18' }}
         run: |
           set -euo pipefail
-          BASE_URL="${APP_URL:-${FINMEMORY_APP_URL:-}}"
+          BASE_URL="${CONSUMER_APP_URL:-${FINMEMORY_APP_URL:-${APP_URL:-}}}"
+          RETAILER_URL="${RETAILER_APP_URL:-${PARCEIROS_APP_URL:-}}"
           SECRET="${DIA_IMPORT_SECRET:-${CRON_SECRET:-}}"
           if [ -z "$BASE_URL" ]; then
-            echo "::error::Defina o secret APP_URL ou FINMEMORY_APP_URL no GitHub (Settings → Secrets → Actions)."
+            echo "::error::Defina CONSUMER_APP_URL=https://finmemory.com.br (scrapers ficam no app consumidor)."
             exit 1
           fi
           if [ -z "$SECRET" ]; then
-            echo "::error::Defina DIA_IMPORT_SECRET ou CRON_SECRET (mesmo valor do Cloud Run)."
+            echo "::error::Defina DIA_IMPORT_SECRET ou CRON_SECRET (mesmo valor do Cloud Run consumer)."
             exit 1
           fi
           BASE_URL="${BASE_URL%/}"
-          BATCH_SIZE=25
+          if echo "$BASE_URL" | grep -qiE 'parceiros\.finmemory|finmemory-retailer|finmemory-parceiros'; then
+            echo "::error::URL do scraper aponta para o app lojista ($BASE_URL)."
+            echo "::error::Use CONSUMER_APP_URL=https://finmemory.com.br — o mapa do parceiros usa o mesmo banco."
+            exit 1
+          fi
+          echo "Consumer (scrapers): $BASE_URL"
+          [ -n "$RETAILER_URL" ] && echo "Parceiros (health only): ${RETAILER_URL%/}"
+          BATCH_SIZE=10
           echo "Iniciando scraper DIA Grande SP — $(date -u) — até ${MAX_BATCHES} lotes de ${BATCH_SIZE} lojas"
           total_inserted=0
           total_ok=0
@@ -57,6 +66,10 @@ jobs:
             body=$(echo "$response" | head -n -1)
             echo "HTTP ${http_code}"
             echo "$body" | python3 -m json.tool 2>/dev/null || echo "$body"
+            if [ "$http_code" = "404" ]; then
+              echo "::error::HTTP 404 — CONSUMER_APP_URL deve ser finmemory.com.br (não parceiros)."
+              exit 1
+            fi
             if [ "$http_code" != "200" ]; then
               echo "::error::Lote ${batch} retornou HTTP ${http_code}"
               exit 1
@@ -70,3 +83,11 @@ jobs:
           done
           echo ""
           echo "Concluído: storesOk acumulado=${total_ok} | price_points inseridos≈${total_inserted}"
+          if [ -n "$RETAILER_URL" ]; then
+            RURL="${RETAILER_URL%/}"
+            rh=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 30 "${RURL}/api/health" || echo "000")
+            echo "Parceiros ${RURL}/api/health → HTTP ${rh}"
+            if [ "$rh" != "200" ]; then
+              echo "::warning::App parceiros sem health 200 — mapa no parceiros redireciona para o consumer."
+            fi
+          fi

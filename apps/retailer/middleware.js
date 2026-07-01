@@ -34,6 +34,7 @@ function isPublicPagePath(pathname) {
   if (pathname.startsWith('/login')) return true;
   if (pathname.startsWith('/parceiros')) return true;
   if (pathname.startsWith('/escolher-perfil')) return true;
+  if (pathname === '/mapa') return true;
   return false;
 }
 

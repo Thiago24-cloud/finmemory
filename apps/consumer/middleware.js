@@ -14,7 +14,7 @@ function isPublicApiPath(pathname) {
   if (pathname === '/api/webhook') return true;
   if (pathname === '/api/signup') return true;
   if (pathname.startsWith('/api/parceiros/pedidos')) return true;
-  if (pathname === '/api/map/produtos-proximos') return true;
+  if (pathname.startsWith('/api/map/')) return true;
   if (pathname.startsWith('/api/scraper/')) return true;
   if (pathname.startsWith('/api/scrapers/')) return true;
   return false;
@@ -29,6 +29,11 @@ function isPublicPagePath(pathname) {
   if (pathname.startsWith('/termos')) return true;
   if (pathname.startsWith('/download')) return true;
   return false;
+}
+
+/** Mapa embutido no app Parceiros — sem filtro de beta no consumidor. */
+function isParceirosMapEmbed(pathname, searchParams) {
+  return pathname === '/mapa' && searchParams.get('from') === 'parceiros';
 }
 
 /** Arquivos em /public — não passar pelo filtro de beta (evita img quebrada no mascote, logos, etc.). */
@@ -66,6 +71,7 @@ export async function middleware(req) {
   }
 
   if (isPublicPagePath(pathname)) return NextResponse.next();
+  if (isParceirosMapEmbed(pathname, req.nextUrl.searchParams)) return NextResponse.next();
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (
