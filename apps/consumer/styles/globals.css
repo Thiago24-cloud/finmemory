@@ -128,6 +128,82 @@
   }
 }
 
+/* Tema claro de produto: neutraliza superfícies escuras legadas quando aplicado ao shell da página. */
+.finmemory-light-shell,
+.finmemory-light-shell.bg-\[\#050508\],
+.finmemory-light-shell.bg-\[\#0A0E1A\],
+.finmemory-light-shell.bg-\[\#0a0f1a\] {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+.finmemory-light-shell .bg-\[\#050508\],
+.finmemory-light-shell .bg-\[\#0a0a10\],
+.finmemory-light-shell .bg-\[\#0A0E1A\],
+.finmemory-light-shell .bg-\[\#0a0f1a\],
+.finmemory-light-shell .bg-\[\#0c0c12\],
+.finmemory-light-shell .bg-\[\#0b1220\],
+.finmemory-light-shell .bg-\[\#0f1419\],
+.finmemory-light-shell .bg-\[\#111827\],
+.finmemory-light-shell .bg-\[\#141c2e\],
+.finmemory-light-shell .from-\[\#050508\],
+.finmemory-light-shell .from-\[\#0a0f1a\],
+.finmemory-light-shell .to-\[\#050508\],
+.finmemory-light-shell .to-\[\#0a0f1a\] {
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+.finmemory-light-shell .bg-\[\#050508\]\/85,
+.finmemory-light-shell .bg-\[\#0a0a10\]\/80,
+.finmemory-light-shell .bg-\[\#0a0f1a\]\/90 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+.finmemory-light-shell .bg-white\/5,
+.finmemory-light-shell .bg-white\/10,
+.finmemory-light-shell .bg-white\/\[0\.02\],
+.finmemory-light-shell .bg-white\/\[0\.03\],
+.finmemory-light-shell .bg-white\/\[0\.05\],
+.finmemory-light-shell .bg-white\/\[0\.08\] {
+  background-color: #ffffff !important;
+}
+.finmemory-light-shell .bg-black\/20,
+.finmemory-light-shell .bg-black\/30,
+.finmemory-light-shell .bg-black\/40,
+.finmemory-light-shell .bg-black\/50 {
+  background-color: #f1f5f9 !important;
+}
+.finmemory-light-shell .text-white,
+.finmemory-light-shell .text-white\/95,
+.finmemory-light-shell .text-white\/90,
+.finmemory-light-shell .text-white\/85,
+.finmemory-light-shell .text-white\/80,
+.finmemory-light-shell .text-white\/75,
+.finmemory-light-shell .text-white\/70,
+.finmemory-light-shell .text-white\/65,
+.finmemory-light-shell .text-white\/60,
+.finmemory-light-shell .text-white\/55,
+.finmemory-light-shell .text-white\/50,
+.finmemory-light-shell .text-white\/45,
+.finmemory-light-shell .text-white\/40 {
+  color: #0f172a !important;
+}
+.finmemory-light-shell .text-\[\#39FF14\],
+.finmemory-light-shell .text-\[\#2ECC49\] {
+  color: #16a34a !important;
+}
+.finmemory-light-shell .border-white\/5,
+.finmemory-light-shell .border-white\/10,
+.finmemory-light-shell .border-white\/15,
+.finmemory-light-shell .border-white\/20,
+.finmemory-light-shell .border-white\/25,
+.finmemory-light-shell .border-white\/30,
+.finmemory-light-shell .border-white\/40 {
+  border-color: #e2e8f0 !important;
+}
+.finmemory-light-shell .shadow-black\/20,
+.finmemory-light-shell .shadow-black\/25 {
+  --tw-shadow-color: rgba(15, 23, 42, 0.08) !important;
+}
+
 /* Cards – Lovable: 16px radius, shadow 0 4px 6px rgba(0,0,0,0.1) */
 @layer components {
   .card-lovable {

@@ -1,49 +1,49 @@
-/** Copywriting — landing Parceiros FinMemory (lojistas regionais). */
+/** Copywriting — landing Parceiros FinMemory (compras e estoque para pequenos empreendedores). */
 
 export const PARTNERS_HERO = {
   eyebrow: 'FinMemory Parceiros',
-  title: 'Mais clientes na porta. Menos fila no balcão.',
+  title: 'Compre insumos pelo menor preço, antes do estoque apertar.',
   subtitle:
-    'Coloque sua lanchonete, pizzaria ou loja no mapa de consumo inteligente. O cliente compra e paga pelo app; quando chega, o pedido já está pronto para retirada — com ETA calculado pela localização.',
+    'Um software para restaurantes, lanchonetes e lojas de conveniência que compram parte dos suprimentos em mercados, atacarejos e CEASA. Acompanhe preços perto da sua loja, receba alertas e mantenha o estoque organizado pelo celular ou computador.',
   ctaPrimary: 'Cadastrar minha loja',
-  ctaSecondary: 'Ver como funciona',
+  ctaSecondary: 'Ver compras inteligentes',
 };
 
 export const PARTNERS_BENEFITS = [
   {
-    icon: 'panel',
-    title: 'Painel exclusivo da sua loja',
-    body: 'Multitenancy lógico: estoque, cardápio e ofertas só da sua marca. Nenhum vizinho vê ou edita seus dados.',
+    icon: 'map',
+    title: 'Mapa de preços em tempo real',
+    body: 'Veja onde arroz, óleo, bebidas, carnes e outros insumos estão mais baratos de acordo com a localização da sua loja.',
   },
   {
-    icon: 'geo',
-    title: 'Ofertas relâmpago por geolocalização',
-    body: 'Dispare promoções (ex.: “Milkshake R$ 10”) para quem está a 2–3 km do seu endereço, no momento certo.',
+    icon: 'alert',
+    title: 'Alertas para comprar na hora certa',
+    body: 'Receba avisos quando produtos importantes baixarem de preço e compare opções antes de sair para comprar.',
   },
   {
-    icon: 'pay',
-    title: 'Pagamento no app + split automático',
-    body: 'Pix ou cartão no FinMemory. Split de pagamento seguro: sua parte cai na conta e o comprovante vai por e-mail.',
+    icon: 'stock',
+    title: 'Controle de estoque simples',
+    body: 'Registre entradas, acompanhe quantidades e evite perder margem por falta de insumo ou compra emergencial cara.',
   },
   {
-    icon: 'pickup',
-    title: 'Retirada inteligente (Pick-up)',
-    body: 'Menos garçom parado com maquininha. Mais giro na cozinha: o cliente avisa a chegada e você prepara no tempo certo.',
+    icon: 'invoice',
+    title: 'Entrada por nota ou foto',
+    body: 'Automatize as compras que chegam na loja: tire foto da nota fiscal ou do papel e transforme em itens de estoque.',
   },
 ];
 
 export const PARTNERS_STEPS = [
-  { step: '01', title: 'Cadastre a loja', body: 'Endereço validado para pin no mapa e raio de alcance das campanhas.' },
-  { step: '02', title: 'Monte ofertas', body: 'Produtos, preços e estoque no painel web — simples como uma planilha moderna.' },
-  { step: '03', title: 'Atraia quem está perto', body: 'Notificações e pins para consumidores no raio de 2–3 km.' },
-  { step: '04', title: 'Receba e entregue na hora', body: 'Pagamento confirmado; produção alinhada ao ETA de chegada do cliente.' },
+  { step: '01', title: 'Cadastre a loja', body: 'O endereço da loja define a área de busca para mercados, atacarejos e ofertas próximas.' },
+  { step: '02', title: 'Monte sua lista de insumos', body: 'Adicione os produtos que mais pesam no seu custo: bebidas, descartáveis, hortifruti, carnes e mercearia.' },
+  { step: '03', title: 'Compare preços no mapa', body: 'O FinMemory mostra onde comprar melhor e monitora variações para você não depender de chute.' },
+  { step: '04', title: 'Atualize o estoque', body: 'Depois da compra, registre a entrada por nota, foto ou painel e mantenha o controle da operação.' },
 ];
 
 export const PARTNERS_FORM = {
-  title: 'Comece a vender pelo FinMemory',
-  subtitle: 'Preencha os dados da loja. Em instantes criamos sua conta varejista e reservamos seu espaço no mapa.',
-  submit: 'Cadastrar minha loja e começar a vender',
+  title: 'Comece a comprar melhor pelo FinMemory',
+  subtitle: 'Preencha os dados da loja. Em instantes criamos sua conta para acessar mapa de preços, lista de compras e estoque.',
+  submit: 'Cadastrar minha loja e organizar compras',
   successTitle: 'Loja registrada!',
   successBody:
-    'Sua conta foi criada. Faça login para acessar o painel da loja, cadastrar produtos e publicar sua primeira oferta no mapa.',
+    'Sua conta foi criada. Faça login para acessar o painel, montar sua lista de insumos e acompanhar preços no mapa.',
 };

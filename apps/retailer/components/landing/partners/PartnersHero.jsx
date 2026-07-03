@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Sparkles, Timer } from 'lucide-react';
+import { Bell, MapPin, PackageCheck } from 'lucide-react';
 import { PARTNERS_HERO } from '../../../lib/partners/landingCopy';
 
 export function PartnersHero() {
@@ -42,15 +42,15 @@ export function PartnersHero() {
           <ul className="mt-10 flex flex-wrap gap-4 text-xs text-white/50 list-none p-0 m-0">
             <li className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-[#39FF14]" aria-hidden />
-              Raio 2–3 km
+              Preços por localização
             </li>
             <li className="flex items-center gap-2">
-              <Timer className="h-4 w-4 text-[#39FF14]" aria-hidden />
-              ETA na retirada
+              <Bell className="h-4 w-4 text-[#39FF14]" aria-hidden />
+              Alertas de queda
             </li>
             <li className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[#39FF14]" aria-hidden />
-              Modelo iFood Parceiros
+              <PackageCheck className="h-4 w-4 text-[#39FF14]" aria-hidden />
+              Estoque por nota/foto
             </li>
           </ul>
         </div>
@@ -60,25 +60,25 @@ export function PartnersHero() {
           aria-hidden
         >
           <div className="absolute -top-px left-8 right-8 h-px bg-gradient-to-r from-transparent via-[#39FF14]/60 to-transparent" />
-          <p className="text-sm font-semibold text-[#39FF14] m-0 mb-4">Simulação ao vivo</p>
+          <p className="text-sm font-semibold text-[#39FF14] m-0 mb-4">Compras inteligentes</p>
           <div className="space-y-3">
             <div className="rounded-2xl bg-[#0c0c12] border border-[#39FF14]/30 p-4">
-              <p className="text-[10px] uppercase tracking-wider text-white/40 m-0">Oferta relâmpago</p>
-              <p className="text-lg font-bold text-white mt-1 m-0">Milkshake R$ 10,00</p>
-              <p className="text-xs text-white/50 mt-1 m-0">127 pessoas a 2,1 km · agora</p>
+              <p className="text-[10px] uppercase tracking-wider text-white/40 m-0">Alerta de preço</p>
+              <p className="text-lg font-bold text-white mt-1 m-0">Óleo 900 ml caiu para R$ 5,89</p>
+              <p className="text-xs text-white/50 mt-1 m-0">Atacarejo a 2,1 km · melhor opção agora</p>
             </div>
             <div className="rounded-2xl bg-[#0c0c12] border border-white/10 p-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs text-white/50 m-0">Cliente a caminho</p>
-                <p className="text-sm font-semibold text-white m-0">Chegada em ~8 min</p>
+                <p className="text-xs text-white/50 m-0">Lista da semana</p>
+                <p className="text-sm font-semibold text-white m-0">12 insumos comparados perto da loja</p>
               </div>
               <span className="shrink-0 rounded-full bg-[#39FF14]/20 text-[#39FF14] text-xs font-bold px-3 py-1">
-                Preparar
+                Comprar
               </span>
             </div>
             <div className="rounded-2xl bg-[#0c0c12] border border-white/10 p-4">
-              <p className="text-xs text-white/50 m-0">Pagamento confirmado</p>
-              <p className="text-sm font-semibold text-[#39FF14] m-0 mt-1">Pix · Split automático</p>
+              <p className="text-xs text-white/50 m-0">Entrada automatizada</p>
+              <p className="text-sm font-semibold text-[#39FF14] m-0 mt-1">Nota/foto atualiza o estoque</p>
             </div>
           </div>
         </div>

@@ -64,7 +64,7 @@ export default function PedidoTrackPage() {
         <title>Acompanhar pedido — FinMemory</title>
         <meta name="robots" content="noindex" />
       </Head>
-      <div className="min-h-screen bg-[#050508] text-white px-4 py-8 max-w-md mx-auto">
+      <div className="finmemory-light-shell min-h-screen bg-[#050508] text-white px-4 py-8 max-w-md mx-auto">
         <Link href="/mapa" className="text-sm text-[#39FF14] hover:underline">
           ← Voltar ao mapa
         </Link>

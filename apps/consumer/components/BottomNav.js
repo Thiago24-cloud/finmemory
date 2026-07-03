@@ -42,7 +42,7 @@ export function BottomNav() {
   const scanActive = pathname === '/add-receipt';
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] isolate glass dark:bg-[#0d1219]/95 dark:backdrop-blur-2xl border-t border-border/50 dark:border-border safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] isolate glass bg-white/92 backdrop-blur-2xl border-t border-border/70 safe-area-bottom">
       <div className="max-w-md mx-auto relative flex items-end justify-between h-[4.5rem] px-2 pb-1">
         <div className="flex flex-1 justify-start items-end gap-0.5 sm:gap-1 pl-0.5">
           {restrictedFeaturesAllowed ? (
@@ -122,9 +122,9 @@ export function BottomNav() {
             'absolute left-1/2 -translate-x-1/2 bottom-[1.1rem] pointer-events-auto z-10',
             'w-[3.65rem] h-[3.65rem] rounded-full flex items-center justify-center',
             'bg-gradient-to-br from-[#34d399] via-[#22c55e] to-[#16a34a] text-[#0A0E1A]',
-            'shadow-[0_10px_28px_rgba(0,230,118,0.4)] ring-4 ring-[#0d1219]',
+            'shadow-[0_10px_28px_rgba(34,197,94,0.32)] ring-4 ring-white',
             'border border-emerald-500/30 hover:brightness-[1.05] active:scale-[0.97] transition-transform will-change-transform',
-            scanActive && 'ring-[#00E676]/40 ring-offset-2 ring-offset-[#0d1219]'
+            scanActive && 'ring-emerald-200 ring-offset-2 ring-offset-[#f8fafc]'
           )}
           aria-label={BOTTOM_NAV.scanAria}
         >

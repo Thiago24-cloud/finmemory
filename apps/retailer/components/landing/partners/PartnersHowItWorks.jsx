@@ -8,7 +8,7 @@ export function PartnersHowItWorks() {
       <div className="max-w-6xl mx-auto">
         <h2 className="text-2xl sm:text-3xl font-bold m-0 text-center">Como funciona na prática</h2>
         <p className="text-center text-white/55 mt-3 max-w-xl mx-auto m-0">
-          Do cadastro à primeira venda em poucos passos — tudo pelo navegador, sem instalar nada no PC da loja.
+          Da lista de compras ao estoque atualizado: tudo pelo navegador, celular ou computador da loja.
         </p>
         <ol className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0">
           {PARTNERS_STEPS.map((s) => (

@@ -926,7 +926,7 @@ export default function Dashboard() {
   const userLevel = transactionCount < 10 ? 'Iniciante' : transactionCount < 50 ? 'Regular' : 'Expert';
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="finmemory-light-shell min-h-screen bg-background text-foreground">
       <h1 className="sr-only">FinMemory - Dashboard</h1>
       {isAuthenticated ? (
         <CalculatorDockProvider>

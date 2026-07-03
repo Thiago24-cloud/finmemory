@@ -242,8 +242,8 @@ export function MerchantPanel() {
   if (panelTab === 'mapa' && !loading) {
     const activeMapUrl = customMapEmbedUrl || defaultMapEmbedUrl;
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-[#e8e4de]">
-        <header className="z-10 shrink-0 border-b border-[#dadce0] bg-[#0a0a10]/95 backdrop-blur">
+      <div className="finmemory-light-shell fixed inset-0 z-50 flex flex-col bg-[#f8fafc]">
+        <header className="z-10 shrink-0 border-b border-[#e2e8f0] bg-white/95 backdrop-blur">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-widest text-[#39FF14]/80 font-bold m-0">
@@ -271,7 +271,7 @@ export function MerchantPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050508] text-white">
+    <div className="finmemory-light-shell min-h-screen bg-[#050508] text-white">
       <header className="border-b border-white/10 bg-[#0a0a10]/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
           <div className="min-w-0">

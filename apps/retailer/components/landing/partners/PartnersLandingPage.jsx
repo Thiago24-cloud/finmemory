@@ -14,7 +14,7 @@ import { PartnersOnboardingForm } from './PartnersOnboardingForm';
 const NAV = [
   { href: '#beneficios', label: 'Benefícios' },
   { href: '#como-funciona', label: 'Como funciona' },
-  { href: '#pickup', label: 'Retirada inteligente' },
+  { href: '#compras', label: 'Compras inteligentes' },
   { href: '#cadastro', label: 'Cadastrar loja' },
 ];
 
@@ -22,7 +22,7 @@ export function PartnersLandingPage({ socialProviders = [] }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#050508] text-white scroll-smooth selection:bg-[#39FF14]/30">
+    <div className="finmemory-light-shell min-h-screen bg-[#050508] text-white scroll-smooth selection:bg-[#39FF14]/30">
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/10 bg-[#050508]/85 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2.5 shrink-0">

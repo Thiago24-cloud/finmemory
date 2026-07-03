@@ -169,7 +169,7 @@ export default function InstitutionalLanding({ accessNotice = null }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#fafbfc] text-[#0f172a] scroll-smooth">
+    <div className="finmemory-light-shell min-h-screen bg-[#fafbfc] text-[#0f172a] scroll-smooth">
       {accessNotice ? (
         <div
           role="alert"
