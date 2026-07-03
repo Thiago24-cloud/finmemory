@@ -40,9 +40,9 @@ export const PARTNERS_STEPS = [
 ];
 
 export const PARTNERS_FORM = {
-  title: 'Comece a comprar melhor pelo FinMemory',
-  subtitle: 'Preencha os dados da loja. Em instantes criamos sua conta para acessar mapa de preços, lista de compras e estoque.',
-  submit: 'Cadastrar minha loja e organizar compras',
+  title: 'Faça seu cadastro normal',
+  subtitle: 'Crie sua conta com Google ou e-mail e acesse o painel. Os dados da loja ficam para configurar depois, sem travar o primeiro acesso.',
+  submit: 'Criar conta e acessar o painel',
   successTitle: 'Loja registrada!',
   successBody:
     'Sua conta foi criada. Faça login para acessar o painel, montar sua lista de insumos e acompanhar preços no mapa.',

@@ -37,15 +37,6 @@ export async function getServerSideProps(ctx) {
       },
     };
   }
-  if (access === 'no_store') {
-    return {
-      redirect: {
-        destination: '/parceiros#cadastro',
-        permanent: false,
-      },
-    };
-  }
-
   return {
     props: {
       session: JSON.parse(JSON.stringify(session)),

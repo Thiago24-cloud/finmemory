@@ -30,6 +30,13 @@ export default function LoginPage({ socialProviders = [] }) {
 
   const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/parceiros/painel';
 
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query?.mode === 'signup' || router.query?.mode === 'cadastro') {
+      setMode('signup');
+    }
+  }, [router.isReady, router.query?.mode]);
+
   /** Conta autenticada: ir ao destino */
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.supabaseId) return;
