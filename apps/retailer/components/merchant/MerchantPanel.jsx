@@ -17,6 +17,14 @@ import { ParceirosMapFrame } from './ParceirosMapFrame';
 import { MerchantListaComprasSection } from './MerchantListaComprasSection';
 import { MerchantVendasSection } from './MerchantVendasSection';
 
+const PANEL_TABS = [
+  { id: 'lista', label: 'Lista', Icon: ListChecks },
+  { id: 'vendas', label: 'Vendas', Icon: Receipt },
+  { id: 'mapa', label: 'Mapa', Icon: Map },
+  { id: 'ofertas', label: 'Ofertas', Icon: Zap },
+  { id: 'insumos', label: 'Insumos', Icon: Boxes },
+];
+
 export function MerchantPanel() {
   const { data: session } = useSession();
   const [ctx, setCtx] = useState(null);
@@ -238,6 +246,8 @@ export function MerchantPanel() {
           embed: true,
         })
       : buildConsumerMapUrl({ from: 'parceiros', embed: true });
+  const activeTab = PANEL_TABS.find((tab) => tab.id === panelTab) || PANEL_TABS[0];
+  const ActiveTabIcon = activeTab.Icon;
 
   if (panelTab === 'mapa' && !loading) {
     const activeMapUrl = customMapEmbedUrl || defaultMapEmbedUrl;
@@ -272,7 +282,48 @@ export function MerchantPanel() {
 
   return (
     <div className="finmemory-light-shell min-h-screen bg-[#050508] text-white">
-      <header className="border-b border-white/10 bg-[#0a0a10]/80 backdrop-blur sticky top-0 z-10">
+      <header className="sm:hidden sticky top-0 z-20 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-xl">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-widest text-[#16a34a] font-black m-0">
+                FinMemory Parceiros
+              </p>
+              <h1 className="text-base font-black m-0 truncate text-[#0f172a]">{storeName}</h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: '/parceiros' })}
+              className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[#e2e8f0] bg-white text-[#64748b] shadow-sm"
+              aria-label="Sair"
+            >
+              <LogOut className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+          {!loading ? (
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-2 py-2">
+                <p className="m-0 text-[10px] font-semibold text-[#64748b]">Produtos</p>
+                <p className="m-0 text-base font-black text-[#0f172a]">{products.length}</p>
+              </div>
+              <div className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-2 py-2">
+                <p className="m-0 text-[10px] font-semibold text-[#15803d]">Ofertas</p>
+                <p className="m-0 text-base font-black text-[#16a34a]">{flashCount}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPanelTab('mapa')}
+                className="rounded-2xl border border-[#bbf7d0] bg-white px-2 py-2 text-[#16a34a]"
+              >
+                <Map className="mx-auto h-4 w-4" aria-hidden />
+                <span className="mt-0.5 block text-[10px] font-bold">Mapa</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </header>
+
+      <header className="hidden sm:block border-b border-white/10 bg-[#0a0a10]/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-widest text-[#39FF14]/80 font-bold m-0">
@@ -294,7 +345,7 @@ export function MerchantPanel() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 pb-16">
+      <main className="max-w-5xl mx-auto px-4 pt-4 pb-28 sm:py-6 sm:pb-16">
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-[#39FF14]" aria-label="Carregando" />
@@ -345,83 +396,97 @@ export function MerchantPanel() {
               </p>
             ) : null}
 
-            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-              <h2 className="text-sm font-bold m-0 text-white/90">Sua loja no mapa</h2>
-              {address ? (
-                <p className="text-xs text-white/50 mt-2 m-0 flex items-start gap-2">
-                  <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-                  {address}
+            <div className="hidden sm:block">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+                <h2 className="text-sm font-bold m-0 text-white/90">Sua loja no mapa</h2>
+                {address ? (
+                  <p className="text-xs text-white/50 mt-2 m-0 flex items-start gap-2">
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                    {address}
+                  </p>
+                ) : (
+                  <p className="text-xs text-white/40 mt-2 m-0">
+                    Endereço cadastrado no signup — clientes próximos verão suas ofertas relâmpago.
+                  </p>
+                )}
+                <div className="mt-4 flex flex-wrap gap-3 text-xs">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-3 py-1.5">
+                    <Package className="h-3.5 w-3.5 text-white/50" aria-hidden />
+                    {products.length} produto{products.length === 1 ? '' : 's'}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#39FF14]/10 border border-[#39FF14]/30 text-[#39FF14] px-3 py-1.5 font-semibold">
+                    <Zap className="h-3.5 w-3.5" aria-hidden />
+                    {flashCount} oferta{flashCount === 1 ? '' : 's'} relâmpago
+                  </span>
+                </div>
+                <p className="text-[11px] text-white/40 mt-3 m-0">
+                  <button
+                    type="button"
+                    onClick={() => setPanelTab('mapa')}
+                    className="text-[#39FF14] hover:underline font-semibold bg-transparent border-0 p-0 cursor-pointer"
+                  >
+                    Abrir mapa de preços
+                  </button>
+                  {' · '}
+                  Ofertas ativas aparecem por ~3 dias para quem está a até ~3 km.
                 </p>
-              ) : (
-                <p className="text-xs text-white/40 mt-2 m-0">
-                  Endereço cadastrado no signup — clientes próximos verão suas ofertas relâmpago.
-                </p>
-              )}
-              <div className="mt-4 flex flex-wrap gap-3 text-xs">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-3 py-1.5">
-                  <Package className="h-3.5 w-3.5 text-white/50" aria-hidden />
-                  {products.length} produto{products.length === 1 ? '' : 's'}
+              </section>
+
+              <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h2 className="text-sm font-bold m-0 text-white/90">Visibilidade e publicação no mapa</h2>
+                  <button
+                    type="button"
+                    onClick={() => void publishOffersBatch()}
+                    disabled={publishingBatch || ctx?.store?.needs_review}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#39FF14]/40 text-[#39FF14] px-3 py-2 text-xs font-semibold hover:bg-[#39FF14]/10 disabled:opacity-50"
+                  >
+                    {publishingBatch ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+                    Publicar ofertas em lote
+                  </button>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <p className="m-0 text-white/50">Produtos</p>
+                    <p className="m-0 mt-1 font-semibold">{mapStatus?.total_products ?? products.length}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <p className="m-0 text-white/50">Prontos p/ oferta</p>
+                    <p className="m-0 mt-1 font-semibold">{mapStatus?.flash_ready_products ?? flashCount}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <p className="m-0 text-white/50">Promoções ativas</p>
+                    <p className="m-0 mt-1 font-semibold">{mapStatus?.active_promotions ?? 0}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <p className="m-0 text-white/50">Publicações 7d</p>
+                    <p className="m-0 mt-1 font-semibold">{mapStatus?.map_publications_last_7d ?? 0}</p>
+                  </div>
+                </div>
+              </section>
+
+              <MerchantStripeSection />
+
+              <MerchantOrdersSection
+                lojaId={ctx?.store?.id}
+                tempoPreparoMedio={ctx?.store?.tempo_preparo_medio ?? 15}
+              />
+            </div>
+
+            <div className="sm:hidden mb-4 rounded-3xl border border-[#e2e8f0] bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#dcfce7] text-[#16a34a]">
+                  <ActiveTabIcon className="h-5 w-5" aria-hidden />
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#39FF14]/10 border border-[#39FF14]/30 text-[#39FF14] px-3 py-1.5 font-semibold">
-                  <Zap className="h-3.5 w-3.5" aria-hidden />
-                  {flashCount} oferta{flashCount === 1 ? '' : 's'} relâmpago
-                </span>
-              </div>
-              <p className="text-[11px] text-white/40 mt-3 m-0">
-                <button
-                  type="button"
-                  onClick={() => setPanelTab('mapa')}
-                  className="text-[#39FF14] hover:underline font-semibold bg-transparent border-0 p-0 cursor-pointer"
-                >
-                  Abrir mapa de preços
-                </button>
-                {' · '}
-                Ofertas ativas aparecem por ~3 dias para quem está a até ~3 km.
-              </p>
-            </section>
-
-            <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <h2 className="text-sm font-bold m-0 text-white/90">Visibilidade e publicação no mapa</h2>
-                <button
-                  type="button"
-                  onClick={() => void publishOffersBatch()}
-                  disabled={publishingBatch || ctx?.store?.needs_review}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#39FF14]/40 text-[#39FF14] px-3 py-2 text-xs font-semibold hover:bg-[#39FF14]/10 disabled:opacity-50"
-                >
-                  {publishingBatch ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-                  Publicar ofertas em lote
-                </button>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="m-0 text-white/50">Produtos</p>
-                  <p className="m-0 mt-1 font-semibold">{mapStatus?.total_products ?? products.length}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="m-0 text-white/50">Prontos p/ oferta</p>
-                  <p className="m-0 mt-1 font-semibold">{mapStatus?.flash_ready_products ?? flashCount}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="m-0 text-white/50">Promoções ativas</p>
-                  <p className="m-0 mt-1 font-semibold">{mapStatus?.active_promotions ?? 0}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="m-0 text-white/50">Publicações 7d</p>
-                  <p className="m-0 mt-1 font-semibold">{mapStatus?.map_publications_last_7d ?? 0}</p>
+                <div className="min-w-0">
+                  <p className="m-0 text-[10px] font-bold uppercase tracking-widest text-[#64748b]">Área atual</p>
+                  <h2 className="m-0 text-lg font-black text-[#0f172a]">{activeTab.label}</h2>
                 </div>
               </div>
-            </section>
+            </div>
 
-            <MerchantStripeSection />
-
-            <MerchantOrdersSection
-              lojaId={ctx?.store?.id}
-              tempoPreparoMedio={ctx?.store?.tempo_preparo_medio ?? 15}
-            />
-
-            <div className="mt-8 flex gap-2 border-b border-white/10 pb-px overflow-x-auto" role="tablist" aria-label="Seções do painel">
+            <div className="mt-8 hidden sm:flex gap-2 border-b border-white/10 pb-px overflow-x-auto" role="tablist" aria-label="Seções do painel">
               <button
                 type="button"
                 role="tab"
@@ -569,6 +634,38 @@ export function MerchantPanel() {
           </>
         )}
       </main>
+
+      {!loading ? (
+        <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-[#e2e8f0] bg-white/95 px-2 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+            {PANEL_TABS.map((tab) => {
+              const Icon = tab.Icon;
+              const active = panelTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setPanelTab(tab.id)}
+                  className={`relative flex min-h-[3.5rem] flex-col items-center justify-center rounded-2xl px-1 text-[10px] font-bold transition-all ${
+                    active
+                      ? 'bg-[#dcfce7] text-[#16a34a] shadow-sm'
+                      : 'text-[#64748b] active:bg-[#f1f5f9]'
+                  }`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <Icon className={`h-5 w-5 ${active ? 'scale-110' : ''}`} aria-hidden />
+                  <span className="mt-0.5 leading-none">{tab.label}</span>
+                  {tab.id === 'insumos' && insumosCount > 0 ? (
+                    <span className="absolute right-2 top-1 min-w-4 rounded-full bg-[#16a34a] px-1 text-[9px] leading-4 text-white">
+                      {insumosCount > 99 ? '99+' : insumosCount}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      ) : null}
     </div>
   );
 }
