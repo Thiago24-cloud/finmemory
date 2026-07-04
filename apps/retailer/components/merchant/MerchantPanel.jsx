@@ -248,6 +248,7 @@ export function MerchantPanel() {
       : buildConsumerMapUrl({ from: 'parceiros', embed: true });
   const activeTab = PANEL_TABS.find((tab) => tab.id === panelTab) || PANEL_TABS[0];
   const ActiveTabIcon = activeTab.Icon;
+  const mapTabAttention = panelTab !== 'mapa';
 
   if (panelTab === 'mapa' && !loading) {
     const activeMapUrl = customMapEmbedUrl || defaultMapEmbedUrl;
@@ -313,7 +314,9 @@ export function MerchantPanel() {
               <button
                 type="button"
                 onClick={() => setPanelTab('mapa')}
-                className="rounded-2xl border border-[#bbf7d0] bg-white px-2 py-2 text-[#16a34a]"
+                className={`rounded-2xl border border-[#bbf7d0] bg-white px-2 py-2 text-[#16a34a] ${
+                  mapTabAttention ? 'finmemory-map-tab-attention ring-2 ring-[#22c55e]/40' : ''
+                }`}
               >
                 <Map className="mx-auto h-4 w-4" aria-hidden />
                 <span className="mt-0.5 block text-[10px] font-bold">Mapa</span>
@@ -523,7 +526,9 @@ export function MerchantPanel() {
                 className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
                   panelTab === 'mapa'
                     ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
+                    : mapTabAttention
+                      ? 'finmemory-map-tab-attention border-[#22c55e]/50 text-[#16a34a] bg-[#dcfce7]/80 hover:text-[#15803d]'
+                      : 'border-transparent text-white/50 hover:text-white/80'
                 }`}
               >
                 <Map className="h-4 w-4" aria-hidden />
@@ -641,6 +646,7 @@ export function MerchantPanel() {
             {PANEL_TABS.map((tab) => {
               const Icon = tab.Icon;
               const active = panelTab === tab.id;
+              const mapAttention = tab.id === 'mapa' && mapTabAttention;
               return (
                 <button
                   key={tab.id}
@@ -649,7 +655,9 @@ export function MerchantPanel() {
                   className={`relative flex min-h-[3.5rem] flex-col items-center justify-center rounded-2xl px-1 text-[10px] font-bold transition-all ${
                     active
                       ? 'bg-[#dcfce7] text-[#16a34a] shadow-sm'
-                      : 'text-[#64748b] active:bg-[#f1f5f9]'
+                      : mapAttention
+                        ? 'finmemory-map-tab-attention bg-[#f0fdf4] text-[#16a34a] ring-2 ring-[#22c55e]/35 active:bg-[#dcfce7]'
+                        : 'text-[#64748b] active:bg-[#f1f5f9]'
                   }`}
                   aria-current={active ? 'page' : undefined}
                 >
