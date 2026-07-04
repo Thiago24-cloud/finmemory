@@ -13,9 +13,17 @@ CREATE TABLE IF NOT EXISTS public.insumos_loja (
   custo_medio numeric(14, 2),
   recorrente boolean NOT NULL DEFAULT true,
   ativo boolean NOT NULL DEFAULT true,
+  imagem_url text,
+  imagem_source text,
+  imagem_atualizada_em timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.insumos_loja
+  ADD COLUMN IF NOT EXISTS imagem_url text,
+  ADD COLUMN IF NOT EXISTS imagem_source text,
+  ADD COLUMN IF NOT EXISTS imagem_atualizada_em timestamptz;
 
 CREATE INDEX IF NOT EXISTS idx_insumos_loja_loja_id
   ON public.insumos_loja (loja_id, ativo, created_at DESC);

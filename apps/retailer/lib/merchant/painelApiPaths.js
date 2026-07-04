@@ -24,6 +24,7 @@ export const painelApi = {
   notasEntradaConfirm: `${PAINEL_API_BASE}/notas-entrada/confirm`,
   estoqueScan: `${PAINEL_API_BASE}/estoque/scan`,
   estoqueDetect: `${PAINEL_API_BASE}/estoque/detect`,
+  cosmosBarcodeLookup: `${PAINEL_API_BASE}/catalog/cosmos/lookup`,
   listaComprasCompare: `${PAINEL_API_BASE}/lista-compras/compare`,
   vendas: `${PAINEL_API_BASE}/vendas`,
   vendasResumo: `${PAINEL_API_BASE}/vendas/resumo`,

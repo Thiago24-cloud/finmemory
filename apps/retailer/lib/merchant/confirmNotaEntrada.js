@@ -1,4 +1,8 @@
 import { normalizeEanDigits, normalizeInsumoUnidade } from './mapInsumoRow';
+import {
+  enrichInsumoImageFromCosmos,
+  getCurrentInsumoImageUrl,
+} from './insumos/enrichInsumoImage';
 
 function roundQty(n) {
   return Math.round(Number(n) * 1000) / 1000;
@@ -95,6 +99,7 @@ export async function confirmNotaEntrada(supabase, input) {
   try {
     for (const line of normalizedLines) {
       let insumoId = line.insumo_id;
+      let createdInsumo = false;
 
       if (!insumoId && line.criar_insumo) {
         const { data: newInsumo, error: insErr } = await supabase
@@ -118,6 +123,7 @@ export async function confirmNotaEntrada(supabase, input) {
           throw new Error(insErr?.message || 'Erro ao criar insumo.');
         }
         insumoId = newInsumo.id;
+        createdInsumo = true;
         createdInsumoIds.push(insumoId);
       }
 
@@ -127,7 +133,7 @@ export async function confirmNotaEntrada(supabase, input) {
 
       const { data: insumoRow, error: fetchInsumoErr } = await supabase
         .from('insumos_loja')
-        .select('id, quantidade_atual, custo_medio')
+        .select('id, ean, quantidade_atual, custo_medio')
         .eq('id', insumoId)
         .eq('loja_id', lojaId)
         .maybeSingle();
@@ -167,6 +173,29 @@ export async function confirmNotaEntrada(supabase, input) {
         .eq('loja_id', lojaId);
 
       if (updErr) throw new Error(updErr.message);
+
+      if (createdInsumo) {
+        await enrichInsumoImageFromCosmos(supabase, {
+          lojaId,
+          insumoId,
+          nome: line.nome,
+          ean: line.ean,
+          currentImageUrl: null,
+          nowIso,
+        });
+      } else {
+        const currentImage = await getCurrentInsumoImageUrl(supabase, { lojaId, insumoId });
+        if (currentImage.available && !currentImage.imageUrl) {
+          await enrichInsumoImageFromCosmos(supabase, {
+            lojaId,
+            insumoId,
+            nome: line.nome,
+            ean: line.ean || insumoRow.ean,
+            currentImageUrl: currentImage.imageUrl,
+            nowIso,
+          });
+        }
+      }
 
       const { error: itemErr } = await supabase.from('notas_entrada_itens').insert({
         nota_id: nota.id,

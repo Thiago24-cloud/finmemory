@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Loader2, PackagePlus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CheckCircle2, Loader2, PackagePlus, Search } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 
 /**
@@ -10,8 +10,50 @@ import { painelApi } from '../../lib/merchant/painelApiPaths';
 export function StockScanUnknownModal({ ean, direction, onCreated, onClose }) {
   const [nome, setNome] = useState('');
   const [quantidade, setQuantidade] = useState('1');
+  const [lookup, setLookup] = useState({ status: 'idle', product: null, error: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!ean) return undefined;
+
+    const ac = new AbortController();
+    setLookup({ status: 'loading', product: null, error: '' });
+
+    (async () => {
+      try {
+        const url = `${painelApi.cosmosBarcodeLookup}?gtin=${encodeURIComponent(ean)}`;
+        const res = await fetch(url, {
+          credentials: 'include',
+          signal: ac.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 404) {
+          setLookup({ status: 'not_found', product: null, error: '' });
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(data.error || 'Não foi possível consultar o Cosmos.');
+        }
+
+        const product = data.product || null;
+        setLookup({ status: 'found', product, error: '' });
+        if (product?.name) {
+          setNome((prev) => (prev.trim() ? prev : product.name));
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+        setLookup({
+          status: 'error',
+          product: null,
+          error: err?.message || 'Não foi possível consultar o Cosmos.',
+        });
+      }
+    })();
+
+    return () => ac.abort();
+  }, [ean]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -36,6 +78,8 @@ export function StockScanUnknownModal({ ean, direction, onCreated, onClose }) {
           ean,
           quantidade_atual: quantidadeAtual,
           unidade: 'un',
+          imagem_url: lookup.product?.imageUrl || null,
+          imagem_source: lookup.product?.source || 'cosmos_gtin',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -63,6 +107,39 @@ export function StockScanUnknownModal({ ean, direction, onCreated, onClose }) {
         <p className="text-sm text-white/60 mt-2 m-0">
           EAN <span className="font-mono text-white/90">{ean}</span> não está no estoque. Cadastre para continuar.
         </p>
+
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          {lookup.status === 'loading' ? (
+            <p className="m-0 flex items-center gap-2 text-xs text-white/60">
+              <Search className="h-3.5 w-3.5 animate-pulse text-[#39FF14]" aria-hidden />
+              Consultando cadastro do produto no Cosmos…
+            </p>
+          ) : lookup.product ? (
+            <div className="flex items-center gap-3">
+              {lookup.product.imageUrl ? (
+                <img
+                  src={lookup.product.imageUrl}
+                  alt=""
+                  className="h-12 w-12 rounded-lg bg-white object-contain p-1"
+                />
+              ) : null}
+              <div className="min-w-0">
+                <p className="m-0 flex items-center gap-1.5 text-xs font-semibold text-[#39FF14]">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                  Encontrado no Cosmos
+                </p>
+                <p className="m-0 mt-1 truncate text-sm text-white/90">{lookup.product.name}</p>
+                {lookup.product.brand ? (
+                  <p className="m-0 mt-0.5 truncate text-xs text-white/45">{lookup.product.brand}</p>
+                ) : null}
+              </div>
+            </div>
+          ) : lookup.error ? (
+            <p className="m-0 text-xs text-amber-200/80">{lookup.error}</p>
+          ) : (
+            <p className="m-0 text-xs text-white/45">Sem cadastro encontrado no Cosmos para este EAN.</p>
+          )}
+        </div>
 
         <form onSubmit={onSubmit} className="mt-4 space-y-3">
           <label className="block text-xs text-white/50">

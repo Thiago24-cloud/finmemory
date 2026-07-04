@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 
 const UNIDADE_LABEL = {
@@ -29,6 +29,7 @@ function formatQty(value, unidade) {
 
 export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
   const [busy, setBusy] = useState(false);
+  const imageUrl = insumo.imagem_url || insumo.image_url;
 
   const remove = async () => {
     if (!confirm(`Remover "${insumo.nome}" da lista de insumos?`)) return;
@@ -78,6 +79,15 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
       }`}
     >
       <div className="flex items-start justify-between gap-3">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white p-1.5 shadow-sm">
+          {imageUrl ? (
+            <img src={imageUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+              <Package className="h-7 w-7" aria-hidden />
+            </div>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold m-0 truncate">{insumo.nome}</h3>

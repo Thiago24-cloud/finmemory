@@ -5,8 +5,22 @@ import {
   normalizeInsumoUnidade,
 } from '../../../../lib/merchant/mapInsumoRow';
 
+const INSUMO_SELECT =
+  'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, imagem_url, imagem_source, imagem_atualizada_em, created_at, updated_at';
+const INSUMO_SELECT_FALLBACK =
+  'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, created_at, updated_at';
+
 function isMissingTableError(error) {
   return /insumos_loja/i.test(String(error?.message || ''));
+}
+
+function isMissingImageColumnError(error) {
+  return /imagem_(url|source|atualizada_em)|column .*imagem/i.test(String(error?.message || ''));
+}
+
+function cleanImageUrl(value) {
+  const url = String(value || '').trim();
+  return url.startsWith('https://') ? url.slice(0, 2048) : null;
 }
 
 /**
@@ -25,9 +39,7 @@ export default async function handler(req, res) {
     const includePending = req.query?.include_pending === '1';
     let query = supabase
       .from('insumos_loja')
-      .select(
-        'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, created_at, updated_at'
-      )
+      .select(INSUMO_SELECT)
       .eq('loja_id', lojaId)
       .order('nome', { ascending: true })
       .limit(500);
@@ -38,7 +50,26 @@ export default async function handler(req, res) {
       query = query.eq('ativo', true);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (error && isMissingImageColumnError(error)) {
+      query = supabase
+        .from('insumos_loja')
+        .select(INSUMO_SELECT_FALLBACK)
+        .eq('loja_id', lojaId)
+        .order('nome', { ascending: true })
+        .limit(500);
+
+      if (includePending) {
+        query = query.in('status_revisao', ['aprovado', 'pendente']);
+      } else if (!includeInactive) {
+        query = query.eq('ativo', true);
+      }
+
+      const retry = await query;
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       if (isMissingTableError(error)) {
@@ -75,6 +106,9 @@ export default async function handler(req, res) {
     const custoMedio =
       custoMedioRaw != null && custoMedioRaw !== '' ? Number(custoMedioRaw) : null;
     const recorrente = body.recorrente !== false;
+    const imagemUrl = cleanImageUrl(body.imagem_url || body.image_url || body.imageUrl);
+    const imagemSource =
+      imagemUrl && body.imagem_source ? String(body.imagem_source).trim().slice(0, 80) : null;
 
     if (!nome || nome.length < 2) {
       return res.status(400).json({ error: 'Informe o nome do insumo.' });
@@ -103,25 +137,45 @@ export default async function handler(req, res) {
     }
 
     const nowIso = new Date().toISOString();
-    const { data: row, error: insErr } = await supabase
+    const insertPayload = {
+      loja_id: lojaId,
+      nome,
+      ean,
+      unidade,
+      estoque_minimo: Math.round(estoqueMinimo * 1000) / 1000,
+      quantidade_atual: Math.round(quantidadeAtual * 1000) / 1000,
+      custo_medio: custoMedio != null ? Math.round(custoMedio * 100) / 100 : null,
+      recorrente,
+      ativo: true,
+      status_revisao: 'aprovado',
+      updated_at: nowIso,
+    };
+
+    if (imagemUrl) {
+      insertPayload.imagem_url = imagemUrl;
+      insertPayload.imagem_source = imagemSource || 'cosmos';
+      insertPayload.imagem_atualizada_em = nowIso;
+    }
+
+    let { data: row, error: insErr } = await supabase
       .from('insumos_loja')
-      .insert({
-        loja_id: lojaId,
-        nome,
-        ean,
-        unidade,
-        estoque_minimo: Math.round(estoqueMinimo * 1000) / 1000,
-        quantidade_atual: Math.round(quantidadeAtual * 1000) / 1000,
-        custo_medio: custoMedio != null ? Math.round(custoMedio * 100) / 100 : null,
-        recorrente,
-        ativo: true,
-        status_revisao: 'aprovado',
-        updated_at: nowIso,
-      })
-      .select(
-        'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, created_at, updated_at'
-      )
+      .insert(insertPayload)
+      .select(INSUMO_SELECT)
       .single();
+
+    if (insErr && isMissingImageColumnError(insErr)) {
+      const fallbackPayload = { ...insertPayload };
+      delete fallbackPayload.imagem_url;
+      delete fallbackPayload.imagem_source;
+      delete fallbackPayload.imagem_atualizada_em;
+      const retry = await supabase
+        .from('insumos_loja')
+        .insert(fallbackPayload)
+        .select(INSUMO_SELECT_FALLBACK)
+        .single();
+      row = retry.data;
+      insErr = retry.error;
+    }
 
     if (insErr) {
       if (isMissingTableError(insErr)) {
