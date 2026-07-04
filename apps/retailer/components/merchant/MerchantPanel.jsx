@@ -388,7 +388,7 @@ export function MerchantPanel() {
 
             {ctx?.store?.needs_review ? (
               <p
-                className="text-sm text-amber-200/95 bg-amber-500/10 border border-amber-500/35 rounded-xl px-4 py-3 mb-4"
+                className="text-sm text-[#78350f] bg-[#fffbeb] border border-[#f59e0b]/45 rounded-xl px-4 py-3 mb-4 font-medium"
                 role="status"
               >
                 Sua loja está em <strong>análise</strong>. Você pode cadastrar produtos, mas ofertas no mapa e pedidos
