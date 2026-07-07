@@ -6,12 +6,24 @@ import {
 } from '../../../../lib/merchant/mapInsumoRow';
 
 const INSUMO_SELECT =
-  'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, imagem_url, imagem_source, imagem_atualizada_em, created_at, updated_at';
+  'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, imagem_url, imagem_source, imagem_atualizada_em, na_cesta, cesta_quantidade, cesta_oferta, canonical_name, match_termos, match_source, match_atualizado_em, created_at, updated_at';
 const INSUMO_SELECT_FALLBACK =
+  'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, imagem_url, imagem_source, imagem_atualizada_em, na_cesta, cesta_quantidade, cesta_oferta, created_at, updated_at';
+const INSUMO_SELECT_MINIMAL =
   'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, created_at, updated_at';
 
 function isMissingTableError(error) {
   return /insumos_loja/i.test(String(error?.message || ''));
+}
+
+function isMissingCestaColumnError(error) {
+  return /na_cesta|cesta_quantidade|cesta_oferta|column .*cesta/i.test(String(error?.message || ''));
+}
+
+function isMissingMatchColumnError(error) {
+  return /canonical_name|match_termos|match_source|match_atualizado|column .*match/i.test(
+    String(error?.message || '')
+  );
 }
 
 function isMissingImageColumnError(error) {
@@ -52,7 +64,7 @@ export default async function handler(req, res) {
 
     let { data, error } = await query;
 
-    if (error && isMissingImageColumnError(error)) {
+    if (error && (isMissingImageColumnError(error) || isMissingCestaColumnError(error) || isMissingMatchColumnError(error))) {
       query = supabase
         .from('insumos_loja')
         .select(INSUMO_SELECT_FALLBACK)
@@ -66,7 +78,22 @@ export default async function handler(req, res) {
         query = query.eq('ativo', true);
       }
 
-      const retry = await query;
+      let retry = await query;
+      if (retry.error && isMissingImageColumnError(retry.error)) {
+        query = supabase
+          .from('insumos_loja')
+          .select(INSUMO_SELECT_MINIMAL)
+          .eq('loja_id', lojaId)
+          .order('nome', { ascending: true })
+          .limit(500);
+
+        if (includePending) {
+          query = query.in('status_revisao', ['aprovado', 'pendente']);
+        } else if (!includeInactive) {
+          query = query.eq('ativo', true);
+        }
+        retry = await query;
+      }
       data = retry.data;
       error = retry.error;
     }

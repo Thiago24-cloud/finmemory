@@ -130,6 +130,42 @@ export default async function handler(req, res) {
       patch.ativo = body.ativo;
     }
 
+    if (typeof body.na_cesta === 'boolean') {
+      patch.na_cesta = body.na_cesta;
+      if (!body.na_cesta) {
+        patch.cesta_quantidade = null;
+        patch.cesta_oferta = null;
+      }
+    }
+
+    if (body.cesta_quantidade != null || body.quantidadeCesta != null) {
+      const qty = Number(body.cesta_quantidade ?? body.quantidadeCesta);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return res.status(400).json({ error: 'Quantidade da cesta inválida.' });
+      }
+      patch.cesta_quantidade = Math.round(qty * 1000) / 1000;
+      patch.na_cesta = true;
+    }
+
+    if (body.cesta_oferta !== undefined) {
+      if (body.cesta_oferta === null) {
+        patch.cesta_oferta = null;
+      } else if (typeof body.cesta_oferta === 'object') {
+        const preco = Number(body.cesta_oferta.preco);
+        if (!Number.isFinite(preco) || preco <= 0) {
+          return res.status(400).json({ error: 'Oferta da cesta inválida.' });
+        }
+        patch.cesta_oferta = {
+          lugar_id: body.cesta_oferta.lugar_id || null,
+          nome_loja: String(body.cesta_oferta.nome_loja || 'Mercado').trim() || 'Mercado',
+          produto_nome: String(body.cesta_oferta.produto_nome || '').trim(),
+          preco,
+          lat: body.cesta_oferta.lat ?? null,
+          lng: body.cesta_oferta.lng ?? null,
+        };
+      }
+    }
+
     const { data: row, error: updErr } = await supabase
       .from('insumos_loja')
       .update(patch)

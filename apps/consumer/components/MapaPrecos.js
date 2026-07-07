@@ -26,6 +26,8 @@ export default function MapaPrecos({
   initialMapZoom = null,
   /** Modo lojista (Parceiros): mapa tela cheia, sem sacola/lista do consumidor. */
   parceirosMode = false,
+  /** Fase 4: filtra pins e mostra total da cesta por mercado (embed Parceiros). */
+  cestaFilter = null,
 }) {
   return (
     <div className="fixed inset-0 z-0 h-full w-full">
@@ -46,6 +48,7 @@ export default function MapaPrecos({
         initialMapCenter={initialMapCenter}
         initialMapZoom={initialMapZoom}
         parceirosMode={parceirosMode}
+        cestaFilter={cestaFilter}
       />
     </div>
   );

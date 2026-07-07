@@ -29,6 +29,7 @@ import { MapOverlayCategoryChips } from '../components/map/MapOverlayCategoryChi
 import { StatesUnlockPanel } from '../components/map/StatesUnlockPanel';
 import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
 import { isParceirosMapView } from '../lib/parceirosMapMode';
+import { decodeCestaMapParam, buildCestaStoreIndex, formatCestaBrl } from '../lib/cestaMapEmbed';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -130,6 +131,34 @@ export default function MapaPage() {
       .slice(0, 12);
   }, [fromParceiros, router.isReady, router.query.lista]);
   const parceirosPlanningMode = fromParceiros && parceirosPlanningItems.length > 0;
+  const parceirosCestaFilter = useMemo(() => {
+    if (!fromParceiros || !router.isReady) return null;
+    const raw = router.query.cesta;
+    if (typeof raw !== 'string' || !raw.trim()) return null;
+    const payload = decodeCestaMapParam(raw);
+    if (!payload) return null;
+    const minRaw = router.query.cesta_min ?? payload.min ?? 1;
+    const minCoverage = Number(minRaw);
+    const storeIndex = buildCestaStoreIndex(payload);
+    if (storeIndex.size === 0) return null;
+    return {
+      enabled: true,
+      minCoverage: Number.isFinite(minCoverage) ? minCoverage : 1,
+      totalItems: Number(payload.T) || parceirosPlanningItems.length || 0,
+      storeIndex,
+      storeCount: storeIndex.size,
+      bestTotal: Math.min(
+        ...[...storeIndex.values()].map((m) => Number(m.total) || Infinity).filter(Number.isFinite)
+      ),
+    };
+  }, [
+    fromParceiros,
+    router.isReady,
+    router.query.cesta,
+    router.query.cesta_min,
+    parceirosPlanningItems.length,
+  ]);
+  const parceirosCestaMapMode = Boolean(parceirosCestaFilter?.enabled);
   const mapFocusLat = router.isReady ? parseCoord(router.query.lat) : null;
   const mapFocusLng = router.isReady ? parseCoord(router.query.lng) : null;
   const mapFocusZoom = router.isReady ? parseCoord(router.query.zoom) : null;
@@ -265,8 +294,13 @@ export default function MapaPage() {
               searchQuery={fromParceiros ? '' : debouncedSearch}
               promoOnly={promoOnly}
               wazeUi={wazeUi}
-              planningMode={parceirosPlanningMode || (!fromParceiros && planningMode)}
+              planningMode={
+                parceirosCestaMapMode
+                  ? false
+                  : parceirosPlanningMode || (!fromParceiros && planningMode)
+              }
               planningItems={fromParceiros ? parceirosPlanningItems : parsedPlanningItems}
+              cestaFilter={fromParceiros ? parceirosCestaFilter : null}
               onPlanningSummaryChange={setPlanningSummary}
               planningActionRequest={planningActionRequest}
               headerOffsetPx={mapPaddingTopPx}
@@ -278,6 +312,19 @@ export default function MapaPage() {
               initialMapZoom={mapFocusZoom ?? undefined}
               parceirosMode={fromParceiros}
             />
+          </div>
+        ) : null}
+
+        {fromParceiros && embedInParceirosApp && parceirosCestaMapMode && !showMapLanding ? (
+          <div className="pointer-events-none absolute top-0 left-0 right-0 z-[45] flex justify-center px-3 pt-[max(8px,env(safe-area-inset-top))]">
+            <div className="pointer-events-auto max-w-md rounded-full border border-[#39FF14]/35 bg-white/95 px-4 py-2 text-center shadow-sm backdrop-blur-sm">
+              <p className="m-0 text-[11px] font-bold text-[#166534]">
+                Sua cesta · {parceirosCestaFilter.storeCount} mercado(s)
+                {Number.isFinite(parceirosCestaFilter.bestTotal)
+                  ? ` · a partir de ${formatCestaBrl(parceirosCestaFilter.bestTotal)}`
+                  : ''}
+              </p>
+            </div>
           </div>
         ) : null}
 

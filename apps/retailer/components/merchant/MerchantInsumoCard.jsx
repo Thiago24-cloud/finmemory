@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Trash2, AlertTriangle, Package } from 'lucide-react';
+import { Loader2, Trash2, AlertTriangle, Package, ShoppingCart } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 
 const UNIDADE_LABEL = {
@@ -42,6 +42,27 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
         return;
       }
       onRemoved?.(insumo.id);
+    } catch {
+      alert('Erro de rede.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addToCesta = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(painelApi.comprasCesta, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', insumoId: insumo.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Não foi possível adicionar à cesta.');
+        return;
+      }
+      onUpdated?.({ ...insumo, na_cesta: true });
     } catch {
       alert('Erro de rede.');
     } finally {
@@ -129,6 +150,19 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
           </dl>
         </div>
         <div className="flex flex-col gap-1 shrink-0">
+          {!insumo.na_cesta ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void addToCesta()}
+              className="inline-flex items-center justify-center gap-1 text-[10px] text-[#39FF14] hover:bg-[#39FF14]/10 px-2 py-1 rounded border border-[#39FF14]/25"
+            >
+              <ShoppingCart className="h-3 w-3" aria-hidden />
+              Na cesta
+            </button>
+          ) : (
+            <span className="text-[10px] text-[#39FF14]/80 px-2 py-1 text-center">Na cesta</span>
+          )}
           <button
             type="button"
             disabled={busy}

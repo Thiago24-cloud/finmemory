@@ -2,6 +2,7 @@
 
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from 'react-leaflet';
 import { displayPromoProductName, promoCategoryBadgeLabel, promoShelfLabel } from '../lib/mapOfferDisplay';
+import { findCestaMetaForStore, pickCestaHeroStoreId, formatCestaBrl } from '../lib/cestaMapEmbed';
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -488,6 +489,8 @@ function StoreMarkers({
   pulseStoreId = null,
   /** Modo lista: halo forte na loja “melhor opção combinada”. */
   planningHeroStoreId = null,
+  /** Fase 4: só mercados que fecham parte da cesta do lojista. */
+  cestaFilter = null,
   /** Ref para forçar reload externo (ex.: após Quick Add ou realtime event). */
   reloadRef = null,
 }) {
@@ -555,7 +558,14 @@ function StoreMarkers({
 
   const visibleStores = useMemo(() => {
     let base = stores;
-    if (planningMode && planningTerms.length > 0) {
+    if (cestaFilter?.enabled && cestaFilter.storeIndex?.size > 0) {
+      const minCov = Number(cestaFilter.minCoverage) || 1;
+      base = stores.filter((store) => {
+        const meta = findCestaMetaForStore(store.name, cestaFilter.storeIndex);
+        if (!meta || meta.coveredItems <= 0) return false;
+        return meta.coveragePct >= minCov;
+      });
+    } else if (planningMode && planningTerms.length > 0) {
       const matchesPlanning = (store) => {
         const haystack = [
           store.name,
@@ -576,7 +586,7 @@ function StoreMarkers({
     if (effectiveQuery.length < 2) return base;
     const matched = base.filter((s) => String(s.name || '').toLowerCase().includes(effectiveQuery));
     return matched.length > 0 ? matched : base;
-  }, [stores, effectiveQuery, planningMode, planningTerms]);
+  }, [stores, effectiveQuery, planningMode, planningTerms, cestaFilter]);
 
   useEffect(() => {
     onVisibleStoresChange?.(visibleStores);
@@ -1630,6 +1640,25 @@ function useStoreOfferPreview(store) {
   return { preview, heroSources, accentHex, heroCategory };
 }
 
+/** Banner da cesta do lojista (embed Parceiros — Fase 4). */
+function CestaStoreBanner({ cestaMeta }) {
+  if (!cestaMeta || !Number.isFinite(Number(cestaMeta.total))) return null;
+  const totalItems = Number(cestaMeta.totalItems) || 0;
+  const covered = Number(cestaMeta.coveredItems) || 0;
+  return (
+    <div className="mx-2 mt-2 mb-1 rounded-xl border border-[#39FF14]/40 bg-[#ecfdf3] px-3 py-2.5">
+      <p className="m-0 text-xs font-black text-[#166534]">
+        Sua cesta aqui: {formatCestaBrl(cestaMeta.total)}
+      </p>
+      <p className="m-0 mt-0.5 text-[10px] font-semibold text-[#15803d]/80">
+        {covered}
+        {totalItems > 0 ? `/${totalItems}` : ''} itens
+        {cestaMeta.coveragePct != null ? ` · ${cestaMeta.coveragePct}% da lista` : ''}
+      </p>
+    </div>
+  );
+}
+
 /** Corpo do card de loja (popup desktop ou bottom sheet mobile) — dados de `offer_preview` no pin. */
 function StoreMarkerOfferPanelBody({
   store,
@@ -1649,6 +1678,8 @@ function StoreMarkerOfferPanelBody({
   allowRootTouchPropagation = false,
   /** Filtro local por nome de produto (ex.: busca no sticky do bottom sheet) */
   offerNameFilter = '',
+  /** Totais da cesta do painel Parceiros para este mercado */
+  cestaMeta = null,
 }) {
   const pinColor = useMemo(
     () => getStorePinMainColor(store.type, store.id),
@@ -1703,6 +1734,8 @@ function StoreMarkerOfferPanelBody({
           {store.neighborhood && <p className="text-xs text-gray-500">{store.neighborhood}</p>}
         </div>
       ) : null}
+
+      <CestaStoreBanner cestaMeta={cestaMeta} />
 
       {peekOnly && hasCardOffers ? (
         <div className="px-2 pb-1 pt-0">
@@ -3175,6 +3208,7 @@ export default function MapaPrecosLeaflet({
   initialMapCenter = null,
   initialMapZoom,
   parceirosMode = false,
+  cestaFilter = null,
 }) {
   const theme = getMapThemeById(mapThemeId);
   const resolvedMapCenter = useMemo(() => {
@@ -3856,7 +3890,13 @@ export default function MapaPrecosLeaflet({
     return shopStore.id;
   }, [shopOpen, isMobileMapSheet, desktopSidebarHoverPulse, shopStore?.id]);
 
+  const cestaBestStorePulseId = useMemo(() => {
+    if (!cestaFilter?.enabled || !cestaFilter.storeIndex?.size) return null;
+    return pickCestaHeroStoreId(storesVisibleOnMap, cestaFilter.storeIndex);
+  }, [cestaFilter, storesVisibleOnMap]);
+
   const planningBestStorePulseId = useMemo(() => {
+    if (cestaBestStorePulseId) return cestaBestStorePulseId;
     if (!planningMode || !planningSummary) return null;
     let targetName = planningSummary?.oneStore?.storeName;
     if (!targetName && Array.isArray(planningSummary?.cheapest?.picks) && planningSummary.cheapest.picks.length) {
@@ -3871,7 +3911,17 @@ export default function MapaPrecosLeaflet({
     const t = String(targetName).trim().toLowerCase();
     const found = (storesVisibleOnMap || []).find((s) => String(s?.name || '').trim().toLowerCase() === t);
     return found?.id != null ? String(found.id) : null;
-  }, [planningMode, planningSummary, storesVisibleOnMap]);
+  }, [cestaBestStorePulseId, planningMode, planningSummary, storesVisibleOnMap]);
+
+  const shopCestaMeta = useMemo(() => {
+    if (!cestaFilter?.enabled || !shopStore?.name) return null;
+    return findCestaMetaForStore(shopStore.name, cestaFilter.storeIndex);
+  }, [cestaFilter, shopStore?.name]);
+
+  const previewCestaMeta = useMemo(() => {
+    if (!cestaFilter?.enabled || !mobileStorePreview?.name) return null;
+    return findCestaMetaForStore(mobileStorePreview.name, cestaFilter.storeIndex);
+  }, [cestaFilter, mobileStorePreview?.name]);
 
   const storePulseIdForMap = desktopSidebarPulseStoreId;
 
@@ -4703,6 +4753,7 @@ export default function MapaPrecosLeaflet({
           searchQuery={searchQuery}
           planningMode={planningMode}
           planningItems={planningItems}
+          cestaFilter={cestaFilter}
           onRequestStoreShop={handleRequestStoreShop}
           userOrigin={userMapPosition}
           cartOfferIdSet={cartOfferIdSet}
@@ -5186,6 +5237,7 @@ export default function MapaPrecosLeaflet({
                 disableInnerProductScroll
                 offerNameFilter={previewOfferFilter}
                 allowRootTouchPropagation
+                cestaMeta={previewCestaMeta}
                 rootClassName="finmemory-popup-store-offers w-full max-w-full overflow-hidden rounded-lg"
               />
             </div>
@@ -5215,6 +5267,13 @@ export default function MapaPrecosLeaflet({
                 <h2 className={`truncate text-lg font-bold ${wazeUi ? 'text-[#f0f0f0]' : 'text-[#fafafa]'}`}>
                   {shopStore?.name}
                 </h2>
+                {shopCestaMeta ? (
+                  <p className={`mt-1 text-xs font-bold ${wazeUi ? 'text-[#2ecc71]' : 'text-[#39FF14]'}`}>
+                    Sua cesta aqui: {formatCestaBrl(shopCestaMeta.total)}
+                    {' · '}
+                    {shopCestaMeta.coveredItems}/{shopCestaMeta.totalItems || '?'} itens
+                  </p>
+                ) : null}
                 {wazeUi && shopStore?.address ? (
                   <p className={`mt-0.5 truncate text-[11px] ${wazeUi ? 'text-[#888]' : 'text-gray-500'}`}>
                     {shopStore.address}

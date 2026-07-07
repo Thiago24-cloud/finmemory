@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ListChecks, Receipt } from 'lucide-react';
+import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ShoppingCart, Receipt } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantOrdersSection } from './MerchantOrdersSection';
@@ -14,11 +14,11 @@ import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
 import { buildConsumerMapUrl } from '../../lib/consumerAppUrl';
 import { ParceirosMapFrame } from './ParceirosMapFrame';
-import { MerchantListaComprasSection } from './MerchantListaComprasSection';
+import { MerchantMinhaCompraSection } from './MerchantMinhaCompraSection';
 import { MerchantVendasSection } from './MerchantVendasSection';
 
 const PANEL_TABS = [
-  { id: 'lista', label: 'Lista', Icon: ListChecks },
+  { id: 'lista', label: 'Minha compra', Icon: ShoppingCart },
   { id: 'vendas', label: 'Vendas', Icon: Receipt },
   { id: 'mapa', label: 'Mapa', Icon: Map },
   { id: 'ofertas', label: 'Ofertas', Icon: Zap },
@@ -501,8 +501,8 @@ export function MerchantPanel() {
                     : 'border-transparent text-white/50 hover:text-white/80'
                 }`}
               >
-                <ListChecks className="h-4 w-4" aria-hidden />
-                Lista
+                <ShoppingCart className="h-4 w-4" aria-hidden />
+                Minha compra
               </button>
               <button
                 type="button"
@@ -569,7 +569,7 @@ export function MerchantPanel() {
 
             {panelTab === 'lista' ? (
               <div className="mt-4">
-                <MerchantListaComprasSection
+                <MerchantMinhaCompraSection
                   storeLat={ctx?.store?.lat}
                   storeLng={ctx?.store?.lng}
                   onOpenMap={(url) => {
