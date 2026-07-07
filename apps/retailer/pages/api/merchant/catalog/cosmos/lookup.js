@@ -1,13 +1,14 @@
-import { cosmosUnavailablePayload, getCosmosToken } from '../../../../../lib/cosmos';
+import { cosmosUnavailablePayload } from '@finmemory/shared/cosmos';
+import { normalizeCosmosGtin } from '@finmemory/shared/cosmos';
 import {
   fetchCosmosProductByGtin,
-  normalizeCosmosGtin,
-} from '../../../../../lib/catalog/cosmosApiClient';
+  isCosmosConsumerUnavailableError,
+} from '../../../../../lib/merchant/cosmosConsumerClient';
 import { requireMerchantApi } from '../../../../../lib/merchant/requireMerchantApi';
 
 /**
  * GET /api/merchant/catalog/cosmos/lookup?gtin=789...
- * Consulta o Cosmos no servidor para pré-preencher cadastro de insumo após leitura de código.
+ * Proxy autenticado para GET /api/catalog/cosmos/lookup no app consumidor.
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -24,10 +25,6 @@ export default async function handler(req, res) {
       error: 'Código de barras inválido.',
       code: 'INVALID_GTIN',
     });
-  }
-
-  if (!getCosmosToken()) {
-    return res.status(503).json(cosmosUnavailablePayload());
   }
 
   try {
@@ -47,6 +44,9 @@ export default async function handler(req, res) {
       product,
     });
   } catch (error) {
+    if (isCosmosConsumerUnavailableError(error)) {
+      return res.status(503).json(cosmosUnavailablePayload());
+    }
     console.error('[catalog/cosmos/lookup]', error?.message || error);
     return res.status(502).json({
       error: 'Falha ao consultar o Cosmos.',

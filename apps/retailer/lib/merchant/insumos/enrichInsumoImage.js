@@ -1,4 +1,4 @@
-import { resolveCosmosProductImage } from '../../catalog/cosmosApiClient';
+import { resolveCosmosProductImage } from '../../merchant/cosmosConsumerClient';
 
 function isMissingImageColumnError(error) {
   return /imagem_(url|source|atualizada_em)|column .*imagem/i.test(String(error?.message || ''));

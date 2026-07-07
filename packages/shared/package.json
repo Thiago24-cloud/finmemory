@@ -13,7 +13,8 @@
     "./validation": "./src/validation/index.ts",
     "./format": "./src/format/index.ts",
     "./auth": "./src/auth/index.ts",
-    "./payments/cielo": "./src/payments/cielo/index.ts"
+    "./payments/cielo": "./src/payments/cielo/index.ts",
+    "./cosmos": "./src/cosmos/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4"

@@ -1,14 +1,22 @@
-/** @deprecated Import from `@finmemory/shared/cosmos` — re-export de compatibilidade. */
+export {
+  getCosmosToken,
+  cosmosUnavailablePayload,
+  getCosmosLookupSecret,
+  isCosmosLookupAuthorized,
+} from './token';
+
 export {
   COSMOS_ORIGIN,
   normalizeCosmosGtin,
   normalizeProductNameForCosmos,
+  mapCosmosGtinPayload,
   extractCosmosProductList,
   mapCosmosProductHit,
-  mapCosmosGtinPayload,
   pickBestCosmosProduct,
   fetchCosmosProductByGtin,
   searchCosmosProductsByQuery,
   resolveCosmosProductImage,
   resolveCosmosImageByProductName,
-} from '@finmemory/shared/cosmos';
+} from './client';
+
+export type { CosmosProduct } from './client';

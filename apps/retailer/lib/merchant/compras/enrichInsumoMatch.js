@@ -1,11 +1,11 @@
 /**
  * Catalog + Match agent: enriquece insumo com nome canônico e termos de busca (Cosmos → heurística).
  */
+import { pickBestCosmosProduct } from '@finmemory/shared/cosmos';
 import {
   fetchCosmosProductByGtin,
-  pickBestCosmosProduct,
   searchCosmosProductsByQuery,
-} from '../../catalog/cosmosApiClient';
+} from '../../merchant/cosmosConsumerClient';
 import { normalizeEanDigits } from '../mapInsumoRow';
 import { enrichInsumoImageFromCosmos } from '../insumos/enrichInsumoImage';
 import {
