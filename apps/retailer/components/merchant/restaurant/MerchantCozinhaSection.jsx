@@ -28,7 +28,7 @@ export function MerchantCozinhaSection({ lojaId }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${painelApi.pedidos}?limit=50`);
+      const res = await fetch(`${painelApi.pedidos}?scope=cozinha&limit=50`);
       const json = await res.json().catch(() => ({}));
       if (res.ok) {
         const active = (json.orders || []).filter((o) =>

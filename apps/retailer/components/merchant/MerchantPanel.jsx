@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ShoppingCart, Receipt, ChefHat, Hash, Utensils, QrCode } from 'lucide-react';
+import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ShoppingCart, Receipt, ChefHat, Hash, Utensils, QrCode, Bell, History, Wallet, Truck, CalendarCheck, ClipboardList } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantOrdersSection } from './MerchantOrdersSection';
@@ -20,17 +20,27 @@ import { MerchantMesasSection } from './restaurant/MerchantMesasSection';
 import { MerchantCozinhaSection } from './restaurant/MerchantCozinhaSection';
 import { MerchantCardapioSection } from './restaurant/MerchantCardapioSection';
 import { MerchantQrCodesSection } from './restaurant/MerchantQrCodesSection';
+import { MerchantGarcomSection } from './restaurant/MerchantGarcomSection';
+import { MerchantCaixaSection } from './restaurant/MerchantCaixaSection';
+import { MerchantHistoricoSection } from './restaurant/MerchantHistoricoSection';
+import { MerchantEntregaSection } from './restaurant/MerchantEntregaSection';
+import { MerchantPreparoSection } from './restaurant/MerchantPreparoSection';
 
 const PANEL_TABS = [
-  { id: 'lista', label: 'Minha compra', Icon: ShoppingCart },
-  { id: 'vendas', label: 'Vendas', Icon: Receipt },
+  { id: 'ofertas', label: 'Início', Icon: Store },
   { id: 'mapa', label: 'Preços', Icon: Map },
-  { id: 'cozinha', label: 'Cozinha', Icon: ChefHat },
-  { id: 'cardapio', label: 'Cardápio', Icon: Utensils },
-  { id: 'mesas', label: 'Mesas', Icon: Hash },
-  { id: 'codigos', label: 'QR', Icon: QrCode },
-  { id: 'ofertas', label: 'Ofertas', Icon: Zap },
   { id: 'insumos', label: 'Estoque', Icon: Boxes },
+  { id: 'cardapio', label: 'Cardápio', Icon: Utensils },
+  { id: 'preparo', label: 'Preparo', Icon: CalendarCheck },
+  { id: 'mesas', label: 'Mesas', Icon: Hash },
+  { id: 'lista', label: 'Lista', Icon: ClipboardList },
+  { id: 'vendas', label: 'Vendas', Icon: Receipt },
+  { id: 'cozinha', label: 'Cozinha', Icon: ChefHat },
+  { id: 'garcom', label: 'Garçom', Icon: Bell },
+  { id: 'historico', label: 'Histórico', Icon: History },
+  { id: 'caixa', label: 'Caixa', Icon: Wallet },
+  { id: 'entrega', label: 'Entrega', Icon: Truck },
+  { id: 'codigos', label: 'QR', Icon: QrCode },
 ];
 
 export function MerchantPanel() {
@@ -476,137 +486,33 @@ export function MerchantPanel() {
             </div>
 
             <div className="mt-8 hidden sm:flex gap-2 border-b border-white/10 pb-px overflow-x-auto" role="tablist" aria-label="Seções do painel">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'lista'}
-                onClick={() => setPanelTab('lista')}
-                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'lista'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <ShoppingCart className="h-4 w-4" aria-hidden />
-                Minha compra
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'vendas'}
-                onClick={() => setPanelTab('vendas')}
-                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'vendas'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Receipt className="h-4 w-4" aria-hidden />
-                Vendas
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'mapa'}
-                onClick={() => setPanelTab('mapa')}
-                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'mapa'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : mapTabAttention
-                      ? 'finmemory-map-tab-attention border-[#22c55e]/50 text-[#16a34a] bg-[#dcfce7]/80 hover:text-[#15803d]'
-                      : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Map className="h-4 w-4" aria-hidden />
-                Preços
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'cozinha'}
-                onClick={() => setPanelTab('cozinha')}
-                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'cozinha'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <ChefHat className="h-4 w-4" aria-hidden />
-                Cozinha
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'cardapio'}
-                onClick={() => setPanelTab('cardapio')}
-                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'cardapio'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Utensils className="h-4 w-4" aria-hidden />
-                Cardápio
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'mesas'}
-                onClick={() => setPanelTab('mesas')}
-                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'mesas'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Hash className="h-4 w-4" aria-hidden />
-                Mesas
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'codigos'}
-                onClick={() => setPanelTab('codigos')}
-                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'codigos'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <QrCode className="h-4 w-4" aria-hidden />
-                QR
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'ofertas'}
-                onClick={() => setPanelTab('ofertas')}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'ofertas'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Zap className="h-4 w-4" aria-hidden />
-                Ofertas
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={panelTab === 'insumos'}
-                onClick={() => setPanelTab('insumos')}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
-                  panelTab === 'insumos'
-                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Boxes className="h-4 w-4" aria-hidden />
-                Estoque
-                {insumosCount > 0 ? (
-                  <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{insumosCount}</span>
-                ) : null}
-              </button>
+              {PANEL_TABS.map((tab) => {
+                const Icon = tab.Icon;
+                const active = panelTab === tab.id;
+                const mapAttention = tab.id === 'mapa' && mapTabAttention && !active;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setPanelTab(tab.id)}
+                    className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                      active
+                        ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                        : mapAttention
+                          ? 'finmemory-map-tab-attention border-[#22c55e]/50 text-[#16a34a] bg-[#dcfce7]/80 hover:text-[#15803d]'
+                          : 'border-transparent text-white/50 hover:text-white/80'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden />
+                    {tab.label}
+                    {tab.id === 'insumos' && insumosCount > 0 ? (
+                      <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{insumosCount}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
 
             {panelTab === 'lista' ? (
@@ -645,6 +551,26 @@ export function MerchantPanel() {
             ) : panelTab === 'codigos' ? (
               <div className="mt-4">
                 <MerchantQrCodesSection storeId={ctx?.store?.id} />
+              </div>
+            ) : panelTab === 'garcom' ? (
+              <div className="mt-4">
+                <MerchantGarcomSection lojaId={ctx?.store?.id} />
+              </div>
+            ) : panelTab === 'caixa' ? (
+              <div className="mt-4">
+                <MerchantCaixaSection lojaId={ctx?.store?.id} />
+              </div>
+            ) : panelTab === 'historico' ? (
+              <div className="mt-4">
+                <MerchantHistoricoSection />
+              </div>
+            ) : panelTab === 'entrega' ? (
+              <div className="mt-4">
+                <MerchantEntregaSection lojaId={ctx?.store?.id} />
+              </div>
+            ) : panelTab === 'preparo' ? (
+              <div className="mt-4">
+                <MerchantPreparoSection products={products} />
               </div>
             ) : panelTab === 'ofertas' ? (
             <section className="mt-4">

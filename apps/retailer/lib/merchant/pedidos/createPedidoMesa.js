@@ -129,7 +129,7 @@ export async function createPedidoMesa(supabase, input) {
       observacao: obsParts.join(' · ').slice(0, 500),
       tempo_preparo_minutos: tempoPrep,
       eta_previsto_em: etaPrevisto,
-      payment_status: 'paid',
+      payment_status: 'pending',
       mesa_id: mesa.id,
       mesa_numero: mesaNumero,
       origem: 'mesa',
