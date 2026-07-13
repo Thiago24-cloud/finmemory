@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Boxes, AlertTriangle, FileText, Upload, ScanBarcode } from 'lucide-react';
+import { Loader2, Plus, Boxes, AlertTriangle, FileText, Upload, ScanBarcode, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchant/merchantApiErrorMessage';
@@ -37,7 +37,14 @@ export function MerchantInsumosSection({ lojaId, onCountChange }) {
   const [notaFlowOpen, setNotaFlowOpen] = useState(false);
   const [importFlowOpen, setImportFlowOpen] = useState(false);
   const [notas, setNotas] = useState([]);
-  const [stats, setStats] = useState({ total: 0, abaixo_minimo: 0, pendente_revisao: 0 });
+  const [stats, setStats] = useState({
+    total: 0,
+    abaixo_minimo: 0,
+    pendente_revisao: 0,
+    imageStats: null,
+    totalUnits: 0,
+  });
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +75,8 @@ export function MerchantInsumosSection({ lojaId, onCountChange }) {
         total: data.total ?? ativos.length,
         abaixo_minimo: data.abaixo_minimo ?? ativos.filter((i) => i.abaixo_minimo).length,
         pendente_revisao: data.pendente_revisao ?? list.filter((i) => i.status_revisao === 'pendente').length,
+        imageStats: data.summary?.imageStats ?? null,
+        totalUnits: data.summary?.totalUnits ?? 0,
       });
       onCountChange?.(ativos.length);
       if (notasRes.ok) setNotas(notasData.notas || []);
@@ -123,6 +132,28 @@ export function MerchantInsumosSection({ lojaId, onCountChange }) {
     void load();
   };
 
+  const syncCatalog = async () => {
+    setSyncingCatalog(true);
+    setError('');
+    try {
+      const res = await fetch(painelApi.catalogSync, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Erro ao publicar catálogo.');
+        return;
+      }
+      alert(
+        `Catálogo sincronizado: ${data.synced ?? 0} produto(s) atualizado(s), ${data.skipped ?? 0} ignorado(s) (sem custo médio).`
+      );
+    } catch {
+      setError('Erro de rede ao sincronizar catálogo.');
+    } finally {
+      setSyncingCatalog(false);
+    }
+  };
+
+  const imageStats = stats.imageStats;
+
   const approveAllPending = async () => {
     try {
       const res = await fetch(painelApi.insumosImportApprove, {
@@ -166,6 +197,30 @@ export function MerchantInsumosSection({ lojaId, onCountChange }) {
               {stats.abaixo_minimo} abaixo do mínimo
             </span>
           ) : null}
+          {imageStats ? (
+            <>
+              {imageStats.openfoodfacts > 0 ? (
+                <span className="text-[11px] text-white/50 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                  {imageStats.openfoodfacts} OFF
+                </span>
+              ) : null}
+              {imageStats.cosmos > 0 ? (
+                <span className="text-[11px] text-white/50 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                  {imageStats.cosmos} Cosmos
+                </span>
+              ) : null}
+              {imageStats.generic > 0 ? (
+                <span className="text-[11px] text-white/50 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                  {imageStats.generic} ícone
+                </span>
+              ) : null}
+              {imageStats.custom > 0 ? (
+                <span className="text-[11px] text-white/50 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                  {imageStats.custom} custom
+                </span>
+              ) : null}
+            </>
+          ) : null}
         </div>
         <p className="text-[11px] text-white/45 mt-3 m-0 leading-relaxed">
           Importe seu estoque do ERP ou cadastre manualmente. Para manter atualizado sem planilha, use entrada por NF (foto/QR).
@@ -202,6 +257,19 @@ export function MerchantInsumosSection({ lojaId, onCountChange }) {
             <ScanBarcode className="h-4 w-4 text-[#39FF14]" aria-hidden />
             Câmera (entrada/saída)
           </Link>
+          <button
+            type="button"
+            disabled={syncingCatalog}
+            onClick={() => void syncCatalog()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#39FF14]/35 bg-[#39FF14]/8 px-4 py-2.5 text-sm font-semibold text-[#39FF14] hover:bg-[#39FF14]/12 disabled:opacity-60"
+          >
+            {syncingCatalog ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw className="h-4 w-4" aria-hidden />
+            )}
+            Publicar catálogo
+          </button>
         </div>
         {stats.pendente_revisao > 0 ? (
           <p className="text-xs text-amber-200/90 mt-3 m-0 flex items-center gap-1.5">

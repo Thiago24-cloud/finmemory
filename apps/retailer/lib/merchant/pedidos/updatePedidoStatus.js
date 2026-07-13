@@ -53,6 +53,18 @@ export async function updatePedidoStatusForStore(supabase, input) {
 
   if (updErr) return { ok: false, error: updErr.message };
 
+  if (
+    status === PEDIDO_STATUS.CONCLUIDO &&
+    updated.origem === 'mesa' &&
+    updated.mesa_id
+  ) {
+    await supabase
+      .from('mesas_loja')
+      .update({ status: 'livre', updated_at: nowIso })
+      .eq('id', updated.mesa_id)
+      .eq('loja_id', lojaId);
+  }
+
   const { data: storeRow } = await supabase
     .from('stores')
     .select('name')

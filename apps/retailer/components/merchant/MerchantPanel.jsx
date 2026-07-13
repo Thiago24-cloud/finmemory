@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ShoppingCart, Receipt } from 'lucide-react';
+import { Loader2, Package, Plus, Store, LogOut, MapPin, Zap, Boxes, Map, ShoppingCart, Receipt, ChefHat, Hash, Utensils, QrCode } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantOrdersSection } from './MerchantOrdersSection';
@@ -13,16 +13,24 @@ import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchan
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
 import { buildConsumerMapUrl } from '../../lib/consumerAppUrl';
-import { ParceirosMapFrame } from './ParceirosMapFrame';
 import { MerchantMinhaCompraSection } from './MerchantMinhaCompraSection';
 import { MerchantVendasSection } from './MerchantVendasSection';
+import { MerchantSkipPrecosMap } from './precos/MerchantSkipPrecosMap';
+import { MerchantMesasSection } from './restaurant/MerchantMesasSection';
+import { MerchantCozinhaSection } from './restaurant/MerchantCozinhaSection';
+import { MerchantCardapioSection } from './restaurant/MerchantCardapioSection';
+import { MerchantQrCodesSection } from './restaurant/MerchantQrCodesSection';
 
 const PANEL_TABS = [
   { id: 'lista', label: 'Minha compra', Icon: ShoppingCart },
   { id: 'vendas', label: 'Vendas', Icon: Receipt },
-  { id: 'mapa', label: 'Mapa', Icon: Map },
+  { id: 'mapa', label: 'Preços', Icon: Map },
+  { id: 'cozinha', label: 'Cozinha', Icon: ChefHat },
+  { id: 'cardapio', label: 'Cardápio', Icon: Utensils },
+  { id: 'mesas', label: 'Mesas', Icon: Hash },
+  { id: 'codigos', label: 'QR', Icon: QrCode },
   { id: 'ofertas', label: 'Ofertas', Icon: Zap },
-  { id: 'insumos', label: 'Insumos', Icon: Boxes },
+  { id: 'insumos', label: 'Estoque', Icon: Boxes },
 ];
 
 export function MerchantPanel() {
@@ -39,7 +47,6 @@ export function MerchantPanel() {
   const [repairing, setRepairing] = useState(false);
   const [panelTab, setPanelTab] = useState('ofertas');
   const [insumosCount, setInsumosCount] = useState(0);
-  const [customMapEmbedUrl, setCustomMapEmbedUrl] = useState(null);
 
   const tryRepairLink = useCallback(async () => {
     setRepairing(true);
@@ -251,33 +258,12 @@ export function MerchantPanel() {
   const mapTabAttention = panelTab !== 'mapa';
 
   if (panelTab === 'mapa' && !loading) {
-    const activeMapUrl = customMapEmbedUrl || defaultMapEmbedUrl;
     return (
-      <div className="finmemory-light-shell fixed inset-0 z-50 flex flex-col bg-[#f8fafc]">
-        <header className="z-10 shrink-0 border-b border-[#e2e8f0] bg-white/95 backdrop-blur">
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-widest text-[#39FF14]/80 font-bold m-0">
-                FinMemory Parceiros
-              </p>
-              <h1 className="text-base font-bold m-0 truncate text-white">Mapa de preços</h1>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setCustomMapEmbedUrl(null);
-                setPanelTab('lista');
-              }}
-              className="shrink-0 rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5"
-            >
-              Voltar ao painel
-            </button>
-          </div>
-        </header>
-        <div className="relative min-h-0 flex-1">
-          <ParceirosMapFrame mapUrl={activeMapUrl} />
-        </div>
-      </div>
+      <MerchantSkipPrecosMap
+        storeLat={ctx?.store?.lat}
+        storeLng={ctx?.store?.lng}
+        onBack={() => setPanelTab('lista')}
+      />
     );
   }
 
@@ -532,7 +518,63 @@ export function MerchantPanel() {
                 }`}
               >
                 <Map className="h-4 w-4" aria-hidden />
-                Mapa
+                Preços
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'cozinha'}
+                onClick={() => setPanelTab('cozinha')}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'cozinha'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <ChefHat className="h-4 w-4" aria-hidden />
+                Cozinha
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'cardapio'}
+                onClick={() => setPanelTab('cardapio')}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'cardapio'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Utensils className="h-4 w-4" aria-hidden />
+                Cardápio
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'mesas'}
+                onClick={() => setPanelTab('mesas')}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'mesas'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Hash className="h-4 w-4" aria-hidden />
+                Mesas
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === 'codigos'}
+                onClick={() => setPanelTab('codigos')}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 -mb-px transition-colors ${
+                  panelTab === 'codigos'
+                    ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5'
+                    : 'border-transparent text-white/50 hover:text-white/80'
+                }`}
+              >
+                <QrCode className="h-4 w-4" aria-hidden />
+                QR
               </button>
               <button
                 type="button"
@@ -560,7 +602,7 @@ export function MerchantPanel() {
                 }`}
               >
                 <Boxes className="h-4 w-4" aria-hidden />
-                Insumos
+                Estoque
                 {insumosCount > 0 ? (
                   <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{insumosCount}</span>
                 ) : null}
@@ -572,10 +614,7 @@ export function MerchantPanel() {
                 <MerchantMinhaCompraSection
                   storeLat={ctx?.store?.lat}
                   storeLng={ctx?.store?.lng}
-                  onOpenMap={(url) => {
-                    setCustomMapEmbedUrl(url);
-                    setPanelTab('mapa');
-                  }}
+                  onOpenMap={() => setPanelTab('mapa')}
                 />
               </div>
             ) : panelTab === 'vendas' ? (
@@ -585,6 +624,27 @@ export function MerchantPanel() {
             ) : panelTab === 'insumos' ? (
               <div className="mt-4">
                 <MerchantInsumosSection lojaId={ctx?.store?.id} onCountChange={setInsumosCount} />
+              </div>
+            ) : panelTab === 'cozinha' ? (
+              <div className="mt-4">
+                <MerchantCozinhaSection lojaId={ctx?.store?.id} />
+              </div>
+            ) : panelTab === 'mesas' ? (
+              <div className="mt-4">
+                <MerchantMesasSection />
+              </div>
+            ) : panelTab === 'cardapio' ? (
+              <div className="mt-4">
+                <MerchantCardapioSection
+                  products={products}
+                  loading={loading}
+                  onProductSaved={onProductSaved}
+                  onProductUpdated={onProductUpdated}
+                />
+              </div>
+            ) : panelTab === 'codigos' ? (
+              <div className="mt-4">
+                <MerchantQrCodesSection storeId={ctx?.store?.id} />
               </div>
             ) : panelTab === 'ofertas' ? (
             <section className="mt-4">
@@ -641,8 +701,8 @@ export function MerchantPanel() {
       </main>
 
       {!loading ? (
-        <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-[#e2e8f0] bg-white/95 px-2 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-[#e2e8f0] bg-white/95 px-1 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl overflow-x-auto">
+          <div className="mx-auto flex w-max min-w-full gap-0.5 px-1">
             {PANEL_TABS.map((tab) => {
               const Icon = tab.Icon;
               const active = panelTab === tab.id;
@@ -652,7 +712,7 @@ export function MerchantPanel() {
                   key={tab.id}
                   type="button"
                   onClick={() => setPanelTab(tab.id)}
-                  className={`relative flex min-h-[3.5rem] flex-col items-center justify-center rounded-2xl px-1 text-[10px] font-bold transition-all ${
+                  className={`relative flex min-h-[3.5rem] min-w-[3.5rem] flex-col items-center justify-center rounded-2xl px-1.5 text-[9px] font-bold transition-all ${
                     active
                       ? 'bg-[#dcfce7] text-[#16a34a] shadow-sm'
                       : mapAttention

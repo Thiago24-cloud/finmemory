@@ -10,6 +10,7 @@ const EMPTY = {
   priceOriginal: '',
   description: '',
   image_url: '',
+  ean: '',
   em_oferta: true,
 };
 
@@ -71,6 +72,7 @@ export function MerchantProductForm({ onSaved, onCancel }) {
           preco_original: precoOriginal,
           description: form.description,
           image_url: form.image_url,
+          ean: form.ean || undefined,
           em_oferta: form.em_oferta,
         }),
       });
@@ -131,6 +133,13 @@ export function MerchantProductForm({ onSaved, onCancel }) {
             onChange={(v) => setForm((f) => ({ ...f, name: v }))}
             required
             placeholder="Milk-shake de Morango"
+          />
+          <Field
+            label="Código de barras (EAN, opcional)"
+            value={form.ean}
+            onChange={(v) => setForm((f) => ({ ...f, ean: v.replace(/\D/g, '').slice(0, 14) }))}
+            placeholder="7891234567890"
+            inputMode="numeric"
           />
           <div className="grid grid-cols-2 gap-3">
             <Field

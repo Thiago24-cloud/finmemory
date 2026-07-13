@@ -55,9 +55,13 @@ function isGooglePlayReviewerEmail(email) {
 // Base padrão para OAuth/callback quando NEXTAUTH_URL não estiver definida.
 const DEFAULT_NEXTAUTH_URL = 'https://finmemory.com.br';
 if (typeof process !== 'undefined') {
-  const url = process.env.NEXTAUTH_URL || '';
-  if (!url || !url.startsWith('http')) {
-    process.env.NEXTAUTH_URL = DEFAULT_NEXTAUTH_URL;
+  if (process.env.NODE_ENV === 'development') {
+    process.env.NEXTAUTH_URL = 'http://localhost:3000';
+  } else {
+    const url = process.env.NEXTAUTH_URL || '';
+    if (!url || !url.startsWith('http')) {
+      process.env.NEXTAUTH_URL = DEFAULT_NEXTAUTH_URL;
+    }
   }
 }
 

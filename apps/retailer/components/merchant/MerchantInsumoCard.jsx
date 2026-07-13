@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Loader2, Trash2, AlertTriangle, Package, ShoppingCart } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Camera, Loader2, Trash2, AlertTriangle, ShoppingCart, RefreshCw } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
+import { InsumoProductImage } from './InsumoProductImage';
 
 const UNIDADE_LABEL = {
   un: 'un',
@@ -29,7 +30,50 @@ function formatQty(value, unidade) {
 
 export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
   const [busy, setBusy] = useState(false);
-  const imageUrl = insumo.imagem_url || insumo.image_url;
+  const fileInputRef = useRef(null);
+
+  const uploadPhoto = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const reader = new FileReader();
+      const imageBase64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const uploadRes = await fetch(painelApi.insumoUploadImage, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64, insumoId: insumo.id }),
+      });
+      const uploadJson = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        alert(uploadJson.error || 'Não foi possível enviar a foto.');
+        return;
+      }
+
+      const patchRes = await fetch(painelApi.insumo(insumo.id), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imagem_url: uploadJson.url,
+          imagem_source: 'custom',
+        }),
+      });
+      const patchJson = await patchRes.json().catch(() => ({}));
+      if (!patchRes.ok) {
+        alert(patchJson.error || 'Foto enviada, mas não foi possível salvar no estoque.');
+        return;
+      }
+      onUpdated?.(patchJson.insumo);
+    } catch {
+      alert('Erro ao enviar foto.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const remove = async () => {
     if (!confirm(`Remover "${insumo.nome}" da lista de insumos?`)) return;
@@ -70,6 +114,23 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
     }
   };
 
+  const retryImage = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(painelApi.insumoResolveImage(insumo.id), { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Não foi possível buscar imagem.');
+        return;
+      }
+      onUpdated?.(data.insumo);
+    } catch {
+      alert('Erro de rede.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleRecorrente = async () => {
     setBusy(true);
     try {
@@ -100,14 +161,28 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white p-1.5 shadow-sm">
-          {imageUrl ? (
-            <img src={imageUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-              <Package className="h-7 w-7" aria-hidden />
-            </div>
-          )}
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white p-1.5 shadow-sm">
+          <InsumoProductImage insumo={insumo} className="h-full w-full" iconClassName="h-7 w-7" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              void uploadPhoto(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute bottom-0.5 right-0.5 rounded-full bg-[#39FF14] p-1 text-black shadow"
+            title="Tirar foto ou enviar imagem"
+          >
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+          </button>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -163,6 +238,16 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
           ) : (
             <span className="text-[10px] text-[#39FF14]/80 px-2 py-1 text-center">Na cesta</span>
           )}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void retryImage()}
+            className="inline-flex items-center justify-center gap-1 text-[10px] text-white/55 hover:text-[#39FF14] px-2 py-1 rounded border border-white/10"
+            title="Buscar imagem (Cosmos / Open Food Facts)"
+          >
+            <RefreshCw className={`h-3 w-3 ${busy ? 'animate-spin' : ''}`} aria-hidden />
+            Imagem auto
+          </button>
           <button
             type="button"
             disabled={busy}

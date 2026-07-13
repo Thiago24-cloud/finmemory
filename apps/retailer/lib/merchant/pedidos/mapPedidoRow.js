@@ -21,6 +21,9 @@ export function mapPedidoRowToApi(row, itens) {
     preparo_iniciado_em: row.preparo_iniciado_em || null,
     pronto_em: row.pronto_em || null,
     concluido_em: row.concluido_em || null,
+    mesa_id: row.mesa_id || null,
+    mesa_numero: row.mesa_numero ?? null,
+    origem: row.origem || 'balcao',
     itens: (itens || []).map((i) => ({
       id: i.id,
       produto_loja_id: i.produto_loja_id,

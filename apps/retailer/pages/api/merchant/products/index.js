@@ -1,7 +1,12 @@
 import { requireMerchantApi } from '../../../../lib/merchant/requireMerchantApi';
 import { publishMerchantProductToMap } from '../../../../lib/merchant/publishMerchantProductToMap';
 import { mapProdutoRowToApi } from '../../../../lib/merchant/mapProdutoRow';
-import { resolveOptimizedProductImage } from '../../../../lib/merchant/optimizedProductImage';
+import { resolveProdutoLojaImage } from '../../../../lib/merchant/resolveProdutoLojaImage';
+import { normalizeEanDigits } from '../../../../lib/merchant/mapInsumoRow';
+
+function isMissingCatalogColumnError(error) {
+  return /ean|categoria|imagem_source|insumo_id|column/i.test(String(error?.message || ''));
+}
 
 function isMissingOptimizedColumnError(error) {
   return /image_optimized_url/i.test(String(error?.message || ''));
@@ -22,13 +27,13 @@ export default async function handler(req, res) {
     let { data, error } = await supabase
       .from('produtos_loja')
       .select(
-        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, image_optimized_url, status_disponivel, created_at, updated_at'
+        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, image_optimized_url, ean, categoria, imagem_source, insumo_id, status_disponivel, created_at, updated_at'
       )
       .eq('loja_id', lojaId)
       .order('created_at', { ascending: false })
       .limit(200);
 
-    if (error && isMissingOptimizedColumnError(error)) {
+    if (error && (isMissingOptimizedColumnError(error) || isMissingCatalogColumnError(error))) {
       const retry = await supabase
         .from('produtos_loja')
         .select(
@@ -64,6 +69,7 @@ export default async function handler(req, res) {
     const descricao = String(body.description || body.descricao || '').trim().slice(0, 500) || null;
     const imageUrl =
       String(body.image_url || body.imageUrl || body.url_imagem || '').trim().slice(0, 2048) || null;
+    const ean = normalizeEanDigits(body.ean || body.gtin || body.barcode);
     const precoOferta = Number(body.price ?? body.preco_oferta);
     const precoOriginal =
       body.preco_original != null ? Number(body.preco_original) : precoOferta;
@@ -79,10 +85,11 @@ export default async function handler(req, res) {
     }
 
     const nowIso = new Date().toISOString();
-    const resolvedImage = await resolveOptimizedProductImage({
-      productName: nome,
+    const resolvedImage = await resolveProdutoLojaImage({
+      nome,
+      ean,
       imageUrl,
-      allowSearchByName: true,
+      imagemSource: imageUrl ? 'custom' : null,
     });
 
     const insertPayload = {
@@ -93,8 +100,11 @@ export default async function handler(req, res) {
       preco_oferta: Math.round(precoOferta * 100) / 100,
       em_oferta: emOferta,
       quantidade_estoque: Number.isFinite(estoque) ? estoque : null,
-      url_imagem: resolvedImage.sourceUrl || imageUrl,
-      image_optimized_url: resolvedImage.optimizedUrl || null,
+      url_imagem: resolvedImage.url_imagem || imageUrl,
+      image_optimized_url: resolvedImage.image_optimized_url || null,
+      ean,
+      categoria: resolvedImage.categoria || null,
+      imagem_source: resolvedImage.imagem_source || null,
       status_disponivel: true,
       updated_at: nowIso,
     };
@@ -107,9 +117,12 @@ export default async function handler(req, res) {
       )
       .single();
 
-    if (insErr && isMissingOptimizedColumnError(insErr)) {
+    if (insErr && (isMissingOptimizedColumnError(insErr) || isMissingCatalogColumnError(insErr))) {
       const fallbackPayload = { ...insertPayload };
       delete fallbackPayload.image_optimized_url;
+      delete fallbackPayload.ean;
+      delete fallbackPayload.categoria;
+      delete fallbackPayload.imagem_source;
       const retry = await supabase
         .from('produtos_loja')
         .insert(fallbackPayload)

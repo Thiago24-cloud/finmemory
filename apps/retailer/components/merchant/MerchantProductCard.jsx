@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Package, Zap } from 'lucide-react';
+import { Loader2, RefreshCw, Zap } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
+import { InsumoProductImage } from './InsumoProductImage';
 
 function formatBrl(value) {
   return Number(value).toFixed(2).replace('.', ',');
@@ -12,8 +13,13 @@ export function MerchantProductCard({ product, onUpdated }) {
   const [busy, setBusy] = useState(false);
   const [priceEdit, setPriceEdit] = useState(String(product.price ?? ''));
   const [editingPrice, setEditingPrice] = useState(false);
-  const [imgFailed, setImgFailed] = useState(false);
-  const [imgLowQuality, setImgLowQuality] = useState(false);
+
+  const imageInsumo = {
+    nome: product.name,
+    categoria: product.categoria,
+    imagem_url: product.image_optimized_url || product.image_url || product.url_imagem,
+    imagem_source: product.imagem_source,
+  };
 
   const patch = async (body) => {
     setBusy(true);
@@ -46,8 +52,23 @@ export function MerchantProductCard({ product, onUpdated }) {
     setEditingPrice(false);
   };
 
-  const img = product.image_optimized_url || product.image_url || product.url_imagem;
-  const showPlaceholder = !img || imgFailed || imgLowQuality;
+  const retryImage = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(painelApi.productResolveImage(product.id), { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Não foi possível buscar imagem.');
+        return;
+      }
+      onUpdated?.(data.product);
+    } catch {
+      alert('Erro de rede.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const showStrike =
     product.preco_original != null &&
     Number(product.preco_original) > Number(product.price);
@@ -55,25 +76,7 @@ export function MerchantProductCard({ product, onUpdated }) {
   return (
     <li className="rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:p-4 flex gap-3 sm:gap-4">
       <div className="shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white border border-white/20 overflow-hidden p-2 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
-        {!showPlaceholder ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={img}
-            alt={product.name || 'Produto'}
-            className="w-full h-full object-contain rounded-xl bg-white"
-            onError={() => setImgFailed(true)}
-            onLoad={(e) => {
-              const w = e.currentTarget.naturalWidth || 0;
-              const h = e.currentTarget.naturalHeight || 0;
-              if (w < 260 || h < 260) setImgLowQuality(true);
-            }}
-          />
-        ) : (
-          <div className="w-full h-full rounded-xl bg-[#0a0f0a] border border-[#39FF14]/25 flex flex-col items-center justify-center text-center px-1">
-            <Package className="h-5 w-5 text-[#39FF14]" aria-hidden />
-            <span className="mt-1 text-[10px] text-[#39FF14]/80 font-semibold">Imagem premium</span>
-          </div>
-        )}
+        <InsumoProductImage insumo={imageInsumo} className="h-full w-full" iconClassName="h-6 w-6" />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -140,6 +143,16 @@ export function MerchantProductCard({ product, onUpdated }) {
         </div>
 
         <div className="mt-3 flex flex-wrap gap-4 text-xs">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void retryImage()}
+            className="inline-flex items-center gap-1.5 text-white/60 hover:text-[#39FF14] transition-colors"
+            title="Buscar imagem automaticamente"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} aria-hidden />
+            Buscar imagem
+          </button>
           <label className="inline-flex items-center gap-2 cursor-pointer text-white/70">
             <input
               type="checkbox"

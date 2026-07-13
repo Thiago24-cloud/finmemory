@@ -4,6 +4,8 @@ import {
   normalizeEanDigits,
   normalizeInsumoUnidade,
 } from '../../../../lib/merchant/mapInsumoRow';
+import { enrichInsumoImage } from '../../../../lib/merchant/insumos/enrichInsumoImage';
+import { computeInsumoImageStats } from '../../../../lib/merchant/insumoImageStats';
 
 const INSUMO_SELECT =
   'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, import_lote_id, imagem_url, imagem_source, imagem_atualizada_em, na_cesta, cesta_quantidade, cesta_oferta, canonical_name, match_termos, match_source, match_atualizado_em, created_at, updated_at';
@@ -109,16 +111,25 @@ export default async function handler(req, res) {
     }
 
     const insumos = (data || []).map(mapInsumoRowToApi);
+    const ativos = insumos.filter((i) => i.ativo);
     const abaixoMinimo = insumos.filter((i) => i.abaixo_minimo && i.ativo).length;
     const pendenteRevisao = insumos.filter((i) => i.status_revisao === 'pendente').length;
+    const imageStats = computeInsumoImageStats(ativos);
+    const totalUnits = ativos.reduce((sum, i) => sum + (Number(i.quantidade_atual) || 0), 0);
 
     return res.status(200).json({
       insumos,
       store_id: lojaId,
       loja_id: lojaId,
-      total: insumos.filter((i) => i.ativo).length,
+      total: ativos.length,
       abaixo_minimo: abaixoMinimo,
       pendente_revisao: pendenteRevisao,
+      summary: {
+        totalProducts: ativos.length,
+        totalUnits: Math.round(totalUnits * 1000) / 1000,
+        lowStockCount: abaixoMinimo,
+        imageStats,
+      },
     });
   }
 
@@ -213,7 +224,23 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: insErr.message });
     }
 
-    return res.status(201).json({ insumo: mapInsumoRowToApi(row) });
+    await enrichInsumoImage(supabase, {
+      lojaId,
+      insumoId: row.id,
+      nome: row.nome,
+      ean: row.ean,
+      currentImageUrl: row.imagem_url,
+      currentImageSource: row.imagem_source,
+      nowIso,
+    }).catch(() => {});
+
+    const { data: enriched } = await supabase
+      .from('insumos_loja')
+      .select(INSUMO_SELECT)
+      .eq('id', row.id)
+      .maybeSingle();
+
+    return res.status(201).json({ insumo: mapInsumoRowToApi(enriched || row) });
   }
 
   res.setHeader('Allow', 'GET, POST');

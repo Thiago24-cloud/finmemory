@@ -76,7 +76,8 @@ $optional = @(
     "CLOUDFLARE_R2_ENDPOINT", "CLOUDFLARE_R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
     "CLOUDFLARE_R2_BUCKET", "CLOUDFLARE_R2_PUBLIC_BASE_URL",
     "ONESIGNAL_APP_ID", "ONESIGNAL_REST_API_KEY",
-    "OPENAI_API_KEY"
+    "OPENAI_API_KEY",
+    "COSMOS_LOOKUP_SECRET"
 )
 
 $envMap = @{}
@@ -126,6 +127,9 @@ try {
 foreach ($entry in $envMap.GetEnumerator()) {
     $merged[$entry.Key] = [string]$entry.Value
 }
+# Cosmos: token só no consumer; retailer usa proxy via NEXT_PUBLIC_CONSUMER_APP_URL
+$merged.Remove("COSMOS_API_TOKEN") | Out-Null
+$merged.Remove("COSMOS_USE_RETAILER_API") | Out-Null
 
 $yamlPath = Join-Path $env:TEMP "finmemory-retailer-cloud-run-env.yaml"
 $lines = @()

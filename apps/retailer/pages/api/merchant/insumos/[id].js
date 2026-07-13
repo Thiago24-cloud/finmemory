@@ -4,6 +4,15 @@ import {
   normalizeEanDigits,
   normalizeInsumoUnidade,
 } from '../../../../lib/merchant/mapInsumoRow';
+import { enrichInsumoImage } from '../../../../lib/merchant/insumos/enrichInsumoImage';
+
+const INSUMO_SELECT =
+  'id, loja_id, nome, sku, ean, categoria, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, status_revisao, imagem_url, imagem_source, imagem_atualizada_em, na_cesta, cesta_quantidade, cesta_oferta, created_at, updated_at';
+
+function cleanImageUrl(value) {
+  const url = String(value || '').trim();
+  return url.startsWith('https://') ? url.slice(0, 2048) : null;
+}
 
 function isMissingTableError(error) {
   return /insumos_loja/i.test(String(error?.message || ''));
@@ -27,9 +36,7 @@ export default async function handler(req, res) {
 
   const { data: existing, error: fetchErr } = await supabase
     .from('insumos_loja')
-    .select(
-      'id, loja_id, nome, ean, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo'
-    )
+    .select(INSUMO_SELECT)
     .eq('id', insumoId)
     .eq('loja_id', lojaId)
     .maybeSingle();
@@ -166,18 +173,53 @@ export default async function handler(req, res) {
       }
     }
 
+    if (body.imagem_url !== undefined || body.image_url !== undefined || body.imageUrl !== undefined) {
+      const imagemUrl = cleanImageUrl(body.imagem_url ?? body.image_url ?? body.imageUrl);
+      patch.imagem_url = imagemUrl;
+      patch.imagem_atualizada_em = patch.updated_at;
+      if (body.imagem_source) {
+        patch.imagem_source = String(body.imagem_source).trim().slice(0, 80);
+      } else if (imagemUrl) {
+        patch.imagem_source = 'custom';
+      }
+    } else if (body.imagem_source) {
+      patch.imagem_source = String(body.imagem_source).trim().slice(0, 80);
+    }
+
     const { data: row, error: updErr } = await supabase
       .from('insumos_loja')
       .update(patch)
       .eq('id', insumoId)
       .eq('loja_id', lojaId)
-      .select(
-        'id, loja_id, nome, ean, unidade, estoque_minimo, quantidade_atual, custo_medio, recorrente, ativo, created_at, updated_at'
-      )
+      .select(INSUMO_SELECT)
       .single();
 
     if (updErr) {
       return res.status(500).json({ error: updErr.message });
+    }
+
+    const nameChanged = patch.nome != null && patch.nome !== existing.nome;
+    const eanChanged = patch.ean !== undefined && patch.ean !== existing.ean;
+    const isCustom = String(row.imagem_source || '').toLowerCase() === 'custom';
+
+    if (!isCustom && (nameChanged || eanChanged) && body.imagem_url === undefined) {
+      await enrichInsumoImage(supabase, {
+        lojaId,
+        insumoId,
+        nome: row.nome,
+        ean: row.ean,
+        currentImageUrl: row.imagem_url,
+        currentImageSource: row.imagem_source,
+        nowIso: patch.updated_at,
+      }).catch(() => {});
+
+      const { data: enriched } = await supabase
+        .from('insumos_loja')
+        .select(INSUMO_SELECT)
+        .eq('id', insumoId)
+        .maybeSingle();
+
+      return res.status(200).json({ insumo: mapInsumoRowToApi(enriched || row) });
     }
 
     return res.status(200).json({ insumo: mapInsumoRowToApi(row) });

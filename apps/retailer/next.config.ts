@@ -6,6 +6,9 @@ const monorepoRoot = path.join(__dirname, '../..');
 loadEnv({ path: path.join(monorepoRoot, '.env') });
 loadEnv({ path: path.join(monorepoRoot, '.env.local'), override: true });
 loadEnv({ path: path.join(monorepoRoot, '.env.production') });
+if (process.env.NODE_ENV !== 'production') {
+  loadEnv({ path: path.join(__dirname, '.env.development.local'), override: true });
+}
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -29,7 +32,7 @@ const nextConfig: NextConfig = {
         : [];
     const securePages = [...noStore, ...hsts];
     return [
-      { source: '/:path*', headers: hsts },
+      ...(hsts.length ? [{ source: '/:path*', headers: hsts }] : []),
       { source: '/parceiros', headers: securePages },
       { source: '/parceiros/painel', headers: securePages },
       { source: '/mapa', headers: securePages },

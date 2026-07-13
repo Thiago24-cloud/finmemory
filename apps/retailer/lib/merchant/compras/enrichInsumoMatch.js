@@ -7,7 +7,7 @@ import {
   searchCosmosProductsByQuery,
 } from '../../merchant/cosmosConsumerClient';
 import { normalizeEanDigits } from '../mapInsumoRow';
-import { enrichInsumoImageFromCosmos } from '../insumos/enrichInsumoImage';
+import { enrichInsumoImage } from '../insumos/enrichInsumoImage';
 import {
   buildHeuristicMatchTerms,
   buildMatchTermsFromCosmos,
@@ -76,7 +76,17 @@ export async function resolveCatalogMatchForInsumo(insumo) {
  */
 export async function enrichInsumoMatchFromCatalog(
   supabase,
-  { lojaId, insumoId, nome, ean, canonical_name, match_termos, currentImageUrl, force = false }
+  {
+    lojaId,
+    insumoId,
+    nome,
+    ean,
+    canonical_name,
+    match_termos,
+    currentImageUrl,
+    currentImageSource = null,
+    force = false,
+  }
 ) {
   if (!insumoId || !lojaId) return { updated: false };
 
@@ -121,13 +131,14 @@ export async function enrichInsumoMatchFromCatalog(
   }
 
   let image = null;
-  if (!currentImageUrl && resolved.cosmos) {
-    image = await enrichInsumoImageFromCosmos(supabase, {
+  if (!currentImageUrl) {
+    image = await enrichInsumoImage(supabase, {
       lojaId,
       insumoId,
       nome: resolved.canonical_name || nome,
       ean: resolved.ean || ean,
       currentImageUrl,
+      currentImageSource,
       nowIso,
     });
   }
@@ -157,6 +168,7 @@ export async function enrichCestaInsumosMatch(supabase, lojaId, insumos, { limit
       canonical_name: insumo.canonical_name,
       match_termos: insumo.match_termos,
       currentImageUrl: insumo.imagem_url || insumo.image_url,
+      currentImageSource: insumo.imagem_source,
       force,
     });
     results.push({ insumoId: insumo.id, ...r });

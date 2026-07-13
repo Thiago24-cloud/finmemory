@@ -120,7 +120,8 @@ $scraperOptional = @(
     "SCRAPER_DIA_BATCH_SIZE",
     "GOOGLE_API_KEY",
     "GOOGLE_CSE_ID",
-    "COSMOS_API_TOKEN"
+    "COSMOS_API_TOKEN",
+    "COSMOS_LOOKUP_SECRET"
 )
 foreach ($k in $scraperOptional) {
     if ($vars[$k]) { $envMap[$k] = $vars[$k] }

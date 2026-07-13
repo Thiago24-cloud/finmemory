@@ -16,6 +16,7 @@ import {
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { buildCestaConsumerMapUrl } from '../../lib/merchant/compras/cestaMapUrl';
 import { offerKey } from '../../lib/merchant/compras/cestaCompare';
+import { InsumoProductImage } from './InsumoProductImage';
 
 const LEGACY_STORAGE_KEY = 'finmemory_parceiros_lista_compras_v1';
 
@@ -25,24 +26,14 @@ function formatBrl(value) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function CestaItemImage({ url, nome }) {
-  if (url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={url}
-        alt=""
-        className="h-14 w-14 rounded-xl object-contain bg-white/[0.06] border border-white/10 shrink-0"
-      />
-    );
-  }
+function CestaItemImage({ insumo }) {
   return (
-    <div
-      className="h-14 w-14 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center shrink-0"
-      aria-hidden
-    >
-      <Package className="h-6 w-6 text-white/30" />
-    </div>
+    <InsumoProductImage
+      insumo={insumo}
+      className="h-14 w-14 shrink-0 border border-white/10"
+      iconClassName="h-6 w-6"
+      roundedClassName="rounded-xl"
+    />
   );
 }
 
@@ -391,7 +382,7 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
               className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 sm:p-4"
             >
               <div className="flex gap-3">
-                <CestaItemImage url={item.imagem_url} nome={item.nome} />
+                <CestaItemImage insumo={item} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -661,7 +652,7 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
                         onClick={() => void addInsumoToCesta(insumo.id)}
                         className="w-full text-left rounded-xl px-3 py-2.5 border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] flex items-center gap-3"
                       >
-                        <CestaItemImage url={insumo.imagem_url || insumo.image_url} nome={insumo.nome} />
+                        <CestaItemImage insumo={insumo} />
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-white m-0 truncate">{insumo.nome}</p>
                           {insumo.abaixo_minimo ? (

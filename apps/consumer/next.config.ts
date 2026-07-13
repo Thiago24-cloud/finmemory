@@ -7,6 +7,9 @@ const monorepoRoot = path.join(__dirname, '../..');
 loadEnv({ path: path.join(monorepoRoot, '.env') });
 loadEnv({ path: path.join(monorepoRoot, '.env.local'), override: true });
 loadEnv({ path: path.join(monorepoRoot, '.env.production') });
+if (process.env.NODE_ENV !== 'production') {
+  loadEnv({ path: path.join(__dirname, '.env.development.local'), override: true });
+}
 
 /** Upstream PostHog (ingest + assets) conforme `NEXT_PUBLIC_POSTHOG_HOST` no build. */
 function posthogUpstream() {

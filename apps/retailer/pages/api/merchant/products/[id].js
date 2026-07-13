@@ -1,7 +1,12 @@
 import { requireMerchantApi } from '../../../../lib/merchant/requireMerchantApi';
 import { mapProdutoRowToApi } from '../../../../lib/merchant/mapProdutoRow';
 import { publishMerchantProductToMap } from '../../../../lib/merchant/publishMerchantProductToMap';
-import { resolveOptimizedProductImage } from '../../../../lib/merchant/optimizedProductImage';
+import { resolveProdutoLojaImage } from '../../../../lib/merchant/resolveProdutoLojaImage';
+import { normalizeEanDigits } from '../../../../lib/merchant/mapInsumoRow';
+
+function isMissingCatalogColumnError(error) {
+  return /ean|categoria|imagem_source|insumo_id|column/i.test(String(error?.message || ''));
+}
 
 function isMissingOptimizedColumnError(error) {
   return /image_optimized_url/i.test(String(error?.message || ''));
@@ -30,13 +35,13 @@ export default async function handler(req, res) {
   let { data: existing, error: fetchErr } = await supabase
     .from('produtos_loja')
     .select(
-      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, image_optimized_url, status_disponivel'
+      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, image_optimized_url, ean, categoria, imagem_source, status_disponivel'
     )
     .eq('id', productId)
     .eq('loja_id', lojaId)
     .maybeSingle();
 
-  if (fetchErr && isMissingOptimizedColumnError(fetchErr)) {
+  if (fetchErr && (isMissingOptimizedColumnError(fetchErr) || isMissingCatalogColumnError(fetchErr))) {
     const retry = await supabase
       .from('produtos_loja')
       .select(
@@ -85,18 +90,35 @@ export default async function handler(req, res) {
   if (body.image_url != null || body.url_imagem != null) {
     const url = String(body.image_url ?? body.url_imagem).trim().slice(0, 2048) || null;
     patch.url_imagem = url;
+    patch.imagem_source = url ? 'custom' : null;
+  }
+
+  if (body.ean !== undefined || body.gtin !== undefined || body.barcode !== undefined) {
+    patch.ean = normalizeEanDigits(body.ean ?? body.gtin ?? body.barcode);
   }
 
   const nextName = patch.nome ?? existing.nome;
   const nextImageUrl = patch.url_imagem ?? existing.url_imagem;
-  if (patch.nome != null || patch.url_imagem != null || body.refresh_image === true) {
-    const resolvedImage = await resolveOptimizedProductImage({
-      productName: nextName,
+  const nextEan = patch.ean !== undefined ? patch.ean : existing.ean;
+  const nextSource = patch.imagem_source ?? existing.imagem_source;
+  const shouldResolve =
+    patch.nome != null ||
+    patch.url_imagem != null ||
+    patch.ean !== undefined ||
+    body.refresh_image === true;
+
+  if (shouldResolve) {
+    const resolvedImage = await resolveProdutoLojaImage({
+      nome: nextName,
+      ean: nextEan,
       imageUrl: nextImageUrl,
-      allowSearchByName: true,
+      imagemSource: nextSource,
+      forceRefresh: body.refresh_image === true,
     });
-    if (resolvedImage.sourceUrl) patch.url_imagem = resolvedImage.sourceUrl;
-    patch.image_optimized_url = resolvedImage.optimizedUrl || null;
+    patch.url_imagem = resolvedImage.url_imagem ?? nextImageUrl;
+    patch.imagem_source = resolvedImage.imagem_source;
+    patch.categoria = resolvedImage.categoria;
+    patch.image_optimized_url = resolvedImage.image_optimized_url || null;
   }
 
   if (typeof body.em_oferta === 'boolean') {
@@ -117,9 +139,12 @@ export default async function handler(req, res) {
     )
     .single();
 
-  if (updErr && isMissingOptimizedColumnError(updErr)) {
+  if (updErr && (isMissingOptimizedColumnError(updErr) || isMissingCatalogColumnError(updErr))) {
     const retryPatch = { ...patch };
     delete retryPatch.image_optimized_url;
+    delete retryPatch.ean;
+    delete retryPatch.categoria;
+    delete retryPatch.imagem_source;
     const retry = await supabase
       .from('produtos_loja')
       .update(retryPatch)

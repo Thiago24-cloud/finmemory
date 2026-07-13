@@ -1,6 +1,6 @@
 import { normalizeEanDigits, normalizeInsumoUnidade } from './mapInsumoRow';
 import {
-  enrichInsumoImageFromCosmos,
+  enrichInsumoImage,
   getCurrentInsumoImageUrl,
 } from './insumos/enrichInsumoImage';
 
@@ -175,23 +175,25 @@ export async function confirmNotaEntrada(supabase, input) {
       if (updErr) throw new Error(updErr.message);
 
       if (createdInsumo) {
-        await enrichInsumoImageFromCosmos(supabase, {
+        await enrichInsumoImage(supabase, {
           lojaId,
           insumoId,
           nome: line.nome,
           ean: line.ean,
           currentImageUrl: null,
+          currentImageSource: null,
           nowIso,
         });
       } else {
         const currentImage = await getCurrentInsumoImageUrl(supabase, { lojaId, insumoId });
         if (currentImage.available && !currentImage.imageUrl) {
-          await enrichInsumoImageFromCosmos(supabase, {
+          await enrichInsumoImage(supabase, {
             lojaId,
             insumoId,
             nome: line.nome,
             ean: line.ean || insumoRow.ean,
             currentImageUrl: currentImage.imageUrl,
+            currentImageSource: currentImage.imageSource,
             nowIso,
           });
         }
