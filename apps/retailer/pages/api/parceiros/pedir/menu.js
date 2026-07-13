@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
   const { data: store, error: storeErr } = await supabase
     .from('stores')
-    .select('id, name, formatted_address')
+    .select('id, name, address')
     .eq('id', lojaId)
     .maybeSingle();
 
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
   });
 
   return res.status(200).json({
-    store: { id: store.id, name: store.name, address: store.formatted_address },
+    store: { id: store.id, name: store.name, address: store.address || null },
     mesa: req.query.mesa ? String(req.query.mesa) : null,
     products: mapped,
   });
