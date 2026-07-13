@@ -9,6 +9,8 @@ export function mapProdutoRowToApi(row) {
     nome: row.nome,
     description: row.descricao,
     descricao: row.descricao,
+    ingredients: row.ingredientes || null,
+    ingredientes: row.ingredientes || null,
     price: row.preco_oferta,
     preco_oferta: row.preco_oferta,
     preco_original: row.preco_original,

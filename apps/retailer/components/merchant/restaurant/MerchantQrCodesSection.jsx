@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Printer, QrCode } from 'lucide-react';
 import { painelApi } from '../../../lib/merchant/painelApiPaths';
 import { buildMesaQrUrl } from '../../../lib/merchant/mesas/mapMesaRow';
+import { SkipPageHeader } from '../skip/SkipPageHeader';
+import { SkipCard, SkipCardContent } from '../skip/SkipCard';
+import { SkipButton } from '../skip/SkipButton';
 
 export function MerchantQrCodesSection({ storeId }) {
   const [mesas, setMesas] = useState([]);
@@ -33,47 +36,39 @@ export function MerchantQrCodesSection({ storeId }) {
   const accessUrl = storeId ? `${baseUrl}/parceiros/pedir?loja=${storeId}` : `${baseUrl}/parceiros`;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold m-0 text-white flex items-center gap-2">
-          <QrCode className="h-5 w-5 text-[#39FF14]" />
-          Códigos QR
-        </h2>
-        <p className="text-xs text-white/50 mt-2 m-0">
-          Imprima e coloque nas mesas. O cliente escaneia e abre o cardápio para pedir.
-        </p>
-      </div>
+    <div className="animate-fade-in-up">
+      <SkipPageHeader
+        icon={QrCode}
+        title="Códigos"
+        description="Imprima e coloque nas mesas. O cliente escaneia e abre o cardápio para pedir."
+      />
 
-      <div className="rounded-2xl border border-[#39FF14]/30 bg-[#39FF14]/5 p-5">
-        <h3 className="text-sm font-bold text-white m-0 mb-2">QR geral do restaurante</h3>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(accessUrl)}`}
-            alt="QR Code de acesso"
-            className="w-36 h-36 rounded-lg border border-white/10 bg-white p-2"
-          />
-          <div className="min-w-0">
-            <p className="text-xs text-white/50 m-0 mb-1">Link:</p>
-            <code className="text-[10px] text-white/70 break-all">{accessUrl}</code>
+      <SkipCard className="border-primary/20 bg-primary/5 shadow-subtle mb-6">
+        <SkipCardContent className="p-5">
+          <h3 className="text-sm font-bold m-0 mb-2">QR geral do restaurante</h3>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(accessUrl)}`}
+              alt="QR Code de acesso"
+              className="w-36 h-36 rounded-lg border border-border bg-white p-2"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground m-0 mb-1">Link:</p>
+              <code className="text-[10px] text-foreground/70 break-all">{accessUrl}</code>
+            </div>
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-xs text-white/80"
-        >
-          <Printer className="h-4 w-4" />
-          Imprimir
-        </button>
-      </div>
+          <SkipButton variant="outline" size="sm" onClick={() => window.print()} className="mt-4">
+            <Printer className="h-4 w-4" />
+            Imprimir
+          </SkipButton>
+        </SkipCardContent>
+      </SkipCard>
 
-      {error ? (
-        <p className="text-sm text-red-400 m-0">{error}</p>
-      ) : null}
+      {error ? <p className="text-sm text-destructive m-0 mb-4">{error}</p> : null}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-white/60">
-          <Loader2 className="h-5 w-5 animate-spin text-[#39FF14]" />
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
           Carregando mesas…
         </div>
       ) : (
@@ -81,27 +76,26 @@ export function MerchantQrCodesSection({ storeId }) {
           {mesas.map((mesa) => {
             const url = buildMesaQrUrl({ storeId, mesaNumero: mesa.numero, baseUrl });
             return (
-              <div
-                key={mesa.id}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex items-center gap-4"
-              >
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(url)}`}
-                  alt={`QR Mesa ${mesa.numero}`}
-                  className="w-24 h-24 rounded-lg bg-white p-1 shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="text-base font-bold text-white m-0">Mesa {mesa.numero}</p>
-                  <p className="text-[10px] text-white/40 mt-1 m-0 break-all">{url}</p>
-                </div>
-              </div>
+              <SkipCard key={mesa.id} className="shadow-subtle">
+                <SkipCardContent className="p-4 flex items-center gap-4">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(url)}`}
+                    alt={`QR Mesa ${mesa.numero}`}
+                    className="w-24 h-24 rounded-lg bg-white p-1 shrink-0 border border-border"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-base font-bold m-0">Mesa {mesa.numero}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1 m-0 break-all">{url}</p>
+                  </div>
+                </SkipCardContent>
+              </SkipCard>
             );
           })}
         </div>
       )}
 
       {!loading && mesas.length === 0 ? (
-        <p className="text-xs text-white/40 m-0">Cadastre mesas na aba Mesas para gerar QR por mesa.</p>
+        <p className="text-xs text-muted-foreground m-0 mt-4">Cadastre mesas na aba Mesas para gerar QR por mesa.</p>
       ) : null}
     </div>
   );

@@ -20,6 +20,8 @@ steps:
       - 'NEXT_PUBLIC_RETAILER_APP_URL=${_NEXT_PUBLIC_RETAILER_APP_URL}'
       - '--build-arg'
       - 'NEXT_PUBLIC_CONSUMER_APP_URL=${_NEXT_PUBLIC_CONSUMER_APP_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${_NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}'
       - '-f'
       - 'Dockerfile.retailer'
       - '-t'
@@ -74,3 +76,4 @@ substitutions:
   _NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS: '1'
   _NEXT_PUBLIC_RETAILER_APP_URL: ''
   _NEXT_PUBLIC_CONSUMER_APP_URL: 'https://finmemory.com.br'
+  _NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ''

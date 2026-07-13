@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './skip-shell.css';
+
 /* FinMemory Design System – tons do logo (verde #2ECC49) + visual limpo e claro */
 @layer base {
   :root {

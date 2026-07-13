@@ -25,6 +25,10 @@ const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || '';
 const stripePublishable = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || '';
 const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() || '';
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim() || '';
+const mapboxToken =
+  process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN?.trim() ||
+  process.env._MAPBOX_ACCESS_TOKEN?.trim() ||
+  '';
 const publicAccess =
   process.env.NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS?.trim() ||
   process.env.FINMEMORY_PUBLIC_ACCESS?.trim() ||
@@ -64,6 +68,12 @@ if (!supabaseUrl || !supabaseAnon) {
   process.exit(1);
 }
 
+if (!mapboxToken) {
+  console.warn(
+    '[deploy-cloud-run:retailer] Aviso: NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN vazio — o mapa de preços pode ficar sem tiles Mapbox.'
+  );
+}
+
 if (!retailerBase) {
   console.warn(
     '[deploy-cloud-run:retailer] Aviso: NEXT_PUBLIC_RETAILER_APP_URL vazio; usando fallback do app.'
@@ -88,6 +98,7 @@ const substitutions = [
   `_NEXT_PUBLIC_FINMEMORY_PUBLIC_ACCESS=${publicAccess}`,
   `_NEXT_PUBLIC_RETAILER_APP_URL=${retailerBase}`,
   `_NEXT_PUBLIC_CONSUMER_APP_URL=${consumerBase}`,
+  `_NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${mapboxToken}`,
 ].join(',');
 
 console.log(`[deploy-cloud-run:retailer] Projeto GCP: ${GCP_PROJECT}`);

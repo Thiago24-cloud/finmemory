@@ -180,6 +180,10 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack }) {
           productName={data?.product || focusedProduct.name}
           onLocateMe={requestLocation}
           isLocating={isLocating}
+          centerLat={storeLat}
+          centerLng={storeLng}
+          userLat={location?.lat}
+          userLng={location?.lng}
         />
       ) : null}
 

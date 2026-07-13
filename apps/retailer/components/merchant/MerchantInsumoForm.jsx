@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
+import { SkipButton } from './skip/SkipButton';
 
 const UNIDADES = [
   { value: 'un', label: 'Unidade (un)' },
@@ -24,6 +25,9 @@ const EMPTY = {
   custo_medio: '',
   recorrente: true,
 };
+
+const inputClass =
+  'w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring';
 
 export function MerchantInsumoForm({ onSaved, onCancel }) {
   const [form, setForm] = useState(EMPTY);
@@ -78,45 +82,39 @@ export function MerchantInsumoForm({ onSaved, onCancel }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="mt-4 rounded-2xl border border-[#39FF14]/25 bg-[#39FF14]/5 p-4 sm:p-5 space-y-3"
+      className="mt-4 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:p-5 space-y-3 shadow-subtle"
     >
-      <p className="text-xs text-white/60 m-0">
-        Insumos são matéria-prima e itens de compra (farinha, óleo, embalagem). Depois você registrará entradas por nota
-        fiscal — Sprint 2.
+      <p className="text-xs text-muted-foreground m-0">
+        Insumos são matéria-prima e itens de compra (farinha, óleo, embalagem). Depois você registrará entradas por nota fiscal.
       </p>
 
       <label className="block">
-        <span className="text-xs font-medium text-white/70 mb-1 block">Nome do insumo *</span>
+        <span className="text-xs font-medium text-muted-foreground mb-1 block">Nome do insumo *</span>
         <input
           name="nome"
           value={form.nome}
           onChange={onChange}
           required
           placeholder="Ex.: Farinha de trigo 1kg"
-          className="w-full rounded-xl border border-white/15 bg-[#0a0a10] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/40"
+          className={inputClass}
         />
       </label>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-white/70 mb-1 block">Código de barras (opcional)</span>
+          <span className="text-xs font-medium text-muted-foreground mb-1 block">Código de barras (opcional)</span>
           <input
             name="ean"
             value={form.ean}
             onChange={onChange}
             inputMode="numeric"
             placeholder="789…"
-            className="w-full rounded-xl border border-white/15 bg-[#0a0a10] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/40"
+            className={inputClass}
           />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-white/70 mb-1 block">Unidade</span>
-          <select
-            name="unidade"
-            value={form.unidade}
-            onChange={onChange}
-            className="w-full rounded-xl border border-white/15 bg-[#0a0a10] px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#39FF14]/40"
-          >
+          <span className="text-xs font-medium text-muted-foreground mb-1 block">Unidade</span>
+          <select name="unidade" value={form.unidade} onChange={onChange} className={inputClass}>
             {UNIDADES.map((u) => (
               <option key={u.value} value={u.value}>
                 {u.label}
@@ -128,73 +126,38 @@ export function MerchantInsumoForm({ onSaved, onCancel }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-white/70 mb-1 block">Quantidade atual</span>
-          <input
-            name="quantidade_atual"
-            value={form.quantidade_atual}
-            onChange={onChange}
-            inputMode="decimal"
-            placeholder="0"
-            className="w-full rounded-xl border border-white/15 bg-[#0a0a10] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/40"
-          />
+          <span className="text-xs font-medium text-muted-foreground mb-1 block">Quantidade atual</span>
+          <input name="quantidade_atual" value={form.quantidade_atual} onChange={onChange} inputMode="decimal" placeholder="0" className={inputClass} />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-white/70 mb-1 block">Estoque mínimo</span>
-          <input
-            name="estoque_minimo"
-            value={form.estoque_minimo}
-            onChange={onChange}
-            inputMode="decimal"
-            placeholder="0"
-            className="w-full rounded-xl border border-white/15 bg-[#0a0a10] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/40"
-          />
+          <span className="text-xs font-medium text-muted-foreground mb-1 block">Estoque mínimo</span>
+          <input name="estoque_minimo" value={form.estoque_minimo} onChange={onChange} inputMode="decimal" placeholder="0" className={inputClass} />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-white/70 mb-1 block">Custo médio (R$)</span>
-          <input
-            name="custo_medio"
-            value={form.custo_medio}
-            onChange={onChange}
-            inputMode="decimal"
-            placeholder="0,00"
-            className="w-full rounded-xl border border-white/15 bg-[#0a0a10] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/40"
-          />
+          <span className="text-xs font-medium text-muted-foreground mb-1 block">Custo médio (R$)</span>
+          <input name="custo_medio" value={form.custo_medio} onChange={onChange} inputMode="decimal" placeholder="0,00" className={inputClass} />
         </label>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer">
-        <input
-          type="checkbox"
-          name="recorrente"
-          checked={form.recorrente}
-          onChange={onChange}
-          className="rounded border-white/30"
-        />
-        Compra recorrente (entra no relatório mensal — em breve)
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" name="recorrente" checked={form.recorrente} onChange={onChange} className="accent-primary rounded" />
+        Compra recorrente
       </label>
 
       {error ? (
-        <p className="text-sm text-red-400 m-0" role="alert">
+        <p className="text-sm text-destructive m-0" role="alert">
           {error}
         </p>
       ) : null}
 
       <div className="flex flex-wrap gap-2 pt-1">
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#39FF14] px-5 py-2.5 text-sm font-bold text-[#050508] hover:brightness-110 disabled:opacity-60"
-        >
+        <SkipButton type="submit" disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Salvar insumo
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-xl border border-white/20 px-5 py-2.5 text-sm text-white/70 hover:bg-white/5"
-        >
+        </SkipButton>
+        <SkipButton type="button" variant="outline" onClick={onCancel}>
           Cancelar
-        </button>
+        </SkipButton>
       </div>
     </form>
   );

@@ -5,7 +5,7 @@ import { resolveProdutoLojaImage } from '../../../../lib/merchant/resolveProduto
 import { normalizeEanDigits } from '../../../../lib/merchant/mapInsumoRow';
 
 function isMissingCatalogColumnError(error) {
-  return /ean|categoria|imagem_source|insumo_id|column/i.test(String(error?.message || ''));
+  return /ean|categoria|imagem_source|insumo_id|ingredientes|column/i.test(String(error?.message || ''));
 }
 
 function isMissingOptimizedColumnError(error) {
@@ -13,11 +13,12 @@ function isMissingOptimizedColumnError(error) {
 }
 
 /**
- * PATCH /api/merchant/products/[id] — atualiza preço, foto, oferta relâmpago, disponibilidade.
+ * PATCH /api/merchant/products/[id] — atualiza produto / item do cardápio.
+ * DELETE /api/merchant/products/[id] — remove item.
  */
 export default async function handler(req, res) {
-  if (req.method !== 'PATCH') {
-    res.setHeader('Allow', 'PATCH');
+  if (req.method !== 'PATCH' && req.method !== 'DELETE') {
+    res.setHeader('Allow', 'PATCH, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -32,10 +33,20 @@ export default async function handler(req, res) {
   const { supabase, userId, store } = auth;
   const lojaId = store.id;
 
+  if (req.method === 'DELETE') {
+    const { error } = await supabase
+      .from('produtos_loja')
+      .delete()
+      .eq('id', productId)
+      .eq('loja_id', lojaId);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
   let { data: existing, error: fetchErr } = await supabase
     .from('produtos_loja')
     .select(
-      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, image_optimized_url, ean, categoria, imagem_source, status_disponivel'
+      'id, loja_id, nome, descricao, ingredientes, preco_original, preco_oferta, em_oferta, url_imagem, image_optimized_url, ean, categoria, imagem_source, status_disponivel'
     )
     .eq('id', productId)
     .eq('loja_id', lojaId)
@@ -45,7 +56,7 @@ export default async function handler(req, res) {
     const retry = await supabase
       .from('produtos_loja')
       .select(
-        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, status_disponivel'
+        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, url_imagem, status_disponivel, categoria'
       )
       .eq('id', productId)
       .eq('loja_id', lojaId)
@@ -62,6 +73,7 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
+  const isMenuItem = body.menu_item === true || body.source === 'cardapio';
   const patch = { updated_at: new Date().toISOString() };
 
   if (body.name != null || body.nome != null) {
@@ -71,7 +83,15 @@ export default async function handler(req, res) {
   }
 
   if (body.description != null || body.descricao != null) {
-    patch.descricao = String(body.description ?? body.descricao).trim().slice(0, 500) || null;
+    patch.descricao = String(body.description ?? body.descricao).trim().slice(0, 4000) || null;
+  }
+
+  if (body.ingredients != null || body.ingredientes != null) {
+    patch.ingredientes = String(body.ingredients ?? body.ingredientes).trim().slice(0, 4000) || null;
+  }
+
+  if (body.category != null || body.categoria != null) {
+    patch.categoria = String(body.category ?? body.categoria).trim().slice(0, 120) || null;
   }
 
   if (body.price != null || body.preco_oferta != null) {
@@ -117,12 +137,16 @@ export default async function handler(req, res) {
     });
     patch.url_imagem = resolvedImage.url_imagem ?? nextImageUrl;
     patch.imagem_source = resolvedImage.imagem_source;
-    patch.categoria = resolvedImage.categoria;
+    if (patch.categoria == null && existing.categoria == null) {
+      patch.categoria = resolvedImage.categoria;
+    }
     patch.image_optimized_url = resolvedImage.image_optimized_url || null;
   }
 
   if (typeof body.em_oferta === 'boolean') {
-    patch.em_oferta = body.em_oferta;
+    patch.em_oferta = isMenuItem ? false : body.em_oferta;
+  } else if (isMenuItem) {
+    patch.em_oferta = false;
   }
 
   if (typeof body.status_disponivel === 'boolean') {
@@ -135,7 +159,7 @@ export default async function handler(req, res) {
     .eq('id', productId)
     .eq('loja_id', lojaId)
     .select(
-      'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, image_optimized_url, status_disponivel, created_at, updated_at'
+      'id, loja_id, nome, descricao, ingredientes, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, image_optimized_url, categoria, status_disponivel, created_at, updated_at'
     )
     .single();
 
@@ -143,15 +167,17 @@ export default async function handler(req, res) {
     const retryPatch = { ...patch };
     delete retryPatch.image_optimized_url;
     delete retryPatch.ean;
-    delete retryPatch.categoria;
     delete retryPatch.imagem_source;
+    if (/ingredientes/i.test(String(updErr.message || ''))) {
+      delete retryPatch.ingredientes;
+    }
     const retry = await supabase
       .from('produtos_loja')
       .update(retryPatch)
       .eq('id', productId)
       .eq('loja_id', lojaId)
       .select(
-        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, status_disponivel, created_at, updated_at'
+        'id, loja_id, nome, descricao, preco_original, preco_oferta, em_oferta, quantidade_estoque, url_imagem, categoria, status_disponivel, created_at, updated_at'
       )
       .single();
     row = retry.data;
@@ -165,8 +191,9 @@ export default async function handler(req, res) {
   let published = false;
   let nearbyPush = null;
   const shouldPublish =
-    body.publishToMap === true ||
-    (typeof body.em_oferta === 'boolean' && body.em_oferta && !existing.em_oferta);
+    !isMenuItem &&
+    (body.publishToMap === true ||
+      (typeof body.em_oferta === 'boolean' && body.em_oferta && !existing.em_oferta));
 
   if (shouldPublish && row.em_oferta && row.status_disponivel) {
     const pub = await publishMerchantProductToMap(supabase, {
@@ -189,6 +216,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     product: mapProdutoRowToApi(row),
     published,
+    menu_item: isMenuItem,
     nearby_push: nearbyPush,
   });
 }

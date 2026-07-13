@@ -74,27 +74,27 @@ export function MerchantProductCard({ product, onUpdated }) {
     Number(product.preco_original) > Number(product.price);
 
   return (
-    <li className="rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:p-4 flex gap-3 sm:gap-4">
-      <div className="shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white border border-white/20 overflow-hidden p-2 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
+    <li className="rounded-xl border border-border bg-card p-3 sm:p-4 flex gap-3 sm:gap-4 shadow-subtle">
+      <div className="shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white border border-border overflow-hidden p-2">
         <InsumoProductImage insumo={imageInsumo} className="h-full w-full" iconClassName="h-6 w-6" />
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="font-semibold m-0 truncate">{product.name}</p>
+          <p className="font-semibold m-0 truncate text-foreground">{product.name}</p>
           {product.em_oferta ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-[#39FF14] bg-[#39FF14]/15 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-primary bg-primary/15 px-2 py-0.5 rounded-full">
               <Zap className="h-3 w-3" aria-hidden />
               Relâmpago
             </span>
           ) : null}
           {product.status_disponivel === false || product.active === false ? (
-            <span className="text-[10px] text-white/40 bg-white/10 px-2 py-0.5 rounded-full">Indisponível</span>
+            <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Indisponível</span>
           ) : null}
         </div>
 
         {product.description ? (
-          <p className="text-xs text-white/50 mt-1 m-0 line-clamp-2">{product.description}</p>
+          <p className="text-xs text-muted-foreground mt-1 m-0 line-clamp-2">{product.description}</p>
         ) : null}
 
         <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -103,14 +103,14 @@ export function MerchantProductCard({ product, onUpdated }) {
               <input
                 value={priceEdit}
                 onChange={(e) => setPriceEdit(e.target.value)}
-                className="w-24 rounded-lg border border-white/20 bg-[#0a0a10] px-2 py-1 text-sm text-white"
+                className="w-24 rounded-lg border border-input bg-background px-2 py-1 text-sm text-foreground"
                 inputMode="decimal"
               />
               <button
                 type="button"
                 onClick={savePrice}
                 disabled={busy}
-                className="text-xs font-bold text-[#39FF14]"
+                className="text-xs font-bold text-primary bg-transparent border-0 cursor-pointer"
               >
                 OK
               </button>
@@ -120,7 +120,7 @@ export function MerchantProductCard({ product, onUpdated }) {
                   setEditingPrice(false);
                   setPriceEdit(String(product.price ?? ''));
                 }}
-                className="text-xs text-white/50"
+                className="text-xs text-muted-foreground bg-transparent border-0 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -129,15 +129,15 @@ export function MerchantProductCard({ product, onUpdated }) {
             <button
               type="button"
               onClick={() => setEditingPrice(true)}
-              className="text-left"
+              className="text-left bg-transparent border-0 cursor-pointer p-0"
               disabled={busy}
             >
               {showStrike ? (
-                <span className="text-xs text-white/40 line-through mr-2">
+                <span className="text-xs text-muted-foreground line-through mr-2">
                   R$ {formatBrl(product.preco_original)}
                 </span>
               ) : null}
-              <span className="text-[#39FF14] font-bold">R$ {formatBrl(product.price)}</span>
+              <span className="text-primary font-bold">R$ {formatBrl(product.price)}</span>
             </button>
           )}
         </div>
@@ -147,13 +147,13 @@ export function MerchantProductCard({ product, onUpdated }) {
             type="button"
             disabled={busy}
             onClick={() => void retryImage()}
-            className="inline-flex items-center gap-1.5 text-white/60 hover:text-[#39FF14] transition-colors"
+            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors bg-transparent border-0 cursor-pointer p-0"
             title="Buscar imagem automaticamente"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} aria-hidden />
             Buscar imagem
           </button>
-          <label className="inline-flex items-center gap-2 cursor-pointer text-white/70">
+          <label className="inline-flex items-center gap-2 cursor-pointer text-foreground">
             <input
               type="checkbox"
               checked={Boolean(product.em_oferta)}
@@ -164,21 +164,21 @@ export function MerchantProductCard({ product, onUpdated }) {
                   publishToMap: e.target.checked,
                 })
               }
-              className="accent-[#39FF14]"
+              className="accent-primary"
             />
             Oferta no mapa
           </label>
-          <label className="inline-flex items-center gap-2 cursor-pointer text-white/70">
+          <label className="inline-flex items-center gap-2 cursor-pointer text-foreground">
             <input
               type="checkbox"
               checked={product.status_disponivel !== false && product.active !== false}
               disabled={busy}
               onChange={(e) => patch({ status_disponivel: e.target.checked })}
-              className="accent-[#39FF14]"
+              className="accent-primary"
             />
             Disponível
           </label>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin text-[#39FF14]" aria-hidden /> : null}
+          {busy ? <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden /> : null}
         </div>
       </div>
     </li>
