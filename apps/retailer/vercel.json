@@ -1,7 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm ci",
-  "buildCommand": "npm run build -w @finmemory/retailer",
-  "framework": "nextjs",
-  "regions": ["gru1"]
+  "ignoreCommand": "exit 0"
 }

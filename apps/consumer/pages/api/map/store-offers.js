@@ -26,6 +26,7 @@ import {
 } from '../../../lib/promotionValidity';
 import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
 import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
+import { isSimulatedMapProductName } from '../../../lib/mapSimulatedOffers';
 import { computeStoreOffersCacheExpiresAt } from '../../../lib/mapStoreOffersCacheExpires';
 
 /**
@@ -370,6 +371,7 @@ export default async function handler(req, res) {
       byDedupKey.set(dedupKey, row);
     }
     const deduped = Array.from(byDedupKey.values())
+      .filter((row) => !isSimulatedMapProductName(row.product_name))
       .filter((row) => !isLikelyNonProductScraperTitle(row.product_name))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
