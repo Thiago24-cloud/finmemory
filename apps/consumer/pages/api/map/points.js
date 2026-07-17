@@ -12,6 +12,7 @@ import { isLikelyNonProductScraperTitle } from '../../../lib/mapStoreChainMatch'
 import { displayPromoProductName } from '../../../lib/mapOfferDisplay';
 import { sanitizeMapPointsPromoImagesHttpsOnly } from '../../../lib/httpsPromoImageUrlForMap';
 import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
+import { isSimulatedMapProductName } from '../../../lib/mapSimulatedOffers';
 import {
   buildMapPointsSearchOrFilter,
   parseMapSearchTerms,
@@ -279,6 +280,7 @@ export default async function handler(req, res) {
       if (!row?.id) continue;
       if (isExcludedFromPriceMapPoint({ store_name: row.store_name, lat: row.lat, lng: row.lng }))
         continue;
+      if (isSimulatedMapProductName(row.product_name)) continue;
       if (isLikelyNonProductScraperTitle(row.product_name)) continue;
       byId.set(row.id, row);
     }

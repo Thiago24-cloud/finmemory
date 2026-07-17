@@ -30,6 +30,7 @@ import { fetchCuratedPinOptOutStoreIds } from '../../../lib/mapCuratedPinOptOut'
 import { httpsPromoImageUrlForMapJson } from '../../../lib/httpsPromoImageUrlForMap';
 import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
+import { isSimulatedMapProductName } from '../../../lib/mapSimulatedOffers';
 
 /**
  * GET /api/map/stores
@@ -302,6 +303,7 @@ export default async function handler(req, res) {
     const storeOfferPreviewMap = new Map();
 
     const attachOffer = (store, p) => {
+      if (isSimulatedMapProductName(p?.product_name)) return;
       const storeId = store.id;
       storeOfferMap.set(storeId, true);
       storeOfferCountMap.set(storeId, (storeOfferCountMap.get(storeId) || 0) + 1);
@@ -405,6 +407,7 @@ export default async function handler(req, res) {
       ...promoFromTableRows.filter((p) => !isExcludedFromPriceMapPoint(p)),
     ];
     for (const p of points) {
+      if (isSimulatedMapProductName(p.product_name)) continue;
       if (isLikelyNonProductScraperTitle(p.product_name)) continue;
       const pLat = Number(p.lat);
       const pLng = Number(p.lng);

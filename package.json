@@ -74,6 +74,7 @@
     "promo:seed-scraper-stores": "node -r dotenv/config scripts/seed-scraper-stores.mjs",
     "promo:catalog-report": "node -r dotenv/config scripts/scraper-catalog-report.mjs",
     "promo:report-map-integrity": "node scripts/report-map-promo-integrity.mjs",
+    "promo:cleanup-sim-cesta": "node -r dotenv/config scripts/cleanup-sim-cesta-map.mjs",
     "promo:test-google-cse": "node scripts/test-google-cse-curator.mjs",
     "catalog:enrich-images": "node -r dotenv/config scripts/enrich-product-images.mjs",
     "logo:strip-bg": "node scripts/strip-logo-corner-bg.mjs",
