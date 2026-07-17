@@ -241,6 +241,40 @@ export default async function handler(req, res) {
       console.warn('Aviso: erro ao buscar promo points (normal):', promoNormalErr.message);
     }
     const promoPoints = [...(promoPointsPromo || []), ...(promoPointsNormal || [])];
+
+    /** Lojas com promo ativa: garante pin laranja mesmo fora do LIMIT aleatório do bbox. */
+    let storesRowsRaw = data || [];
+    const promoLinkedNames = [
+      ...new Set(
+        (promoPoints || [])
+          .filter((p) => isPromoCategory(p.category))
+          .map((p) => String(p.store_name || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+    if (promoLinkedNames.length) {
+      const seenIds = new Set(storesRowsRaw.map((s) => s.id));
+      const storeSelect =
+        'id, name, type, address, lat, lng, neighborhood, photo_url';
+      for (let i = 0; i < promoLinkedNames.length; i += 40) {
+        const chunk = promoLinkedNames.slice(i, i + 40);
+        const { data: extraRows, error: extraErr } = await supabase
+          .from('stores')
+          .select(storeSelect)
+          .eq('active', true)
+          .in('name', chunk);
+        if (extraErr) {
+          console.warn('stores promo-linked fetch:', extraErr.message);
+          continue;
+        }
+        for (const row of extraRows || []) {
+          if (!row?.id || seenIds.has(row.id)) continue;
+          seenIds.add(row.id);
+          storesRowsRaw.push(row);
+        }
+      }
+    }
+
     let pinSuppressions = [];
     try {
       pinSuppressions = await fetchActiveMapPinSuppressions(supabase);
@@ -255,7 +289,7 @@ export default async function handler(req, res) {
       console.warn('stores curated pin opt-out:', e?.message || e);
     }
 
-    const storesRows = (data || [])
+    const storesRows = storesRowsRaw
       .filter((s) => !isPharmacyStoreType(s.type))
       .filter((s) => !isExcludedFromPriceMapPoint({ store_name: s.name, lat: s.lat, lng: s.lng }))
       .filter((s) => !isStoreRowSuppressedByPinRules(s, pinSuppressions));
