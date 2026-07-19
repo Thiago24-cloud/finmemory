@@ -33,6 +33,8 @@ export const painelApi = {
   comprasCesta: `${PAINEL_API_BASE}/compras/cesta`,
   comprasSimulate: `${PAINEL_API_BASE}/compras/simulate`,
   comprasMatch: `${PAINEL_API_BASE}/compras/match`,
+  comprasPriceHistory: `${PAINEL_API_BASE}/compras/price-history`,
+  alertas: `${PAINEL_API_BASE}/alertas`,
   vendas: `${PAINEL_API_BASE}/vendas`,
   vendasResumo: `${PAINEL_API_BASE}/vendas/resumo`,
   mapPrecosSearch: `${PAINEL_API_BASE}/map/precos-search`,

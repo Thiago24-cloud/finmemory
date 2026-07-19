@@ -64,6 +64,8 @@ export function MerchantNotaEntradaFlow({ insumos = [], onConfirmed, onClose }) 
   const [error, setError] = useState('');
   const [qrInput, setQrInput] = useState('');
   const [draft, setDraft] = useState(emptyDraft);
+  const [addToCesta, setAddToCesta] = useState(true);
+  const [cestaAdded, setCestaAdded] = useState(0);
 
   const processPhoto = async (file) => {
     setStep('processing');
@@ -150,6 +152,7 @@ export function MerchantNotaEntradaFlow({ insumos = [], onConfirmed, onClose }) 
   const confirm = async () => {
     setStep('saving');
     setError('');
+    setCestaAdded(0);
     try {
       const valorTotal =
         draft.valor_total === '' ? null : parseFloat(String(draft.valor_total).replace(',', '.'));
@@ -180,8 +183,25 @@ export function MerchantNotaEntradaFlow({ insumos = [], onConfirmed, onClose }) 
         setStep('review');
         return;
       }
+
+      let added = 0;
+      if (addToCesta && Array.isArray(data.insumo_ids) && data.insumo_ids.length) {
+        for (const insumoId of data.insumo_ids) {
+          try {
+            const cestaRes = await fetch(painelApi.comprasCesta, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'add', insumoId }),
+            });
+            if (cestaRes.ok) added += 1;
+          } catch {
+            /* best-effort */
+          }
+        }
+      }
+      setCestaAdded(added);
       setStep('success');
-      onConfirmed?.(data);
+      onConfirmed?.({ ...data, cesta_added: added });
     } catch {
       setError('Erro de rede ao salvar.');
       setStep('review');
@@ -194,6 +214,11 @@ export function MerchantNotaEntradaFlow({ insumos = [], onConfirmed, onClose }) 
         <CheckCircle2 className="h-12 w-12 text-primary mx-auto mb-3" aria-hidden />
         <h3 className="text-lg font-bold m-0">Entrada registrada</h3>
         <p className="text-sm text-muted-foreground mt-2 m-0">O estoque dos insumos foi atualizado.</p>
+        {cestaAdded > 0 ? (
+          <p className="text-sm text-primary font-semibold mt-2 m-0">
+            {cestaAdded} item(ns) sugeridos na cesta — veja Preços no mapa / Rota de Compras.
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={onClose}
@@ -372,6 +397,21 @@ export function MerchantNotaEntradaFlow({ insumos = [], onConfirmed, onClose }) 
               </li>
             ))}
           </ul>
+
+          <label className="flex items-start gap-2 rounded-xl border border-border bg-background px-3 py-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={addToCesta}
+              onChange={(e) => setAddToCesta(e.target.checked)}
+              className="mt-0.5 accent-primary"
+            />
+            <span className="text-xs text-foreground">
+              <span className="font-semibold">Sugerir reposição na cesta</span>
+              <span className="block text-muted-foreground mt-0.5">
+                Após confirmar, coloca estes insumos na Rota de Compras para achar preço no mapa.
+              </span>
+            </span>
+          </label>
 
           <div className="flex flex-wrap gap-2 pt-2">
             <button

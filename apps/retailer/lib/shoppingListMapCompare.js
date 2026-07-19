@@ -48,7 +48,10 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
 
   const grouped = items.map((it) => {
     const offers = rows
-      .filter((row) => listItemMatchesOfferName(it.listName, row.produto_nome))
+      .filter((row) => {
+        if (/\[sim-cesta\]/i.test(row.produto_nome || '')) return false;
+        return listItemMatchesOfferName(it.listName, row.produto_nome);
+      })
       .map((row) => ({
         lugar_id: row.lugar_id,
         nome_loja: row.nome_loja,
@@ -57,6 +60,8 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
         origem: row.origem,
         lat: row.lat,
         lng: row.lng,
+        expires_at: row.expires_at || null,
+        created_at: row.created_at || null,
       }))
       .filter((o) => Number.isFinite(o.preco) && o.preco > 0)
       .sort((a, b) => a.preco - b.preco);

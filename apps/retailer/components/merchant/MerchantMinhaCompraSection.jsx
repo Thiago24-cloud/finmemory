@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeftRight,
+  Bell,
   Loader2,
   MapPin,
   Plus,
@@ -11,6 +12,7 @@ import {
   ShoppingCart,
   Store,
   Trash2,
+  TrendingDown,
   X,
 } from 'lucide-react';
 import { SkipPageHeader } from './skip/SkipPageHeader';
@@ -22,7 +24,9 @@ import {
   buildCestaGoogleMapsRouteUrl,
 } from '../../lib/merchant/compras/cestaMapUrl';
 import { offerKey } from '../../lib/merchant/compras/cestaCompare';
+import { buildChainCompareFromStores } from '../../lib/merchant/compras/chainCompare';
 import { InsumoProductImage } from './InsumoProductImage';
+import { InsumoPriceSparkline, formatHistoryBrl } from './InsumoPriceSparkline';
 
 const LEGACY_STORAGE_KEY = 'finmemory_parceiros_lista_compras_v1';
 
@@ -63,6 +67,11 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [allInsumos, setAllInsumos] = useState([]);
   const [pickerLoading, setPickerLoading] = useState(false);
+  const [historyItemId, setHistoryItemId] = useState(null);
+  const [historyData, setHistoryData] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [alertsBusy, setAlertsBusy] = useState(false);
   const simulateTimer = useRef(null);
   const pendingSelections = useRef([]);
 
@@ -312,7 +321,56 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
     });
   }, [stores, storeLat, storeLng]);
 
+  const chainCompare = useMemo(() => buildChainCompareFromStores(stores).slice(0, 4), [stores]);
+  const bestStoreToday = stores[0] || null;
+
   const routeTotal = summary?.estimatedBestTotal ?? stores[0]?.total ?? 0;
+
+  const loadAlerts = useCallback(async () => {
+    setAlertsBusy(true);
+    try {
+      const res = await fetch(`${painelApi.alertas}?radiusKm=12`);
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) setAlerts(json.alerts || []);
+    } catch {
+      /* ignore */
+    } finally {
+      setAlertsBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && items.length > 0) void loadAlerts();
+  }, [loading, items.length, loadAlerts]);
+
+  const openHistory = async (insumoId) => {
+    setHistoryItemId(insumoId);
+    setHistoryLoading(true);
+    setHistoryData(null);
+    try {
+      const res = await fetch(`${painelApi.comprasPriceHistory}?insumoId=${encodeURIComponent(insumoId)}`);
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) setHistoryData(json);
+    } catch {
+      setHistoryData(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const toggleAlerta = async (insumoId, enable) => {
+    setBusy(true);
+    try {
+      await fetch(painelApi.alertas, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: enable ? 'enable' : 'disable', insumoId }),
+      });
+      await loadAlerts();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-5 animate-fade-in-up">
@@ -395,6 +453,103 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
         </p>
       ) : null}
 
+      {!loading && bestStoreToday ? (
+        <SkipCard className="border-primary/30 bg-primary/5">
+          <SkipCardContent className="p-4 space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-primary m-0 flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5" aria-hidden />
+              Onde comprar hoje
+            </p>
+            <p className="text-sm font-bold text-foreground m-0">{bestStoreToday.storeName}</p>
+            <p className="text-xs text-muted-foreground m-0">
+              Melhor loja da cesta · {bestStoreToday.coveragePct}% cobertura · {formatBrl(bestStoreToday.total)}
+            </p>
+          </SkipCardContent>
+        </SkipCard>
+      ) : null}
+
+      {!loading && chainCompare.length >= 2 ? (
+        <section>
+          <h3 className="text-sm font-bold text-foreground m-0 mb-2">Comparar redes</h3>
+          <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2 list-none p-0 m-0">
+            {chainCompare.slice(0, 3).map((c) => (
+              <li
+                key={c.chainKey}
+                className="rounded-xl border border-border bg-card px-3 py-2.5 shadow-subtle"
+              >
+                <p className="text-xs font-bold text-foreground m-0">{c.label}</p>
+                <p className="text-sm font-black text-primary m-0 mt-0.5">
+                  {c.bestTotal != null ? formatBrl(c.bestTotal) : '—'}
+                </p>
+                <p className="text-[10px] text-muted-foreground m-0 mt-0.5 truncate">
+                  {c.bestCoveragePct}% · {c.bestStoreName || `${c.storeCount} loja(s)`}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {!loading && items.length > 0 ? (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3 space-y-2">
+          <p className="text-xs font-bold text-amber-900 m-0 flex items-center gap-1.5">
+            <TrendingDown className="h-3.5 w-3.5" aria-hidden />
+            Alertas de queda
+            {alertsBusy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : null}
+          </p>
+          {alerts.length === 0 && !alertsBusy ? (
+            <p className="text-[11px] text-amber-800/80 m-0">
+              Nenhuma queda ≥8% perto de você agora. Toque em &quot;Alertar queda&quot; nos itens.
+            </p>
+          ) : null}
+          <ul className="space-y-2 list-none p-0 m-0">
+            {alerts.slice(0, 5).map((a) => (
+              <li key={`${a.insumoId}-${a.storeName}`} className="text-[11px] text-amber-950">
+                <span className="font-bold">{a.nome}</span> caiu {a.dropPct}% no {a.storeName} ·{' '}
+                {formatBrl(a.mapPrice)}
+                {a.whatsappUrl ? (
+                  <a
+                    href={a.whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 font-semibold text-primary underline"
+                  >
+                    WhatsApp
+                  </a>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <SkipButton variant="outline" onClick={() => void loadAlerts()} disabled={alertsBusy}>
+              <Bell className="h-3.5 w-3.5" aria-hidden />
+              Atualizar
+            </SkipButton>
+            {alerts.length > 0 ? (
+              <SkipButton
+                variant="outline"
+                disabled={alertsBusy}
+                onClick={async () => {
+                  setAlertsBusy(true);
+                  try {
+                    await fetch(painelApi.alertas, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'check', notify: true, radiusKm: 12 }),
+                    });
+                    await loadAlerts();
+                  } finally {
+                    setAlertsBusy(false);
+                  }
+                }}
+              >
+                Enviar push
+              </SkipButton>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       {!loading && items.length > 0 ? (
         <ul className="space-y-3 list-none p-0 m-0">
           {items.map((item) => (
@@ -455,6 +610,52 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
                       <span className="text-muted-foreground">{item.unidade || 'un'}</span>
                     </label>
                   </div>
+
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => void openHistory(item.insumoId)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-semibold text-foreground/80 hover:bg-muted"
+                    >
+                      Histórico
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void toggleAlerta(item.insumoId, true)}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-semibold text-foreground/80 hover:bg-muted disabled:opacity-50"
+                    >
+                      <Bell className="h-3 w-3" aria-hidden />
+                      Alertar queda
+                    </button>
+                  </div>
+
+                  {historyItemId === item.insumoId ? (
+                    <div className="mt-2 rounded-xl border border-border bg-muted/20 p-2.5">
+                      {historyLoading ? (
+                        <p className="text-[11px] text-muted-foreground m-0 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> Carregando histórico…
+                        </p>
+                      ) : historyData ? (
+                        <>
+                          <p className="text-[11px] text-foreground m-0 mb-1">
+                            Paguei {formatHistoryBrl(historyData.summary?.lastPaid)} · hoje no mapa{' '}
+                            {formatHistoryBrl(historyData.summary?.latestMap)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground m-0 mb-1">
+                            {historyData.summary?.advice}
+                          </p>
+                          <InsumoPriceSparkline
+                            points={[...(historyData.paid || []), ...(historyData.map || [])].sort(
+                              (a, b) => new Date(a.at) - new Date(b.at)
+                            )}
+                          />
+                        </>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground m-0">Sem histórico.</p>
+                      )}
+                    </div>
+                  ) : null}
 
                   {item.matched ? (
                     <div className="mt-2 flex items-start justify-between gap-2">

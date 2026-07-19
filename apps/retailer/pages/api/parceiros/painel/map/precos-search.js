@@ -78,6 +78,8 @@ export default async function handler(req, res) {
         lng: offer.lng,
         preco: offer.preco,
         produto_nome: offer.produto_nome,
+        expires_at: offer.expires_at || null,
+        created_at: offer.created_at || null,
         offers: [],
       });
     }
@@ -86,6 +88,8 @@ export default async function handler(req, res) {
     if (offer.preco < entry.preco) {
       entry.preco = offer.preco;
       entry.produto_nome = offer.produto_nome;
+      entry.expires_at = offer.expires_at || null;
+      entry.created_at = offer.created_at || null;
     }
   }
 

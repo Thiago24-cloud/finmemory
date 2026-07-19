@@ -41,6 +41,7 @@ export default async function handler(req, res) {
     nota: result.nota,
     movimentos: result.movimentos,
     insumos_criados: result.insumos_criados,
+    insumo_ids: result.insumo_ids || [],
     message: `Entrada confirmada: ${result.itens_confirmados} item(ns) no estoque.`,
   });
 }
