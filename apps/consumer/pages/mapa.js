@@ -29,7 +29,13 @@ import { MapOverlayCategoryChips } from '../components/map/MapOverlayCategoryChi
 import { StatesUnlockPanel } from '../components/map/StatesUnlockPanel';
 import { MAP_ARIA, MAP_PLACEHOLDERS } from '../lib/appMicrocopy';
 import { isParceirosMapView } from '../lib/parceirosMapMode';
-import { decodeCestaMapParam, buildCestaStoreIndex, formatCestaBrl } from '../lib/cestaMapEmbed';
+import {
+  decodeCestaMapParam,
+  buildCestaStoreIndex,
+  formatCestaBrl,
+  pickCestaRouteStopsFromPayload,
+} from '../lib/cestaMapEmbed';
+import { openGoogleMapsMultiStopRoute } from '../lib/mapDirections';
 
 const MapaPrecos = dynamic(() => import('../components/MapaPrecos'), { ssr: false });
 
@@ -141,6 +147,9 @@ export default function MapaPage() {
     const minCoverage = Number(minRaw);
     const storeIndex = buildCestaStoreIndex(payload);
     if (storeIndex.size === 0) return null;
+    const routeStops = pickCestaRouteStopsFromPayload(payload, { maxStops: 5 });
+    const wantRota =
+      router.query.rota === '1' || payload.r === 1 || payload.r === true;
     return {
       enabled: true,
       minCoverage: Number.isFinite(minCoverage) ? minCoverage : 1,
@@ -150,12 +159,15 @@ export default function MapaPage() {
       bestTotal: Math.min(
         ...[...storeIndex.values()].map((m) => Number(m.total) || Infinity).filter(Number.isFinite)
       ),
+      routeStops,
+      wantRota: Boolean(wantRota && routeStops.length),
     };
   }, [
     fromParceiros,
     router.isReady,
     router.query.cesta,
     router.query.cesta_min,
+    router.query.rota,
     parceirosPlanningItems.length,
   ]);
   const parceirosCestaMapMode = Boolean(parceirosCestaFilter?.enabled);
@@ -316,7 +328,7 @@ export default function MapaPage() {
         ) : null}
 
         {fromParceiros && embedInParceirosApp && parceirosCestaMapMode && !showMapLanding ? (
-          <div className="pointer-events-none absolute top-0 left-0 right-0 z-[45] flex justify-center px-3 pt-[max(8px,env(safe-area-inset-top))]">
+          <div className="pointer-events-none absolute top-0 left-0 right-0 z-[45] flex flex-col items-center gap-2 px-3 pt-[max(8px,env(safe-area-inset-top))]">
             <div className="pointer-events-auto max-w-md rounded-full border border-[#39FF14]/35 bg-white/95 px-4 py-2 text-center shadow-sm backdrop-blur-sm">
               <p className="m-0 text-[11px] font-bold text-[#166534]">
                 Sua cesta · {parceirosCestaFilter.storeCount} mercado(s)
@@ -325,6 +337,23 @@ export default function MapaPage() {
                   : ''}
               </p>
             </div>
+            {parceirosCestaFilter.wantRota && parceirosCestaFilter.routeStops?.length ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const origin =
+                    mapFocusLat != null && mapFocusLng != null
+                      ? { lat: mapFocusLat, lng: mapFocusLng }
+                      : null;
+                  openGoogleMapsMultiStopRoute(origin, parceirosCestaFilter.routeStops);
+                }}
+                className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-[#166534]/30 bg-[#166534] px-4 py-2 text-[11px] font-bold text-white shadow-sm hover:bg-[#14532d]"
+              >
+                <Navigation className="h-3.5 w-3.5" aria-hidden />
+                Iniciar rota ({parceirosCestaFilter.routeStops.length} parada
+                {parceirosCestaFilter.routeStops.length > 1 ? 's' : ''})
+              </button>
+            ) : null}
           </div>
         ) : null}
 
