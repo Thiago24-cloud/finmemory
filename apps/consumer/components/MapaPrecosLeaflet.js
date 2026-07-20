@@ -23,6 +23,7 @@ import {
   MAP_MAX_ZOOM,
   MAP_MAX_BOUNDS_VISCOSITY,
   clampBboxToSaoPauloState,
+  clampCenterToSaoPaulo,
 } from '../lib/saoPauloStateMap';
 import {
   getSupermercadoData,
@@ -3215,7 +3216,9 @@ export default function MapaPrecosLeaflet({
     if (Array.isArray(initialMapCenter) && initialMapCenter.length >= 2) {
       const lat = Number(initialMapCenter[0]);
       const lng = Number(initialMapCenter[1]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) return [lat, lng];
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return clampCenterToSaoPaulo(lat, lng);
+      }
     }
     return DEFAULT_MAP_CENTER;
   }, [initialMapCenter]);
