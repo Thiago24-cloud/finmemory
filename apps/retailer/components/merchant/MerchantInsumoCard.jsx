@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Camera, Loader2, Trash2, AlertTriangle, ShoppingCart, RefreshCw } from 'lucide-react';
+import { Camera, Loader2, Trash2, AlertTriangle, ShoppingCart, RefreshCw, Minus, Plus } from 'lucide-react';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { InsumoProductImage } from './InsumoProductImage';
 import { SkipButton } from './skip/SkipButton';
@@ -29,8 +29,19 @@ function formatQty(value, unidade) {
   return `${n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${label}`;
 }
 
+function stockStep(unidade) {
+  const u = String(unidade || 'un').toLowerCase();
+  if (u === 'kg' || u === 'l') return 0.1;
+  return 1;
+}
+
+function roundQty(n) {
+  return Math.round(Number(n) * 1000) / 1000;
+}
+
 export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
   const [busy, setBusy] = useState(false);
+  const [qtyBusy, setQtyBusy] = useState(false);
   const fileInputRef = useRef(null);
 
   const uploadPhoto = async (file) => {
@@ -153,6 +164,36 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
     }
   };
 
+  const adjustStock = async (direction) => {
+    const step = stockStep(insumo.unidade);
+    const current = Number(insumo.quantidade_atual) || 0;
+    const next = roundQty(Math.max(0, current + direction * step));
+    if (next === roundQty(current)) return;
+
+    setQtyBusy(true);
+    try {
+      const res = await fetch(painelApi.insumo(insumo.id), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantidade_atual: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Não foi possível atualizar o estoque.');
+        return;
+      }
+      onUpdated?.(data.insumo);
+    } catch {
+      alert('Erro de rede.');
+    } finally {
+      setQtyBusy(false);
+    }
+  };
+
+  const qty = Number(insumo.quantidade_atual) || 0;
+  const unitLabel = UNIDADE_LABEL[insumo.unidade] || insumo.unidade || 'un';
+  const canDecrement = qty > 0;
+
   return (
     <li
       className={`rounded-xl border p-3 sm:p-4 shadow-subtle bg-card ${
@@ -201,7 +242,37 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
           <dl className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs m-0">
             <div>
               <dt className="text-muted-foreground m-0">Em estoque</dt>
-              <dd className="font-medium m-0 mt-0.5">{formatQty(insumo.quantidade_atual, insumo.unidade)}</dd>
+              <dd className="m-0 mt-1">
+                <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/30 p-0.5">
+                  <button
+                    type="button"
+                    disabled={busy || qtyBusy || !canDecrement}
+                    onClick={() => void adjustStock(-1)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+                    aria-label={`Remover do estoque`}
+                    title="Tirar do estoque"
+                  >
+                    {qtyBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Minus className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                  </button>
+                  <span className="min-w-[3.5rem] text-center font-semibold tabular-nums px-1">
+                    {formatQty(insumo.quantidade_atual, insumo.unidade)}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy || qtyBusy}
+                    onClick={() => void adjustStock(1)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+                    aria-label={`Adicionar ao estoque`}
+                    title="Entrada no estoque"
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+              </dd>
             </div>
             <div>
               <dt className="text-muted-foreground m-0">Mínimo</dt>
