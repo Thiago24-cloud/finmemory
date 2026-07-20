@@ -96,6 +96,7 @@ export function MontarListaDualPanel({
 }) {
   const inputRef = useRef(null);
   const [openPricesFor, setOpenPricesFor] = useState(null);
+  const [expandedStoreKey, setExpandedStoreKey] = useState(null);
   const popoverRef = useRef(null);
 
   useEffect(() => {
@@ -139,13 +140,49 @@ export function MontarListaDualPanel({
 
     const withTotals = stores.map((store) => {
       let totalCost = 0;
-      let availableCount = 0;
+      const availableNames = [];
+      const lineByName = new Map();
       for (const line of store.lines || []) {
+        const key = String(line.listName || '').toLowerCase();
+        if (!key) continue;
         const qty = Math.max(1, Number(qtyByName[line.listName]) || 1);
-        totalCost += Number(line.price) * qty;
-        availableCount += 1;
+        const unit = Number(line.price);
+        if (Number.isFinite(unit) && unit > 0) {
+          totalCost += unit * qty;
+          availableNames.push(line.listName);
+          lineByName.set(key, line);
+        }
       }
-      const missing = items.length - availableCount;
+      const availableCount = availableNames.length;
+      const totalCount = items.length;
+      const missing = Math.max(0, totalCount - availableCount);
+      const availableSet = new Set(availableNames.map((n) => n.toLowerCase()));
+      const missingNames = items.filter((n) => !availableSet.has(String(n).toLowerCase()));
+
+      const itemRows = items.map((listName) => {
+        const qty = Math.max(1, Number(qtyByName[listName]) || 1);
+        const match = lineByName.get(String(listName).toLowerCase());
+        if (match) {
+          const unit = Number(match.price);
+          return {
+            listName,
+            qty,
+            available: true,
+            productName: match.productName || listName,
+            unitPrice: unit,
+            lineTotal: Number((unit * qty).toFixed(2)),
+          };
+        }
+        return {
+          listName,
+          qty,
+          available: false,
+          productName: null,
+          unitPrice: null,
+          lineTotal: null,
+        };
+      });
+
       let distanceKm = null;
       if (
         origin &&
@@ -166,7 +203,11 @@ export function MontarListaDualPanel({
         ...store,
         totalCost: Number(totalCost.toFixed(2)),
         availableCount,
+        totalCount,
         missing,
+        availableNames,
+        missingNames,
+        itemRows,
         distanceKm,
       };
     });
@@ -184,7 +225,7 @@ export function MontarListaDualPanel({
       }
       return a.totalCost - b.totalCost;
     });
-  }, [listCompare, qtyByName, items.length, origin, radiusKm]);
+  }, [listCompare, qtyByName, items, origin, radiusKm]);
 
   return (
     <div className="flex flex-1 min-h-0 divide-x divide-white/10" style={{ minHeight: 280 }}>
@@ -225,12 +266,18 @@ export function MontarListaDualPanel({
           ) : (
             items.map((name) => {
               const qty = Math.max(1, Number(qtyByName[name]) || 1);
-              const prices = storePricesByItem.get(name.toLowerCase());
+              const prices = storePricesByItem.get(name.toLowerCase()) || [];
               const isOpen = openPricesFor === name;
+              const unitPrices = prices
+                .map((p) => Number(p.price))
+                .filter((n) => Number.isFinite(n) && n > 0);
+              const bestUnit = unitPrices.length ? Math.min(...unitPrices) : null;
+              const lineTotal =
+                bestUnit != null ? Number((bestUnit * qty).toFixed(2)) : null;
               return (
                 <div key={name} className="relative">
                   <div className="flex items-center gap-1 py-1 flex-wrap">
-                    <span className="inline-flex items-center gap-1 bg-green-600 text-white text-[11px] font-medium px-2 py-0.5 rounded-full max-w-[110px]">
+                    <span className="inline-flex items-center gap-1 bg-green-600 text-white text-[11px] font-medium px-2 py-0.5 rounded-full max-w-[100px]">
                       <span className="truncate">{name}</span>
                       <button
                         type="button"
@@ -261,10 +308,24 @@ export function MontarListaDualPanel({
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
+                    <div className="ml-auto text-right leading-tight min-w-[64px]">
+                      {lineTotal != null ? (
+                        <>
+                          <div className="text-[11px] font-bold text-green-400">
+                            {formatBrl(lineTotal)}
+                          </div>
+                          <div className="text-[9px] text-white/40">
+                            {formatBrl(bestUnit)}/un
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-[10px] text-white/35">R$ —</div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setOpenPricesFor(isOpen ? null : name)}
-                      className="ml-auto text-[10px] text-white/45 hover:text-green-400 inline-flex items-center gap-0.5"
+                      className="text-[10px] text-white/45 hover:text-green-400 inline-flex items-center gap-0.5"
                     >
                       Preços
                       <ChevronDown
@@ -278,25 +339,38 @@ export function MontarListaDualPanel({
                       className="absolute left-0 right-0 z-20 bg-[#1a2332] border border-white/15 rounded-lg shadow-xl p-2 text-xs"
                     >
                       <div className="text-white/45 font-medium mb-1.5 uppercase tracking-wide text-[10px]">
-                        Preços individuais — {name}
+                        Preços individuais — {name} (qtd {qty})
                       </div>
-                      {!prices?.length ? (
+                      {!prices.length ? (
                         <p className="text-white/40 m-0 text-[11px]">
                           Sem preços ainda. Aguarde a comparação.
                         </p>
                       ) : (
                         <div className="flex flex-col gap-1">
-                          {prices.map((sp, i) => (
-                            <div
-                              key={`${sp.storeName}-${i}`}
-                              className="flex justify-between items-center gap-2"
-                            >
-                              <span className="text-white/70 truncate">{sp.storeName}</span>
-                              <span className="font-bold text-white shrink-0">
-                                {formatBrl(sp.price)}
-                              </span>
-                            </div>
-                          ))}
+                          {prices.map((sp, i) => {
+                            const unit = Number(sp.price);
+                            const line = Number.isFinite(unit)
+                              ? Number((unit * qty).toFixed(2))
+                              : null;
+                            return (
+                              <div
+                                key={`${sp.storeName}-${i}`}
+                                className="flex justify-between items-center gap-2"
+                              >
+                                <span className="text-white/70 truncate">
+                                  {sp.storeName}
+                                </span>
+                                <span className="shrink-0 text-right leading-tight">
+                                  <span className="font-bold text-white block">
+                                    {line != null ? formatBrl(line) : '—'}
+                                  </span>
+                                  <span className="text-[9px] text-white/40">
+                                    {Number.isFinite(unit) ? `${formatBrl(unit)}/un` : ''}
+                                  </span>
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -337,64 +411,119 @@ export function MontarListaDualPanel({
           ) : (
             rankings.map((r, i) => {
               const isCheapest = i === 0 && r.availableCount > 0;
+              const storeKey = String(r.storeId || r.storeName);
               const isSelected = selectedStoreName === r.storeName;
+              const isExpanded = expandedStoreKey === storeKey;
               return (
-                <button
-                  key={r.storeId || r.storeName}
-                  type="button"
-                  onClick={() => onSelectStore?.(r)}
-                  className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${
+                <div
+                  key={storeKey}
+                  className={`rounded-lg transition-colors overflow-hidden ${
                     isCheapest
                       ? 'bg-green-600/20 border border-green-600/40'
-                      : isSelected
+                      : isSelected || isExpanded
                         ? 'bg-white/10 border border-white/25'
-                        : 'bg-white/[0.04] border border-transparent hover:bg-white/[0.08]'
+                        : 'bg-white/[0.04] border border-transparent'
                   }`}
                 >
-                  <div className="shrink-0 w-7 h-7 rounded-full bg-white/10 border border-white/15 flex items-center justify-center text-white font-bold text-xs">
-                    {String(r.storeName || '?')[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-white font-bold text-[11px] uppercase tracking-wide truncate leading-tight">
-                      {r.storeName}
-                    </div>
-                    {r.missing > 0 ? (
-                      <div className="text-orange-400 text-[10px] leading-tight">
-                        Falta {r.missing} item{r.missing > 1 ? 's' : ''}
+                  <div className="flex items-center gap-2 px-2.5 py-2">
+                    <button
+                      type="button"
+                      onClick={() => onSelectStore?.(r)}
+                      className="flex flex-1 min-w-0 items-center gap-2 text-left"
+                    >
+                      <div className="shrink-0 w-7 h-7 rounded-full bg-white/10 border border-white/15 flex items-center justify-center text-white font-bold text-xs">
+                        {String(r.storeName || '?')[0].toUpperCase()}
                       </div>
-                    ) : null}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div
-                      className={`font-bold text-sm leading-tight ${
-                        isCheapest ? 'text-green-400' : 'text-white'
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white font-bold text-[11px] uppercase tracking-wide truncate leading-tight">
+                          {r.storeName}
+                        </div>
+                        <div className="text-white/70 text-[10px] leading-tight mt-0.5">
+                          {r.availableCount} de {r.totalCount}{' '}
+                          {r.totalCount === 1 ? 'produto' : 'produtos'}
+                        </div>
+                        {r.missing > 0 ? (
+                          <div className="text-orange-400 text-[10px] leading-tight mt-0.5">
+                            Falta {r.missing}{' '}
+                            {r.missing === 1 ? 'item' : 'itens'}
+                          </div>
+                        ) : (
+                          <div className="text-green-500/80 text-[10px] leading-tight mt-0.5">
+                            Cesta completa
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div
+                          className={`font-bold text-sm leading-tight ${
+                            isCheapest ? 'text-green-400' : 'text-white'
+                          }`}
+                        >
+                          {formatBrl(r.totalCost)}
+                        </div>
+                        <div className="text-white/40 text-[10px] leading-tight">
+                          {r.distanceKm != null
+                            ? `${r.distanceKm.toFixed(1)} km`
+                            : '—'}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = isExpanded ? null : storeKey;
+                        setExpandedStoreKey(next);
+                        onViewItems?.(r);
+                        onSelectStore?.(r);
+                      }}
+                      className={`shrink-0 inline-flex items-center gap-0.5 text-[9px] border rounded px-1.5 py-1 transition-colors ${
+                        isExpanded
+                          ? 'border-green-500 text-green-400'
+                          : 'text-white/45 border-white/15 hover:border-green-500 hover:text-green-400'
                       }`}
                     >
-                      {formatBrl(r.totalCost)}
-                    </div>
-                    <div className="text-white/40 text-[10px] leading-tight">
-                      {r.distanceKm != null ? `${r.distanceKm.toFixed(1)} km` : '—'}
-                    </div>
+                      <Grid2x2 className="w-3 h-3" />
+                      Ver
+                    </button>
                   </div>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onViewItems?.(r);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.stopPropagation();
-                        onViewItems?.(r);
-                      }
-                    }}
-                    className="shrink-0 inline-flex items-center gap-0.5 text-[9px] text-white/45 border border-white/15 rounded px-1 py-1 hover:border-green-500 hover:text-green-400"
-                  >
-                    <Grid2x2 className="w-3 h-3" />
-                    Ver
-                  </span>
-                </button>
+
+                  {isExpanded ? (
+                    <div className="border-t border-white/10 bg-black/20 px-2.5 py-2 space-y-2">
+                      {(r.itemRows || []).map((row) => (
+                        <div
+                          key={row.listName}
+                          className="flex items-start justify-between gap-2 text-[11px]"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-white font-medium">
+                              {row.qty}x {row.listName}
+                            </div>
+                            {row.available ? (
+                              <div className="text-white/45 text-[10px] mt-0.5 leading-snug">
+                                {row.productName}
+                                {row.unitPrice != null
+                                  ? ` (${formatBrl(row.unitPrice)} / un)`
+                                  : ''}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="shrink-0 text-right">
+                            {row.available ? (
+                              <span className="font-bold text-white">
+                                {formatBrl(row.lineTotal)}
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[10px] font-medium text-white/50 bg-white/10 px-2 py-0.5 rounded">
+                                Não disponível
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               );
             })
           )}
