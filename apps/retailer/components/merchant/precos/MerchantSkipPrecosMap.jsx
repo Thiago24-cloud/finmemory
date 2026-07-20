@@ -1,7 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Bell, ChevronLeft, Loader2, MapPin, Search, Star } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bell,
+  ChevronLeft,
+  Loader2,
+  MapPin,
+  Plus,
+  Scale,
+  Search,
+  Star,
+  X,
+} from 'lucide-react';
 import { painelApi } from '../../../lib/merchant/painelApiPaths';
 import {
   CHAIN_LABELS,
@@ -9,6 +20,12 @@ import {
   inferChainKeyFromStoreName,
   isAtacadoStoreName,
 } from '../../../lib/merchant/compras/chainCompare';
+import {
+  loadShoppingListDraft,
+  normalizeListName,
+  parseDraftInput,
+  saveShoppingListDraft,
+} from '../../../lib/merchant/compras/shoppingListDraft';
 import { SkipPriceMap } from './SkipPriceMap';
 import { SkipBottomSheet } from './SkipBottomSheet';
 import { SkipStoreCard } from './SkipStoreCard';
@@ -82,8 +99,9 @@ function isPromoStillValid(store) {
 
 /**
  * Mapa de preços estilo Skip — mapa atrás, busca por cima, preços reais do FinMemory.
+ * Dois modos: explorar 1 produto OU montar lista completa e comparar depois.
  */
-export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack }) {
+export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [focusedProductId, setFocusedProductId] = useState(null);
@@ -99,15 +117,25 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack }) {
   const [radiusKm, setRadiusKm] = useState(0);
   const [chainKey, setChainKey] = useState('');
   const [onlyValidPromo, setOnlyValidPromo] = useState(true);
+  const [workMode, setWorkMode] = useState('explorar'); // explorar | montar
+  const [draftList, setDraftList] = useState([]);
+  const [listCompare, setListCompare] = useState(null);
+  const [listCompareLoading, setListCompareLoading] = useState(false);
+  const [listCompareError, setListCompareError] = useState('');
 
   useEffect(() => {
     setFavorites(loadFavorites());
+    setDraftList(loadShoppingListDraft());
     const f = loadSavedFilters();
     setOnlyAtacado(f.onlyAtacado);
     setRadiusKm(f.radiusKm);
     setChainKey(f.chainKey);
     setOnlyValidPromo(f.onlyValidPromo);
   }, []);
+
+  useEffect(() => {
+    saveShoppingListDraft(draftList);
+  }, [draftList]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -122,9 +150,49 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack }) {
   }, [onlyAtacado, radiusKm, chainKey, onlyValidPromo]);
 
   useEffect(() => {
+    // Em “montar lista” não busca preço a cada tecla — só adiciona à lista.
+    if (workMode === 'montar') return undefined;
     const t = window.setTimeout(() => setDebouncedQ(searchTerm.trim()), 300);
     return () => window.clearTimeout(t);
-  }, [searchTerm]);
+  }, [searchTerm, workMode]);
+
+  const addSearchToDraft = () => {
+    const name = normalizeListName(searchTerm);
+    if (name.length < 2) return;
+    setDraftList((prev) => parseDraftInput(name, prev));
+    setSearchTerm('');
+    setListCompare(null);
+    setListCompareError('');
+  };
+
+  const removeDraftItem = (name) => {
+    setDraftList((prev) => prev.filter((n) => n !== name));
+    setListCompare(null);
+  };
+
+  const compareDraftList = async () => {
+    if (!draftList.length) return;
+    setListCompareLoading(true);
+    setListCompareError('');
+    try {
+      const res = await fetch(
+        `${painelApi.listaComprasCompare}?names=${encodeURIComponent(draftList.join(','))}`
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setListCompareError(json.error || 'Não foi possível comparar a lista.');
+        setListCompare(null);
+        return;
+      }
+      setListCompare(json);
+      setWorkMode('montar');
+    } catch {
+      setListCompareError('Erro de rede ao comparar.');
+      setListCompare(null);
+    } finally {
+      setListCompareLoading(false);
+    }
+  };
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -303,19 +371,116 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack }) {
         </div>
       ) : null}
 
-      {!loading && focusedProduct ? (
+      {!loading && (focusedProduct || workMode === 'montar' || draftList.length > 0) ? (
         <SkipBottomSheet
           header={
             <div className="px-5 space-y-4 pb-4">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                <input
-                  className="w-full pl-11 pr-4 h-14 text-sm rounded-2xl bg-white/5 border border-white/15 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/50"
-                  placeholder="Buscar insumo (ex: manga, pera, leite...)"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+              <div className="flex gap-1 rounded-xl bg-white/5 border border-white/10 p-1">
+                <button
+                  type="button"
+                  onClick={() => setWorkMode('explorar')}
+                  className={`flex-1 rounded-lg px-2 py-2 text-xs font-bold ${
+                    workMode === 'explorar' ? 'bg-green-600 text-white' : 'text-white/55'
+                  }`}
+                >
+                  Explorar preço
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWorkMode('montar')}
+                  className={`flex-1 rounded-lg px-2 py-2 text-xs font-bold ${
+                    workMode === 'montar' ? 'bg-green-600 text-white' : 'text-white/55'
+                  }`}
+                >
+                  Montar lista
+                </button>
               </div>
+
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                  <input
+                    className="w-full pl-11 pr-4 h-14 text-sm rounded-2xl bg-white/5 border border-white/15 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/50"
+                    placeholder={
+                      workMode === 'montar'
+                        ? 'Digite e + para adicionar (sem buscar ainda)'
+                        : 'Buscar preço (ex: feijão, leite...)'
+                    }
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (workMode === 'montar') addSearchToDraft();
+                        else setDebouncedQ(searchTerm.trim());
+                      }
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addSearchToDraft}
+                  disabled={normalizeListName(searchTerm).length < 2}
+                  className="shrink-0 w-14 h-14 rounded-full bg-[#39FF14] text-[#050508] flex items-center justify-center disabled:opacity-40"
+                  aria-label="Adicionar à minha lista"
+                >
+                  <Plus className="w-6 h-6" aria-hidden />
+                </button>
+              </div>
+
+              {draftList.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-white/70 m-0">
+                      Minha lista ({draftList.length})
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void compareDraftList()}
+                      disabled={listCompareLoading}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#39FF14]/20 border border-[#39FF14]/40 px-3 py-1 text-[11px] font-bold text-[#39FF14] disabled:opacity-50"
+                    >
+                      {listCompareLoading ? (
+                        <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
+                      ) : (
+                        <Scale className="w-3 h-3" aria-hidden />
+                      )}
+                      Comparar preços
+                    </button>
+                  </div>
+                  <ul className="flex flex-wrap gap-1.5 list-none p-0 m-0">
+                    {draftList.map((name) => (
+                      <li
+                        key={name}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 pl-2.5 pr-1 py-1 text-[11px] font-semibold text-white"
+                      >
+                        {name}
+                        <button
+                          type="button"
+                          onClick={() => removeDraftItem(name)}
+                          className="rounded-full p-0.5 text-white/50 hover:text-white"
+                          aria-label={`Remover ${name}`}
+                        >
+                          <X className="w-3 h-3" aria-hidden />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {typeof onOpenLista === 'function' ? (
+                    <button
+                      type="button"
+                      onClick={onOpenLista}
+                      className="text-[10px] text-white/45 underline m-0"
+                    >
+                      Abrir na aba Lista
+                    </button>
+                  ) : null}
+                </div>
+              ) : workMode === 'montar' ? (
+                <p className="text-[11px] text-white/45 m-0">
+                  Adicione todos os produtos com + e só depois compare os preços.
+                </p>
+              ) : null}
 
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-white/45 m-0">
@@ -426,19 +591,58 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack }) {
           }
         >
           <div className="px-4 space-y-3 pt-2 pb-10">
+            {listCompareError ? (
+              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 m-0">
+                {listCompareError}
+              </p>
+            ) : null}
+
+            {listCompare?.stores?.length > 0 ? (
+              <section className="space-y-2">
+                <p className="text-xs font-bold text-[#39FF14] m-0">
+                  Comparação da lista · {listCompare.summary?.matched}/{listCompare.summary?.total} com
+                  oferta
+                </p>
+                {listCompare.stores.slice(0, 8).map((store) => (
+                  <div
+                    key={store.storeId || store.storeName}
+                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 flex items-start justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white m-0 truncate">{store.storeName}</p>
+                      <p className="text-[10px] text-white/45 m-0 mt-0.5">
+                        {store.coveredItems}/{store.totalItems} itens · {store.coveragePct}%
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-black text-[#39FF14]">
+                      {Number(store.total).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+
             {error ? (
               <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 m-0">
                 {error}
               </p>
             ) : null}
-            {data?.summary?.matched > 0 ? (
+            {workMode === 'explorar' && data?.summary?.matched > 0 ? (
               <p className="text-xs font-semibold text-[#39FF14] m-0 flex items-center gap-2">
                 <Bell className="w-4 h-4" />
                 {filteredStores.length} mercado(s) · {data.product}
                 {chainKey ? ` · ${CHAIN_LABELS[chainKey] || chainKey}` : ''}
               </p>
             ) : null}
-            {filteredStores.length === 0 ? (
+            {workMode === 'montar' && !listCompare ? (
+              <p className="text-center text-sm text-white/50 py-6 m-0">
+                Monte a lista com + e toque em Comparar preços para ver totais por mercado.
+              </p>
+            ) : null}
+            {workMode === 'explorar' && filteredStores.length === 0 ? (
               <p className="text-center text-sm text-white/50 py-8 m-0">
                 {showFavoritesOnly
                   ? 'Nenhum favorito. Toque na estrela de um mercado.'
@@ -446,46 +650,53 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack }) {
                     ? 'Nenhum preço com esses filtros. Afrobe o raio ou desative “só atacado”.'
                     : 'Nenhum preço encontrado no mapa para este produto.'}
               </p>
-            ) : (
-              filteredStores.map((store) => {
-                const isLowest = store.price === lowestPrice;
-                const diff = highestPrice - store.price;
-                const pct = highestPrice > 0 ? (diff / highestPrice) * 100 : 0;
-                const dist =
-                  origin && store.lat != null && store.lng != null
-                    ? haversineKm(origin.lat, origin.lng, Number(store.lat), Number(store.lng))
-                    : null;
-                return (
-                  <SkipStoreCard
-                    key={store.name}
-                    name={store.name}
-                    color={store.color}
-                    price={store.price}
-                    address={
-                      [
-                        dist != null ? `${dist.toFixed(1)} km` : null,
-                        store.expires_at ? `vál. ${String(store.expires_at).slice(0, 10)}` : null,
-                        store.isAtacado ? 'atacado' : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')
-                    }
-                    isLowest={isLowest}
-                    savingsPercent={pct}
-                    savingsAmount={diff}
-                    isSelected={selectedStore === store.name}
-                    isFavorite={store.isFavorite}
-                    isOpportunity={store.isOpportunity}
-                    onSelect={() => setSelectedStore(store.name)}
-                    onAddToList={() => void addToCesta()}
-                    onNavigate={() => handleNavigate(store.lat, store.lng)}
-                    onToggleFavorite={() => toggleFavorite(store.name)}
-                  />
-                );
-              })
-            )}
+            ) : null}
+            {workMode === 'explorar' && filteredStores.length > 0
+              ? filteredStores.map((store) => {
+                  const isLowest = store.price === lowestPrice;
+                  const diff = highestPrice - store.price;
+                  const pct = highestPrice > 0 ? (diff / highestPrice) * 100 : 0;
+                  const dist =
+                    origin && store.lat != null && store.lng != null
+                      ? haversineKm(origin.lat, origin.lng, Number(store.lat), Number(store.lng))
+                      : null;
+                  return (
+                    <SkipStoreCard
+                      key={store.name}
+                      name={store.name}
+                      color={store.color}
+                      price={store.price}
+                      address={
+                        [
+                          dist != null ? `${dist.toFixed(1)} km` : null,
+                          store.expires_at ? `vál. ${String(store.expires_at).slice(0, 10)}` : null,
+                          store.isAtacado ? 'atacado' : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                      }
+                      isLowest={isLowest}
+                      savingsPercent={pct}
+                      savingsAmount={diff}
+                      isSelected={selectedStore === store.name}
+                      isFavorite={store.isFavorite}
+                      isOpportunity={store.isOpportunity}
+                      onSelect={() => setSelectedStore(store.name)}
+                      onAddToList={() => {
+                        const name = normalizeListName(data?.product || focusedProduct?.name || '');
+                        if (name.length >= 2) {
+                          setDraftList((prev) => parseDraftInput(name, prev));
+                        }
+                        void addToCesta();
+                      }}
+                      onNavigate={() => handleNavigate(store.lat, store.lng)}
+                      onToggleFavorite={() => toggleFavorite(store.name)}
+                    />
+                  );
+                })
+              : null}
             <p className="text-[10px] text-white/35 text-center pt-2 m-0">
-              Preços reais do mapa FinMemory (sem demo). Filtros: atacado, raio, rede e validade.
+              Monte a lista completa ou explore um produto. Preços reais (sem demo).
             </p>
           </div>
         </SkipBottomSheet>

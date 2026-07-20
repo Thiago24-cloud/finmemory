@@ -11,6 +11,7 @@ import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchan
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
 import { MerchantMinhaCompraSection } from './MerchantMinhaCompraSection';
+import { MerchantListaComprasSection } from './MerchantListaComprasSection';
 import { MerchantVendasSection } from './MerchantVendasSection';
 import { MerchantSkipPrecosMap } from './precos/MerchantSkipPrecosMap';
 import { ParceirosMapFrame } from './ParceirosMapFrame';
@@ -40,8 +41,9 @@ export function MerchantPanel() {
   const [needsPartnerSignup, setNeedsPartnerSignup] = useState(false);
   const [repairing, setRepairing] = useState(false);
   const [panelTab, setPanelTab] = useState('ofertas');
+  const [listaMode, setListaMode] = useState('montar'); // montar | rota
   const [insumosCount, setInsumosCount] = useState(0);
-  /** URL do mapa consumidor com ?cesta= — aberto a partir de “Rota de Compras”. */
+  /** URL do mapa consumidor com ?cesta= / ?lista= — aberto a partir da Lista. */
   const [cestaMapUrl, setCestaMapUrl] = useState(null);
 
   const tryRepairLink = useCallback(async () => {
@@ -247,6 +249,10 @@ export function MerchantPanel() {
         storeLat={ctx?.store?.lat}
         storeLng={ctx?.store?.lng}
         onBack={() => setPanelTab('ofertas')}
+        onOpenLista={() => {
+          setListaMode('montar');
+          setPanelTab('lista');
+        }}
       />
     );
   }
@@ -315,16 +321,56 @@ export function MerchantPanel() {
           ) : null}
 
           {panelTab === 'lista' ? (
-            <MerchantMinhaCompraSection
-              storeLat={ctx?.store?.lat}
-              storeLng={ctx?.store?.lng}
-              onOpenMap={(url) => {
-                if (typeof url === 'string' && url.trim()) {
-                  setCestaMapUrl(url.trim());
-                }
-                setPanelTab('mapa');
-              }}
-            />
+            <div className="space-y-4">
+              <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setListaMode('montar')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    listaMode === 'montar'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Montar lista
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListaMode('rota')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    listaMode === 'rota'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Rota (estoque)
+                </button>
+              </div>
+              {listaMode === 'montar' ? (
+                <MerchantListaComprasSection
+                  storeLat={ctx?.store?.lat}
+                  storeLng={ctx?.store?.lng}
+                  onOpenMap={(url) => {
+                    if (typeof url === 'string' && url.trim()) {
+                      setCestaMapUrl(url.trim());
+                    }
+                    setPanelTab('mapa');
+                  }}
+                  onOpenRota={() => setListaMode('rota')}
+                />
+              ) : (
+                <MerchantMinhaCompraSection
+                  storeLat={ctx?.store?.lat}
+                  storeLng={ctx?.store?.lng}
+                  onOpenMap={(url) => {
+                    if (typeof url === 'string' && url.trim()) {
+                      setCestaMapUrl(url.trim());
+                    }
+                    setPanelTab('mapa');
+                  }}
+                />
+              )}
+            </div>
           ) : panelTab === 'vendas' ? (
             <MerchantVendasSection lojaId={ctx?.store?.id} />
           ) : panelTab === 'insumos' ? (
