@@ -191,6 +191,22 @@ function SkipPriceMapImpl({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !selectedStore) return;
+    const store = (stores || []).find((s) => s.name === selectedStore);
+    if (
+      !store ||
+      !Number.isFinite(Number(store.lat)) ||
+      !Number.isFinite(Number(store.lng))
+    ) {
+      return;
+    }
+    map.flyTo([Number(store.lat), Number(store.lng)], Math.max(map.getZoom(), 14), {
+      duration: 0.8,
+    });
+  }, [selectedStore, stores]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
 
     if (userMarkerRef.current) {

@@ -29,6 +29,7 @@ import {
 import { SkipPriceMap } from './SkipPriceMap';
 import { SkipBottomSheet } from './SkipBottomSheet';
 import { SkipStoreCard } from './SkipStoreCard';
+import { MontarListaDualPanel } from './MontarListaDualPanel';
 
 const FAVORITES_KEY = 'finmemory_parceiros_map_favorites_v1';
 const FILTERS_KEY = 'finmemory_parceiros_map_filters_v1';
@@ -119,9 +120,11 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
   const [onlyValidPromo, setOnlyValidPromo] = useState(true);
   const [workMode, setWorkMode] = useState('explorar'); // explorar | montar
   const [draftList, setDraftList] = useState([]);
+  const [qtyByName, setQtyByName] = useState({});
   const [listCompare, setListCompare] = useState(null);
   const [listCompareLoading, setListCompareLoading] = useState(false);
   const [listCompareError, setListCompareError] = useState('');
+  const [montarRadiusKm, setMontarRadiusKm] = useState(10);
 
   useEffect(() => {
     setFavorites(loadFavorites());
@@ -160,6 +163,7 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
     const name = normalizeListName(searchTerm);
     if (name.length < 2) return;
     setDraftList((prev) => parseDraftInput(name, prev));
+    setQtyByName((prev) => ({ ...prev, [name]: prev[name] || 1 }));
     setSearchTerm('');
     setListCompare(null);
     setListCompareError('');
@@ -167,7 +171,17 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
 
   const removeDraftItem = (name) => {
     setDraftList((prev) => prev.filter((n) => n !== name));
+    setQtyByName((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
     setListCompare(null);
+  };
+
+  const setDraftQty = (name, qty) => {
+    const safe = Math.max(1, Math.floor(Number(qty)) || 1);
+    setQtyByName((prev) => ({ ...prev, [name]: safe }));
   };
 
   const compareDraftList = async () => {
@@ -193,6 +207,38 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
       setListCompareLoading(false);
     }
   };
+
+  // Recalcula comparação ao montar/alterar a cesta (debounce 300ms).
+  useEffect(() => {
+    if (workMode !== 'montar' || draftList.length === 0) return undefined;
+    const t = window.setTimeout(() => {
+      void compareDraftList();
+    }, 300);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só nomes da lista
+  }, [workMode, draftList.join('|')]);
+
+  const montarMapStores = useMemo(() => {
+    if (!listCompare?.stores?.length) return [];
+    return listCompare.stores
+      .filter((s) => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lng)))
+      .map((s) => {
+        let total = 0;
+        for (const line of s.lines || []) {
+          const qty = Math.max(1, Number(qtyByName[line.listName]) || 1);
+          total += Number(line.price) * qty;
+        }
+        return {
+          name: s.storeName,
+          lat: s.lat,
+          lng: s.lng,
+          price: Number(total.toFixed(2)),
+          color: '#16a34a',
+          isFavorite: favorites.includes(s.storeName),
+          isOpportunity: false,
+        };
+      });
+  }, [listCompare, qtyByName, favorites]);
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -341,12 +387,16 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-[#0d1b2e]">
-      {focusedProduct && !loading ? (
+      {(workMode === 'montar' ? montarMapStores.length > 0 : focusedProduct) && !loading ? (
         <SkipPriceMap
-          stores={filteredStores}
+          stores={workMode === 'montar' ? montarMapStores : filteredStores}
           selectedStore={selectedStore}
           onSelectStore={setSelectedStore}
-          productName={data?.product || focusedProduct.name}
+          productName={
+            workMode === 'montar'
+              ? draftList.slice(0, 3).join(', ') || 'Lista'
+              : data?.product || focusedProduct?.name
+          }
           onLocateMe={requestLocation}
           isLocating={isLocating}
           centerLat={storeLat}
@@ -396,23 +446,20 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
                 </button>
               </div>
 
+              {workMode === 'explorar' ? (
+              <>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                   <input
                     className="w-full pl-11 pr-4 h-14 text-sm rounded-2xl bg-white/5 border border-white/15 text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-[#39FF14]/50"
-                    placeholder={
-                      workMode === 'montar'
-                        ? 'Digite e + para adicionar (sem buscar ainda)'
-                        : 'Buscar preço (ex: feijão, leite...)'
-                    }
+                    placeholder="Buscar preço (ex: feijão, leite...)"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (workMode === 'montar') addSearchToDraft();
-                        else setDebouncedQ(searchTerm.trim());
+                        setDebouncedQ(searchTerm.trim());
                       }
                     }}
                   />
@@ -436,7 +483,10 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
                     </p>
                     <button
                       type="button"
-                      onClick={() => void compareDraftList()}
+                      onClick={() => {
+                        setWorkMode('montar');
+                        void compareDraftList();
+                      }}
                       disabled={listCompareLoading}
                       className="inline-flex items-center gap-1.5 rounded-full bg-[#39FF14]/20 border border-[#39FF14]/40 px-3 py-1 text-[11px] font-bold text-[#39FF14] disabled:opacity-50"
                     >
@@ -476,10 +526,6 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
                     </button>
                   ) : null}
                 </div>
-              ) : workMode === 'montar' ? (
-                <p className="text-[11px] text-white/45 m-0">
-                  Adicione todos os produtos com + e só depois compare os preços.
-                </p>
               ) : null}
 
               <div className="space-y-2">
@@ -587,62 +633,58 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
                   Perto de mim · {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
                 </p>
               ) : null}
+              </>
+              ) : (
+                <p className="text-[11px] text-white/45 m-0">
+                  Arraste o sheet para cima · cesta à esquerda, comparativo à direita.
+                </p>
+              )}
             </div>
           }
         >
-          <div className="px-4 space-y-3 pt-2 pb-10">
-            {listCompareError ? (
-              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 m-0">
-                {listCompareError}
-              </p>
-            ) : null}
-
-            {listCompare?.stores?.length > 0 ? (
-              <section className="space-y-2">
-                <p className="text-xs font-bold text-[#39FF14] m-0">
-                  Comparação da lista · {listCompare.summary?.matched}/{listCompare.summary?.total} com
-                  oferta
+          {workMode === 'montar' ? (
+            <div className="flex flex-col min-h-0 pb-6" style={{ height: 'min(58vh, 520px)' }}>
+              {listCompareError ? (
+                <p className="mx-3 mb-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 m-0">
+                  {listCompareError}
                 </p>
-                {listCompare.stores.slice(0, 8).map((store) => (
-                  <div
-                    key={store.storeId || store.storeName}
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 flex items-start justify-between gap-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white m-0 truncate">{store.storeName}</p>
-                      <p className="text-[10px] text-white/45 m-0 mt-0.5">
-                        {store.coveredItems}/{store.totalItems} itens · {store.coveragePct}%
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-sm font-black text-[#39FF14]">
-                      {Number(store.total).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                    </span>
-                  </div>
-                ))}
-              </section>
-            ) : null}
-
+              ) : null}
+              <MontarListaDualPanel
+                items={draftList}
+                qtyByName={qtyByName}
+                onAddItem={(name) => {
+                  setDraftList((prev) => parseDraftInput(name, prev));
+                  setQtyByName((prev) => ({ ...prev, [name]: prev[name] || 1 }));
+                }}
+                onRemoveItem={removeDraftItem}
+                onQtyChange={setDraftQty}
+                searchTerm={searchTerm}
+                onSearchTermChange={setSearchTerm}
+                listCompare={listCompare}
+                listCompareLoading={listCompareLoading}
+                origin={origin}
+                radiusKm={montarRadiusKm}
+                onRadiusChange={setMontarRadiusKm}
+                selectedStoreName={selectedStore}
+                onSelectStore={(store) => setSelectedStore(store.storeName)}
+                onViewItems={(store) => setSelectedStore(store.storeName)}
+              />
+            </div>
+          ) : (
+          <div className="px-4 space-y-3 pt-2 pb-10">
             {error ? (
               <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 m-0">
                 {error}
               </p>
             ) : null}
-            {workMode === 'explorar' && data?.summary?.matched > 0 ? (
+            {data?.summary?.matched > 0 ? (
               <p className="text-xs font-semibold text-[#39FF14] m-0 flex items-center gap-2">
                 <Bell className="w-4 h-4" />
                 {filteredStores.length} mercado(s) · {data.product}
                 {chainKey ? ` · ${CHAIN_LABELS[chainKey] || chainKey}` : ''}
               </p>
             ) : null}
-            {workMode === 'montar' && !listCompare ? (
-              <p className="text-center text-sm text-white/50 py-6 m-0">
-                Monte a lista com + e toque em Comparar preços para ver totais por mercado.
-              </p>
-            ) : null}
-            {workMode === 'explorar' && filteredStores.length === 0 ? (
+            {filteredStores.length === 0 ? (
               <p className="text-center text-sm text-white/50 py-8 m-0">
                 {showFavoritesOnly
                   ? 'Nenhum favorito. Toque na estrela de um mercado.'
@@ -651,7 +693,7 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
                     : 'Nenhum preço encontrado no mapa para este produto.'}
               </p>
             ) : null}
-            {workMode === 'explorar' && filteredStores.length > 0
+            {filteredStores.length > 0
               ? filteredStores.map((store) => {
                   const isLowest = store.price === lowestPrice;
                   const diff = highestPrice - store.price;
@@ -686,6 +728,7 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
                         const name = normalizeListName(data?.product || focusedProduct?.name || '');
                         if (name.length >= 2) {
                           setDraftList((prev) => parseDraftInput(name, prev));
+                          setQtyByName((prev) => ({ ...prev, [name]: prev[name] || 1 }));
                         }
                         void addToCesta();
                       }}
@@ -699,6 +742,7 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
               Monte a lista completa ou explore um produto. Preços reais (sem demo).
             </p>
           </div>
+          )}
         </SkipBottomSheet>
       ) : null}
     </div>
