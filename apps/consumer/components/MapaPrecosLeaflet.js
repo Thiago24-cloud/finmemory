@@ -17,14 +17,36 @@ import { getMapThemeById, getCategoryColor, getStorePinMainColor, MAP_THEMES } f
 import { trackBackendEvent, trackEvent } from '../lib/analytics';
 import {
   SAO_PAULO_CITY_CENTER,
+  SAO_PAULO_STATE_BOUNDS,
   SAO_PAULO_STATE_MAX_BOUNDS,
   MAP_DEFAULT_ZOOM,
   MAP_MIN_ZOOM,
   MAP_MAX_ZOOM,
   MAP_MAX_BOUNDS_VISCOSITY,
   clampBboxToSaoPauloState,
-  clampCenterToSaoPaulo,
+  clampCenterToSaoPaulo as clampCenterToSaoPauloImported,
 } from '../lib/saoPauloStateMap';
+
+/** Fallback local — evita crash se o named export falhar no bundle antigo. */
+function clampCenterToSaoPaulo(lat, lng) {
+  if (typeof clampCenterToSaoPauloImported === 'function') {
+    return clampCenterToSaoPauloImported(lat, lng);
+  }
+  const la = Number(lat);
+  const lo = Number(lng);
+  const b = SAO_PAULO_STATE_BOUNDS;
+  if (
+    Number.isFinite(la) &&
+    Number.isFinite(lo) &&
+    la >= b.minLat &&
+    la <= b.maxLat &&
+    lo >= b.minLng &&
+    lo <= b.maxLng
+  ) {
+    return [la, lo];
+  }
+  return [...SAO_PAULO_CITY_CENTER];
+}
 import {
   getSupermercadoData,
   fetchStoreOffersFromApi,
