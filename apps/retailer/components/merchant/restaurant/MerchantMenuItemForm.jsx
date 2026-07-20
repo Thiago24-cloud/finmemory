@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, ImageIcon, Link2, Loader2, Upload, X } from 'lucide-react';
 import { painelApi } from '../../../lib/merchant/painelApiPaths';
 import { SkipButton } from '../skip/SkipButton';
@@ -23,8 +24,13 @@ export function MerchantMenuItemForm({ open, onOpenChange, onSaved, editItem = n
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -41,7 +47,21 @@ export function MerchantMenuItemForm({ open, onOpenChange, onSaved, editItem = n
     setError('');
   }, [open, editItem]);
 
-  if (!open) return null;
+  // Trava o scroll do fundo enquanto o modal estiver aberto.
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return undefined;
+    const { body, documentElement } = document;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlOverflow = documentElement.style.overflow;
+    body.style.overflow = 'hidden';
+    documentElement.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [open]);
+
+  if (!open || !mounted) return null;
 
   const uploadFile = async (file) => {
     if (!file?.type?.startsWith('image/')) {
@@ -153,11 +173,14 @@ export function MerchantMenuItemForm({ open, onOpenChange, onSaved, editItem = n
   const areaClass =
     'w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-y';
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  const dialog = (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      role="presentation"
+    >
       <button
         type="button"
-        className="absolute inset-0 bg-black/80"
+        className="absolute inset-0 z-0 bg-black/50 backdrop-blur-sm"
         aria-label="Fechar"
         onClick={() => onOpenChange?.(false)}
       />
@@ -166,6 +189,7 @@ export function MerchantMenuItemForm({ open, onOpenChange, onSaved, editItem = n
         aria-modal="true"
         aria-labelledby="menu-item-form-title"
         className="relative z-10 flex w-full max-w-md max-h-[90vh] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-5 py-4">
           <h2 id="menu-item-form-title" className="text-lg font-semibold m-0 text-foreground">
@@ -374,4 +398,6 @@ export function MerchantMenuItemForm({ open, onOpenChange, onSaved, editItem = n
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }
