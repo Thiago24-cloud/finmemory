@@ -191,7 +191,6 @@ export function MerchantInsumoCard({ insumo, onUpdated, onRemoved }) {
   };
 
   const qty = Number(insumo.quantidade_atual) || 0;
-  const unitLabel = UNIDADE_LABEL[insumo.unidade] || insumo.unidade || 'un';
   const canDecrement = qty > 0;
 
   return (
