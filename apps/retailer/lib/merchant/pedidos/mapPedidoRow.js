@@ -12,6 +12,7 @@ export function mapPedidoRowToApi(row, itens) {
     cliente_user_id: row.cliente_user_id,
     status: row.status,
     payment_status: row.payment_status || 'paid',
+    forma_pagamento: row.forma_pagamento || null,
     total: Number(row.total),
     observacao: row.observacao || null,
     tempo_preparo_minutos: row.tempo_preparo_minutos,

@@ -1,12 +1,38 @@
+const FORMAS_PAGAMENTO = new Set(['debito', 'credito', 'pix', 'dinheiro']);
+
+function normalizeFormaPagamento(raw) {
+  const m = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '');
+  if (m === 'credito' || m === 'credit' || m === 'credito_cartao') return 'credito';
+  if (m === 'debito' || m === 'debit' || m === 'debito_cartao') return 'debito';
+  if (m === 'pix') return 'pix';
+  if (m === 'dinheiro' || m === 'cash') return 'dinheiro';
+  return FORMAS_PAGAMENTO.has(m) ? m : null;
+}
+
 /**
  * Caixa: confirma pagamento de pedidos da mesa e libera mesa.
+ * Cobrança na maquininha física fica fora do app — aqui só registra a forma e fecha.
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {{ lojaId: string, pedidoIds: string[], mesaId?: string | null }} input
+ * @param {{ lojaId: string, pedidoIds: string[], mesaId?: string | null, formaPagamento?: string | null }} input
  */
 export async function confirmMesaPayment(supabase, input) {
   const { lojaId, pedidoIds, mesaId } = input;
   if (!lojaId || !Array.isArray(pedidoIds) || pedidoIds.length === 0) {
     return { ok: false, error: 'Pedidos obrigatórios.' };
+  }
+
+  const formaPagamento = normalizeFormaPagamento(
+    input.formaPagamento || input.forma_pagamento || input.metodo
+  );
+  if (!formaPagamento) {
+    return {
+      ok: false,
+      error: 'Informe como o cliente pagou: debito, credito, pix ou dinheiro.',
+    };
   }
 
   const nowIso = new Date().toISOString();
@@ -27,11 +53,27 @@ export async function confirmMesaPayment(supabase, input) {
 
   const { error: updErr } = await supabase
     .from('pedidos_loja')
-    .update({ payment_status: 'paid', updated_at: nowIso })
+    .update({
+      payment_status: 'paid',
+      forma_pagamento: formaPagamento,
+      updated_at: nowIso,
+    })
     .eq('loja_id', lojaId)
     .in('id', pedidoIds);
 
-  if (updErr) return { ok: false, error: updErr.message };
+  if (updErr) {
+    // Migration ainda não aplicada: fecha o pedido sem gravar a forma.
+    if (/forma_pagamento/i.test(updErr.message || '')) {
+      const { error: fallbackErr } = await supabase
+        .from('pedidos_loja')
+        .update({ payment_status: 'paid', updated_at: nowIso })
+        .eq('loja_id', lojaId)
+        .in('id', pedidoIds);
+      if (fallbackErr) return { ok: false, error: fallbackErr.message };
+    } else {
+      return { ok: false, error: updErr.message };
+    }
+  }
 
   const resolvedMesaId = mesaId || pedidos[0]?.mesa_id;
   if (resolvedMesaId) {
@@ -53,5 +95,5 @@ export async function confirmMesaPayment(supabase, input) {
     }
   }
 
-  return { ok: true, paid_count: pedidos.length };
+  return { ok: true, paid_count: pedidos.length, forma_pagamento: formaPagamento };
 }

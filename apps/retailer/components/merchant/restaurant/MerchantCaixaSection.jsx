@@ -1,7 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, DollarSign, Loader2, Receipt, Utensils } from 'lucide-react';
+import {
+  Banknote,
+  CheckCircle2,
+  CreditCard,
+  DollarSign,
+  Loader2,
+  Receipt,
+  Smartphone,
+  Utensils,
+  X,
+} from 'lucide-react';
 import { painelApi } from '../../../lib/merchant/painelApiPaths';
 import { usePedidosLojaRealtime } from '../../../hooks/usePedidosLojaRealtime';
 import { SkipPageHeader } from '../skip/SkipPageHeader';
@@ -12,12 +22,21 @@ function formatBrl(v) {
   return `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
 }
 
+const FORMAS_PAGAMENTO = [
+  { id: 'debito', label: 'Débito', Icon: CreditCard, hint: 'Cartão na maquininha' },
+  { id: 'credito', label: 'Crédito', Icon: CreditCard, hint: 'Cartão na maquininha' },
+  { id: 'pix', label: 'Pix', Icon: Smartphone, hint: 'Transferência Pix' },
+  { id: 'dinheiro', label: 'Dinheiro', Icon: Banknote, hint: 'Pagamento em espécie' },
+];
+
 export function MerchantCaixaSection({ lojaId }) {
   const [orders, setOrders] = useState([]);
   const [mesas, setMesas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMesa, setSelectedMesa] = useState(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [payError, setPayError] = useState('');
   const [cancelId, setCancelId] = useState(null);
 
   const load = useCallback(async () => {
@@ -76,20 +95,42 @@ export function MerchantCaixaSection({ lojaId }) {
     selectedMesa === 'balcao' ? t.numero === -1 : t.numero === selectedMesa
   );
 
-  const pagarMesa = async () => {
+  const openFinalizar = () => {
     if (!selected?.orders?.length) return;
+    setPayError('');
+    setPayModalOpen(true);
+  };
+
+  const closePayModal = () => {
+    if (busy) return;
+    setPayModalOpen(false);
+    setPayError('');
+  };
+
+  const pagarComForma = async (formaPagamento) => {
+    if (!selected?.orders?.length || !formaPagamento) return;
     setBusy(true);
+    setPayError('');
     try {
-      await fetch(painelApi.caixaPagar, {
+      const res = await fetch(painelApi.caixaPagar, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pedido_ids: selected.orders.map((o) => o.id),
           mesa_id: selected.mesa?.id || null,
+          forma_pagamento: formaPagamento,
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPayError(data.error || 'Não foi possível finalizar o pedido.');
+        return;
+      }
+      setPayModalOpen(false);
       setSelectedMesa(null);
       await load();
+    } catch {
+      setPayError('Erro de rede ao finalizar.');
     } finally {
       setBusy(false);
     }
@@ -115,7 +156,7 @@ export function MerchantCaixaSection({ lojaId }) {
       <SkipPageHeader
         icon={Receipt}
         title="Caixa"
-        description="Contas em aberto — pagamento na mesa."
+        description="Some o pedido, cobre na maquininha e finalize no app."
       />
 
       {loading ? (
@@ -150,7 +191,7 @@ export function MerchantCaixaSection({ lojaId }) {
             type="button"
             className="absolute inset-0 bg-black/40"
             aria-label="Fechar"
-            onClick={() => !busy && setSelectedMesa(null)}
+            onClick={() => !busy && !payModalOpen && setSelectedMesa(null)}
           />
           <SkipCard className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-lg z-10">
             <SkipCardContent className="p-5">
@@ -179,14 +220,84 @@ export function MerchantCaixaSection({ lojaId }) {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between items-center mb-4 pt-3 border-t border-border">
+              <div className="flex justify-between items-center mb-2 pt-3 border-t border-border">
                 <span className="text-muted-foreground">Total</span>
                 <span className="text-2xl font-black text-primary">{formatBrl(selected.total)}</span>
               </div>
-              <SkipButton disabled={busy} onClick={() => void pagarMesa()} className="w-full h-12 rounded-xl text-base font-bold">
+              <p className="text-xs text-muted-foreground m-0 mb-4">
+                Passe <strong>{formatBrl(selected.total)}</strong> na maquininha física. Quando aprovar,
+                toque em Finalizar Pedido e informe como o cliente pagou.
+              </p>
+              <SkipButton
+                disabled={busy}
+                onClick={openFinalizar}
+                className="w-full h-12 rounded-xl text-base font-bold"
+              >
                 <DollarSign className="h-5 w-5" />
-                Confirmar pagamento
+                Finalizar Pedido
               </SkipButton>
+            </SkipCardContent>
+          </SkipCard>
+        </div>
+      ) : null}
+
+      {payModalOpen && selected ? (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Fechar"
+            onClick={closePayModal}
+          />
+          <SkipCard className="relative w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-lg z-10">
+            <SkipCardContent className="p-5">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div>
+                  <p className="font-bold text-lg m-0">Como o cliente pagou?</p>
+                  <p className="text-sm text-muted-foreground m-0 mt-1">
+                    Total cobrado: <strong className="text-foreground">{formatBrl(selected.total)}</strong>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePayModal}
+                  disabled={busy}
+                  className="p-2 rounded-full text-muted-foreground hover:bg-muted border-0 bg-transparent cursor-pointer"
+                  aria-label="Fechar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {payError ? (
+                <p className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-xl px-3 py-2 my-3 m-0">
+                  {payError}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground my-3 m-0">
+                  A cobrança já foi feita na maquininha. Só registre a forma para fechar o pedido.
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {FORMAS_PAGAMENTO.map(({ id, label, Icon, hint }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void pagarComForma(id)}
+                    className="flex flex-col items-center gap-1.5 rounded-2xl border border-border bg-card p-4 text-center hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {busy ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    ) : (
+                      <Icon className="h-6 w-6 text-primary" />
+                    )}
+                    <span className="font-bold text-sm">{label}</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">{hint}</span>
+                  </button>
+                ))}
+              </div>
             </SkipCardContent>
           </SkipCard>
         </div>

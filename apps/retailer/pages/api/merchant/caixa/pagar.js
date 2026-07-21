@@ -22,8 +22,13 @@ export default async function handler(req, res) {
     lojaId: auth.store.id,
     pedidoIds,
     mesaId: body.mesa_id || null,
+    formaPagamento: body.forma_pagamento || body.formaPagamento || body.metodo || null,
   });
 
   if (!result.ok) return res.status(400).json({ error: result.error });
-  return res.status(200).json({ success: true, paid_count: result.paid_count });
+  return res.status(200).json({
+    success: true,
+    paid_count: result.paid_count,
+    forma_pagamento: body.forma_pagamento || body.formaPagamento || body.metodo || null,
+  });
 }

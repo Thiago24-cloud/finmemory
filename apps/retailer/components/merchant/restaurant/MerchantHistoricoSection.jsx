@@ -41,6 +41,13 @@ function formatDt(iso) {
   }
 }
 
+const FORMA_LABEL = {
+  debito: 'Débito',
+  credito: 'Crédito',
+  pix: 'Pix',
+  dinheiro: 'Dinheiro',
+};
+
 export function MerchantHistoricoSection() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -115,6 +122,12 @@ export function MerchantHistoricoSection() {
               <span className="text-muted-foreground">Total</span>
               <span className="text-xl font-black text-primary">{formatBrl(selected.total)}</span>
             </div>
+            {selected.forma_pagamento ? (
+              <p className="text-sm m-0 mt-3">
+                Pagamento:{' '}
+                <strong>{FORMA_LABEL[selected.forma_pagamento] || selected.forma_pagamento}</strong>
+              </p>
+            ) : null}
             {selected.observacao ? (
               <p className="text-xs text-muted-foreground mt-3 m-0">Obs: {selected.observacao}</p>
             ) : null}
