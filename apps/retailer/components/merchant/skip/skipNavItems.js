@@ -13,6 +13,7 @@ import {
   Receipt,
   Truck,
   QrCode,
+  Users,
 } from 'lucide-react';
 
 /** Navegação inferior — mesma ordem e rótulos do Skip. */
@@ -31,4 +32,5 @@ export const SKIP_NAV_ITEMS = [
   { id: 'caixa', name: 'Caixa', Icon: Receipt },
   { id: 'entrega', name: 'Entrega', Icon: Truck },
   { id: 'codigos', name: 'Códigos', Icon: QrCode },
+  { id: 'equipe', name: 'Equipe', Icon: Users },
 ];

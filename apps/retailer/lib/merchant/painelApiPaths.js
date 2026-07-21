@@ -46,7 +46,13 @@ export const painelApi = {
   paymentsStatus: `${PAINEL_API_BASE}/payments/status`,
   paymentsSimulate: `${PAINEL_API_BASE}/payments/simulate`,
   paymentsWebhook: `${PAINEL_API_BASE}/payments/webhook`,
+  equipe: `${PAINEL_API_BASE}/equipe`,
+  equipeMembro: (id) => `${PAINEL_API_BASE}/equipe/${id}`,
 };
+
+/** Login da equipe (garçom/cozinha) — código da loja + PIN */
+export const EQUIPE_LOGIN_API = '/api/parceiros/equipe/login';
+export const EQUIPE_ME_API = '/api/parceiros/equipe/me';
 
 /** POST pedido retirada (consumidor logado). */
 export const PEDIDOS_API = '/api/parceiros/pedidos';

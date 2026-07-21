@@ -27,6 +27,7 @@ import { MerchantPreparoSection } from './restaurant/MerchantPreparoSection';
 import { MerchantSkipShell } from './skip/MerchantSkipShell';
 import { MerchantSkipDashboard } from './skip/MerchantSkipDashboard';
 import { SkipButton } from './skip/SkipButton';
+import { MerchantEquipeSection } from './restaurant/MerchantEquipeSection';
 
 export function MerchantPanel() {
   const { data: session } = useSession();
@@ -399,6 +400,8 @@ export function MerchantPanel() {
             <MerchantEntregaSection lojaId={ctx?.store?.id} />
           ) : panelTab === 'preparo' ? (
             <MerchantPreparoSection products={products} />
+          ) : panelTab === 'equipe' ? (
+            <MerchantEquipeSection />
           ) : panelTab === 'ofertas' ? (
             <MerchantSkipDashboard
               products={products}
