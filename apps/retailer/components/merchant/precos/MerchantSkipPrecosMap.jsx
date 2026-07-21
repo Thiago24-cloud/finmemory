@@ -387,7 +387,7 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-[#0d1b2e]">
-      {(workMode === 'montar' ? montarMapStores.length > 0 : focusedProduct) && !loading ? (
+      {!loading ? (
         <SkipPriceMap
           stores={workMode === 'montar' ? montarMapStores : filteredStores}
           selectedStore={selectedStore}
@@ -395,7 +395,7 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
           productName={
             workMode === 'montar'
               ? draftList.slice(0, 3).join(', ') || 'Lista'
-              : data?.product || focusedProduct?.name
+              : data?.product || focusedProduct?.name || 'FinMemory'
           }
           onLocateMe={requestLocation}
           isLocating={isLocating}
@@ -421,7 +421,7 @@ export function MerchantSkipPrecosMap({ storeLat, storeLng, onBack, onOpenLista 
         </div>
       ) : null}
 
-      {!loading && (focusedProduct || workMode === 'montar' || draftList.length > 0) ? (
+      {!loading ? (
         <SkipBottomSheet
           header={
             <div className="px-5 space-y-4 pb-4">

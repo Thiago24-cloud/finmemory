@@ -17,7 +17,7 @@ export function AuthenticatedHomeRedirect() {
     const userId = session?.user?.supabaseId;
     if (!userId) return;
     if (router.query?.msg === 'nao-cadastrado') return;
-    void router.replace('/dashboard');
+    void router.replace('/mapa');
   }, [status, session?.user?.supabaseId, router.query?.msg, router]);
 
   return null;

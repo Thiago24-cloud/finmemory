@@ -40,7 +40,7 @@ export function MerchantPanel() {
   const [formOpen, setFormOpen] = useState(false);
   const [needsPartnerSignup, setNeedsPartnerSignup] = useState(false);
   const [repairing, setRepairing] = useState(false);
-  const [panelTab, setPanelTab] = useState('ofertas');
+  const [panelTab, setPanelTab] = useState('mapa');
   const [listaMode, setListaMode] = useState('montar'); // montar | rota
   const [insumosCount, setInsumosCount] = useState(0);
   /** URL do mapa consumidor com ?cesta= / ?lista= — aberto a partir da Lista. */

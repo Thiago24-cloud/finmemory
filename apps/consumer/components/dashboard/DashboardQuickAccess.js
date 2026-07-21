@@ -43,7 +43,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
   const { data: session } = useSession();
   const allowed = canUseRestrictedFeatures(session?.user?.email);
 
-  const RESTRICTED_KEYS = new Set(['mapa', 'lista', 'barcode', 'missoes']);
+  const RESTRICTED_KEYS = new Set(['lista', 'barcode', 'missoes']);
 
   const items = [
     {

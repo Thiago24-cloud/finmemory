@@ -6,7 +6,6 @@ import { getServerSession } from 'next-auth/next';
 import { ArrowLeft, Navigation } from 'lucide-react';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
-import { canUseRestrictedFeatures } from '../lib/restrictedFeatureAccess';
 import { isParceirosMapView } from '../lib/parceirosMapMode';
 import {
   decodeCestaMapParam,
@@ -55,9 +54,6 @@ export async function getServerSideProps(ctx) {
     const allowed = await canAccessForSession(session);
     if (!allowed) {
       return { redirect: { destination: '/?msg=nao-cadastrado', permanent: false } };
-    }
-    if (!canUseRestrictedFeatures(session.user.email)) {
-      return { redirect: { destination: '/em-breve', permanent: false } };
     }
     return { props: {} };
   } catch (err) {

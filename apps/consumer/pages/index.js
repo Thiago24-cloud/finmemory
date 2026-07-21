@@ -40,7 +40,7 @@ export async function getServerSideProps(ctx) {
     const allowed = await canAccessForSession(session);
     if (allowed) {
       return {
-        redirect: { destination: '/dashboard', permanent: false },
+        redirect: { destination: '/mapa', permanent: false },
       };
     }
   }
