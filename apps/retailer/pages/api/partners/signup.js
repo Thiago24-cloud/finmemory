@@ -8,7 +8,8 @@ import { documentTaxIdReuseHttpResponse } from '../../../lib/partners/documentTa
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { geocodePartnerStoreAddress } from '../../../lib/geocode';
 import { checkRateLimit, getRequestIp } from '../../../lib/rateLimit';
-import { sendSecurityEmail } from '../../../lib/securityEmail';
+import { sendPartnerAccessCredentialsEmail } from '../../../lib/auth/sendPartnerAccessEmail';
+import { getRetailerPublicBaseUrl } from '../../../lib/auth/getRetailerPublicBaseUrl';
 import { isValidEmail, normalizeEmail, validatePasswordStrength } from '../../../lib/securityPolicy';
 import { isValidCpfOrCnpj, normalizeTaxIdDigits } from '../../../lib/validateTaxId';
 import { syncMerchantStoreBindings } from '../../../lib/merchant/syncMerchantStoreBindings';
@@ -133,15 +134,22 @@ export default async function handler(req, res) {
       return res.status(completed.status || 500).json({ error: completed.error });
     }
 
-    const appUrl = process.env.NEXTAUTH_URL || process.env.APP_BASE_URL || 'https://finmemory.com.br';
+    const appUrl = getRetailerPublicBaseUrl();
     const painelPath = '/parceiros/painel';
+    await sendPartnerAccessCredentialsEmail({
+      to: normalizedEmail,
+      name: responsibleName,
+      password,
+      storeName: businessName,
+      subject: 'Loja vinculada — seu acesso FinMemory Parceiros',
+    });
     return res.status(201).json({
       success: true,
       userId: existingAuth.user_id,
       storeId: completed.storeId,
       completedExistingAccount: true,
       loginUrl: `${appUrl}/login?callbackUrl=${encodeURIComponent(painelPath)}`,
-      message: 'Loja vinculada à sua conta. Faça login para acessar o painel.',
+      message: 'Loja vinculada. Enviamos o acesso por e-mail.',
     });
   }
 
@@ -248,15 +256,14 @@ export default async function handler(req, res) {
       await saveDocumentReuseAck(supabase, userId, documentTaxId);
     }
 
-    const appUrl = process.env.NEXTAUTH_URL || process.env.APP_BASE_URL || 'https://finmemory.com.br';
+    const appUrl = getRetailerPublicBaseUrl();
     const painelPath = '/parceiros/painel';
-    await sendSecurityEmail({
+    await sendPartnerAccessCredentialsEmail({
       to: normalizedEmail,
-      subject: 'Sua loja foi cadastrada no FinMemory Parceiros',
-      html: `<p>Olá, ${responsibleName}!</p>
-        <p><strong>${businessName}</strong> está no mapa FinMemory (revisão rápida da equipe).</p>
-        <p><a href="${appUrl}/login?callbackUrl=${encodeURIComponent(painelPath)}">Entrar no painel da loja</a></p>`,
-      fallbackLog: `partner_signup=${normalizedEmail}`,
+      name: responsibleName,
+      password,
+      storeName: businessName,
+      subject: 'Sua loja no FinMemory Parceiros — e-mail e senha',
     });
 
     return res.status(201).json({
@@ -264,7 +271,7 @@ export default async function handler(req, res) {
       userId,
       storeId: storeRow.id,
       loginUrl: `${appUrl}/login?callbackUrl=${encodeURIComponent(painelPath)}`,
-      message: 'Loja cadastrada com sucesso.',
+      message: 'Loja cadastrada. Enviamos o acesso por e-mail.',
     });
   } catch (e) {
     console.error('[partners/signup]', e);

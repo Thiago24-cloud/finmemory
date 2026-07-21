@@ -356,6 +356,20 @@ export const authOptions = {
           user.supabaseId = oauthUser.id;
           if (oauthUser.name) user.name = oauthUser.name;
           console.info('[auth][oauth]', { provider, email: user.email, isNew: oauthUser.isNew });
+
+          // Primeiro acesso OAuth: gera senha local e envia e-mail com link + credenciais.
+          if (oauthUser.isNew) {
+            const { ensureLocalPasswordForUser } = await import(
+              '../../../lib/auth/ensureLocalPasswordForUser'
+            );
+            await ensureLocalPasswordForUser(supabase, {
+              userId: oauthUser.id,
+              email: user.email,
+              name: oauthUser.name || user.name,
+              forceNewPassword: true,
+              sendEmail: true,
+            });
+          }
         }
 
         console.log('🔐 NextAuth SignIn callback –', user?.email);
