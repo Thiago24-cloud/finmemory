@@ -46,6 +46,7 @@ const FORMA_LABEL = {
   credito: 'Crédito',
   pix: 'Pix',
   dinheiro: 'Dinheiro',
+  misto: 'Misto',
 };
 
 export function MerchantHistoricoSection() {
