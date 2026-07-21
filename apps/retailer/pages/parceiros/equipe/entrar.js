@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { ChefHat, KeyRound, Loader2, Store } from 'lucide-react';
-import { EQUIPE_LOGIN_API } from '../../lib/merchant/painelApiPaths';
+import { EQUIPE_LOGIN_API } from '../../../lib/merchant/painelApiPaths';
 
 export default function EquipeEntrarPage() {
   const router = useRouter();

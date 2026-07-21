@@ -1,10 +1,10 @@
-import { requireMerchantApi } from '../../../../../../lib/merchant/requireMerchantApi';
+import { requireMerchantApi } from '../../../../../lib/merchant/requireMerchantApi';
 import {
   createPinHash,
   normalizePapel,
   normalizePin,
   EQUIPE_PAPEL_LABEL,
-} from '../../../../../../lib/merchant/equipe/equipeAuth';
+} from '../../../../../lib/merchant/equipe/equipeAuth';
 
 function mapMembro(row) {
   return {
