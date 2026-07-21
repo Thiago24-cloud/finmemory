@@ -128,6 +128,16 @@ export function MerchantHistoricoSection() {
                 <strong>{FORMA_LABEL[selected.forma_pagamento] || selected.forma_pagamento}</strong>
               </p>
             ) : null}
+            {Array.isArray(selected.pagamentos) && selected.pagamentos.length > 1 ? (
+              <ul className="mt-2 space-y-1 list-none p-0 m-0 text-xs text-muted-foreground">
+                {selected.pagamentos.map((p, i) => (
+                  <li key={i}>
+                    {i + 1}. {FORMA_LABEL[p.forma] || p.forma}:{' '}
+                    {Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {selected.observacao ? (
               <p className="text-xs text-muted-foreground mt-3 m-0">Obs: {selected.observacao}</p>
             ) : null}
