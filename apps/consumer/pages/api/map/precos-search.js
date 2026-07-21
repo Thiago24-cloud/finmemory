@@ -4,6 +4,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { isSimulatedMapProductName } from '../../../lib/mapSimulatedOffers';
+import { compareListWithMapOffers } from '../../../lib/shoppingListMapMatch';
 
 const CHAIN_COLORS = {
   dia: '#e30613',
@@ -114,34 +115,19 @@ export default async function handler(req, res) {
   }));
 
   const product = names[0];
+  const listCompare = compareListWithMapOffers(names, rows);
+
   return res.status(200).json({
     product,
     products: names.map((name, i) => ({ id: `q-${i}`, name })),
     mapStores,
     stores: storeList,
     summary: {
-      matched: mapStores.length > 0 ? 1 : 0,
+      matched: listCompare.summary?.matched ?? (mapStores.length > 0 ? 1 : 0),
       total: names.length,
-      storesCount: mapStores.length,
+      storesCount: listCompare.summary?.storesCount ?? mapStores.length,
     },
-    items: names.map((name, i) => ({
-      listItemId: `q-${i}`,
-      listName: name,
-      matched: mapStores.length > 0,
-      offers: storeList.slice(0, 8).map((s) => ({
-        nome_loja: s.nome_loja,
-        preco: s.preco,
-        produto_nome: s.produto_nome,
-        lat: s.lat,
-        lng: s.lng,
-      })),
-      bestOffer: storeList[0]
-        ? {
-            nome_loja: storeList[0].nome_loja,
-            preco: storeList[0].preco,
-            produto_nome: storeList[0].produto_nome,
-          }
-        : null,
-    })),
+    items: listCompare.items,
+    listCompare,
   });
 }
