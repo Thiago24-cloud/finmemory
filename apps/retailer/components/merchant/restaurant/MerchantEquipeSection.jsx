@@ -133,12 +133,21 @@ export function MerchantEquipeSection() {
             </SkipButton>
           </div>
           <p className="text-xs text-muted-foreground m-0 mt-2">
-            Link da equipe:{' '}
-            <a href="/parceiros/equipe/entrar" className="text-primary underline font-medium">
-              /parceiros/equipe/entrar
+            No celular da equipe, abra:
+          </p>
+          <p className="text-xs m-0 mt-1 break-all">
+            <a
+              href="https://finmemory-retailer-836908221936.southamerica-east1.run.app/equipe/entrar"
+              className="text-primary underline font-medium"
+              target="_blank"
+              rel="noreferrer"
+            >
+              finmemory-retailer-….run.app/equipe/entrar
             </a>
           </p>
-          <div className="grid grid-cols-3 gap-2 mt-4">
+          <p className="text-[10px] text-muted-foreground m-0 mt-1">
+            (O domínio parceiros.finmemory.com.br ainda aponta para o app errado — use o link acima.)
+          </p>          <div className="grid grid-cols-3 gap-2 mt-4">
             <div className="rounded-xl bg-muted/50 p-3 text-center">
               <p className="text-2xl font-black m-0">{counts.garcom}</p>
               <p className="text-[10px] text-muted-foreground m-0">Garçons</p>

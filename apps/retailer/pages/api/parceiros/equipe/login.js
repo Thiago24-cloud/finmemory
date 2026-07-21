@@ -94,6 +94,6 @@ export default async function handler(req, res) {
       papel: membro.papel,
     },
     store: { id: store.id, name: store.name, codigo_equipe: store.codigo_equipe },
-    redirect: '/parceiros/equipe',
+    redirect: '/equipe',
   });
 }

@@ -24,12 +24,12 @@ export default function EquipeWorkspacePage() {
     try {
       const res = await fetch(EQUIPE_ME_API);
       if (res.status === 401) {
-        await router.replace('/parceiros/equipe/entrar');
+        await router.replace('/equipe/entrar');
         return;
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        await router.replace('/parceiros/equipe/entrar');
+        await router.replace('/equipe/entrar');
         return;
       }
       setMembro(data.membro);
@@ -51,7 +51,7 @@ export default function EquipeWorkspacePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'logout' }),
     });
-    await router.replace('/parceiros/equipe/entrar');
+    await router.replace('/equipe/entrar');
   };
 
   const tabs = EQUIPE_TABS_BY_PAPEL[membro?.papel] || [];

@@ -28,7 +28,7 @@ export default function EquipeEntrarPage() {
         setError(data.error || 'Não foi possível entrar.');
         return;
       }
-      await router.replace('/parceiros/equipe');
+      await router.replace('/equipe');
     } catch {
       setError('Erro de rede.');
     } finally {
