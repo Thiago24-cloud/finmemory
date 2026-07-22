@@ -31,6 +31,7 @@ import { MerchantEquipeSection } from './restaurant/MerchantEquipeSection';
 
 export function MerchantPanel() {
   const { data: session } = useSession();
+  const isAdm = Boolean(session?.user?.isFinmemoryAdmin);
   const [ctx, setCtx] = useState(null);
   const [products, setProducts] = useState([]);
   const [mapStatus, setMapStatus] = useState(null);
@@ -309,6 +310,21 @@ export function MerchantPanel() {
             >
               {success}
             </p>
+          ) : null}
+
+          {isAdm ? (
+            <Link
+              href="/parceiros/adm"
+              className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 hover:bg-emerald-100 transition-colors"
+            >
+              <span>
+                <strong className="font-bold">ADM FinMemory Compra</strong>
+                <span className="block text-xs text-emerald-800/80 mt-0.5">
+                  Usuários, listas, preços e alertas WhatsApp
+                </span>
+              </span>
+              <span className="shrink-0 text-xs font-bold text-emerald-700">Abrir →</span>
+            </Link>
           ) : null}
 
           {ctx?.store?.needs_review && panelTab !== 'cardapio' ? (

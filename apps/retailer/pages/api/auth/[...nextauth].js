@@ -11,6 +11,7 @@ import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../
 import { FINMEMORY_CREDENTIAL_ERROR, credentialLoginRejected } from '../../../lib/finmemoryLoginErrorCodes';
 import { ensureMerchantStoreLink } from '../../../lib/merchant/ensureMerchantStoreLink';
 import { ensureOAuthUser } from '../../../lib/auth/ensureOAuthUser';
+import { isFinmemoryAdminEmail } from '../../../lib/adminAccess';
 
 async function attachMerchantStoreToToken(token, supabase, userId) {
   if (!token || !supabase || !userId) {
@@ -391,6 +392,7 @@ export const authOptions = {
         session.user.account_type = token.account_type || 'consumidor';
         session.user.merchantStoreId = token.merchantStoreId || null;
         session.user.merchantStoreName = token.merchantStoreName || null;
+        session.user.isFinmemoryAdmin = isFinmemoryAdminEmail(session.user.email || token.email);
         if (token.name) session.user.name = token.name;
         if (token.picture) session.user.image = token.picture;
       }
@@ -431,6 +433,9 @@ export const authOptions = {
         } catch (error) {
           console.error('Error fetching Supabase user:', error);
         }
+      }
+      if (session?.user?.email) {
+        session.user.isFinmemoryAdmin = isFinmemoryAdminEmail(session.user.email);
       }
       return session;
     }
