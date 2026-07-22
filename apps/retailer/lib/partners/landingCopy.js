@@ -1,49 +1,106 @@
-/** Copywriting — landing Parceiros FinMemory (compras e estoque para pequenos empreendedores). */
+/** Copywriting — landing FinMemory Comerciantes (wireframe + design). */
 
 export const PARTNERS_HERO = {
-  eyebrow: 'FinMemory Parceiros',
-  title: 'Compre insumos pelo menor preço, antes do estoque apertar.',
+  brand: 'FinMemory',
+  title: 'Controle seu negócio com mais clareza, economia e lucro',
   subtitle:
-    'Um software para restaurantes, lanchonetes e lojas de conveniência que compram parte dos suprimentos em mercados, atacarejos e CEASA. Acompanhe preços perto da sua loja, receba alertas e mantenha o estoque organizado pelo celular ou computador.',
-  ctaPrimary: 'Cadastrar minha loja',
-  ctaSecondary: 'Ver compras inteligentes',
+    'Organize compras, estoque e vendas em um só app. Entenda seu lucro real e tome decisões melhores.',
+  ctaPrimary: 'Quero testar o app',
+  ctaSecondary: 'Ver como funciona',
+};
+
+export const PARTNERS_PROBLEM = {
+  title: 'Você ainda controla seu negócio no caderno, na cabeça ou pelo WhatsApp?',
+  intro: 'Muitos pequenos negócios perdem dinheiro porque não sabem exatamente:',
+  items: [
+    'quanto estão vendendo',
+    'quanto estão gastando',
+    'qual produto dá mais lucro',
+    'quando o estoque está acabando',
+    'onde comprar mais barato',
+  ],
+};
+
+export const PARTNERS_OFFERS_SECTION = {
+  title: 'O que o app faz por você',
 };
 
 export const PARTNERS_BENEFITS = [
   {
     icon: 'map',
-    title: 'Mapa de preços em tempo real',
-    body: 'Veja onde arroz, óleo, bebidas, carnes e outros insumos estão mais baratos de acordo com a localização da sua loja.',
-  },
-  {
-    icon: 'alert',
-    title: 'Alertas para comprar na hora certa',
-    body: 'Receba avisos quando produtos importantes baixarem de preço e compare opções antes de sair para comprar.',
+    title: 'Comparar preços',
+    body: 'Saiba onde comprar mais barato. Compare fornecedores e reduza custos com o mapa de preços.',
   },
   {
     icon: 'stock',
-    title: 'Controle de estoque simples',
-    body: 'Registre entradas, acompanhe quantidades e evite perder margem por falta de insumo ou compra emergencial cara.',
+    title: 'Controlar estoque',
+    body: 'Veja o que entra, sai e está acabando. Evite falta de mercadoria e compras desnecessárias.',
   },
   {
-    icon: 'invoice',
-    title: 'Entrada por nota ou foto',
-    body: 'Automatize as compras que chegam na loja: tire foto da nota fiscal ou do papel e transforme em itens de estoque.',
+    icon: 'sales',
+    title: 'Registrar vendas',
+    body: 'Acompanhe suas vendas do dia, o faturamento e quais produtos trazem mais resultado.',
+  },
+  {
+    icon: 'profit',
+    title: 'Entender lucro real',
+    body: 'Veja o que realmente sobra. Visualize custos, vendas e margens sem complicação.',
+  },
+  {
+    icon: 'insights',
+    title: 'Tomar decisões com dados',
+    body: 'Use insights simples para saber quando comprar, onde economizar e o que priorizar.',
   },
 ];
 
 export const PARTNERS_STEPS = [
-  { step: '01', title: 'Cadastre a loja', body: 'O endereço da loja define a área de busca para mercados, atacarejos e ofertas próximas.' },
-  { step: '02', title: 'Monte sua lista de insumos', body: 'Adicione os produtos que mais pesam no seu custo: bebidas, descartáveis, hortifruti, carnes e mercearia.' },
-  { step: '03', title: 'Compare preços no mapa', body: 'O FinMemory mostra onde comprar melhor e monitora variações para você não depender de chute.' },
-  { step: '04', title: 'Atualize o estoque', body: 'Depois da compra, registre a entrada por nota, foto ou painel e mantenha o controle da operação.' },
+  {
+    step: '1',
+    title: 'Cadastre seus produtos',
+    body: 'Coloque os itens que você compra e vende.',
+  },
+  {
+    step: '2',
+    title: 'Registre compras e vendas',
+    body: 'Acompanhe tudo de forma simples.',
+  },
+  {
+    step: '3',
+    title: 'Veja seu lucro e tome decisões melhores',
+    body: 'Entenda onde economizar e onde ganhar mais.',
+  },
 ];
 
+export const PARTNERS_AUDIENCE = {
+  title: 'Feito para quem vende todo dia',
+  items: [
+    'Ambulantes',
+    'Lanchonetes',
+    'Docerias',
+    'Marmitarias',
+    'Pequenos mercados',
+    'Negócios locais',
+    'Restaurantes',
+    'Comerciantes',
+  ],
+};
+
+export const PARTNERS_CLOSING = {
+  title: 'Menos bagunça. Mais controle. Mais lucro.',
+  body: [
+    'Pare de depender da memória, do caderno ou de anotações perdidas no WhatsApp.',
+    'Tenha uma visão clara do seu negócio e tome decisões com mais segurança todos os dias.',
+  ],
+  lines: ['Seu negócio merece mais controle.', 'Você merece vender com mais inteligência.'],
+  cta: 'Quero testar o app',
+};
+
 export const PARTNERS_FORM = {
-  title: 'Faça seu cadastro normal',
-  subtitle: 'Crie sua conta com Google ou e-mail e acesse o painel. Os dados da loja ficam para configurar depois, sem travar o primeiro acesso.',
+  title: 'Quero testar o app',
+  subtitle:
+    'Crie sua conta com Google ou e-mail e acesse o painel. Os dados da loja ficam para configurar depois.',
   submit: 'Criar conta e acessar o painel',
-  successTitle: 'Loja registrada!',
+  successTitle: 'Conta criada!',
   successBody:
-    'Sua conta foi criada. Faça login para acessar o painel, montar sua lista de insumos e acompanhar preços no mapa.',
+    'Sua conta foi criada. Faça login para acessar o painel, organizar compras, estoque, vendas e lucro.',
 };

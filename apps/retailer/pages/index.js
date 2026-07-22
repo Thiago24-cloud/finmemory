@@ -13,7 +13,7 @@ export default function RetailerHome() {
   return (
     <>
       <Head>
-        <title>FinMemory Parceiros</title>
+        <title>FinMemory Comerciantes</title>
       </Head>
       <p className="text-center text-muted-foreground py-16">Redirecionando…</p>
     </>
