@@ -37,7 +37,7 @@ function posthogUpstream() {
 function retailerAppBaseUrl(): string {
   const runApp =
     process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
-    'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+    'https://finmemorycomerciantes-836908221936.southamerica-east1.run.app';
   const fromEnv =
     process.env.NEXT_PUBLIC_RETAILER_APP_URL || process.env.NEXT_PUBLIC_FINMEMORY_RETAILER_URL || '';
   const base =

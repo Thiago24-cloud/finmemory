@@ -24,7 +24,7 @@ const SCRYPT_P = 1;
 const KEY_LEN = 64;
 const RETAILER_URL =
   process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
-  'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+  'https://finmemorycomerciantes-836908221936.southamerica-east1.run.app';
 
 function argValue(name) {
   const prefix = `--${name}=`;

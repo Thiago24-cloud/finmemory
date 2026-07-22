@@ -34,7 +34,7 @@ function retailerAppUrlForMap() {
   const runApp =
     process.env.NEXT_PUBLIC_RETAILER_APP_URL ||
     process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
-    'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+    'https://finmemorycomerciantes-836908221936.southamerica-east1.run.app';
   const base = String(runApp).replace(/\/$/, '');
   if (/parceiros\.finmemory\.com\.br/i.test(base)) return base;
   return base;

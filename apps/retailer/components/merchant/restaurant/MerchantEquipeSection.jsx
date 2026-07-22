@@ -137,12 +137,12 @@ export function MerchantEquipeSection() {
           </p>
           <p className="text-xs m-0 mt-1 break-all">
             <a
-              href="https://finmemory-retailer-836908221936.southamerica-east1.run.app/equipe/entrar"
+              href="https://finmemorycomerciantes-836908221936.southamerica-east1.run.app/equipe/entrar"
               className="text-primary underline font-medium"
               target="_blank"
               rel="noreferrer"
             >
-              finmemory-retailer-….run.app/equipe/entrar
+              finmemorycomerciantes-….run.app/equipe/entrar
             </a>
           </p>
           <p className="text-[10px] text-muted-foreground m-0 mt-1">

@@ -1,12 +1,12 @@
-# Atualiza variáveis do Cloud Run finmemory-retailer a partir do .env.local
+# Atualiza variáveis do Cloud Run finmemorycomerciantes a partir do .env.local
 # Uso: .\scripts\set-cloud-run-env-retailer.ps1
 
 $ErrorActionPreference = "Stop"
 $FINMEMORY_GCP_PROJECT = "exalted-entry-480904-s9"
-$SERVICE = "finmemory-retailer"
+$SERVICE = "finmemorycomerciantes"
 $REGION = "southamerica-east1"
 # URL pública do Cloud Run (use até parceiros.finmemory.com.br ter domain mapping + DNS OK)
-$RETAILER_CLOUD_RUN = "https://finmemory-retailer-836908221936.southamerica-east1.run.app"
+$RETAILER_CLOUD_RUN = "https://finmemorycomerciantes-836908221936.southamerica-east1.run.app"
 $RETAILER_BASE = $RETAILER_CLOUD_RUN
 
 $envLocalPath = Join-Path (Get-Location) ".env.local"
@@ -131,7 +131,7 @@ foreach ($entry in $envMap.GetEnumerator()) {
 $merged.Remove("COSMOS_API_TOKEN") | Out-Null
 $merged.Remove("COSMOS_USE_RETAILER_API") | Out-Null
 
-$yamlPath = Join-Path $env:TEMP "finmemory-retailer-cloud-run-env.yaml"
+$yamlPath = Join-Path $env:TEMP "finmemorycomerciantes-cloud-run-env.yaml"
 $lines = @()
 foreach ($entry in $merged.GetEnumerator() | Sort-Object Name) {
     $val = [string]$entry.Value

@@ -25,29 +25,29 @@ steps:
       - '-f'
       - 'Dockerfile.retailer'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/finmemory-retailer:$_COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finmemorycomerciantes:$_COMMIT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/finmemory-retailer:latest'
+      - 'gcr.io/$PROJECT_ID/finmemorycomerciantes:latest'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/finmemory-retailer:$_COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finmemorycomerciantes:$_COMMIT_SHA'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/finmemory-retailer:latest'
+      - 'gcr.io/$PROJECT_ID/finmemorycomerciantes:latest'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'finmemory-retailer'
+      - 'finmemorycomerciantes'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/finmemory-retailer:$_COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/finmemorycomerciantes:$_COMMIT_SHA'
       - '--region'
       - 'southamerica-east1'
       - '--platform'
@@ -63,8 +63,8 @@ steps:
       - '1'
 
 images:
-  - 'gcr.io/$PROJECT_ID/finmemory-retailer:$_COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/finmemory-retailer:latest'
+  - 'gcr.io/$PROJECT_ID/finmemorycomerciantes:$_COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/finmemorycomerciantes:latest'
 
 substitutions:
   _COMMIT_SHA: 'manual'
