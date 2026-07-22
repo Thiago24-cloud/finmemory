@@ -1,5 +1,5 @@
 /** GET/POST /api/parceiros/adm/users/[id]/lista — itens da lista de compra */
-import { requireAdmCompraApi } from '../../../../../lib/adm/admCompra';
+import { requireAdmCompraApi } from '../../../../../../lib/adm/admCompra';
 
 export default async function handler(req, res) {
   const ctx = await requireAdmCompraApi(req, res);

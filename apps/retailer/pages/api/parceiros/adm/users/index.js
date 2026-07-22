@@ -5,7 +5,7 @@ import {
   ADM_PLANOS,
   ADM_STATUS,
   ADM_DIAS,
-} from '../../../../lib/adm/admCompra';
+} from '../../../../../lib/adm/admCompra';
 
 export default async function handler(req, res) {
   const ctx = await requireAdmCompraApi(req, res);
