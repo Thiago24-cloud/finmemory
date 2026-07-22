@@ -22,7 +22,27 @@ export default async function handler(req, res) {
       plano,
       alerta_hoje,
       q,
+      produto_id,
     } = req.query;
+
+    let userIdsFilter = null;
+    if (produto_id) {
+      const { data: listRows, error: listErr } = await supabase
+        .from('adm_compra_list_items')
+        .select('user_id')
+        .eq('product_id', String(produto_id));
+      if (listErr) {
+        console.error('[adm/users GET lista]', listErr);
+        return res.status(503).json({ error: listErr.message });
+      }
+      userIdsFilter = [...new Set((listRows || []).map((r) => r.user_id))];
+      if (userIdsFilter.length === 0) {
+        return res.status(200).json({
+          users: [],
+          meta: { perfis: ADM_PERFIS, planos: ADM_PLANOS, status: ADM_STATUS, dias: ADM_DIAS },
+        });
+      }
+    }
 
     let query = supabase.from('adm_compra_users').select('*').order('created_at', { ascending: false });
 
@@ -32,6 +52,7 @@ export default async function handler(req, res) {
     if (dia_compra) query = query.eq('dia_compra', String(dia_compra));
     if (status) query = query.eq('status', String(status));
     if (plano) query = query.eq('plano', String(plano));
+    if (userIdsFilter) query = query.in('id', userIdsFilter);
     if (q) {
       const raw = String(q).trim().replace(/[%_,]/g, '');
       if (raw) {

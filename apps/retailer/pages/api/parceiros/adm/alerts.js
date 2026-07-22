@@ -26,6 +26,21 @@ export default async function handler(req, res) {
       'Sexta-feira',
       'Sábado',
     ];
+    const { cidade, bairro, perfil, dia_compra, produto_id } = req.query;
+
+    let userIdsFilter = null;
+    if (produto_id) {
+      const { data: listRows, error: listErr } = await supabase
+        .from('adm_compra_list_items')
+        .select('user_id')
+        .eq('product_id', String(produto_id));
+      if (listErr) return res.status(503).json({ error: listErr.message });
+      userIdsFilter = [...new Set((listRows || []).map((r) => r.user_id))];
+      if (userIdsFilter.length === 0) {
+        return res.status(200).json({ users: [] });
+      }
+    }
+
     let query = supabase
       .from('adm_compra_users')
       .select('id, nome, telefone, perfil, bairro, cidade, dia_compra, status, plano')
@@ -34,11 +49,11 @@ export default async function handler(req, res) {
     if (alertaHoje) {
       query = query.eq('dia_compra', dias[new Date().getDay()]);
     }
-    const { cidade, bairro, perfil, dia_compra } = req.query;
     if (cidade) query = query.ilike('cidade', `%${String(cidade)}%`);
     if (bairro) query = query.ilike('bairro', `%${String(bairro)}%`);
     if (perfil) query = query.eq('perfil', String(perfil));
     if (dia_compra) query = query.eq('dia_compra', String(dia_compra));
+    if (userIdsFilter) query = query.in('id', userIdsFilter);
 
     const { data, error } = await query;
     if (error) return res.status(503).json({ error: error.message });
