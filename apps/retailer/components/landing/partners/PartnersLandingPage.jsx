@@ -10,6 +10,7 @@ import { PartnersProblemSection } from './PartnersProblemSection';
 import { PartnersBenefitsGrid } from './PartnersBenefitsGrid';
 import { PartnersHowItWorks } from './PartnersHowItWorks';
 import { PartnersAudienceSection } from './PartnersAudienceSection';
+import { PartnersPlansSection } from './PartnersPlansSection';
 import { PartnersClosingSection } from './PartnersClosingSection';
 import { PartnersOnboardingForm } from './PartnersOnboardingForm';
 
@@ -17,6 +18,7 @@ const NAV = [
   { href: '#inicio', label: 'Início' },
   { href: '#servicos', label: 'Serviços' },
   { href: '#como-funciona', label: 'Como funciona' },
+  { href: '#pacotes', label: 'Pacotes' },
 ];
 
 export function PartnersLandingPage({ socialProviders = [] }) {
@@ -106,6 +108,7 @@ export function PartnersLandingPage({ socialProviders = [] }) {
         <PartnersBenefitsGrid />
         <PartnersHowItWorks />
         <PartnersAudienceSection />
+        <PartnersPlansSection />
         <PartnersClosingSection />
         <PartnersOnboardingForm socialProviders={socialProviders} />
       </main>

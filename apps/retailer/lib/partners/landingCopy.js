@@ -85,6 +85,82 @@ export const PARTNERS_AUDIENCE = {
   ],
 };
 
+export const PARTNERS_PLANS_SECTION = {
+  title: 'Escolha o pacote do seu negócio',
+  subtitle: 'Comece simples. Cresça quando fizer sentido.',
+};
+
+export const PARTNERS_PLANS = [
+  {
+    id: 'compra',
+    name: 'FinMemory Compra',
+    audience: 'Para autônomos e ambulantes',
+    tagline: 'Economize antes de vender.',
+    price: 'R$ 29,90',
+    priceNote: '/mês',
+    features: [
+      'Mapa de preços',
+      'Promoções dos mercados',
+      'Lista de compras inteligente',
+      'Alertas no WhatsApp/app',
+      'Relatório de economia',
+    ],
+    highlighted: false,
+  },
+  {
+    id: 'controle',
+    name: 'FinMemory Controle',
+    audience: 'Para pequenos negócios',
+    tagline: 'Pare de perder dinheiro no estoque.',
+    price: 'R$ 59,90',
+    priceNote: '/mês',
+    features: [
+      'Controle de estoque',
+      'Entradas e saídas',
+      'Alertas de falta',
+      'Histórico de compras',
+      'Mapa de preços básico',
+      'Relatório de perdas',
+    ],
+    highlighted: false,
+  },
+  {
+    id: 'operacao',
+    name: 'FinMemory Operação',
+    audience: 'Para negócios de alimentação',
+    tagline: 'Venda e opere pelo celular.',
+    price: 'R$ 85,00',
+    priceNote: '/mês',
+    features: [
+      'Estoque',
+      'Cardápio QR Code',
+      'Pedidos',
+      'Cozinha digital',
+      'Papel zero',
+      'Mapa de preços',
+      'Relatórios',
+    ],
+    highlighted: true,
+  },
+  {
+    id: 'inteligencia',
+    name: 'FinMemory Inteligência',
+    audience: 'Para quem quer crescer com dados',
+    tagline: 'Decida como empresa grande, pagando como pequeno.',
+    price: 'a partir de R$ 149,90',
+    priceNote: '/mês',
+    features: [
+      'IA de compras',
+      'CMV',
+      'Margem por produto',
+      'Sugestão de preço de venda',
+      'Previsão de reposição',
+      'Comparação avançada de fornecedores',
+    ],
+    highlighted: false,
+  },
+];
+
 export const PARTNERS_CLOSING = {
   title: 'Menos bagunça. Mais controle. Mais lucro.',
   body: [
