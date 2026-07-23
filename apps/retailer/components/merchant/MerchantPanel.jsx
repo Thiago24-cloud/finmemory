@@ -22,12 +22,37 @@ import { MerchantQrCodesSection } from './restaurant/MerchantQrCodesSection';
 import { MerchantGarcomSection } from './restaurant/MerchantGarcomSection';
 import { MerchantCaixaSection } from './restaurant/MerchantCaixaSection';
 import { MerchantHistoricoSection } from './restaurant/MerchantHistoricoSection';
+import { MerchantTrialReportSection } from './restaurant/MerchantTrialReportSection';
 import { MerchantEntregaSection } from './restaurant/MerchantEntregaSection';
 import { MerchantPreparoSection } from './restaurant/MerchantPreparoSection';
 import { MerchantSkipShell } from './skip/MerchantSkipShell';
 import { MerchantSkipDashboard } from './skip/MerchantSkipDashboard';
 import { SkipButton } from './skip/SkipButton';
 import { MerchantEquipeSection } from './restaurant/MerchantEquipeSection';
+import { MerchantPedidosDiretosSection } from './restaurant/MerchantPedidosDiretosSection';
+import { PlanLockedNotice } from './PlanLockedNotice';
+import {
+  PANEL_TAB_FEATURES,
+  PANEL_TAB_LABELS,
+  clientCanAccessPanelTab,
+  unlockPlanForFeature,
+} from '../../lib/merchant/storePlans';
+
+function planInfoFromCtx(ctx) {
+  const p = ctx?.plan;
+  if (!p) return null;
+  return {
+    planCode: p.code,
+    planName: p.name,
+    status: p.status,
+    trialStartedAt: p.trial_started_at,
+    trialEndsAt: p.trial_ends_at,
+    features: p.features || [],
+    accessActive: p.access_active !== false,
+    gatesEnabled: p.gates_enabled !== false,
+    missingSchema: Boolean(p.missing_schema),
+  };
+}
 
 export function MerchantPanel() {
   const { data: session } = useSession();
@@ -44,6 +69,8 @@ export function MerchantPanel() {
   const [repairing, setRepairing] = useState(false);
   const [panelTab, setPanelTab] = useState('mapa');
   const [listaMode, setListaMode] = useState('montar'); // montar | rota
+  const [vendasMode, setVendasMode] = useState('pedidos'); // pedidos | terminal
+  const [historicoMode, setHistoricoMode] = useState('validacao'); // validacao | pedidos
   const [insumosCount, setInsumosCount] = useState(0);
   /** URL do mapa consumidor com ?cesta= / ?lista= — aberto a partir da Lista. */
   const [cestaMapUrl, setCestaMapUrl] = useState(null);
@@ -220,6 +247,19 @@ export function MerchantPanel() {
   const storeName = ctx?.store?.name || session?.user?.merchantStoreName || 'Minha loja';
   const flashCount = products.filter((p) => p.em_oferta).length;
   const mapTabAttention = panelTab !== 'mapa';
+  const planInfo = planInfoFromCtx(ctx);
+  const tabAllowed = clientCanAccessPanelTab(planInfo, panelTab);
+  const lockedFeatureKey = PANEL_TAB_FEATURES[panelTab] || null;
+  const unlock = lockedFeatureKey ? unlockPlanForFeature(lockedFeatureKey) : null;
+
+  const lockedNotice = !tabAllowed ? (
+    <PlanLockedNotice
+      featureLabel={PANEL_TAB_LABELS[panelTab] || 'Esta funcionalidade'}
+      requiredPlanName={unlock?.name || 'superior'}
+      currentPlanName={planInfo?.planName}
+      trialEndsAt={planInfo?.trialEndsAt}
+    />
+  ) : null;
 
   if (panelTab === 'mapa' && !loading && cestaMapUrl) {
     return (
@@ -246,6 +286,19 @@ export function MerchantPanel() {
   }
 
   if (panelTab === 'mapa' && !loading) {
+    if (!tabAllowed) {
+      return (
+        <MerchantSkipShell
+          storeName={storeName}
+          activeTab={panelTab}
+          onTabChange={setPanelTab}
+          onSignOut={() => signOut({ callbackUrl: '/parceiros' })}
+          mapTabAttention={mapTabAttention}
+        >
+          <div className="animate-fade-in-up py-6">{lockedNotice}</div>
+        </MerchantSkipShell>
+      );
+    }
     return (
       <MerchantSkipPrecosMap
         storeLat={ctx?.store?.lat}
@@ -337,7 +390,19 @@ export function MerchantPanel() {
             </p>
           ) : null}
 
-          {panelTab === 'lista' ? (
+          {planInfo && !planInfo.missingSchema && planInfo.status === 'trialing' && planInfo.trialEndsAt ? (
+            <p
+              className="text-xs text-sky-900 bg-sky-50 border border-sky-200 rounded-xl px-4 py-2.5 mb-4 m-0"
+              role="status"
+            >
+              Trial <strong>{planInfo.planName || 'Gestão Completa'}</strong> até{' '}
+              {new Date(planInfo.trialEndsAt).toLocaleDateString('pt-BR')}.
+            </p>
+          ) : null}
+
+          {!tabAllowed ? (
+            lockedNotice
+          ) : panelTab === 'lista' ? (
             <div className="space-y-4">
               <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1">
                 <button
@@ -389,7 +454,37 @@ export function MerchantPanel() {
               )}
             </div>
           ) : panelTab === 'vendas' ? (
-            <MerchantVendasSection lojaId={ctx?.store?.id} />
+            <div className="space-y-4">
+              <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setVendasMode('pedidos')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    vendasMode === 'pedidos'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Pedidos QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVendasMode('terminal')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    vendasMode === 'terminal'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Terminal
+                </button>
+              </div>
+              {vendasMode === 'pedidos' ? (
+                <MerchantPedidosDiretosSection lojaId={ctx?.store?.id} />
+              ) : (
+                <MerchantVendasSection lojaId={ctx?.store?.id} />
+              )}
+            </div>
           ) : panelTab === 'insumos' ? (
             <MerchantInsumosSection lojaId={ctx?.store?.id} onCountChange={setInsumosCount} />
           ) : panelTab === 'cozinha' ? (
@@ -411,7 +506,37 @@ export function MerchantPanel() {
           ) : panelTab === 'caixa' ? (
             <MerchantCaixaSection lojaId={ctx?.store?.id} />
           ) : panelTab === 'historico' ? (
-            <MerchantHistoricoSection />
+            <div className="space-y-4">
+              <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setHistoricoMode('validacao')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    historicoMode === 'validacao'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Validação 30 dias
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoricoMode('pedidos')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    historicoMode === 'pedidos'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Histórico pedidos
+                </button>
+              </div>
+              {historicoMode === 'validacao' ? (
+                <MerchantTrialReportSection />
+              ) : (
+                <MerchantHistoricoSection />
+              )}
+            </div>
           ) : panelTab === 'entrega' ? (
             <MerchantEntregaSection lojaId={ctx?.store?.id} />
           ) : panelTab === 'preparo' ? (

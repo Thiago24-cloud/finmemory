@@ -17,6 +17,7 @@ function isPublicApiPath(pathname) {
   if (pathname.startsWith('/api/map/')) return true;
   if (pathname.startsWith('/api/scraper/')) return true;
   if (pathname.startsWith('/api/scrapers/')) return true;
+  if (pathname.startsWith('/api/loja/')) return true;
   return false;
 }
 
@@ -28,6 +29,7 @@ function isPublicPagePath(pathname) {
   if (pathname.startsWith('/privacidade')) return true;
   if (pathname.startsWith('/termos')) return true;
   if (pathname.startsWith('/download')) return true;
+  if (pathname.startsWith('/loja/')) return true;
   return false;
 }
 

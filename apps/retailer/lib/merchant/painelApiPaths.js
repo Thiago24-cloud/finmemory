@@ -40,6 +40,7 @@ export const painelApi = {
   mapPrecosSearch: `${PAINEL_API_BASE}/map/precos-search`,
   mesas: `${PAINEL_API_BASE}/mesas`,
   mesa: (id) => `${PAINEL_API_BASE}/mesas/${id}`,
+  qrCode: `${PAINEL_API_BASE}/qr-code`,
   caixaPagar: `${PAINEL_API_BASE}/caixa/pagar`,
   entregaConfig: `${PAINEL_API_BASE}/entrega/config`,
   preparo: `${PAINEL_API_BASE}/preparo`,
@@ -48,6 +49,7 @@ export const painelApi = {
   paymentsWebhook: `${PAINEL_API_BASE}/payments/webhook`,
   equipe: `${PAINEL_API_BASE}/equipe`,
   equipeMembro: (id) => `${PAINEL_API_BASE}/equipe/${id}`,
+  trialReport: `${PAINEL_API_BASE}/trial-report`,
 };
 
 /** Login da equipe (garçom/cozinha) — código da loja + PIN */
