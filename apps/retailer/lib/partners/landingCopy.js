@@ -17,7 +17,7 @@ export const PARTNERS_PROBLEM = {
     'quanto estão gastando',
     'qual produto dá mais lucro',
     'quando o estoque está acabando',
-    'onde comprar mais barato',
+    'onde o fornecedor está mais barato',
   ],
 };
 
@@ -28,8 +28,8 @@ export const PARTNERS_OFFERS_SECTION = {
 export const PARTNERS_BENEFITS = [
   {
     icon: 'map',
-    title: 'Comparar preços',
-    body: 'Saiba onde comprar mais barato. Compare fornecedores e reduza custos com o mapa de preços.',
+    title: 'Comparar fornecedores',
+    body: 'Veja preços de atacados e distribuidores na sua região e reduza o custo dos insumos.',
   },
   {
     icon: 'stock',
@@ -99,8 +99,7 @@ export const PARTNERS_PLANS = [
     price: 'R$ 29,90',
     priceNote: '/mês',
     features: [
-      'Mapa de preços',
-      'Promoções dos mercados',
+      'Preços de atacados e fornecedores',
       'Lista de compras inteligente',
       'Alertas no WhatsApp/app',
       'Relatório de economia',
@@ -119,7 +118,7 @@ export const PARTNERS_PLANS = [
       'Entradas e saídas',
       'Alertas de falta',
       'Histórico de compras',
-      'Mapa de preços básico',
+      'Comparação básica de fornecedores',
       'Relatório de perdas',
     ],
     highlighted: false,
@@ -137,7 +136,7 @@ export const PARTNERS_PLANS = [
       'Pedidos',
       'Cozinha digital',
       'Papel zero',
-      'Mapa de preços',
+      'Comparação de fornecedores',
       'Relatórios',
     ],
     highlighted: true,
