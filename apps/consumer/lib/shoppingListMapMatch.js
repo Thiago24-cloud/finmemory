@@ -109,11 +109,13 @@ export function computeStoreTotalsForList(listItemNames, rpcRows) {
 
   const byStore = new Map();
   for (const row of rows) {
-    const storeKey = String(row.lugar_id || row.nome_loja || '').trim() || 'loja';
+    // Agrupar por nome da loja (lugar_id é único por oferta no RPC).
+    const storeName = String(row.nome_loja || 'Mercado').trim() || 'Mercado';
+    const storeKey = storeName.toLowerCase();
     if (!byStore.has(storeKey)) {
       byStore.set(storeKey, {
-        storeId: row.lugar_id || null,
-        storeName: String(row.nome_loja || 'Mercado').trim() || 'Mercado',
+        storeId: storeKey,
+        storeName,
         lat: row.lat,
         lng: row.lng,
         rows: [],
