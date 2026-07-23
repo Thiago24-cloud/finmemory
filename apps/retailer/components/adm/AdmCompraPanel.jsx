@@ -11,6 +11,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
+import { AdmWhatsappQuoteTab } from './AdmWhatsappQuoteTab';
 
 const TABS = [
   { id: 'usuarios', label: 'Usuários' },
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'mercados', label: 'Mercados' },
   { id: 'precos', label: 'Preços' },
   { id: 'listas', label: 'Listas de compra' },
+  { id: 'orcamento', label: 'Orçamento WhatsApp' },
   { id: 'alertas', label: 'Alertas' },
   { id: 'relatorios', label: 'Relatórios' },
 ];
@@ -857,6 +859,13 @@ export function AdmCompraPanel() {
             </table>
           </div>
         </div>
+      ) : null}
+
+      {!loading && tab === 'orcamento' ? (
+        <AdmWhatsappQuoteTab
+          onError={(msg) => setError(msg || '')}
+          onSuccess={(msg) => setSuccess(msg || '')}
+        />
       ) : null}
 
       {!loading && tab === 'alertas' ? (
