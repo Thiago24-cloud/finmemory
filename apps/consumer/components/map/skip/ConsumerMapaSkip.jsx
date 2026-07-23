@@ -235,18 +235,25 @@ export function ConsumerMapaSkip({
     }
   }, [location]);
 
-  /** Pins de mercados próximos (sem precisar digitar produto). */
+  /** Pins de mercados: Qualquer = bbox Grande SP; com raio = filtro em km. */
   const loadNearbyStores = useCallback(async () => {
     if (location?.lat == null || location?.lng == null) return;
     setLoading(true);
     setError('');
     try {
-      const radiusM = Math.max(3000, Math.round((radiusKm > 0 ? radiusKm : 12) * 1000));
-      const params = new URLSearchParams({
-        lat: String(location.lat),
-        lng: String(location.lng),
-        radius_m: String(radiusM),
-      });
+      const params = new URLSearchParams();
+      if (radiusKm > 0) {
+        params.set('lat', String(location.lat));
+        params.set('lng', String(location.lng));
+        params.set('radius_m', String(Math.round(radiusKm * 1000)));
+        params.set('radius', String(Math.round(radiusKm * 1000)));
+      } else {
+        // Qualquer: todos os mercados da Grande SP (estilo Google Maps sem filtro).
+        params.set('sw_lat', '-24.05');
+        params.set('sw_lng', '-47.25');
+        params.set('ne_lat', '-23.15');
+        params.set('ne_lng', '-46.15');
+      }
       const res = await fetch(`/api/map/stores?${params.toString()}`);
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -275,7 +282,7 @@ export function ConsumerMapaSkip({
           };
         });
       setData({
-        product: 'Mercados próximos',
+        product: radiusKm > 0 ? `Mercados · ${radiusKm} km` : 'Todos os mercados',
         mapStores,
         summary: { storesCount: mapStores.length },
       });
@@ -722,7 +729,9 @@ export function ConsumerMapaSkip({
               <p className="text-center text-sm text-white/50 py-8 m-0">
                 {showFavoritesOnly
                   ? 'Nenhum favorito.'
-                  : 'Busque um produto para ver preços no mapa.'}
+                  : location?.lat != null
+                    ? 'Nenhum mercado nesta área. Ajuste o raio ou aguarde o carregamento.'
+                    : 'Ative a localização para ver os mercados no mapa.'}
               </p>
             ) : (
               filteredStores.map((store) => {
@@ -739,6 +748,10 @@ export function ConsumerMapaSkip({
                     name={store.name}
                     color={store.color}
                     price={store.price}
+                    productName={store.produto_nome || null}
+                    productImageUrl={
+                      store.product_image_url || store.image_url || data?.product_image_url || null
+                    }
                     address={
                       [
                         dist != null ? `${dist.toFixed(1)} km` : null,

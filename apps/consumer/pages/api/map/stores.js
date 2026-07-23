@@ -11,7 +11,7 @@ import {
 import { isExcludedFromPriceMapPoint } from '../../../lib/mapExcludedMapStores';
 import { parsePriceToNumber } from '../../../lib/parseMapPrice';
 import { displayPromoProductName, productNameForThumbnailSearch } from '../../../lib/mapOfferDisplay';
-import { isCuratedMapLogoStoreName, getStoreLogoPinSrc } from '../../../lib/storeLogos';
+import { getStoreLogoPinSrc } from '../../../lib/storeLogos';
 import { pickStoreLogoFromCacheRows } from '../../../lib/mapStoreLogoCache';
 import {
   inferChainSlugFromPromoStoreName,
@@ -66,23 +66,6 @@ function isPharmacyStoreType(type) {
 }
 
 /**
- * Supermercados e padarias só entram no JSON do mapa se tiverem oferta/promo ativa no app
- * (price_points promocionais recentes ou promocoes_supermercados). Outros tipos (ex.: restaurante) seguem visíveis.
- */
-function isSupermarketOrBakeryMapType(type) {
-  const t = String(type || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '');
-  if (!t) return false;
-  if (t === 'bakery' || t === 'padaria') return true;
-  if (t === 'supermarket' || t === 'supermercado') return true;
-  if (t.includes('supermercado') || t.includes('hipermercado')) return true;
-  if (t.includes('padaria') || t.includes('panificadora')) return true;
-  return false;
-}
-
-/**
  * Itens em `offer_preview` por loja no GET /api/map/stores (popup do pin + pílula).
  * O contador `offer_count` pode ser maior; lista completa em GET /api/map/store-offers.
  */
@@ -122,7 +105,12 @@ export default async function handler(req, res) {
 
   const lat = parseFloat(req.query.lat);
   const lng = parseFloat(req.query.lng);
-  const radiusM = Math.min(Number(req.query.radius) || 2000, 5000);
+  // Aceita `radius` (legado) ou `radius_m` (cliente skip). Cap alto para “Qualquer” / metro SP.
+  const rawRadius = Number(req.query.radius_m ?? req.query.radius);
+  const radiusM = Math.min(
+    Number.isFinite(rawRadius) && rawRadius > 0 ? rawRadius : 2000,
+    120000
+  );
 
   let latMin, latMax, lngMin, lngMax;
 
@@ -179,7 +167,7 @@ export default async function handler(req, res) {
             1200,
             Math.max(400, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT || '600', 10) || 600)
           )
-      : 100;
+      : Math.min(800, Math.max(100, Math.ceil(radiusM / 80)));
 
     const storesQuery = supabase
       .from('stores')
@@ -462,13 +450,13 @@ export default async function handler(req, res) {
       if (bestStore) attachOffer(bestStore, p);
     }
 
+    // Google Maps style: mostrar todos os mercados no bbox/raio.
+    // Opt-out curado só some se não tiver oferta ativa.
     const storesVisible = storesRows.filter((s) => {
-      if (!isSupermarketOrBakeryMapType(s.type)) return true;
       if (curatedPinOptOutIds.has(String(s.id))) {
         return !!storeOfferMap.get(s.id);
       }
-      if (isCuratedMapLogoStoreName(s.name)) return true;
-      return !!storeOfferMap.get(s.id);
+      return true;
     });
 
     const offerPreviewCap = getStoreOfferPreviewLimit();

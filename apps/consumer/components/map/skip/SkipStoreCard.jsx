@@ -14,6 +14,8 @@ function SkipStoreCardImpl({
   color,
   price,
   address,
+  productName,
+  productImageUrl,
   isLowest,
   savingsPercent,
   savingsAmount,
@@ -42,17 +44,28 @@ function SkipStoreCardImpl({
       }`}
     >
       <div className="flex items-center gap-3">
-        <div
-          className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md relative text-lg font-bold text-white"
-          style={{ backgroundColor: color }}
-        >
-          {name[0]}
-          {isFavorite ? (
-            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
-              <Star className="w-3 h-3 text-yellow-900 fill-yellow-900" />
-            </div>
-          ) : null}
-        </div>
+        {productImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={productImageUrl}
+            alt={productName || name}
+            className="w-11 h-11 rounded-xl object-cover shrink-0 border border-white/15 bg-white/10"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md relative text-lg font-bold text-white"
+            style={{ backgroundColor: color }}
+          >
+            {name[0]}
+            {isFavorite ? (
+              <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
+                <Star className="w-3 h-3 text-yellow-900 fill-yellow-900" />
+              </div>
+            ) : null}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
             <span className="font-semibold text-sm truncate text-white">{name}</span>
@@ -67,6 +80,9 @@ function SkipStoreCardImpl({
               </span>
             ) : null}
           </div>
+          {productName ? (
+            <p className="text-[10px] text-white/55 m-0 truncate">{productName}</p>
+          ) : null}
           {address ? (
             <p className="text-[10px] text-white/45 m-0 flex items-center gap-1 truncate">
               <MapPin className="w-3 h-3 shrink-0" />

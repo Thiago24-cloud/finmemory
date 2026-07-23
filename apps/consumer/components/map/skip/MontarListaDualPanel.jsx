@@ -171,6 +171,7 @@ export function MontarListaDualPanel({
             productName: match.productName || listName,
             unitPrice: unit,
             lineTotal: Number((unit * qty).toFixed(2)),
+            image_url: match.image_url || null,
           };
         }
         return {
@@ -180,6 +181,7 @@ export function MontarListaDualPanel({
           productName: null,
           unitPrice: null,
           lineTotal: null,
+          image_url: null,
         };
       });
 
@@ -495,18 +497,34 @@ export function MontarListaDualPanel({
                           key={row.listName}
                           className="flex items-start justify-between gap-2 text-[11px]"
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="text-white font-medium">
-                              {row.qty}x {row.listName}
-                            </div>
-                            {row.available ? (
-                              <div className="text-white/45 text-[10px] mt-0.5 leading-snug">
-                                {row.productName}
-                                {row.unitPrice != null
-                                  ? ` (${formatBrl(row.unitPrice)} / un)`
-                                  : ''}
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            {row.image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={row.image_url}
+                                alt={row.productName || row.listName}
+                                className="w-10 h-10 rounded-lg object-cover bg-white/10 border border-white/10 shrink-0"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/10 shrink-0 flex items-center justify-center text-[9px] font-bold text-white/40">
+                                {(row.listName || '?').slice(0, 2).toUpperCase()}
                               </div>
-                            ) : null}
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white font-medium">
+                                {row.qty}x {row.listName}
+                              </div>
+                              {row.available ? (
+                                <div className="text-white/45 text-[10px] mt-0.5 leading-snug">
+                                  {row.productName}
+                                  {row.unitPrice != null
+                                    ? ` (${formatBrl(row.unitPrice)} / un)`
+                                    : ''}
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="shrink-0 text-right">
                             {row.available ? (
