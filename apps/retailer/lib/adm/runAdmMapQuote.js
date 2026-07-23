@@ -1,5 +1,6 @@
 /**
- * Cruza lista ADM com preços do mapa (mesma RPC do Caça-Preço).
+ * Cruza lista ADM com preços do mapa (mesma fonte do Caça-Preço).
+ * Usa busca rápida por nome (evita timeout da RPC com vários itens).
  */
 import { geocodePartnerStoreAddress } from '../geocode';
 import { compareListWithMapOffers } from '../shoppingListMapCompare';
@@ -11,6 +12,7 @@ import {
 import { getStoreBrandLogoUrl } from './storeBrandLogo';
 import { resolveQuoteProductImagesBatch } from './resolveQuoteProductImage';
 import { buildConsumerMapUrl } from '../consumerAppUrl';
+import { fetchMapOffersByProductNames } from './fetchMapOffersByProductNames';
 
 /** Endereço/região a partir do cadastro do usuário ADM. */
 export function buildUserRegionAddress(user) {
@@ -67,21 +69,75 @@ export async function runAdmMapQuote(opts) {
     coords = await geocodePartnerStoreAddress(address);
   }
 
-  const { data: rpcRows, error: rpcErr } = await supabase.rpc('buscar_lojas_por_produtos_lista', {
-    produtos: items,
-  });
-
-  if (rpcErr) {
-    console.warn('[adm/runAdmMapQuote]', rpcErr.message);
+  let rpcRows = [];
+  try {
+    rpcRows = await fetchMapOffersByProductNames(supabase, items, {
+      perNameLimit: 50,
+      concurrency: 4,
+    });
+  } catch (err) {
+    console.warn('[adm/runAdmMapQuote] fast fetch', err?.message || err);
     return { error: 'Não foi possível buscar preços no mapa.', status: 500 };
+  }
+
+  // Fallback: RPC só com poucos itens (ela estoura timeout em listas longas).
+  if ((!rpcRows || rpcRows.length === 0) && items.length <= 3) {
+    const { data, error: rpcErr } = await supabase.rpc('buscar_lojas_por_produtos_lista', {
+      produtos: items,
+    });
+    if (rpcErr) {
+      console.warn('[adm/runAdmMapQuote] rpc', rpcErr.message);
+      return { error: 'Não foi possível buscar preços no mapa.', status: 500 };
+    }
+    rpcRows = data || [];
+  }
+
+  if (!rpcRows?.length) {
+    const comparedEmpty = compareListWithMapOffers(items, []);
+    const mensagem = buildMapQuoteWhatsappMessage({
+      customerName: name,
+      address,
+      stores: [],
+      items,
+    });
+    return {
+      status: 200,
+      payload: {
+        parsed: {
+          address,
+          phone_digits: phoneDigits,
+          items,
+          customer_name: name,
+        },
+        geo: coords
+          ? { lat: coords.lat, lng: coords.lng, radius_km: radiusKm, geocoded: true }
+          : { lat: null, lng: null, radius_km: radiusKm, geocoded: false },
+        summary: comparedEmpty.summary,
+        items_detail: comparedEmpty.items || [],
+        stores: [],
+        mensagem,
+        whatsapp_url: phoneDigits
+          ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(mensagem)}`
+          : null,
+        mapa_lista_url: buildConsumerMapUrl({
+          lista: items,
+          lat: coords?.lat,
+          lng: coords?.lng,
+          zoom: coords ? 14 : 11,
+          from: 'adm',
+        }),
+        used_fallback_national: false,
+        price_source: 'map',
+      },
+    };
   }
 
   const filtered =
     coords?.lat != null
       ? filterRpcRowsByRadius(rpcRows, coords.lat, coords.lng, radiusKm)
-      : rpcRows || [];
+      : rpcRows;
 
-  const compared = compareListWithMapOffers(items, filtered.length ? filtered : rpcRows || []);
+  const compared = compareListWithMapOffers(items, filtered.length ? filtered : rpcRows);
 
   const imageNames = [
     ...items,
@@ -155,7 +211,7 @@ export async function runAdmMapQuote(opts) {
       mensagem,
       whatsapp_url: waUrl,
       mapa_lista_url: mapaUrl,
-      used_fallback_national: Boolean(coords && filtered.length === 0 && (rpcRows || []).length > 0),
+      used_fallback_national: Boolean(coords && filtered.length === 0 && rpcRows.length > 0),
       price_source: 'map',
     },
   };
