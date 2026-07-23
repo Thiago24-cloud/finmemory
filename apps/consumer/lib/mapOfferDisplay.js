@@ -45,6 +45,7 @@ export function stripKnownStorePrefixFromProductName(productName, storeDisplayNa
  */
 export function displayPromoProductName(productName, storeDisplayName) {
   let s = String(productName || '').trim();
+  s = s.replace(/\s*\[sim-cesta\]\s*/gi, ' ').replace(/\s+/g, ' ').trim();
   if (storeDisplayName) s = stripKnownStorePrefixFromProductName(s, storeDisplayName);
   return stripFanoutProductSuffix(s);
 }

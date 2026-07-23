@@ -6,7 +6,6 @@
 export const FINMEMORY_DEFAULT_RESTRICTED_EMAIL = 'finmemory.oficial@gmail.com';
 
 export const RESTRICTED_FEATURE_ROUTES = [
-  '/mapa',
   '/scan-product',
   '/shopping-list',
   '/missoes',

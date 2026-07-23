@@ -48,7 +48,10 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
 
   const grouped = items.map((it) => {
     const offers = rows
-      .filter((row) => listItemMatchesOfferName(it.listName, row.produto_nome))
+      .filter((row) => {
+        if (/\[sim-cesta\]/i.test(row.produto_nome || '')) return false;
+        return listItemMatchesOfferName(it.listName, row.produto_nome);
+      })
       .map((row) => ({
         lugar_id: row.lugar_id,
         nome_loja: row.nome_loja,
@@ -57,6 +60,8 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
         origem: row.origem,
         lat: row.lat,
         lng: row.lng,
+        expires_at: row.expires_at || null,
+        created_at: row.created_at || null,
       }))
       .filter((o) => Number.isFinite(o.preco) && o.preco > 0)
       .sort((a, b) => a.preco - b.preco);
@@ -103,11 +108,13 @@ export function computeStoreTotalsForList(listItemNames, rpcRows) {
 
   const byStore = new Map();
   for (const row of rows) {
-    const storeKey = String(row.lugar_id || row.nome_loja || '').trim() || 'loja';
+    // Agrupar por nome da loja (lugar_id é único por oferta no RPC).
+    const storeName = String(row.nome_loja || 'Mercado').trim() || 'Mercado';
+    const storeKey = storeName.toLowerCase();
     if (!byStore.has(storeKey)) {
       byStore.set(storeKey, {
-        storeId: row.lugar_id || null,
-        storeName: String(row.nome_loja || 'Mercado').trim() || 'Mercado',
+        storeId: storeKey,
+        storeName,
         lat: row.lat,
         lng: row.lng,
         rows: [],

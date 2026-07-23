@@ -7,5 +7,5 @@ if (-not $jwt) {
     Write-Host "SUPABASE_JWT_SECRET nao encontrado no servico finmemory." -ForegroundColor Red
     exit 1
 }
-& gcloud run services update finmemory-retailer --region $r --project $p --update-env-vars "SUPABASE_JWT_SECRET=$jwt" --quiet
-Write-Host "SUPABASE_JWT_SECRET copiado para finmemory-retailer." -ForegroundColor Green
+& gcloud run services update finmemorycomerciantes --region $r --project $p --update-env-vars "SUPABASE_JWT_SECRET=$jwt" --quiet
+Write-Host "SUPABASE_JWT_SECRET copiado para finmemorycomerciantes." -ForegroundColor Green

@@ -4,18 +4,17 @@ import { PARTNERS_STEPS } from '../../../lib/partners/landingCopy';
 
 export function PartnersHowItWorks() {
   return (
-    <section id="como-funciona" className="px-4 sm:px-6 py-16 scroll-mt-20 bg-white/[0.02] border-y border-white/5">
-      <div className="max-w-6xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl font-bold m-0 text-center">Como funciona na prática</h2>
-        <p className="text-center text-white/55 mt-3 max-w-xl mx-auto m-0">
-          Da lista de compras ao estoque atualizado: tudo pelo navegador, celular ou computador da loja.
-        </p>
-        <ol className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0">
+    <section id="como-funciona" className="px-4 sm:px-6 py-14 sm:py-20 scroll-mt-20">
+      <div className="max-w-5xl mx-auto">
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#0b1f3a] m-0 text-center">Como funciona</h2>
+        <ol className="mt-12 grid sm:grid-cols-3 gap-6 list-none p-0 m-0">
           {PARTNERS_STEPS.map((s) => (
-            <li key={s.step} className="relative">
-              <span className="text-4xl font-black text-[#39FF14]/20">{s.step}</span>
-              <h3 className="text-base font-bold mt-2 m-0">{s.title}</h3>
-              <p className="text-sm text-white/55 mt-2 leading-relaxed m-0">{s.body}</p>
+            <li key={s.step} className="relative text-center sm:text-left">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#16a34a] text-white text-xl font-bold">
+                {s.step}
+              </span>
+              <h3 className="text-base font-bold text-[#0b1f3a] mt-4 m-0">{s.title}</h3>
+              <p className="text-sm text-[#475569] mt-2 leading-relaxed m-0">{s.body}</p>
             </li>
           ))}
         </ol>

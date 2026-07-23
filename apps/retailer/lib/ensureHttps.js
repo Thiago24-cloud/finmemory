@@ -14,7 +14,7 @@ export function ensureHttpsUrl(raw, fallback = '') {
 
 export const RETAILER_CLOUD_RUN_HTTPS_URL =
   process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
-  'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+  'https://finmemorycomerciantes-836908221936.southamerica-east1.run.app';
 
 export const RETAILER_PUBLIC_HTTPS_URL = ensureHttpsUrl(
   process.env.NEXT_PUBLIC_RETAILER_APP_URL ||

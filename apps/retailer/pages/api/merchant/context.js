@@ -1,4 +1,5 @@
 import { requireMerchantApi } from '../../../lib/merchant/requireMerchantApi';
+import { getRestaurantPlan } from '../../../lib/merchant/storePlans';
 
 /**
  * GET /api/merchant/context — loja do tenant logado (store_id na sessão de negócio).
@@ -12,7 +13,9 @@ export default async function handler(req, res) {
   const auth = await requireMerchantApi(req, res);
   if (!auth) return;
 
-  const { store, profile } = auth;
+  const { store, profile, supabase } = auth;
+  const plan = await getRestaurantPlan(supabase, store.id);
+
   return res.status(200).json({
     store: {
       id: store.id,
@@ -30,6 +33,19 @@ export default async function handler(req, res) {
       status_ativa: store.active,
       needs_review: store.needs_review,
       cnpj: store.cnpj,
+    },
+    plan: {
+      code: plan.planCode,
+      name: plan.planName,
+      status: plan.status,
+      trial_started_at: plan.trialStartedAt,
+      trial_ends_at: plan.trialEndsAt,
+      current_period_start: plan.currentPeriodStart,
+      current_period_end: plan.currentPeriodEnd,
+      features: plan.features,
+      access_active: plan.accessActive,
+      gates_enabled: plan.gatesEnabled,
+      missing_schema: plan.missingSchema,
     },
     usuario_loja: auth.usuarioLoja
       ? { cargo: auth.usuarioLoja.cargo, loja_id: auth.usuarioLoja.loja_id }

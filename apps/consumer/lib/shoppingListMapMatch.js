@@ -84,3 +84,93 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
     items: grouped,
   };
 }
+
+export function parseListItemNames(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((s) => String(s || '').trim())
+      .filter((n) => n.length >= 2)
+      .slice(0, 24);
+  }
+  return String(raw || '')
+    .split(/[,;\n]+/)
+    .map((s) => s.trim())
+    .filter((n) => n.length >= 2)
+    .slice(0, 24);
+}
+
+/**
+ * Total estimado da lista em cada supermercado (melhor preço por item naquela loja).
+ */
+export function computeStoreTotalsForList(listItemNames, rpcRows) {
+  const names = parseListItemNames(listItemNames);
+  const rows = Array.isArray(rpcRows) ? rpcRows : [];
+  if (names.length === 0) return [];
+
+  const byStore = new Map();
+  for (const row of rows) {
+    // Agrupar por nome da loja (lugar_id é único por oferta no RPC).
+    const storeName = String(row.nome_loja || 'Mercado').trim() || 'Mercado';
+    const storeKey = storeName.toLowerCase();
+    if (!byStore.has(storeKey)) {
+      byStore.set(storeKey, {
+        storeId: storeKey,
+        storeName,
+        lat: row.lat,
+        lng: row.lng,
+        rows: [],
+      });
+    }
+    byStore.get(storeKey).rows.push(row);
+  }
+
+  const stores = [];
+  for (const store of byStore.values()) {
+    const lines = [];
+    let total = 0;
+    for (const listName of names) {
+      const matches = store.rows
+        .filter((row) => listItemMatchesOfferName(listName, row.produto_nome))
+        .map((row) => ({ ...row, preco: Number(row.preco) }))
+        .filter((o) => Number.isFinite(o.preco) && o.preco > 0)
+        .sort((a, b) => a.preco - b.preco);
+      if (matches.length > 0) {
+        const best = matches[0];
+        lines.push({
+          listName,
+          productName: best.produto_nome,
+          price: best.preco,
+        });
+        total += best.preco;
+      }
+    }
+    if (lines.length > 0) {
+      stores.push({
+        storeId: store.storeId,
+        storeName: store.storeName,
+        lat: store.lat,
+        lng: store.lng,
+        coveredItems: lines.length,
+        totalItems: names.length,
+        coveragePct: Math.round((lines.length / names.length) * 100),
+        total: Number(total.toFixed(2)),
+        lines,
+      });
+    }
+  }
+
+  stores.sort((a, b) => {
+    if (b.coveredItems !== a.coveredItems) return b.coveredItems - a.coveredItems;
+    return a.total - b.total;
+  });
+
+  return stores;
+}
+
+export function compareListWithMapOffers(listItemNames, rpcRows) {
+  const names = parseListItemNames(listItemNames);
+  const listItems = names.map((name, i) => ({ id: `q-${i}`, name }));
+  const byItem = groupMapOffersByListItems(listItems, rpcRows);
+  const byStore = computeStoreTotalsForList(names, rpcRows);
+  return { ...byItem, stores: byStore };
+}

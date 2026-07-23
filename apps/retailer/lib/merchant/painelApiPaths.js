@@ -3,6 +3,7 @@ export const PAINEL_API_BASE = '/api/parceiros/painel';
 
 export const painelApi = {
   context: `${PAINEL_API_BASE}/context`,
+  selectTrialPlan: `${PAINEL_API_BASE}/select-trial-plan`,
   products: `${PAINEL_API_BASE}/products`,
   mapStatus: `${PAINEL_API_BASE}/map/status`,
   mapPublishBatch: `${PAINEL_API_BASE}/map/publish-batch`,
@@ -33,18 +34,28 @@ export const painelApi = {
   comprasCesta: `${PAINEL_API_BASE}/compras/cesta`,
   comprasSimulate: `${PAINEL_API_BASE}/compras/simulate`,
   comprasMatch: `${PAINEL_API_BASE}/compras/match`,
+  comprasPriceHistory: `${PAINEL_API_BASE}/compras/price-history`,
+  alertas: `${PAINEL_API_BASE}/alertas`,
   vendas: `${PAINEL_API_BASE}/vendas`,
   vendasResumo: `${PAINEL_API_BASE}/vendas/resumo`,
   mapPrecosSearch: `${PAINEL_API_BASE}/map/precos-search`,
   mesas: `${PAINEL_API_BASE}/mesas`,
   mesa: (id) => `${PAINEL_API_BASE}/mesas/${id}`,
+  qrCode: `${PAINEL_API_BASE}/qr-code`,
   caixaPagar: `${PAINEL_API_BASE}/caixa/pagar`,
   entregaConfig: `${PAINEL_API_BASE}/entrega/config`,
   preparo: `${PAINEL_API_BASE}/preparo`,
   paymentsStatus: `${PAINEL_API_BASE}/payments/status`,
   paymentsSimulate: `${PAINEL_API_BASE}/payments/simulate`,
   paymentsWebhook: `${PAINEL_API_BASE}/payments/webhook`,
+  equipe: `${PAINEL_API_BASE}/equipe`,
+  equipeMembro: (id) => `${PAINEL_API_BASE}/equipe/${id}`,
+  trialReport: `${PAINEL_API_BASE}/trial-report`,
 };
+
+/** Login da equipe (garçom/cozinha) — código da loja + PIN */
+export const EQUIPE_LOGIN_API = '/api/parceiros/equipe/login';
+export const EQUIPE_ME_API = '/api/parceiros/equipe/me';
 
 /** POST pedido retirada (consumidor logado). */
 export const PEDIDOS_API = '/api/parceiros/pedidos';

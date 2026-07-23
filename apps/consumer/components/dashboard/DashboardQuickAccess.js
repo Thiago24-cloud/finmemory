@@ -13,6 +13,7 @@ import {
   BarChart3,
   Users,
   Tags,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { DASHBOARD, QUICK_ACTION_TITLE } from '../../lib/appMicrocopy';
@@ -43,7 +44,7 @@ export function DashboardQuickAccess({ className, onExtrato }) {
   const { data: session } = useSession();
   const allowed = canUseRestrictedFeatures(session?.user?.email);
 
-  const RESTRICTED_KEYS = new Set(['mapa', 'lista', 'barcode', 'missoes']);
+  const RESTRICTED_KEYS = new Set(['lista', 'barcode', 'missoes']);
 
   const items = [
     {
@@ -53,6 +54,15 @@ export function DashboardQuickAccess({ className, onExtrato }) {
       Icon: Map,
       tile: 'bg-gradient-to-br from-sky-900/70 to-[#1E2A3A] border-sky-500/35 text-sky-300',
       labelClass: 'text-sky-200/95',
+    },
+    {
+      key: 'orcamento',
+      href: '/orcamento',
+      label: 'Orçamento WA',
+      Icon: MessageCircle,
+      tile: 'bg-gradient-to-br from-green-950/80 to-[#1E2A3A] border-green-500/35 text-green-300',
+      labelClass: 'text-green-200/95',
+      title: 'Comparar lista e enviar no WhatsApp',
     },
     {
       key: 'scan',

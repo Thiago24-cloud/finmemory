@@ -10,5 +10,8 @@ const EXACT = new Set([
 ]);
 
 export function isPublicMarketingPage(pathname) {
-  return Boolean(pathname && typeof pathname === 'string' && EXACT.has(pathname));
+  if (!pathname || typeof pathname !== 'string') return false;
+  if (EXACT.has(pathname)) return true;
+  if (pathname.startsWith('/loja/')) return true;
+  return false;
 }

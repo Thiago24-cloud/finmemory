@@ -26,7 +26,7 @@ App nativo para maquininha Stone com controle de estoque integrado ao backend `a
 
 ```properties
 sdk.dir=C\:\\Users\\SEU_USUARIO\\AppData\\Local\\Android\\Sdk
-FINMEMORY_API_BASE_URL=https://finmemory-retailer-836908221936.southamerica-east1.run.app
+FINMEMORY_API_BASE_URL=https://finmemorycomerciantes-836908221936.southamerica-east1.run.app
 # Após DNS de parceiros.finmemory.com.br:
 # FINMEMORY_API_BASE_URL=https://parceiros.finmemory.com.br
 stonePackageCloudToken=SEU_TOKEN_STONE

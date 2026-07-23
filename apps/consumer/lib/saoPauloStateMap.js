@@ -1,6 +1,7 @@
 /**
  * Viewport e limites do mapa de preços (escala Estado de São Paulo).
- * Fonte única para Leaflet (MapaPrecos) e heurísticas de API por bbox.
+ * Fonte canônica do ecossistema FinMemory (consumidor + Parceiros usam as mesmas regras).
+ * Manter `apps/retailer/lib/saoPauloStateMap.js` alinhado a este arquivo.
  */
 
 /** Centro da cidade de São Paulo (capital) — vista inicial do mapa. */
@@ -71,4 +72,22 @@ export function bboxIsStateOrMacroRegion(bbox) {
   const latSpan = Math.abs(bbox.maxLat - bbox.minLat);
   const lngSpan = Math.abs(bbox.maxLng - bbox.minLng);
   return latSpan >= 2.0 || lngSpan >= 3.0;
+}
+
+export function isInsideSaoPauloState(lat, lng) {
+  const la = Number(lat);
+  const lo = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(lo)) return false;
+  const b = SAO_PAULO_STATE_BOUNDS;
+  return la >= b.minLat && la <= b.maxLat && lo >= b.minLng && lo <= b.maxLng;
+}
+
+/**
+ * Mantém centro dentro do estado de SP; fora (ou inválido) volta à capital.
+ * Usado pelo mapa consumidor e pelo mapa Parceiros (mesma regra).
+ * @returns {[number, number]}
+ */
+export function clampCenterToSaoPaulo(lat, lng) {
+  if (isInsideSaoPauloState(lat, lng)) return [Number(lat), Number(lng)];
+  return [...SAO_PAULO_CITY_CENTER];
 }

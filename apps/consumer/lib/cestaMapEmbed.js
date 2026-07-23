@@ -31,7 +31,7 @@ export function decodeCestaMapParam(raw) {
 }
 
 /**
- * @param {{ s?: Array<{ n: string, t: number, c: number, p: number, T?: number }>, T?: number }} payload
+ * @param {{ s?: Array<{ n: string, t: number, c: number, p: number, T?: number, a?: number, o?: number }>, T?: number, r?: number }} payload
  */
 export function buildCestaStoreIndex(payload) {
   const rows = Array.isArray(payload?.s) ? payload.s : [];
@@ -41,15 +41,43 @@ export function buildCestaStoreIndex(payload) {
     if (!storeName) continue;
     const key = normalizeStoreNameForCestaMatch(storeName);
     if (!key) continue;
+    const lat = Number(row.a ?? row.lat);
+    const lng = Number(row.o ?? row.lng);
     index.set(key, {
       storeName,
       total: Number(row.t) || 0,
       coveredItems: Number(row.c) || 0,
       totalItems: Number(row.T ?? payload?.T) || 0,
       coveragePct: Number(row.p) || 0,
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
     });
   }
   return index;
+}
+
+/**
+ * Paradas da cesta com lat/lng (ordem do payload = ranking da cesta).
+ * @param {{ s?: Array }} payload
+ * @param {{ maxStops?: number }} [opts]
+ */
+export function pickCestaRouteStopsFromPayload(payload, { maxStops = 5 } = {}) {
+  const rows = Array.isArray(payload?.s) ? payload.s : [];
+  const stops = [];
+  for (const row of rows) {
+    const lat = Number(row?.a ?? row?.lat);
+    const lng = Number(row?.o ?? row?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    stops.push({
+      name: String(row?.n || 'Mercado').trim() || 'Mercado',
+      lat,
+      lng,
+      total: Number(row?.t) || 0,
+      coveragePct: Number(row?.p) || 0,
+    });
+    if (stops.length >= maxStops) break;
+  }
+  return stops;
 }
 
 /**

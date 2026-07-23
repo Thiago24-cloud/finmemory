@@ -124,7 +124,7 @@ console.log('Dica: se o build falhar por env, adicione variáveis em Settings �
 deployApp('finmemory', 'apps/consumer');
 
 if (!consumerOnly) {
-  deployApp('finmemory-retailer', 'apps/retailer');
+  deployApp('finmemorycomerciantes', 'apps/retailer');
 }
 
 console.log('\n✅ Deploy Vercel concluído. URLs em https://vercel.com/dashboard\n');

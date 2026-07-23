@@ -15,19 +15,34 @@ export async function listPedidosForStore(supabase, lojaId, opts = {}) {
 
   switch (scope) {
     case 'cozinha':
-      q = q.in('status', ['pendente', 'preparando', 'pronto']);
+      q = q.in('status', [
+        'pendente',
+        'preparando',
+        'pronto',
+        'pending',
+        'accepted',
+        'preparing',
+        'ready_for_pickup',
+        'out_for_delivery',
+      ]);
+      break;
+    case 'diretos':
+      q = q.or('order_source.not.is.null,origem.eq.qr_public');
       break;
     case 'garcom':
-      q = q.eq('status', 'pronto').in('origem', ['mesa', 'garcom', 'balcao']);
+      q = q
+        .in('status', ['pronto', 'ready_for_pickup'])
+        .in('origem', ['mesa', 'garcom', 'balcao']);
       break;
     case 'caixa':
       q = q
         .eq('payment_status', 'pending')
         .in('origem', ['mesa', 'garcom', 'balcao'])
-        .neq('status', 'cancelado');
+        .neq('status', 'cancelado')
+        .neq('status', 'canceled');
       break;
     case 'entrega':
-      q = q.eq('origem', 'delivery');
+      q = q.or('origem.eq.delivery,order_type.eq.delivery');
       break;
     case 'historico':
       break;
@@ -49,17 +64,29 @@ export async function listPedidosForStore(supabase, lojaId, opts = {}) {
   if (error) return { ok: false, error: error.message };
 
   const ids = (pedidos || []).map((p) => p.id);
-  let itensByPedido = new Map();
+  const itensByPedido = new Map();
   if (ids.length > 0) {
     const { data: itens, error: itensErr } = await supabase
       .from('pedidos_loja_itens')
-      .select('id, pedido_id, produto_loja_id, nome, preco_unitario, quantidade')
+      .select('id, pedido_id, produto_loja_id, nome, preco_unitario, quantidade, total_price')
       .in('pedido_id', ids);
-    if (itensErr) return { ok: false, error: itensErr.message };
-    for (const row of itens || []) {
-      const list = itensByPedido.get(row.pedido_id) || [];
-      list.push(row);
-      itensByPedido.set(row.pedido_id, list);
+    if (itensErr) {
+      const { data: itens2, error: err2 } = await supabase
+        .from('pedidos_loja_itens')
+        .select('id, pedido_id, produto_loja_id, nome, preco_unitario, quantidade')
+        .in('pedido_id', ids);
+      if (err2) return { ok: false, error: err2.message };
+      for (const row of itens2 || []) {
+        const list = itensByPedido.get(row.pedido_id) || [];
+        list.push(row);
+        itensByPedido.set(row.pedido_id, list);
+      }
+    } else {
+      for (const row of itens || []) {
+        const list = itensByPedido.get(row.pedido_id) || [];
+        list.push(row);
+        itensByPedido.set(row.pedido_id, list);
+      }
     }
   }
 

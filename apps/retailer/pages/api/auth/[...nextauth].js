@@ -11,6 +11,7 @@ import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../
 import { FINMEMORY_CREDENTIAL_ERROR, credentialLoginRejected } from '../../../lib/finmemoryLoginErrorCodes';
 import { ensureMerchantStoreLink } from '../../../lib/merchant/ensureMerchantStoreLink';
 import { ensureOAuthUser } from '../../../lib/auth/ensureOAuthUser';
+import { isFinmemoryAdminEmail } from '../../../lib/adminAccess';
 
 async function attachMerchantStoreToToken(token, supabase, userId) {
   if (!token || !supabase || !userId) {
@@ -75,7 +76,7 @@ function isGooglePlayReviewerEmail(email) {
 // Base padrão para OAuth/callback no app lojista (não usar finmemory.com.br).
 const DEFAULT_NEXTAUTH_URL =
   process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
-  'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+  'https://finmemorycomerciantes-836908221936.southamerica-east1.run.app';
 if (typeof process !== 'undefined') {
   if (process.env.NODE_ENV === 'development') {
     process.env.NEXTAUTH_URL = 'http://localhost:3001';
@@ -356,6 +357,20 @@ export const authOptions = {
           user.supabaseId = oauthUser.id;
           if (oauthUser.name) user.name = oauthUser.name;
           console.info('[auth][oauth]', { provider, email: user.email, isNew: oauthUser.isNew });
+
+          // Primeiro acesso OAuth: gera senha local e envia e-mail com link + credenciais.
+          if (oauthUser.isNew) {
+            const { ensureLocalPasswordForUser } = await import(
+              '../../../lib/auth/ensureLocalPasswordForUser'
+            );
+            await ensureLocalPasswordForUser(supabase, {
+              userId: oauthUser.id,
+              email: user.email,
+              name: oauthUser.name || user.name,
+              forceNewPassword: true,
+              sendEmail: true,
+            });
+          }
         }
 
         console.log('🔐 NextAuth SignIn callback –', user?.email);
@@ -377,6 +392,7 @@ export const authOptions = {
         session.user.account_type = token.account_type || 'consumidor';
         session.user.merchantStoreId = token.merchantStoreId || null;
         session.user.merchantStoreName = token.merchantStoreName || null;
+        session.user.isFinmemoryAdmin = isFinmemoryAdminEmail(session.user.email || token.email);
         if (token.name) session.user.name = token.name;
         if (token.picture) session.user.image = token.picture;
       }
@@ -417,6 +433,9 @@ export const authOptions = {
         } catch (error) {
           console.error('Error fetching Supabase user:', error);
         }
+      }
+      if (session?.user?.email) {
+        session.user.isFinmemoryAdmin = isFinmemoryAdminEmail(session.user.email);
       }
       return session;
     }

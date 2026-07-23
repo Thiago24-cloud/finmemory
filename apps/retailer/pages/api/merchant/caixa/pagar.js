@@ -1,7 +1,7 @@
 import { requireMerchantApi } from '../../../../lib/merchant/requireMerchantApi';
 import { confirmMesaPayment } from '../../../../lib/merchant/pedidos/confirmMesaPayment';
 
-/** POST /api/merchant/caixa/pagar — confirma pagamento de vários pedidos da mesa. */
+/** POST /api/merchant/caixa/pagar — confirma pagamento (único ou divisão de conta). */
 export default async function handler(req, res) {
   const auth = await requireMerchantApi(req, res);
   if (!auth) return;
@@ -22,8 +22,15 @@ export default async function handler(req, res) {
     lojaId: auth.store.id,
     pedidoIds,
     mesaId: body.mesa_id || null,
+    formaPagamento: body.forma_pagamento || body.formaPagamento || body.metodo || null,
+    pagamentos: body.pagamentos || null,
   });
 
   if (!result.ok) return res.status(400).json({ error: result.error });
-  return res.status(200).json({ success: true, paid_count: result.paid_count });
+  return res.status(200).json({
+    success: true,
+    paid_count: result.paid_count,
+    forma_pagamento: result.forma_pagamento,
+    pagamentos: result.pagamentos,
+  });
 }

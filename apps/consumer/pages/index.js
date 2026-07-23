@@ -4,6 +4,8 @@ import InstitutionalLanding from '../components/landing/InstitutionalLanding';
 import { AuthenticatedHomeRedirect } from '../components/landing/AuthenticatedHomeRedirect';
 import { authOptions } from './api/auth/[...nextauth]';
 import { canAccessForSession } from '../lib/access-server';
+import { getSupabaseAdmin } from '../lib/supabaseAdmin';
+import { fetchUserPlanPreference, homePathFromPreference } from '../lib/planPreference';
 
 const ACCESS_NOTICES = {
   'nao-cadastrado':
@@ -38,15 +40,20 @@ export async function getServerSideProps(ctx) {
 
   if (session?.user?.email && msg !== 'nao-cadastrado') {
     const allowed = await canAccessForSession(session);
-    if (allowed) {
+    if (allowed && session?.user?.supabaseId) {
+      const supabase = getSupabaseAdmin();
+      let destination = '/inicio';
+      if (supabase) {
+        const prefs = await fetchUserPlanPreference(supabase, session.user.supabaseId);
+        destination = homePathFromPreference(prefs || {}) || '/inicio';
+      }
       return {
-        redirect: { destination: '/dashboard', permanent: false },
+        redirect: { destination, permanent: false },
       };
     }
   }
 
-  const accessNotice =
-    msg && ACCESS_NOTICES[msg] ? ACCESS_NOTICES[msg] : null;
+  const accessNotice = msg && ACCESS_NOTICES[msg] ? ACCESS_NOTICES[msg] : null;
 
   return { props: { accessNotice } };
 }

@@ -1,4 +1,5 @@
 import { requireMerchantApi } from '../../../../lib/merchant/requireMerchantApi';
+import { requireFeature } from '../../../../lib/merchant/requireFeature';
 import {
   mapInsumoRowToApi,
   normalizeEanDigits,
@@ -44,6 +45,7 @@ function cleanImageUrl(value) {
 export default async function handler(req, res) {
   const auth = await requireMerchantApi(req, res);
   if (!auth) return;
+  if (!(await requireFeature(auth, res, 'inventory_control'))) return;
 
   const { supabase, store } = auth;
   const lojaId = store.id;

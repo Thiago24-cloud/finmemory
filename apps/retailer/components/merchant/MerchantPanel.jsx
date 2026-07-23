@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantInsumosSection } from './MerchantInsumosSection';
@@ -11,8 +12,10 @@ import { formatMerchantApiError, logMerchantApiFailure } from '../../lib/merchan
 import { painelApi } from '../../lib/merchant/painelApiPaths';
 import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
 import { MerchantMinhaCompraSection } from './MerchantMinhaCompraSection';
+import { MerchantListaComprasSection } from './MerchantListaComprasSection';
 import { MerchantVendasSection } from './MerchantVendasSection';
 import { MerchantSkipPrecosMap } from './precos/MerchantSkipPrecosMap';
+import { ParceirosMapFrame } from './ParceirosMapFrame';
 import { MerchantMesasSection } from './restaurant/MerchantMesasSection';
 import { MerchantCozinhaSection } from './restaurant/MerchantCozinhaSection';
 import { MerchantCardapioSection } from './restaurant/MerchantCardapioSection';
@@ -20,14 +23,42 @@ import { MerchantQrCodesSection } from './restaurant/MerchantQrCodesSection';
 import { MerchantGarcomSection } from './restaurant/MerchantGarcomSection';
 import { MerchantCaixaSection } from './restaurant/MerchantCaixaSection';
 import { MerchantHistoricoSection } from './restaurant/MerchantHistoricoSection';
+import { MerchantTrialReportSection } from './restaurant/MerchantTrialReportSection';
 import { MerchantEntregaSection } from './restaurant/MerchantEntregaSection';
 import { MerchantPreparoSection } from './restaurant/MerchantPreparoSection';
 import { MerchantSkipShell } from './skip/MerchantSkipShell';
 import { MerchantSkipDashboard } from './skip/MerchantSkipDashboard';
 import { SkipButton } from './skip/SkipButton';
+import { MerchantEquipeSection } from './restaurant/MerchantEquipeSection';
+import { MerchantPedidosDiretosSection } from './restaurant/MerchantPedidosDiretosSection';
+import { PlanLockedNotice } from './PlanLockedNotice';
+import {
+  PANEL_TAB_FEATURES,
+  PANEL_TAB_LABELS,
+  clientCanAccessPanelTab,
+  unlockPlanForFeature,
+} from '../../lib/merchant/storePlans';
+
+function planInfoFromCtx(ctx) {
+  const p = ctx?.plan;
+  if (!p) return null;
+  return {
+    planCode: p.code,
+    planName: p.name,
+    status: p.status,
+    trialStartedAt: p.trial_started_at,
+    trialEndsAt: p.trial_ends_at,
+    features: p.features || [],
+    accessActive: p.access_active !== false,
+    gatesEnabled: p.gates_enabled !== false,
+    missingSchema: Boolean(p.missing_schema),
+  };
+}
 
 export function MerchantPanel() {
+  const router = useRouter();
   const { data: session } = useSession();
+  const isAdm = Boolean(session?.user?.isFinmemoryAdmin);
   const [ctx, setCtx] = useState(null);
   const [products, setProducts] = useState([]);
   const [mapStatus, setMapStatus] = useState(null);
@@ -38,8 +69,13 @@ export function MerchantPanel() {
   const [formOpen, setFormOpen] = useState(false);
   const [needsPartnerSignup, setNeedsPartnerSignup] = useState(false);
   const [repairing, setRepairing] = useState(false);
-  const [panelTab, setPanelTab] = useState('ofertas');
+  const [panelTab, setPanelTab] = useState('mapa');
+  const [listaMode, setListaMode] = useState('montar'); // montar | rota
+  const [vendasMode, setVendasMode] = useState('pedidos'); // pedidos | terminal
+  const [historicoMode, setHistoricoMode] = useState('validacao'); // validacao | pedidos
   const [insumosCount, setInsumosCount] = useState(0);
+  /** URL do mapa consumidor com ?cesta= / ?lista= — aberto a partir da Lista. */
+  const [cestaMapUrl, setCestaMapUrl] = useState(null);
 
   const tryRepairLink = useCallback(async () => {
     setRepairing(true);
@@ -160,6 +196,46 @@ export function MerchantPanel() {
     load();
   }, [load]);
 
+  /** Hub /inicio → ?trial_plan=estoque_margem&tab=insumos */
+  useEffect(() => {
+    if (!router.isReady) return;
+    const trialPlan = String(router.query.trial_plan || '').toLowerCase();
+    const tab = String(router.query.tab || '').toLowerCase();
+    if (tab && PANEL_TAB_LABELS[tab]) {
+      setPanelTab(tab);
+    }
+    if (!trialPlan) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(painelApi.selectTrialPlan, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan_code: trialPlan }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok) {
+          setSuccess(`Plano de teste: ${data.plan?.planName || trialPlan}`);
+          await load();
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) {
+          const q = { ...router.query };
+          delete q.trial_plan;
+          void router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, router.query.trial_plan, router.query.tab, load, router]);
+
   useProdutosLojaRealtime(ctx?.store?.id, load);
 
   useEffect(() => {
@@ -213,13 +289,67 @@ export function MerchantPanel() {
   const storeName = ctx?.store?.name || session?.user?.merchantStoreName || 'Minha loja';
   const flashCount = products.filter((p) => p.em_oferta).length;
   const mapTabAttention = panelTab !== 'mapa';
+  const planInfo = planInfoFromCtx(ctx);
+  const tabAllowed = clientCanAccessPanelTab(planInfo, panelTab);
+  const lockedFeatureKey = PANEL_TAB_FEATURES[panelTab] || null;
+  const unlock = lockedFeatureKey ? unlockPlanForFeature(lockedFeatureKey) : null;
+
+  const lockedNotice = !tabAllowed ? (
+    <PlanLockedNotice
+      featureLabel={PANEL_TAB_LABELS[panelTab] || 'Esta funcionalidade'}
+      requiredPlanName={unlock?.name || 'superior'}
+      currentPlanName={planInfo?.planName}
+      trialEndsAt={planInfo?.trialEndsAt}
+    />
+  ) : null;
+
+  if (panelTab === 'mapa' && !loading && cestaMapUrl) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#e8e4de]">
+        <div className="z-10 flex shrink-0 items-center gap-3 border-b border-[#dadce0] bg-white px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))] shadow-[0_1px_3px_rgba(60,64,67,0.12)]">
+          <button
+            type="button"
+            onClick={() => {
+              setCestaMapUrl(null);
+              setPanelTab('lista');
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-xs font-bold text-[#202124] hover:bg-[#f8f9fa]"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Voltar à cesta
+          </button>
+          <span className="text-sm font-bold text-[#202124]">Rota da cesta</span>
+        </div>
+        <div className="relative min-h-0 flex-1">
+          <ParceirosMapFrame mapUrl={cestaMapUrl} title="Rota de compras — FinMemory" />
+        </div>
+      </div>
+    );
+  }
 
   if (panelTab === 'mapa' && !loading) {
+    if (!tabAllowed) {
+      return (
+        <MerchantSkipShell
+          storeName={storeName}
+          activeTab={panelTab}
+          onTabChange={setPanelTab}
+          onSignOut={() => signOut({ callbackUrl: '/parceiros' })}
+          mapTabAttention={mapTabAttention}
+        >
+          <div className="animate-fade-in-up py-6">{lockedNotice}</div>
+        </MerchantSkipShell>
+      );
+    }
     return (
       <MerchantSkipPrecosMap
         storeLat={ctx?.store?.lat}
         storeLng={ctx?.store?.lng}
         onBack={() => setPanelTab('ofertas')}
+        onOpenLista={() => {
+          setListaMode('montar');
+          setPanelTab('lista');
+        }}
       />
     );
   }
@@ -277,6 +407,21 @@ export function MerchantPanel() {
             </p>
           ) : null}
 
+          {isAdm ? (
+            <Link
+              href="/parceiros/adm"
+              className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 hover:bg-emerald-100 transition-colors"
+            >
+              <span>
+                <strong className="font-bold">ADM FinMemory Compra</strong>
+                <span className="block text-xs text-emerald-800/80 mt-0.5">
+                  Usuários, listas, preços e alertas WhatsApp
+                </span>
+              </span>
+              <span className="shrink-0 text-xs font-bold text-emerald-700">Abrir →</span>
+            </Link>
+          ) : null}
+
           {ctx?.store?.needs_review && panelTab !== 'cardapio' ? (
             <p
               className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 font-medium m-0"
@@ -287,14 +432,101 @@ export function MerchantPanel() {
             </p>
           ) : null}
 
-          {panelTab === 'lista' ? (
-            <MerchantMinhaCompraSection
-              storeLat={ctx?.store?.lat}
-              storeLng={ctx?.store?.lng}
-              onOpenMap={() => setPanelTab('mapa')}
-            />
+          {planInfo && !planInfo.missingSchema && planInfo.status === 'trialing' && planInfo.trialEndsAt ? (
+            <p
+              className="text-xs text-sky-900 bg-sky-50 border border-sky-200 rounded-xl px-4 py-2.5 mb-4 m-0"
+              role="status"
+            >
+              Trial <strong>{planInfo.planName || 'Gestão Completa'}</strong> até{' '}
+              {new Date(planInfo.trialEndsAt).toLocaleDateString('pt-BR')}.
+            </p>
+          ) : null}
+
+          {!tabAllowed ? (
+            lockedNotice
+          ) : panelTab === 'lista' ? (
+            <div className="space-y-4">
+              <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setListaMode('montar')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    listaMode === 'montar'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Montar lista
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListaMode('rota')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    listaMode === 'rota'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Rota (estoque)
+                </button>
+              </div>
+              {listaMode === 'montar' ? (
+                <MerchantListaComprasSection
+                  storeLat={ctx?.store?.lat}
+                  storeLng={ctx?.store?.lng}
+                  onOpenMap={(url) => {
+                    if (typeof url === 'string' && url.trim()) {
+                      setCestaMapUrl(url.trim());
+                    }
+                    setPanelTab('mapa');
+                  }}
+                  onOpenRota={() => setListaMode('rota')}
+                />
+              ) : (
+                <MerchantMinhaCompraSection
+                  storeLat={ctx?.store?.lat}
+                  storeLng={ctx?.store?.lng}
+                  onOpenMap={(url) => {
+                    if (typeof url === 'string' && url.trim()) {
+                      setCestaMapUrl(url.trim());
+                    }
+                    setPanelTab('mapa');
+                  }}
+                />
+              )}
+            </div>
           ) : panelTab === 'vendas' ? (
-            <MerchantVendasSection lojaId={ctx?.store?.id} />
+            <div className="space-y-4">
+              <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setVendasMode('pedidos')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    vendasMode === 'pedidos'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Pedidos QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVendasMode('terminal')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    vendasMode === 'terminal'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Terminal
+                </button>
+              </div>
+              {vendasMode === 'pedidos' ? (
+                <MerchantPedidosDiretosSection lojaId={ctx?.store?.id} />
+              ) : (
+                <MerchantVendasSection lojaId={ctx?.store?.id} />
+              )}
+            </div>
           ) : panelTab === 'insumos' ? (
             <MerchantInsumosSection lojaId={ctx?.store?.id} onCountChange={setInsumosCount} />
           ) : panelTab === 'cozinha' ? (
@@ -316,11 +548,43 @@ export function MerchantPanel() {
           ) : panelTab === 'caixa' ? (
             <MerchantCaixaSection lojaId={ctx?.store?.id} />
           ) : panelTab === 'historico' ? (
-            <MerchantHistoricoSection />
+            <div className="space-y-4">
+              <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setHistoricoMode('validacao')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    historicoMode === 'validacao'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Validação 30 dias
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoricoMode('pedidos')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                    historicoMode === 'pedidos'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Histórico pedidos
+                </button>
+              </div>
+              {historicoMode === 'validacao' ? (
+                <MerchantTrialReportSection />
+              ) : (
+                <MerchantHistoricoSection />
+              )}
+            </div>
           ) : panelTab === 'entrega' ? (
             <MerchantEntregaSection lojaId={ctx?.store?.id} />
           ) : panelTab === 'preparo' ? (
             <MerchantPreparoSection products={products} />
+          ) : panelTab === 'equipe' ? (
+            <MerchantEquipeSection />
           ) : panelTab === 'ofertas' ? (
             <MerchantSkipDashboard
               products={products}

@@ -28,7 +28,7 @@ export default function LoginPage({ socialProviders = [] }) {
   const [recoveryHint, setRecoveryHint] = useState(null); // { maskedEmail, found }
   const [infoMsg, setInfoMsg] = useState('');
 
-  const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/dashboard';
+  const callbackUrl = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/inicio';
 
   /** Conta autenticada: ir ao destino */
   useEffect(() => {

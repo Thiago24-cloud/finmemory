@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, MapPin, Store, Tag } from 'lucide-react';
+import { Loader2, MapPin, Store, Tag, MessageCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 function formatBrl(value) {
@@ -14,7 +14,7 @@ function formatBrl(value) {
 /**
  * Mostra quais itens da lista têm oferta ativa no mapa de preços.
  */
-export function ShoppingListMapMatchesPanel({ listItems, mapHref }) {
+export function ShoppingListMapMatchesPanel({ listItems, mapHref, orcamentoHref }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -135,16 +135,30 @@ export function ShoppingListMapMatchesPanel({ listItems, mapHref }) {
         </p>
       ) : null}
 
-      <Link
-        href={mapHref || '/mapa'}
-        className={cn(
-          'flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold no-underline',
-          'border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
-        )}
-      >
-        <MapPin className="h-4 w-4" aria-hidden />
-        Ver no mapa e planejar rota
-      </Link>
+      <div className="space-y-2">
+        <Link
+          href={mapHref || '/mapa'}
+          className={cn(
+            'flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold no-underline',
+            'border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
+          )}
+        >
+          <MapPin className="h-4 w-4" aria-hidden />
+          Ver no mapa e planejar rota
+        </Link>
+        {orcamentoHref ? (
+          <Link
+            href={orcamentoHref}
+            className={cn(
+              'flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold no-underline',
+              'border border-[#25D366]/40 bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/15'
+            )}
+          >
+            <MessageCircle className="h-4 w-4" aria-hidden />
+            Orçamento no WhatsApp
+          </Link>
+        ) : null}
+      </div>
     </section>
   );
 }
