@@ -7,11 +7,14 @@ import {
   Copy,
   ExternalLink,
   Loader2,
+  Map,
   MessageCircle,
   Plus,
+  Search,
   Trash2,
 } from 'lucide-react';
 import { AdmWhatsappQuoteTab } from './AdmWhatsappQuoteTab';
+import { buildConsumerMapUrl } from '../../lib/consumerAppUrl';
 
 const TABS = [
   { id: 'usuarios', label: 'Usuários' },
@@ -125,6 +128,10 @@ export function AdmCompraPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [mapQuote, setMapQuote] = useState(null);
+  const [mapQuoteBusy, setMapQuoteBusy] = useState(false);
+  const [mapRadiusKm, setMapRadiusKm] = useState(8);
+  const [orcamentoSeed, setOrcamentoSeed] = useState(null);
 
   const activeProducts = useMemo(() => products.filter((p) => p.ativo !== false), [products]);
 
@@ -198,6 +205,7 @@ export function AdmCompraPanel() {
     setSelectedUserId(id);
     setBusy(true);
     setError('');
+    setMapQuote(null);
     try {
       const data = await api(`/api/parceiros/adm/users/${id}`);
       setUserDetail(data);
@@ -207,6 +215,48 @@ export function AdmCompraPanel() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const fetchMapQuoteForUser = async () => {
+    if (!selectedUserId) return;
+    setMapQuoteBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const data = await api(`/api/parceiros/adm/users/${selectedUserId}/map-quote`, {
+        method: 'POST',
+        body: JSON.stringify({ radius_km: mapRadiusKm }),
+      });
+      setMapQuote(data);
+      setSuccess(
+        data.geo?.geocoded
+          ? `${data.stores?.length || 0} mercados no mapa · região geocodificada.`
+          : `${data.stores?.length || 0} mercados no mapa (sem geocode do endereço — confira bairro/cidade).`
+      );
+    } catch (err) {
+      setMapQuote(null);
+      setError(err.message);
+    } finally {
+      setMapQuoteBusy(false);
+    }
+  };
+
+  const sendListToOrcamento = () => {
+    const u = userDetail?.user;
+    if (!u) return;
+    const items = (userDetail?.list || [])
+      .map((row) => String(row.product?.nome || '').trim())
+      .filter((n) => n.length >= 2);
+    const region = [u.bairro, u.cidade, 'São Paulo - SP'].filter(Boolean).join(', ');
+    setOrcamentoSeed({
+      customerName: u.nome || '',
+      phone: u.telefone || '',
+      address: region,
+      itemsText: items.join('\n'),
+      radiusKm: mapRadiusKm,
+    });
+    setTab('orcamento');
+    setSuccess('Lista e região enviadas para Orçamento WhatsApp.');
   };
 
   const saveUser = async (e) => {
@@ -294,7 +344,11 @@ export function AdmCompraPanel() {
         body: JSON.stringify({ user_id: userId }),
       });
       setAlertPreview(data);
-      setSuccess(`Alerta gerado para ${data.user?.nome || 'cliente'}`);
+      const src =
+        data.price_source === 'map'
+          ? ` (mapa · ${data.map_stores_count || 0} mercados)`
+          : ' (preços manuais ADM)';
+      setSuccess(`Alerta gerado para ${data.user?.nome || 'cliente'}${src}`);
       return data;
     } catch (err) {
       setError(err.message);
@@ -367,17 +421,65 @@ export function AdmCompraPanel() {
 
   const listEditor = selectedUserId && userDetail ? (
     <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-bold m-0">
-          Lista — {userDetail.user?.nome || 'cliente'}
-        </p>
-        <button
-          type="button"
-          onClick={() => void generateAlert(selectedUserId)}
-          className="inline-flex items-center gap-1 text-xs font-bold text-primary"
-        >
-          <MessageCircle className="h-3.5 w-3.5" /> Gerar WhatsApp
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-bold m-0">Lista — {userDetail.user?.nome || 'cliente'}</p>
+          <p className="text-[11px] text-muted-foreground m-0 mt-0.5">
+            Região: {[userDetail.user?.bairro, userDetail.user?.cidade].filter(Boolean).join(' · ') || 'sem bairro/cidade'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={mapQuoteBusy || !(userDetail.list || []).length}
+            onClick={() => void fetchMapQuoteForUser()}
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50"
+          >
+            {mapQuoteBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+            Preços no mapa
+          </button>
+          <button
+            type="button"
+            disabled={!(userDetail.list || []).length}
+            onClick={sendListToOrcamento}
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold disabled:opacity-50"
+          >
+            <Map className="h-3.5 w-3.5" /> Orçamento
+          </button>
+          <button
+            type="button"
+            onClick={() => void generateAlert(selectedUserId)}
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary"
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> Gerar WhatsApp
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="inline-flex items-center gap-1.5">
+          Raio mapa (km)
+          <input
+            type="number"
+            min={2}
+            max={25}
+            value={mapRadiusKm}
+            onChange={(e) => setMapRadiusKm(Number(e.target.value) || 8)}
+            className="w-14 rounded-lg border border-border px-2 py-1"
+          />
+        </label>
+        {(userDetail.list || []).length > 0 ? (
+          <a
+            href={buildConsumerMapUrl({
+              lista: (userDetail.list || []).map((i) => i.product?.nome).filter(Boolean),
+              from: 'adm',
+            })}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-primary"
+          >
+            <ExternalLink className="h-3.5 w-3.5" /> Abrir no Caça-Preço
+          </a>
+        ) : null}
       </div>
       <ul className="space-y-1.5 list-none m-0 p-0">
         {(userDetail.list || []).map((item) => (
@@ -401,6 +503,44 @@ export function AdmCompraPanel() {
           <li className="text-xs text-muted-foreground">Nenhum item ainda.</li>
         ) : null}
       </ul>
+      {mapQuote ? (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
+          <p className="text-xs font-bold m-0">
+            Resultado do mapa · {mapQuote.stores?.length || 0} mercados
+            {mapQuote.geo?.geocoded ? ` · raio ${mapQuote.geo.radius_km} km` : ''}
+          </p>
+          {(mapQuote.stores || []).slice(0, 3).map((s) => (
+            <div key={s.storeId || s.storeName} className="text-xs">
+              <strong>{s.storeName}</strong>
+              <span className="text-muted-foreground">
+                {' '}
+                · {s.coveredItems}/{s.totalItems} itens ·{' '}
+                {Number(s.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </span>
+            </div>
+          ))}
+          {mapQuote.mapa_lista_url ? (
+            <a
+              href={mapQuote.mapa_lista_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-bold text-primary"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Ver lista no mapa
+            </a>
+          ) : null}
+          {mapQuote.whatsapp_url ? (
+            <a
+              href={mapQuote.whatsapp_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-bold text-primary ml-3"
+            >
+              <MessageCircle className="h-3.5 w-3.5" /> Abrir WhatsApp
+            </a>
+          ) : null}
+        </div>
+      ) : null}
       <form onSubmit={addListItem} className="grid sm:grid-cols-[1fr_auto_auto_auto] gap-2 items-end">
         <Field label="Produto">
           <select
@@ -454,7 +594,7 @@ export function AdmCompraPanel() {
           </Link>
           <h1 className="text-xl font-bold m-0">ADM FinMemory Compra</h1>
           <p className="text-sm text-muted-foreground m-0 mt-1">
-            Cadastre usuários, listas e preços. Gere alertas e abra o WhatsApp manualmente.
+            Lista do cliente + bairro/cidade → preços do Caça-Preço (mapa). Gere WhatsApp e abra o mapa.
           </p>
         </div>
       </div>
@@ -801,7 +941,10 @@ export function AdmCompraPanel() {
               }
             }}
           >
-            <p className="text-sm font-bold m-0">Cadastrar preço</p>
+            <p className="text-sm font-bold m-0">Cadastrar preço manual (fallback)</p>
+            <p className="text-xs text-muted-foreground m-0">
+              Use quando o mapa ainda não tiver oferta. A lista do cliente e os alertas preferem o Caça-Preço.
+            </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <Field label="Produto">
                 <select required className={inputClass} value={priceForm.product_id} onChange={(e) => setPriceForm((f) => ({ ...f, product_id: e.target.value }))}>
@@ -863,6 +1006,8 @@ export function AdmCompraPanel() {
 
       {!loading && tab === 'orcamento' ? (
         <AdmWhatsappQuoteTab
+          seed={orcamentoSeed}
+          onSeedConsumed={() => setOrcamentoSeed(null)}
           onError={(msg) => setError(msg || '')}
           onSuccess={(msg) => setSuccess(msg || '')}
         />

@@ -1,6 +1,7 @@
 /**
  * POST /api/parceiros/adm/alerts/generate
  * Body: { user_id } → monta mensagem WhatsApp + salva alerta
+ * Preferência: preços do mapa (região do cliente). Fallback: preços manuais ADM.
  * PATCH: { alert_id, enviado: true } → marca enviado
  */
 import {
@@ -9,6 +10,7 @@ import {
   buildAlertMessage,
   normalizeWhatsAppDigits,
 } from '../../../../lib/adm/admCompra';
+import { buildUserRegionAddress, runAdmMapQuote } from '../../../../lib/adm/runAdmMapQuote';
 
 export default async function handler(req, res) {
   const ctx = await requireAdmCompraApi(req, res);
@@ -63,6 +65,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const userId = String(req.body?.user_id || '').trim();
     if (!userId) return res.status(400).json({ error: 'user_id obrigatório' });
+    const preferManual = req.body?.price_source === 'manual';
 
     const { data: user, error: uErr } = await supabase
       .from('adm_compra_users')
@@ -78,26 +81,63 @@ export default async function handler(req, res) {
       .eq('user_id', userId);
     if (lErr) return res.status(500).json({ error: lErr.message });
 
-    const productIds = (list || []).map((i) => i.product_id);
-    let bestPrices = new Map();
-    try {
-      bestPrices = await getBestPricesForProducts(supabase, productIds);
-    } catch (err) {
-      return res.status(500).json({ error: err.message || 'Erro ao buscar preços' });
+    const items = (list || [])
+      .map((row) => String(row.product?.nome || '').trim())
+      .filter((n) => n.length >= 2);
+
+    let mensagem = '';
+    let economia = 0;
+    let priceSource = 'manual';
+    let mapaListaUrl = null;
+    let mapStoresCount = 0;
+
+    if (!preferManual && items.length > 0) {
+      const mapResult = await runAdmMapQuote({
+        supabase,
+        items,
+        address: buildUserRegionAddress(user),
+        phone: user.telefone,
+        customerName: user.nome,
+        radiusKm: Number(req.body?.radius_km) || 8,
+      });
+      if (!mapResult.error && mapResult.payload?.stores?.length) {
+        mensagem = mapResult.payload.mensagem;
+        mapStoresCount = mapResult.payload.stores.length;
+        mapaListaUrl = mapResult.payload.mapa_lista_url || null;
+        priceSource = 'map';
+        const bestStore = mapResult.payload.stores[0];
+        economia =
+          Number(bestStore?.total) > 0
+            ? Math.round(Number(bestStore.total) * 0.08 * 100) / 100
+            : 0;
+      }
     }
 
-    const built = buildAlertMessage({ user, listItems: list || [], bestPrices });
+    if (!mensagem) {
+      const productIds = (list || []).map((i) => i.product_id);
+      let bestPrices = new Map();
+      try {
+        bestPrices = await getBestPricesForProducts(supabase, productIds);
+      } catch (err) {
+        return res.status(500).json({ error: err.message || 'Erro ao buscar preços' });
+      }
+      const built = buildAlertMessage({ user, listItems: list || [], bestPrices });
+      mensagem = built.mensagem;
+      economia = built.economia_estimada;
+      priceSource = 'manual';
+    }
+
     const waDigits = normalizeWhatsAppDigits(user.telefone);
     const waUrl = waDigits
-      ? `https://wa.me/${waDigits}?text=${encodeURIComponent(built.mensagem)}`
+      ? `https://wa.me/${waDigits}?text=${encodeURIComponent(mensagem)}`
       : null;
 
     const { data: alert, error: aErr } = await supabase
       .from('adm_compra_alerts')
       .insert({
         user_id: userId,
-        mensagem: built.mensagem,
-        economia_estimada: built.economia_estimada,
+        mensagem,
+        economia_estimada: economia,
         enviado: false,
       })
       .select('*')
@@ -106,10 +146,13 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       alert,
-      mensagem: built.mensagem,
-      economia_estimada: built.economia_estimada,
+      mensagem,
+      economia_estimada: economia,
       whatsapp_url: waUrl,
       telefone_digits: waDigits,
+      price_source: priceSource,
+      map_stores_count: mapStoresCount,
+      mapa_lista_url: mapaListaUrl,
       user: { id: user.id, nome: user.nome, telefone: user.telefone },
     });
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Copy, ExternalLink, Loader2, MessageCircle, Search, Sparkles } from 'lucide-react';
 
 const inputClass =
@@ -56,7 +56,7 @@ function StoreLogo({ url, name }) {
 /**
  * Cola mensagem WhatsApp (endereço + lista) → preços do mapa → enviar resposta.
  */
-export function AdmWhatsappQuoteTab({ onError, onSuccess }) {
+export function AdmWhatsappQuoteTab({ onError, onSuccess, seed, onSeedConsumed }) {
   const [paste, setPaste] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
@@ -66,6 +66,19 @@ export function AdmWhatsappQuoteTab({ onError, onSuccess }) {
   const [busy, setBusy] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    if (!seed) return;
+    if (seed.customerName != null) setCustomerName(String(seed.customerName));
+    if (seed.phone != null) setPhone(String(seed.phone));
+    if (seed.address != null) setAddress(String(seed.address));
+    if (seed.itemsText != null) setItemsText(String(seed.itemsText));
+    if (seed.radiusKm != null) setRadiusKm(Number(seed.radiusKm) || 8);
+    setResult(null);
+    onSeedConsumed?.();
+    // seed é um objeto pontual; não depender de onSeedConsumed (evita loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed]);
 
   const loadDemo = async () => {
     setSeeding(true);
@@ -277,7 +290,19 @@ export function AdmWhatsappQuoteTab({ onError, onSuccess }) {
           ) : null}
 
           <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
-            <p className="text-sm font-bold m-0">Mercados (melhor cobertura / preço)</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold m-0">Mercados (melhor cobertura / preço)</p>
+              {result.mapa_lista_url ? (
+                <a
+                  href={result.mapa_lista_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-primary"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> Abrir no Caça-Preço
+                </a>
+              ) : null}
+            </div>
             {(result.stores || []).length === 0 ? (
               <p className="text-sm text-muted-foreground m-0">Nenhum mercado com match.</p>
             ) : (
