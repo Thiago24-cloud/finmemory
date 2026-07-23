@@ -28,21 +28,30 @@ function cn(...parts) {
 const MAPBOX_STYLE = 'mapbox/streets-v12';
 
 function buildPriceMarkerHtml(store, isSelected) {
-  const priceBg = store.isOpportunity ? '#16a34a' : '#2563eb';
+  const priceBg = store.isOpportunity ? '#16a34a' : store.color || '#2563eb';
   const ring = isSelected
     ? 'box-shadow:0 0 0 2px #fff,0 8px 20px rgba(0,0,0,.35);transform:scale(1.08);'
     : '';
   const star = store.isFavorite
     ? `<span style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:999px;background:#facc15;display:flex;align-items:center;justify-content:center;font-size:9px;line-height:1;">★</span>`
     : '';
+  const priceLabel =
+    Number.isFinite(Number(store.price)) && Number(store.price) > 0
+      ? formatBrl(store.price)
+      : store.offer_count > 0
+        ? `${store.offer_count} ofertas`
+        : 'Mercado';
+  const logo = store.pin_logo_url
+    ? `<img src="${String(store.pin_logo_url).replace(/"/g, '')}" alt="" style="width:22px;height:22px;object-fit:contain;border-radius:4px;" />`
+    : `<span style="color:#fff;font-size:11px;font-weight:700;">${String(store.name || '?')[0]}</span>`;
   return `
     <div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-4px);${ring}">
       <div style="background:${priceBg};color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.3);margin-bottom:4px;position:relative;">
-        ${formatBrl(store.price)}
+        ${priceLabel}
         <span style="position:absolute;left:50%;bottom:-3px;width:6px;height:6px;background:${priceBg};transform:translateX(-50%) rotate(45deg);"></span>
       </div>
-      <div style="position:relative;width:34px;height:34px;border-radius:999px;background:${store.color || '#2563eb'};border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,.25);">
-        <span style="color:#fff;font-size:11px;font-weight:700;">${String(store.name || '?')[0]}</span>
+      <div style="position:relative;width:34px;height:34px;border-radius:999px;background:#fff;border:2px solid ${store.color || '#2563eb'};display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,.25);overflow:hidden;">
+        ${logo}
         ${star}
       </div>
       <div style="margin-top:2px;font-size:9px;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;">

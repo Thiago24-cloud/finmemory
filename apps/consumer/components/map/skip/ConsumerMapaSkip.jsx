@@ -36,11 +36,21 @@ const RADIUS_OPTIONS = [
 
 const CHAIN_FILTERS = [
   { key: '', label: 'Todas' },
+  { key: 'mambo', label: 'Mambo' },
   { key: 'assai', label: 'Assaí' },
   { key: 'atacadao', label: 'Atacadão' },
   { key: 'sonda', label: 'Sonda' },
   { key: 'dia', label: 'DIA' },
 ];
+
+const CHAIN_PIN_COLORS = {
+  mambo: '#7c3aed',
+  assai: '#00a651',
+  atacadao: '#f7941d',
+  sonda: '#0066b3',
+  dia: '#e30613',
+  outros: '#2563eb',
+};
 
 function loadJson(key, fallback) {
   if (typeof window === 'undefined') return fallback;
@@ -225,10 +235,66 @@ export function ConsumerMapaSkip({
     }
   }, [location]);
 
+  /** Pins de mercados próximos (sem precisar digitar produto). */
+  const loadNearbyStores = useCallback(async () => {
+    if (location?.lat == null || location?.lng == null) return;
+    setLoading(true);
+    setError('');
+    try {
+      const radiusM = Math.max(3000, Math.round((radiusKm > 0 ? radiusKm : 12) * 1000));
+      const params = new URLSearchParams({
+        lat: String(location.lat),
+        lng: String(location.lng),
+        radius_m: String(radiusM),
+      });
+      const res = await fetch(`/api/map/stores?${params.toString()}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || 'Erro ao carregar mercados.');
+        return;
+      }
+      const stores = Array.isArray(json.stores) ? json.stores : [];
+      const mapStores = stores
+        .filter((s) => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lng)))
+        .map((s, i) => {
+          const chainKeyLocal = inferChainKeyFromStoreName(s.name);
+          const headline = Number(s.pin_headline_price);
+          return {
+            name: s.name,
+            lat: Number(s.lat),
+            lng: Number(s.lng),
+            price: Number.isFinite(headline) && headline > 0 ? headline : null,
+            color: CHAIN_PIN_COLORS[chainKeyLocal] || CHAIN_PIN_COLORS.outros,
+            pin_logo_url: s.pin_logo_url || null,
+            offer_count: s.offer_count || 0,
+            expires_at: null,
+            chainKey: chainKeyLocal,
+            isAtacado: isAtacadoStoreName(s.name),
+            _nearby: true,
+            _index: i,
+          };
+        });
+      setData({
+        product: 'Mercados próximos',
+        mapStores,
+        summary: { storesCount: mapStores.length },
+      });
+    } catch {
+      setError('Erro de rede ao carregar mercados.');
+    } finally {
+      setLoading(false);
+    }
+  }, [location, radiusKm]);
+
   useEffect(() => {
     if (workMode !== 'explorar') return;
-    void loadPrices(debouncedQ);
-  }, [debouncedQ, workMode, loadPrices]);
+    const q = String(debouncedQ || '').trim();
+    if (q.length >= 2) {
+      void loadPrices(q);
+      return;
+    }
+    void loadNearbyStores();
+  }, [debouncedQ, workMode, loadPrices, loadNearbyStores]);
 
   const addSearchToDraft = () => {
     const name = normalizeName(searchTerm);
@@ -352,7 +418,16 @@ export function ConsumerMapaSkip({
         return haversineKm(origin.lat, origin.lng, Number(s.lat), Number(s.lng)) <= radiusKm;
       });
     }
-    return [...list].sort((a, b) => a.price - b.price);
+    return [...list].sort((a, b) => {
+      const pa = Number(a.price);
+      const pb = Number(b.price);
+      const aOk = Number.isFinite(pa) && pa > 0;
+      const bOk = Number.isFinite(pb) && pb > 0;
+      if (aOk && bOk) return pa - pb;
+      if (aOk) return -1;
+      if (bOk) return 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
+    });
   }, [mapStores, showFavoritesOnly, onlyAtacado, chainKey, onlyValidPromo, radiusKm, origin]);
 
   const lowestPrice = filteredStores[0]?.price ?? 0;
