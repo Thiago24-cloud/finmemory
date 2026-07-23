@@ -152,6 +152,21 @@ export async function ensureStoreSubscription(supabase, storeId, opts = {}) {
         .maybeSingle();
       return updated || { ...existing, status: 'expired' };
     }
+    // Troca de plano durante trial (hub /inicio → Parceiros).
+    if (
+      opts.forcePlan &&
+      existing.status === 'trialing' &&
+      planCode &&
+      planCode !== existing.plan_code
+    ) {
+      const { data: switched } = await supabase
+        .from('store_subscriptions')
+        .update({ plan_code: planCode, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select('*')
+        .maybeSingle();
+      return switched || { ...existing, plan_code: planCode };
+    }
     return existing;
   }
 

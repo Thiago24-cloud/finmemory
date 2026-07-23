@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { signOut, useSession } from 'next-auth/react';
 import { ArrowLeft, Loader2, Plus } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
@@ -55,6 +56,7 @@ function planInfoFromCtx(ctx) {
 }
 
 export function MerchantPanel() {
+  const router = useRouter();
   const { data: session } = useSession();
   const isAdm = Boolean(session?.user?.isFinmemoryAdmin);
   const [ctx, setCtx] = useState(null);
@@ -193,6 +195,46 @@ export function MerchantPanel() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /** Hub /inicio → ?trial_plan=estoque_margem&tab=insumos */
+  useEffect(() => {
+    if (!router.isReady) return;
+    const trialPlan = String(router.query.trial_plan || '').toLowerCase();
+    const tab = String(router.query.tab || '').toLowerCase();
+    if (tab && PANEL_TAB_LABELS[tab]) {
+      setPanelTab(tab);
+    }
+    if (!trialPlan) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(painelApi.selectTrialPlan, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan_code: trialPlan }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok) {
+          setSuccess(`Plano de teste: ${data.plan?.planName || trialPlan}`);
+          await load();
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) {
+          const q = { ...router.query };
+          delete q.trial_plan;
+          void router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, router.query.trial_plan, router.query.tab, load, router]);
 
   useProdutosLojaRealtime(ctx?.store?.id, load);
 
