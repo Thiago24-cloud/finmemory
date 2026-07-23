@@ -31,10 +31,17 @@ if (!apiKey || !url || !key) {
   console.error('Faltam ANTHROPIC_API_KEY, NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY');
   process.exit(1);
 }
+process.env.DIA_VISION_PROVIDER = 'anthropic';
+console.log('Vision provider: anthropic');
 
 const onlyArg = process.argv.find((a) => a.startsWith('--only='));
 const only = onlyArg ? onlyArg.slice('--only='.length).toLowerCase() : '';
-const manifest = JSON.parse(readFileSync(resolve(process.cwd(), 'scripts/dia-unidades-terminal-ids.json'), 'utf8'));
+const manifestPath =
+  process.env.DIA_UNITS_MANIFEST ||
+  (process.argv.find((a) => a.startsWith('--manifest='))?.slice('--manifest='.length) ||
+    'scripts/dia-unidades-terminal-ids.json');
+const manifest = JSON.parse(readFileSync(resolve(process.cwd(), manifestPath), 'utf8'));
+console.log('Manifest:', manifestPath);
 let ids = manifest.storeIds || [];
 if (only) ids = ids.filter((id) => id.toLowerCase().includes(only));
 

@@ -1,57 +1,137 @@
 [
   {
-    "slug": "brooklin",
-    "name": "Mambo Brooklin",
-    "address": "Avenida Vereador José Diniz, 2329 - Santo Amaro, São Paulo - SP, 04603-001",
-    "neighborhood": "Brooklin",
-    "lat": -23.6249644,
-    "lng": -46.6830379,
-    "place_id": "manual-mambo-brooklin-jose-diniz-2329"
-  },
-  {
-    "slug": "morumbi",
-    "name": "Mambo Morumbi",
-    "address": "Avenida Giovanni Gronchi, 2799 - Morumbi, São Paulo - SP, 05651-002",
-    "neighborhood": "Morumbi",
-    "lat": -23.6064089,
-    "lng": -46.7250062,
-    "place_id": "manual-mambo-morumbi-gronchi-2799"
+    "slug": "moema",
+    "name": "Mambo Moema",
+    "address": "Alameda dos Maracatins, 422 - Moema, São Paulo - SP",
+    "neighborhood": "Moema",
+    "lat": -23.605317,
+    "lng": -46.659233,
+    "place_id": "manual-mambo-moema"
   },
   {
     "slug": "vila-madalena",
     "name": "Mambo Vila Madalena",
-    "address": "Rua Deputado Lacerda Franco, 553 - Pinheiros, São Paulo - SP, 05418-001",
-    "neighborhood": "Pinheiros",
-    "lat": -23.5606538,
-    "lng": -46.6928092,
-    "place_id": "manual-mambo-vm-lacerda-franco-553"
-  },
-  {
-    "slug": "vila-romana",
-    "name": "Mambo Vila Romana",
-    "address": "Rua Aurélia, 1973 - Vila Romana, São Paulo - SP, 05046-000",
-    "neighborhood": "Vila Romana",
-    "lat": -23.5394445,
-    "lng": -46.6971548,
-    "place_id": "manual-mambo-vila-romana-aurelia-1973",
-    "note": "OSM tem o POI em 1971 na mesma rua; ajuste lat/lng no mapa se precisar."
+    "address": "Rua Deputado Lacerda Franco, 480 - Vila Madalena, São Paulo - SP",
+    "neighborhood": "Vila Madalena",
+    "lat": -23.561122,
+    "lng": -46.692016,
+    "place_id": "manual-mambo-vila-madalena"
   },
   {
     "slug": "higienopolis",
     "name": "Mambo Higienópolis",
-    "address": "Avenida Angélica, 546 - Santa Cecília, São Paulo - SP, 01228-000",
+    "address": "Rua Maria Antônia, 239 - Higienópolis, São Paulo - SP",
     "neighborhood": "Higienópolis",
-    "lat": -23.5458958,
-    "lng": -46.6577897,
-    "place_id": "manual-mambo-higienopolis-angelica-546"
+    "lat": -23.546642,
+    "lng": -46.650787,
+    "place_id": "manual-mambo-higienopolis"
+  },
+  {
+    "slug": "brooklin",
+    "name": "Mambo Brooklin",
+    "address": "Rua Padre Antônio José dos Santos, 882 - Brooklin, São Paulo - SP",
+    "neighborhood": "Brooklin",
+    "lat": -23.610286,
+    "lng": -46.686614,
+    "place_id": "manual-mambo-brooklin"
+  },
+  {
+    "slug": "perdizes",
+    "name": "Mambo Perdizes",
+    "address": "Rua Deputado João Susumu Hirata, 611 - Vila Andrade / Perdizes, São Paulo - SP",
+    "neighborhood": "Perdizes",
+    "lat": -23.630095,
+    "lng": -46.730957,
+    "place_id": "manual-mambo-perdizes"
+  },
+  {
+    "slug": "campo-belo",
+    "name": "Mambo Campo Belo",
+    "address": "Rua Vieira de Morais, 1034 - Campo Belo, São Paulo - SP",
+    "neighborhood": "Campo Belo",
+    "lat": -23.622068,
+    "lng": -46.672168,
+    "place_id": "manual-mambo-campo-belo"
+  },
+  {
+    "slug": "tatuape",
+    "name": "Mambo Tatuapé",
+    "address": "Rua Serra de Botucatu, 1703 - Tatuapé, São Paulo - SP",
+    "neighborhood": "Tatuapé",
+    "lat": -23.540979,
+    "lng": -46.55522,
+    "place_id": "manual-mambo-tatuape"
+  },
+  {
+    "slug": "santana",
+    "name": "Mambo Santana",
+    "address": "Rua Pedro Doll, 499 - Santana, São Paulo - SP",
+    "neighborhood": "Santana",
+    "lat": -23.491198,
+    "lng": -46.63065,
+    "place_id": "manual-mambo-santana"
+  },
+  {
+    "slug": "vila-nova-conceicao",
+    "name": "Mambo Vila Nova Conceição",
+    "address": "Rua Clappan, 63 - Vila Nova Conceição, São Paulo - SP",
+    "neighborhood": "Vila Nova Conceição",
+    "lat": -23.730266,
+    "lng": -46.783652,
+    "place_id": "manual-mambo-vila-nova-conceicao"
+  },
+  {
+    "slug": "panamby",
+    "name": "Mambo Panamby",
+    "address": "Av. Giovanni Gronchi, 5930 - Vila Andrade, São Paulo - SP",
+    "neighborhood": "Panamby",
+    "lat": -23.631664,
+    "lng": -46.737679,
+    "place_id": "manual-mambo-panamby"
   },
   {
     "slug": "leopoldina",
     "name": "Mambo Leopoldina",
-    "address": "Rua Aliança Liberal, 322 - Vila Leopoldina, São Paulo - SP, 05088-000",
-    "neighborhood": "Vila Leopoldina",
-    "lat": -23.5222182,
-    "lng": -46.7250521,
-    "place_id": "manual-mambo-leopoldina-alianca-liberal-322"
+    "address": "Rua Carlos Weber, 1500 - Vila Leopoldina, São Paulo - SP",
+    "neighborhood": "Leopoldina",
+    "lat": -23.533748,
+    "lng": -46.725026,
+    "place_id": "manual-mambo-leopoldina"
+  },
+  {
+    "slug": "pinheiros",
+    "name": "Mambo Pinheiros",
+    "address": "Rua Teodoro Sampaio, 1933 - Pinheiros, São Paulo - SP",
+    "neighborhood": "Pinheiros",
+    "lat": -23.563272,
+    "lng": -46.687188,
+    "place_id": "manual-mambo-pinheiros"
+  },
+  {
+    "slug": "jardins",
+    "name": "Mambo Jardins",
+    "address": "Alameda Gabriel Monteiro da Silva, 1230 - Jardim Paulistano, São Paulo - SP",
+    "neighborhood": "Jardins",
+    "lat": -23.570379,
+    "lng": -46.680349,
+    "place_id": "manual-mambo-jardins"
+  },
+  {
+    "slug": "morumbi",
+    "name": "Mambo Morumbi",
+    "address": "Av. Dr. Guilherme Dumont Villares, 1210 - Morumbi, São Paulo - SP",
+    "neighborhood": "Morumbi",
+    "lat": -23.614223,
+    "lng": -46.741069,
+    "place_id": "manual-mambo-morumbi"
+  },
+  {
+    "slug": "itaim-bibi",
+    "name": "Mambo Itaim Bibi",
+    "address": "Rua João Cachoeira, 1100 - Itaim Bibi, São Paulo - SP",
+    "neighborhood": "Itaim Bibi",
+    "lat": -23.589839,
+    "lng": -46.676168,
+    "place_id": "manual-mambo-itaim-bibi"
   }
 ]

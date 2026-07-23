@@ -36,10 +36,14 @@
 'use strict';
 
 const path = require('path');
-// Raiz do monorepo (fallback); ficheiros do agente sobrepõem com override para credenciais específicas.
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
-require('dotenv').config({ path: path.join(__dirname, '.env.local'), override: true });
+// Todos os .env na raiz do monorepo (Finmemory/). .env.agent.local sobrescreve se existir.
+const monorepoRoot = path.join(__dirname, '..');
+require('dotenv').config({ path: path.join(monorepoRoot, '.env') });
+require('dotenv').config({ path: path.join(monorepoRoot, '.env.local'), override: true });
+require('dotenv').config({
+  path: path.join(monorepoRoot, '.env.agent.local'),
+  override: true,
+});
 
 const { chromium } = require('playwright');
 const { createClient } = require('@supabase/supabase-js');
@@ -640,7 +644,8 @@ function buildPromoRowsFromRaw(raw, scraper, runId, now, expireAt, chainCoords, 
       preco: price,
       preco_original: precoOriginalOut,
       imagem_url: p.imagem ?? null,
-      validade: vd,
+      // bot_promocoes_fila exige validade em todos os itens
+      validade: vd || (expireAt ? String(expireAt).slice(0, 10) : null),
       lat: latP ?? (deferCoords ? null : chainCoords[scraper.key]?.lat ?? null),
       lng: lngP ?? (deferCoords ? null : chainCoords[scraper.key]?.lng ?? null),
       run_id: String(runId),
@@ -1673,17 +1678,21 @@ async function writeToSupabase(rows, supermarketSlug, runId, nowIso, expireIso) 
     return;
   }
 
-  const produtos = rows.map((r) => ({
-    nome: r.nome_produto,
-    preco: r.preco,
-    imagem_url: r.imagem_url || null,
-    valid_until: r.validade || null,
-    unidade: r.categoria || null,
-    metadata: {
-      gtin: r.gtin || null,
-      ingest_source: r.ingest_source || `finmemory_agent:${supermarketSlug}`,
-    },
-  }));
+  const expireYmd = expireIso ? String(expireIso).slice(0, 10) : null;
+  const produtos = rows
+    .map((r) => ({
+      nome: r.nome_produto,
+      preco: r.preco,
+      imagem_url: r.imagem_url || null,
+      valid_until: r.validade || expireYmd,
+      unidade: r.categoria || null,
+      metadata: {
+        gtin: r.gtin || null,
+        ingest_source: r.ingest_source || `finmemory_agent:${supermarketSlug}`,
+      },
+    }))
+    // enqueue/mapa exige preço; encartes sem R$ ficam só em promocoes_supermercados via insert direto abaixo se necessário
+    .filter((p) => p.preco != null && Number(p.preco) > 0 && p.valid_until);
 
   const lat = rows.find((r) => r.lat != null)?.lat ?? null;
   const lng = rows.find((r) => r.lng != null)?.lng ?? null;
@@ -1707,6 +1716,12 @@ async function writeToSupabase(rows, supermarketSlug, runId, nowIso, expireIso) 
     process.env.CATALOG_ENRICH_SECRET;
 
   if (appBase && secret) {
+    if (!produtos.length) {
+      log.warn(
+        `    ${supermarketSlug}: ${rows.length} itens brutos, 0 com preço — nada a enfileirar no mapa`
+      );
+      return;
+    }
     const res = await fetch(`${String(appBase).replace(/\/$/, '')}/api/scrapers/enqueue-batch`, {
       method: 'POST',
       headers: {
@@ -1776,13 +1791,20 @@ async function runScraper(key, context, runId, now, expireAt, chainCoords = {}) 
   log.info(`\n🛒  ${scraper.label}`);
 
   let raw;
-  if (scraper.usePageData) {
-    raw = await withRetry(() => scraper.fetch(), {
-      retries: 3,
-      label: scraper.label,
-    });
-    log.info(`    📦 ${raw.length} itens (page-data / API)`);
-  } else {
+  if (scraper.usePageData && typeof scraper.fetch === 'function') {
+    try {
+      raw = await withRetry(() => scraper.fetch(), {
+        retries: 2,
+        label: scraper.label,
+      });
+      log.info(`    📦 ${raw.length} itens (page-data / API)`);
+    } catch (e) {
+      log.warn(`    ${scraper.key}: API falhou (${e.message}); tentando Playwright…`);
+      raw = null;
+    }
+  }
+
+  if (raw == null) {
     if (!context) throw new Error('Contexto do browser ausente');
     const page = await context.newPage();
     page.setDefaultTimeout(30_000);

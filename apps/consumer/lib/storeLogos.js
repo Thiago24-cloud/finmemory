@@ -14,6 +14,8 @@ export const STORE_LOGOS = {
   hypercarrefour: 'https://logo.clearbit.com/carrefour.com.br',
   dia: 'https://logo.clearbit.com/dia.com.br',
   'supermercado dia': 'https://logo.clearbit.com/dia.com.br',
+  atacadao: 'https://logo.clearbit.com/atacadao.com.br',
+  'atacadão': 'https://logo.clearbit.com/atacadao.com.br',
   padraosuper: 'https://logo.clearbit.com/padraosuper.com.br',
   'supermercado padrao': 'https://logo.clearbit.com/padraosuper.com.br',
   'supermercado padrão': 'https://logo.clearbit.com/padraosuper.com.br',
@@ -191,7 +193,31 @@ const STORE_LOGO_CUSTOM_PATHS = {
   'pomar vila madalena': '/map-logos/pomar-da-vila-madalena.png',
   'sacolão são jorge': '/map-logos/sacolao-sao-jorge.png',
   'sacolao sao jorge': '/map-logos/sacolao-sao-jorge.png',
+  // Redes da lista SP (pins com logo local, estilo protótipo)
+  'supermercado dia': '/map-logos/dia.png',
+  dia: '/map-logos/dia.png',
+  'assai atacadista': '/map-logos/assai.png',
+  assai: '/map-logos/assai.png',
+  'assaí': '/map-logos/assai.png',
+  mambo: '/map-logos/mambo.png',
+  'supermercados sonda': '/map-logos/sonda.png',
+  'rede sonda': '/map-logos/sonda.png',
+  sonda: '/map-logos/sonda.png',
+  'atacadão': '/map-logos/atacadao.png',
+  atacadao: '/map-logos/atacadao.png',
 };
+
+/** Pins curated: sempre no mapa (com logo), mesmo sem oferta ativa. */
+const CURATED_ALWAYS_VISIBLE_LOGO_PATHS = new Set([
+  '/map-logos/pomar-da-vila-madalena.png',
+  '/map-logos/sacolao-sao-jorge.png',
+  '/map-logos/dia.png',
+  '/map-logos/assai.png',
+  '/map-logos/mambo.png',
+  '/map-logos/sonda.png',
+  '/map-logos/atacadao.png',
+]);
+
 
 function matchCustomStoreLogoPath(storeName) {
   const lower = normalizeStoreNameForLogoMatch(storeName);
@@ -212,6 +238,12 @@ export function isPomarDaVilaCuratedStoreName(storeName) {
 /** Sacolão São Jorge (curadoria / map-logos): mesmo critério que Pomar. */
 export function isSacolaoSaoJorgeCuratedStoreName(storeName) {
   return matchCustomStoreLogoPath(storeName) === '/map-logos/sacolao-sao-jorge.png';
+}
+
+/** Redes com logo local em map-logos — pin sempre visível (lista SP / protótipo). */
+export function isCuratedMapLogoStoreName(storeName) {
+  const path = matchCustomStoreLogoPath(storeName);
+  return Boolean(path && CURATED_ALWAYS_VISIBLE_LOGO_PATHS.has(path));
 }
 
 /**

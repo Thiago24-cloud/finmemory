@@ -11,7 +11,7 @@ import {
 import { isExcludedFromPriceMapPoint } from '../../../lib/mapExcludedMapStores';
 import { parsePriceToNumber } from '../../../lib/parseMapPrice';
 import { displayPromoProductName, productNameForThumbnailSearch } from '../../../lib/mapOfferDisplay';
-import { isPomarDaVilaCuratedStoreName, isSacolaoSaoJorgeCuratedStoreName } from '../../../lib/storeLogos';
+import { isCuratedMapLogoStoreName, getStoreLogoPinSrc } from '../../../lib/storeLogos';
 import { pickStoreLogoFromCacheRows } from '../../../lib/mapStoreLogoCache';
 import {
   inferChainSlugFromPromoStoreName,
@@ -467,8 +467,7 @@ export default async function handler(req, res) {
       if (curatedPinOptOutIds.has(String(s.id))) {
         return !!storeOfferMap.get(s.id);
       }
-      if (isPomarDaVilaCuratedStoreName(s.name)) return true;
-      if (isSacolaoSaoJorgeCuratedStoreName(s.name)) return true;
+      if (isCuratedMapLogoStoreName(s.name)) return true;
       return !!storeOfferMap.get(s.id);
     });
 
@@ -586,6 +585,7 @@ export default async function handler(req, res) {
         return clean;
       });
       const pinLogoFromCache = pickStoreLogoFromCacheRows(s.name, storeLogoCacheRows);
+      const pinLogoFallback = getStoreLogoPinSrc(s.name);
       return {
         id: s.id,
         name: s.name,
@@ -622,7 +622,7 @@ export default async function handler(req, res) {
             product_id: product_id ?? null,
           })
         ),
-        pin_logo_url: pinLogoFromCache || null,
+        pin_logo_url: pinLogoFromCache || pinLogoFallback || null,
       };
     };
 

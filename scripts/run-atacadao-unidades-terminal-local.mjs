@@ -32,9 +32,12 @@ if (!url || !key) {
   process.exit(1);
 }
 
-const manifest = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'scripts/atacadao-unidades-regiao-terminal-ids.json'), 'utf8')
-);
+const manifestPath =
+  process.env.ATACADAO_UNITS_MANIFEST ||
+  (process.argv.find((a) => a.startsWith('--manifest='))?.slice('--manifest='.length) ||
+    'scripts/atacadao-unidades-regiao-terminal-ids.json');
+const manifest = JSON.parse(readFileSync(resolve(process.cwd(), manifestPath), 'utf8'));
+console.log('Manifest:', manifestPath);
 const officialIds = (manifest.officialSellerIds || []).map(String);
 const legacyIds = manifest.storeIds || [];
 const wantCeps = new Set(

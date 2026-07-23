@@ -1,0 +1,25 @@
+{
+  "description": "Atacadão — sellerIds corretos (nome exato no VTEX) para lista 2026-07 SP capital",
+  "officialSellerIds": ["60", "20", "229", "48", "938", "937", "35"],
+  "notes": {
+    "matchedExact": [
+      "Vila Maria=60",
+      "Santo Amaro=20",
+      "Interlagos=229",
+      "Itaquera=48",
+      "Pirituba=938",
+      "Penha=937",
+      "São Miguel=35"
+    ],
+    "notInVtexSpCatalog": [
+      "Marginal Pinheiros",
+      "Freguesia do Ó",
+      "Campo Limpo",
+      "São Mateus",
+      "Cidade Tiradentes",
+      "Jabaquara",
+      "Butantã",
+      "Secco / Anhanguera"
+    ]
+  }
+}
