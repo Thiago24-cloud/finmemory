@@ -1,7 +1,12 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { Check, Clock } from 'lucide-react';
 import { PARTNERS_PLANS, PARTNERS_PLANS_SECTION } from '../../../lib/partners/landingCopy';
+
+function normalizeFeature(feat) {
+  if (typeof feat === 'string') return { label: feat, soon: false };
+  return { label: feat.label, soon: Boolean(feat.soon) };
+}
 
 export function PartnersPlansSection() {
   return (
@@ -38,12 +43,31 @@ export function PartnersPlansSection() {
               </div>
 
               <ul className="space-y-2.5 list-none p-0 m-0 flex-1">
-                {plan.features.map((feat) => (
-                  <li key={feat} className="flex items-start gap-2 text-sm text-[#0b1f3a]">
-                    <Check className="h-4 w-4 text-[#16a34a] shrink-0 mt-0.5" aria-hidden />
-                    <span>{feat}</span>
-                  </li>
-                ))}
+                {plan.features.map((raw) => {
+                  const feat = normalizeFeature(raw);
+                  return (
+                    <li
+                      key={feat.label}
+                      className={`flex items-start gap-2 text-sm ${
+                        feat.soon ? 'text-[#64748b]' : 'text-[#0b1f3a]'
+                      }`}
+                    >
+                      {feat.soon ? (
+                        <Clock className="h-4 w-4 text-[#94a3b8] shrink-0 mt-0.5" aria-hidden />
+                      ) : (
+                        <Check className="h-4 w-4 text-[#16a34a] shrink-0 mt-0.5" aria-hidden />
+                      )}
+                      <span className="min-w-0">
+                        {feat.label}
+                        {feat.soon ? (
+                          <span className="ml-1.5 inline-flex align-middle rounded-full border border-[#cbd5e1] bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+                            Em breve
+                          </span>
+                        ) : null}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
 
               <a
