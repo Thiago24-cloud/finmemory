@@ -3,6 +3,35 @@
  * @see apps/consumer/lib/shoppingListMapMatch.js
  */
 
+const MATCH_STOP = new Set([
+  'tipo',
+  'pacote',
+  'unidade',
+  'un',
+  'kg',
+  'g',
+  'ml',
+  'l',
+  'com',
+  'sem',
+  'para',
+  'cada',
+  'leve',
+  'pague',
+]);
+
+const MEAL_NOISE = new Set([
+  'frango',
+  'cremoso',
+  'lasanha',
+  'prato',
+  'pronto',
+  'refeicao',
+  'brocolis',
+  'strogonoff',
+  'risoto',
+]);
+
 export function normalizeProductNameForMatch(name) {
   return String(name || '')
     .toLowerCase()
@@ -13,14 +42,46 @@ export function normalizeProductNameForMatch(name) {
     .trim();
 }
 
-export function listItemMatchesOfferName(listName, offerName) {
+function significantWords(norm) {
+  return norm
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !MATCH_STOP.has(w) && !/^\d+$/.test(w));
+}
+
+/**
+ * Score lista ↔ oferta. 0 = sem match.
+ * Exige a palavra-cabeça (ex.: arroz) na oferta; evita "Frango com arroz" para "arroz".
+ */
+export function offerMatchScore(listName, offerName) {
   const a = normalizeProductNameForMatch(listName);
   const b = normalizeProductNameForMatch(offerName);
-  if (a.length < 2 || b.length < 2) return false;
-  if (b.includes(a) || a.includes(b)) return true;
-  const aWords = a.split(/\s+/).filter((w) => w.length >= 3);
-  if (aWords.length === 0) return b.includes(a);
-  return aWords.some((w) => b.includes(w));
+  if (a.length < 2 || b.length < 2) return 0;
+
+  const aWords = significantWords(a);
+  const bWords = significantWords(b);
+  if (!aWords.length) return b.includes(a) ? 10 : 0;
+
+  const head = aWords[0];
+  if (!b.includes(head)) return 0;
+
+  const listIsStaple = aWords.length <= 4 && !aWords.some((w) => MEAL_NOISE.has(w));
+  if (listIsStaple && bWords.some((w) => MEAL_NOISE.has(w))) return 0;
+
+  let score = 20;
+  if (a === b) score += 100;
+  else if (b.includes(a)) score += 50;
+  else if (a.includes(b) && b.length >= 4) score += 30;
+
+  for (const w of aWords) {
+    if (b.includes(w)) score += 12;
+  }
+  if (/\b5\s*kg\b/.test(a) && /\b5\s*kg\b/.test(b)) score += 8;
+  if (/\b1\s*kg\b/.test(a) && /\b1\s*kg\b/.test(b)) score += 8;
+  return score;
+}
+
+export function listItemMatchesOfferName(listName, offerName) {
+  return offerMatchScore(listName, offerName) > 0;
 }
 
 export function parseListItemNames(raw) {
@@ -37,12 +98,27 @@ export function parseListItemNames(raw) {
     .slice(0, 24);
 }
 
+function pickBestOffer(listName, candidates) {
+  const scored = (candidates || [])
+    .map((row) => ({
+      ...row,
+      preco: Number(row.preco ?? row.price),
+      _score: offerMatchScore(listName, row.produto_nome || row.productName || ''),
+    }))
+    .filter((o) => o._score > 0 && Number.isFinite(o.preco) && o.preco > 0);
+  scored.sort((a, b) => {
+    if (b._score !== a._score) return b._score - a._score;
+    return a.preco - b.preco;
+  });
+  return scored[0] || null;
+}
+
 export function groupMapOffersByListItems(listItems, rpcRows) {
   const rows = Array.isArray(rpcRows) ? rpcRows : [];
   const items = (listItems || [])
-    .map((name, i) => ({
-      listItemId: `item-${i}`,
-      listName: String(name || '').trim(),
+    .map((it, i) => ({
+      listItemId: it?.id || `item-${i}`,
+      listName: String(it?.name || it || '').trim(),
     }))
     .filter((it) => it.listName.length >= 2);
 
@@ -50,7 +126,7 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
     const offers = rows
       .filter((row) => {
         if (/\[sim-cesta\]/i.test(row.produto_nome || '')) return false;
-        return listItemMatchesOfferName(it.listName, row.produto_nome);
+        return offerMatchScore(it.listName, row.produto_nome) > 0;
       })
       .map((row) => ({
         lugar_id: row.lugar_id,
@@ -62,18 +138,32 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
         lng: row.lng,
         expires_at: row.expires_at || null,
         created_at: row.created_at || null,
+        matchScore: offerMatchScore(it.listName, row.produto_nome),
       }))
       .filter((o) => Number.isFinite(o.preco) && o.preco > 0)
-      .sort((a, b) => a.preco - b.preco);
+      .sort((a, b) => {
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        return a.preco - b.preco;
+      });
 
-    const bestOffer = offers[0] || null;
+    const byStore = new Map();
+    for (const o of offers) {
+      const k = String(o.nome_loja || '').toLowerCase();
+      if (!byStore.has(k)) byStore.set(k, o);
+    }
+    const deduped = [...byStore.values()].sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      return a.preco - b.preco;
+    });
+
+    const bestOffer = deduped[0] || null;
     return {
       listItemId: it.listItemId,
       listName: it.listName,
-      matched: offers.length > 0,
-      offersCount: offers.length,
+      matched: deduped.length > 0,
+      offersCount: deduped.length,
       bestOffer,
-      offers: offers.slice(0, 8),
+      offers: deduped.slice(0, 8),
     };
   });
 
@@ -96,11 +186,6 @@ export function groupMapOffersByListItems(listItems, rpcRows) {
   };
 }
 
-/**
- * Total estimado da lista em cada supermercado (melhor preço por item naquela loja).
- * @param {string[]} listItemNames
- * @param {Array} rpcRows — saída de buscar_lojas_por_produtos_lista
- */
 export function computeStoreTotalsForList(listItemNames, rpcRows) {
   const names = parseListItemNames(listItemNames);
   const rows = Array.isArray(rpcRows) ? rpcRows : [];
@@ -108,7 +193,6 @@ export function computeStoreTotalsForList(listItemNames, rpcRows) {
 
   const byStore = new Map();
   for (const row of rows) {
-    // Agrupar por nome da loja (lugar_id é único por oferta no RPC).
     const storeName = String(row.nome_loja || 'Mercado').trim() || 'Mercado';
     const storeKey = storeName.toLowerCase();
     if (!byStore.has(storeKey)) {
@@ -128,13 +212,8 @@ export function computeStoreTotalsForList(listItemNames, rpcRows) {
     const lines = [];
     let total = 0;
     for (const listName of names) {
-      const matches = store.rows
-        .filter((row) => listItemMatchesOfferName(listName, row.produto_nome))
-        .map((row) => ({ ...row, preco: Number(row.preco) }))
-        .filter((o) => Number.isFinite(o.preco) && o.preco > 0)
-        .sort((a, b) => a.preco - b.preco);
-      if (matches.length > 0) {
-        const best = matches[0];
+      const best = pickBestOffer(listName, store.rows);
+      if (best) {
         lines.push({
           listName,
           productName: best.produto_nome,
