@@ -20,6 +20,8 @@
     "lint": "npm run lint -w @finmemory/consumer",
     "postinstall": "patch-package",
     "validate-env": "node scripts/validate-env.mjs",
+    "bridge:verify": "node -r dotenv/config scripts/verify-bridge-adm-setup.mjs",
+    "bridge:seed": "node -r dotenv/config scripts/verify-bridge-adm-setup.mjs --seed",
     "stripe:activate-catalog": "node -r dotenv/config scripts/stripe-activate-catalog.mjs",
     "check-r2": "node scripts/check-r2-env.mjs",
     "verify-build": "node scripts/verify-build.mjs",

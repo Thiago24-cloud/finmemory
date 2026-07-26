@@ -72,6 +72,27 @@ export default function AdminHomePage() {
       ready: true,
       badge: 'Novo',
     },
+    {
+      href: '/admin/credit-campaigns',
+      title: 'Campanhas de crédito',
+      desc: 'Cashback patrocinado por produto/região — orçamento e recompensa.',
+      ready: true,
+      badge: 'MVP',
+    },
+    {
+      href: '/admin/credit-validate',
+      title: 'Validar compra (créditos)',
+      desc: 'Simular compra do microvarejista e conceder crédito da campanha.',
+      ready: true,
+      badge: 'MVP',
+    },
+    {
+      href: '/demo/investor',
+      title: 'Demo investidor',
+      desc: 'Loop completo: mapa → campanha → crédito → carteira + hash auditável.',
+      ready: true,
+      badge: 'Pitch',
+    },
   ];
 
   return (

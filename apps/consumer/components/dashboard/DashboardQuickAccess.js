@@ -14,6 +14,7 @@ import {
   Users,
   Tags,
   MessageCircle,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { DASHBOARD, QUICK_ACTION_TITLE } from '../../lib/appMicrocopy';
@@ -106,6 +107,15 @@ export function DashboardQuickAccess({ className, onExtrato }) {
       Icon: List,
       tile: 'bg-gradient-to-br from-emerald-950/60 to-[#1E2A3A] border-emerald-500/25 text-emerald-300',
       labelClass: 'text-emerald-300/95',
+    },
+    {
+      key: 'carteira',
+      href: '/carteira',
+      label: 'Carteira',
+      Icon: Wallet,
+      tile: 'bg-gradient-to-br from-teal-950/80 to-[#1E2A3A] border-teal-500/35 text-teal-300',
+      labelClass: 'text-teal-200/95',
+      title: 'Créditos e cashback FinMemory',
     },
     {
       key: 'relatorios',

@@ -79,7 +79,7 @@ function shortDia(d) {
   return String(d).replace('-feira', '');
 }
 
-export function AdmCompraPanel() {
+export function AdmCompraPanel({ embedded = false }) {
   const [tab, setTab] = useState('usuarios');
   const [meta, setMeta] = useState({ perfis: [], planos: [], status: [], dias: [] });
   const [users, setUsers] = useState([]);
@@ -584,20 +584,22 @@ export function AdmCompraPanel() {
 
   return (
     <div className="space-y-4 pb-8">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Link
-            href="/parceiros/painel"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao painel
-          </Link>
-          <h1 className="text-xl font-bold m-0">ADM FinMemory Compra</h1>
-          <p className="text-sm text-muted-foreground m-0 mt-1">
-            Lista do cliente + bairro/cidade → preços do Caça-Preço (mapa). Gere WhatsApp e abra o mapa.
-          </p>
+      {!embedded ? (
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <Link
+              href="/parceiros/painel"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao painel
+            </Link>
+            <h1 className="text-xl font-bold m-0">ADM FinMemory Compra</h1>
+            <p className="text-sm text-muted-foreground m-0 mt-1">
+              Lista do cliente + bairro/cidade → preços do Caça-Preço (mapa). Gere WhatsApp e abra o mapa.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <nav className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-muted/40 p-1">
         {TABS.map((t) => (

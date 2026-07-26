@@ -10,6 +10,12 @@ function toPair(lat, lng) {
   return { la, ln };
 }
 
+const GEO_OPTS = Object.freeze({
+  enableHighAccuracy: true,
+  timeout: 10000,
+  maximumAge: 120000,
+});
+
 /**
  * @param {{ lat: number, lng: number } | null} origin
  * @param {Array<{ lat: number, lng: number }>} stops
@@ -41,4 +47,57 @@ export function buildGoogleMapsMultiStopUrl(origin, stops, travelMode = 'driving
   }
 
   return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+/** Abre rota no Google Maps com origem conhecida ou geolocalização do navegador. */
+export function openGoogleMapsDirectionsPreferCurrentLocation(
+  dest,
+  knownOrigin = null,
+  travelMode = 'driving'
+) {
+  if (typeof window === 'undefined') return;
+  const d = toPair(dest.lat, dest.lng);
+  if (!d) return;
+
+  const openWithQueryOrigin = (la, ln) => {
+    const params = new URLSearchParams({
+      api: '1',
+      origin: `${la},${ln}`,
+      destination: `${d.la},${d.ln}`,
+      travelmode: travelMode,
+    });
+    window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const openFromCurrentLocationPath = () => {
+    const destSeg = `${d.la},${d.ln}`;
+    const url = `https://www.google.com/maps/dir/${encodeURIComponent('Current Location')}/${encodeURIComponent(destSeg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const ko = knownOrigin && toPair(knownOrigin.lat, knownOrigin.lng);
+  if (ko) {
+    openWithQueryOrigin(ko.la, ko.ln);
+    return;
+  }
+
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    openFromCurrentLocationPath();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => openWithQueryOrigin(pos.coords.latitude, pos.coords.longitude),
+    () => openFromCurrentLocationPath(),
+    GEO_OPTS
+  );
+}
+
+/** Abre o Waze até o ponto (comum no Brasil). */
+export function openWazeNavigation(dest) {
+  if (typeof window === 'undefined') return;
+  const d = toPair(dest.lat, dest.lng);
+  if (!d) return;
+  const url = `https://waze.com/ul?ll=${encodeURIComponent(`${d.la},${d.ln}`)}&navigate=yes`;
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
