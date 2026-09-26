@@ -37,9 +37,18 @@ export default async function handler(req, res) {
   }
 
   const { pedidos, itensByPedido } = result;
-  const active = (pedidos || []).filter((p) =>
-    ['pendente', 'preparando', 'pronto'].includes(p.status)
-  ).length;
+    const active = (pedidos || []).filter((p) =>
+      [
+        'pendente',
+        'preparando',
+        'pronto',
+        'pending',
+        'accepted',
+        'preparing',
+        'ready_for_pickup',
+        'out_for_delivery',
+      ].includes(p.status)
+    ).length;
 
   return res.status(200).json({
     orders: (pedidos || []).map((p) => mapPedidoRowToApi(p, itensByPedido.get(p.id))),

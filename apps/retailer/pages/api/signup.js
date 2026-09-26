@@ -1,7 +1,7 @@
 import { hashPassword } from '../../lib/passwordAuth';
 import { getSupabaseAdmin } from '../../lib/supabaseAdmin';
 import { checkRateLimit, getRequestIp } from '../../lib/rateLimit';
-import { sendSecurityEmail } from '../../lib/securityEmail';
+import { sendPartnerAccessCredentialsEmail } from '../../lib/auth/sendPartnerAccessEmail';
 import { isValidEmail, normalizeEmail, validatePasswordStrength } from '../../lib/securityPolicy';
 import { getPrivateBetaAllowlistFromEnv, isEmailAllowedInPrivateBeta } from '../../lib/privateBetaAllowlist';
 
@@ -100,22 +100,18 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: authErr.message || 'Erro ao guardar senha' });
     }
 
-    const appUrl =
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXT_PUBLIC_RETAILER_APP_URL ||
-      'https://parceiros.finmemory.com.br';
-    await sendSecurityEmail({
+    await sendPartnerAccessCredentialsEmail({
       to: normalized,
-      subject: 'Bem-vindo ao FinMemory Parceiros',
-      html: `<p>Sua conta está pronta.</p><p>Você já pode entrar no painel: <a href="${appUrl}/login">${appUrl}/login</a></p>`,
-      fallbackLog: `retailer_welcome_signup=${normalized}`,
+      name: safeName,
+      password,
+      subject: 'Bem-vindo ao FinMemory Parceiros — seu acesso',
     });
 
     console.info('[retailer signup]', { email: normalized, ip });
     return res.status(201).json({
       success: true,
       userId: userRow.id,
-      message: 'Conta criada.',
+      message: 'Conta criada. Enviamos o acesso por e-mail.',
     });
   } catch (e) {
     console.error('[retailer signup] exception:', e);

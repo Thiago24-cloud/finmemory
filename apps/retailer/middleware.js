@@ -23,6 +23,7 @@ function isPublicApiPath(pathname) {
   if (pathname.startsWith('/api/auth')) return true;
   if (pathname.startsWith('/api/partners/')) return true;
   if (pathname.startsWith('/api/parceiros/painel/')) return true;
+  if (pathname.startsWith('/api/parceiros/equipe')) return true;
   if (pathname.startsWith('/api/merchant/')) return true;
   if (pathname.startsWith('/api/varejo/')) return true;
   if (pathname === '/api/user/account-type') return true;
@@ -33,6 +34,7 @@ function isPublicPagePath(pathname) {
   if (pathname === '/') return true;
   if (pathname.startsWith('/login')) return true;
   if (pathname.startsWith('/parceiros')) return true;
+  if (pathname.startsWith('/equipe')) return true;
   if (pathname.startsWith('/escolher-perfil')) return true;
   if (pathname === '/mapa') return true;
   return false;

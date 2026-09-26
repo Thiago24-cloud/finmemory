@@ -1,44 +1,45 @@
 'use client';
 
-import { Bell, Camera, LayoutDashboard, MapPinned, PackageCheck } from 'lucide-react';
-import { PARTNERS_BENEFITS } from '../../../lib/partners/landingCopy';
+import {
+  LayoutDashboard,
+  MapPinned,
+  PackageCheck,
+  Receipt,
+  TrendingUp,
+  Lightbulb,
+} from 'lucide-react';
+import { PARTNERS_BENEFITS, PARTNERS_OFFERS_SECTION } from '../../../lib/partners/landingCopy';
 
 const ICONS = {
   panel: LayoutDashboard,
   map: MapPinned,
-  alert: Bell,
   stock: PackageCheck,
-  invoice: Camera,
+  sales: Receipt,
+  profit: TrendingUp,
+  insights: Lightbulb,
 };
 
 export function PartnersBenefitsGrid() {
   return (
-    <section id="beneficios" className="px-4 sm:px-6 py-16 sm:py-20 scroll-mt-20">
+    <section id="servicos" className="px-4 sm:px-6 py-14 sm:py-20 scroll-mt-20 bg-white border-y border-[#dbe7df]">
       <div className="max-w-6xl mx-auto">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#39FF14] mb-3">
-          Para quem compra fora do fornecedor
-        </p>
-        <h2 className="text-2xl sm:text-3xl font-bold m-0 max-w-2xl">
-          Mercado, atacarejo ou CEASA: saiba onde vale a pena comprar.
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#0b1f3a] m-0 text-center">
+          {PARTNERS_OFFERS_SECTION.title}
         </h2>
-        <p className="mt-3 text-white/60 max-w-2xl m-0">
-          Muitos pequenos negócios não fecham pedido mínimo com fornecedor todos os dias. O FinMemory ajuda a
-          decidir quando e onde comprar insumos sem perder margem.
-        </p>
 
-        <div className="mt-10 grid sm:grid-cols-2 gap-4 lg:gap-6">
+        <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
           {PARTNERS_BENEFITS.map((item) => {
             const Icon = ICONS[item.icon] || LayoutDashboard;
             return (
               <article
                 key={item.title}
-                className="group rounded-2xl border border-white/10 bg-white/[0.03] p-6 hover:border-[#39FF14]/40 hover:bg-white/[0.05] transition-all duration-300"
+                className="rounded-2xl border border-[#dbe7df] bg-[#f7fbf8] p-6 hover:border-[#86efac] hover:shadow-[0_12px_32px_rgba(11,31,58,0.06)] transition-all duration-300"
               >
-                <div className="w-12 h-12 rounded-xl bg-[#39FF14]/10 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                  <Icon className="h-6 w-6 text-[#39FF14]" aria-hidden />
+                <div className="w-11 h-11 rounded-xl bg-[#dcfce7] flex items-center justify-center mb-4">
+                  <Icon className="h-5 w-5 text-[#16a34a]" aria-hidden />
                 </div>
-                <h3 className="text-lg font-bold m-0">{item.title}</h3>
-                <p className="mt-2 text-sm text-white/60 leading-relaxed m-0">{item.body}</p>
+                <h3 className="text-lg font-bold text-[#0b1f3a] m-0">{item.title}</h3>
+                <p className="mt-2 text-sm text-[#475569] leading-relaxed m-0">{item.body}</p>
               </article>
             );
           })}

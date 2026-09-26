@@ -284,6 +284,12 @@ export default function ShoppingListPage() {
     return `/mapa?lista=${encodeURIComponent(q)}`;
   }, [pendingNoteNamesForMap]);
 
+  const orcamentoListaHref = useMemo(() => {
+    if (!pendingNoteNamesForMap.length) return '/orcamento';
+    const q = pendingNoteNamesForMap.slice(0, 12).join(',');
+    return `/orcamento?lista=${encodeURIComponent(q)}`;
+  }, [pendingNoteNamesForMap]);
+
   /** Itens manuais ainda sem “comprar depois” explícito — marcamos para o fluxo de radar. */
   const baseNoteItems = useMemo(
     () => filteredItems.filter((i) => i.source_type !== 'map'),
@@ -718,6 +724,7 @@ export default function ShoppingListPage() {
           <ShoppingListMapMatchesPanel
             listItems={pendingNoteItemsForMap}
             mapHref={mapaListaHref}
+            orcamentoHref={orcamentoListaHref}
           />
         ) : null}
 
@@ -737,6 +744,7 @@ export default function ShoppingListPage() {
           onToggleChecked={toggleChecked}
           onDelete={handleDelete}
           mapaListaHref={mapaListaHref}
+          orcamentoListaHref={orcamentoListaHref}
           listCount={noteItems.length}
           voiceHint={voiceHint}
           placeholder="Digite aqui..."

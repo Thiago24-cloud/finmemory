@@ -45,20 +45,18 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-[100] isolate glass bg-white/92 backdrop-blur-2xl border-t border-border/70 safe-area-bottom">
       <div className="max-w-md mx-auto relative flex items-end justify-between h-[4.5rem] px-2 pb-1">
         <div className="flex flex-1 justify-start items-end gap-0.5 sm:gap-1 pl-0.5">
-          {restrictedFeaturesAllowed ? (
-            <button type="button" onClick={() => router.push(mapHref)} className={tabBtn(pathname === '/mapa')}>
-              <Map className={cn('h-5 w-5 transition-transform', pathname === '/mapa' && 'scale-110')} />
-              {bagCount > 0 ? (
-                <span className="absolute -top-1 right-0 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white shadow-sm">
-                  {bagCount > 99 ? '99+' : bagCount}
-                </span>
-              ) : null}
-              <span className={cn('text-[10px]', pathname === '/mapa' ? 'font-bold' : 'font-medium')}>{BOTTOM_NAV.map}</span>
-              {pathname === '/mapa' && (
-                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
-              )}
-            </button>
-          ) : null}
+          <button type="button" onClick={() => router.push(mapHref)} className={tabBtn(pathname === '/mapa')}>
+            <Map className={cn('h-5 w-5 transition-transform', pathname === '/mapa' && 'scale-110')} />
+            {bagCount > 0 ? (
+              <span className="absolute -top-1 right-0 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white shadow-sm">
+                {bagCount > 99 ? '99+' : bagCount}
+              </span>
+            ) : null}
+            <span className={cn('text-[10px]', pathname === '/mapa' ? 'font-bold' : 'font-medium')}>{BOTTOM_NAV.map}</span>
+            {pathname === '/mapa' && (
+              <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
+            )}
+          </button>
           <button
             type="button"
             onClick={() => router.push('/dashboard')}

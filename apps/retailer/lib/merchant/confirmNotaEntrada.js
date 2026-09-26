@@ -94,6 +94,7 @@ export async function confirmNotaEntrada(supabase, input) {
   }
 
   const createdInsumoIds = [];
+  const touchedInsumoIds = [];
   let movimentos = 0;
 
   try {
@@ -210,6 +211,9 @@ export async function confirmNotaEntrada(supabase, input) {
       });
 
       if (itemErr) throw new Error(itemErr.message);
+      if (insumoId && !touchedInsumoIds.includes(insumoId)) {
+        touchedInsumoIds.push(insumoId);
+      }
       movimentos += 1;
     }
   } catch (err) {
@@ -228,5 +232,6 @@ export async function confirmNotaEntrada(supabase, input) {
     movimentos,
     itens_confirmados: movimentos,
     insumos_criados: createdInsumoIds.length,
+    insumo_ids: touchedInsumoIds,
   };
 }

@@ -1,4 +1,5 @@
 import { requireMerchantApi } from '../../../../../lib/merchant/requireMerchantApi';
+import { requireFeature } from '../../../../../lib/merchant/requireFeature';
 import { mapMesaRowToApi } from '../../../../../lib/merchant/mesas/mapMesaRow';
 
 const MESA_SELECT = 'id, loja_id, numero, capacidade, status, observacao, created_at, updated_at';
@@ -9,6 +10,7 @@ const MESA_SELECT = 'id, loja_id, numero, capacidade, status, observacao, create
 export default async function handler(req, res) {
   const auth = await requireMerchantApi(req, res);
   if (!auth) return;
+  if (!(await requireFeature(auth, res, 'qr_code'))) return;
 
   const { supabase, store } = auth;
   const lojaId = store.id;

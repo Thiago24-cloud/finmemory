@@ -45,9 +45,12 @@ if (cleanup) {
   process.exit(0);
 }
 
-const manifest = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'scripts/sonda-unidades-terminal-ids.json'), 'utf8')
-);
+const manifestPath =
+  process.env.SONDA_UNITS_MANIFEST ||
+  (process.argv.find((a) => a.startsWith('--manifest='))?.slice('--manifest='.length) ||
+    'scripts/sonda-unidades-terminal-ids.json');
+const manifest = JSON.parse(readFileSync(resolve(process.cwd(), manifestPath), 'utf8'));
+console.log('Manifest:', manifestPath);
 let units = manifest.units || [];
 if (only) units = units.filter((u) => u.id.includes(only) || u.label.toLowerCase().includes(only));
 

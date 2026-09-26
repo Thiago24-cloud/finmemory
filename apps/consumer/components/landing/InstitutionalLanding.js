@@ -95,11 +95,20 @@ function ProfileColumn({ emoji, title, items }) {
   );
 }
 
-function PillarCard({ title, body }) {
+function PillarCard({ title, body, href, cta }) {
   return (
-    <article className={cn(L.cardOnDark, 'p-6 h-full')}>
+    <article className={cn(L.cardOnDark, 'p-6 h-full flex flex-col')}>
       <h3 className={cn(L.cardSubtitle, 'mb-3')}>{title}</h3>
-      <p className={L.cardBodyDark}>{body}</p>
+      <p className={cn(L.cardBodyDark, 'flex-1')}>{body}</p>
+      {href ? (
+        <a
+          href={href}
+          className="mt-5 inline-flex items-center justify-center gap-1 rounded-xl bg-[#2ECC49] text-[#0a0f1a] text-sm font-bold px-4 py-2.5 hover:bg-[#22a83a] transition-colors"
+        >
+          {cta || 'Testar este plano'}
+          <ChevronRight className="h-4 w-4" />
+        </a>
+      ) : null}
     </article>
   );
 }
@@ -204,7 +213,7 @@ export default function InstitutionalLanding({ accessNotice = null }) {
             >
               Play Store em breve
             </Link>
-            <CtaButton href="/login" variant="primaryOutline">
+            <CtaButton href="/login?callbackUrl=%2Finicio" variant="primaryOutline">
               Entrar
             </CtaButton>
           </div>
@@ -236,7 +245,7 @@ export default function InstitutionalLanding({ accessNotice = null }) {
             >
               Play Store em breve
             </Link>
-            <CtaButton href="/login" variant="primaryOutline" className="w-full mt-1" onClick={closeMenu}>
+            <CtaButton href="/login?callbackUrl=%2Finicio" variant="primaryOutline" className="w-full mt-1" onClick={closeMenu}>
               Entrar
             </CtaButton>
           </nav>
@@ -267,7 +276,7 @@ export default function InstitutionalLanding({ accessNotice = null }) {
               minutos.
             </p>
             <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-start">
-              <CtaButton href="/login" variant="primaryOutline">
+              <CtaButton href="/login?callbackUrl=%2Finicio" variant="primaryOutline">
                 Entrar no FinMemory
               </CtaButton>
               <CtaButton href="#investimento" variant="outline">
@@ -382,10 +391,14 @@ export default function InstitutionalLanding({ accessNotice = null }) {
               <PillarCard
                 title="B2C Assinaturas (Freemium)"
                 body="Planos recorrentes para o consumidor final (Gratuito | Plus por R$ 9,90 | Pro por R$ 19,90 | Família por R$ 29,90). Libera recursos avançados de Open Finance, gerenciamento de limites e inteligência artificial preditiva."
+                href="/login?callbackUrl=%2Finicio"
+                cta="Testar planos consumidor"
               />
               <PillarCard
                 title="B2B SaaS Varejo (O Motor de Inicialização)"
-                body="Uma assinatura de apenas R$ 50,00/mês para o pequeno comerciante ter controle de estoque por código de barras, cotação automática em atacados parceiros e vitrine orgânica no mapa local."
+                body="Planos do lojista: Presença Digital, Pedidos Diretos, Estoque e Margem, e Gestão Completa (a partir de R$ 50,00/mês no pacote completo). Estoque por código de barras, pedidos e vitrine no mapa."
+                href="/login?callbackUrl=%2Finicio"
+                cta="Testar planos lojista"
               />
               <PillarCard
                 title="B2B Canal & DaaS (Data as a Service)"
@@ -473,7 +486,7 @@ export default function InstitutionalLanding({ accessNotice = null }) {
             varejo físico.&rdquo;
           </blockquote>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-white/70 mb-6">
-            <CtaButton href="/login" variant="primaryOutline" className="text-sm">
+            <CtaButton href="/login?callbackUrl=%2Finicio" variant="primaryOutline" className="text-sm">
               Entrar no app
             </CtaButton>
             <Link href="/download" className="text-white/50 hover:text-white/80 transition-colors">

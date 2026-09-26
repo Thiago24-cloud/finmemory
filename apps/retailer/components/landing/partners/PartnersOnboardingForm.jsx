@@ -14,41 +14,40 @@ export function PartnersOnboardingForm({ socialProviders = [] }) {
   const loggedIn = status === 'authenticated' && Boolean(session?.user?.email);
 
   return (
-    <section id="cadastro" className="px-4 sm:px-6 py-16 sm:py-24 scroll-mt-20">
+    <section id="cadastro" className="px-4 sm:px-6 py-14 sm:py-20 scroll-mt-20 bg-white border-t border-[#dbe7df]">
       <div className="max-w-xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center m-0">{PARTNERS_FORM.title}</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#0b1f3a] m-0">
+          {PARTNERS_FORM.title}
+        </h2>
         <p className="text-center text-[#475569] mt-3 m-0">
           {loggedIn ? 'Você já está logado. Entre no painel para começar.' : PARTNERS_FORM.subtitle}
         </p>
 
-        <div className="mt-10 rounded-3xl border border-[#e2e8f0] bg-white p-6 sm:p-8 shadow-lg shadow-slate-900/5">
+        <div className="mt-10 rounded-3xl border border-[#dbe7df] bg-[#f7fbf8] p-6 sm:p-8 shadow-[0_12px_32px_rgba(11,31,58,0.05)]">
           {loggedIn ? (
             <div className="space-y-5 text-center">
-              <p className="text-sm text-[#475569] m-0 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
-                Conta atual: <strong className="text-[#0f172a]">{session?.user?.email}</strong>
+              <p className="text-sm text-[#475569] m-0 rounded-xl border border-[#dbe7df] bg-white px-4 py-3">
+                Conta atual: <strong className="text-[#0b1f3a]">{session?.user?.email}</strong>
               </p>
               <Link
                 href={PANEL_URL}
-                className="w-full inline-flex items-center justify-center rounded-xl bg-[#39FF14] py-4 text-base font-bold text-[#050508] shadow-[0_10px_26px_rgba(34,197,94,0.28)] hover:bg-[#5dff3a] transition-all active:scale-[0.98]"
+                className="w-full inline-flex items-center justify-center rounded-xl bg-[#16a34a] py-4 text-base font-bold text-white shadow-[0_10px_26px_rgba(22,163,74,0.28)] hover:bg-[#15803d] transition-all active:scale-[0.98]"
               >
                 Ir para o painel
               </Link>
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-[#475569] m-0 text-center">
-                Faça seu cadastro normal. Depois, dentro do painel, você configura os dados da loja quando precisar.
-              </p>
               <SocialLoginButtons providers={socialProviders} callbackUrl={PANEL_URL} variant="light" />
               <Link
                 href={SIGNUP_URL}
-                className="w-full inline-flex items-center justify-center rounded-xl bg-[#39FF14] py-4 text-base font-bold text-[#050508] shadow-[0_10px_26px_rgba(34,197,94,0.28)] hover:bg-[#5dff3a] transition-all active:scale-[0.98]"
+                className="w-full inline-flex items-center justify-center rounded-xl bg-[#16a34a] py-4 text-base font-bold text-white shadow-[0_10px_26px_rgba(22,163,74,0.28)] hover:bg-[#15803d] transition-all active:scale-[0.98]"
               >
                 Criar conta com e-mail
               </Link>
               <Link
                 href={LOGIN_URL}
-                className="w-full inline-flex items-center justify-center rounded-xl border border-[#d7dee8] bg-white py-3.5 text-sm font-semibold text-[#0f172a] hover:bg-[#f8fafc] transition-colors"
+                className="w-full inline-flex items-center justify-center rounded-xl border border-[#cbd5e1] bg-white py-3.5 text-sm font-semibold text-[#0b1f3a] hover:bg-[#f8fafc] transition-colors"
               >
                 Já tenho conta
               </Link>

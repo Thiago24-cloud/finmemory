@@ -1,10 +1,10 @@
 /**
  * Recursos em rollout gradual — visíveis só para allowlist (time interno).
- * - Caça-preço / mapa de preços (/mapa)
  * - Lista de compras (/shopping-list)
  * - Missões (/missoes)
  * - Código de barras (/scan-product)
  *
+ * O mapa de preços (/mapa) está liberado para todos os usuários autenticados.
  * FINMEMORY_PUBLIC_ACCESS controla login aberto (privateBetaAllowlist), não estas features.
  */
 
@@ -12,7 +12,6 @@ export const FINMEMORY_DEFAULT_RESTRICTED_EMAIL = 'finmemory.oficial@gmail.com';
 
 /** Rotas bloqueadas para quem não está na allowlist (SSR redireciona para /em-breve). */
 export const RESTRICTED_FEATURE_ROUTES = [
-  '/mapa',
   '/scan-product',
   '/shopping-list',
   '/missoes',

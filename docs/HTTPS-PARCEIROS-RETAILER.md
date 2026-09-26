@@ -3,10 +3,10 @@
 O app lojista **já responde em HTTPS** no Cloud Run:
 
 ```text
-https://finmemory-retailer-836908221936.southamerica-east1.run.app
+https://finmemorycomerciantes-836908221936.southamerica-east1.run.app
 ```
 
-O subdomínio `parceiros.finmemory.com.br` hoje devolve **404** porque o DNS (Cloudflare) aponta para o **consumer**, não para o serviço `finmemory-retailer`.
+O subdomínio `parceiros.finmemory.com.br` hoje devolve **404** porque o DNS (Cloudflare) aponta para o **consumer**, não para o serviço `finmemorycomerciantes`.
 
 ## Opção A — Firebase Hosting (certificado gerenciado Google)
 
@@ -33,7 +33,7 @@ npm run deploy:firebase-hosting:retailer
 5. Atualizar env do retailer:
 
 ```powershell
-gcloud run services update finmemory-retailer --region southamerica-east1 --project exalted-entry-480904-s9 --update-env-vars "NEXTAUTH_URL=https://parceiros.finmemory.com.br,NEXT_PUBLIC_APP_URL=https://parceiros.finmemory.com.br,NEXT_PUBLIC_RETAILER_APP_URL=https://parceiros.finmemory.com.br,GOOGLE_REDIRECT_URI=https://parceiros.finmemory.com.br/api/auth/callback/google"
+gcloud run services update finmemorycomerciantes --region southamerica-east1 --project exalted-entry-480904-s9 --update-env-vars "NEXTAUTH_URL=https://parceiros.finmemory.com.br,NEXT_PUBLIC_APP_URL=https://parceiros.finmemory.com.br,NEXT_PUBLIC_RETAILER_APP_URL=https://parceiros.finmemory.com.br,GOOGLE_REDIRECT_URI=https://parceiros.finmemory.com.br/api/auth/callback/google"
 ```
 
 6. Google OAuth: origins + redirect com `https://parceiros.finmemory.com.br`.
@@ -41,7 +41,7 @@ gcloud run services update finmemory-retailer --region southamerica-east1 --proj
 ## Opção B — Cloud Run domain mapping (sem Firebase)
 
 ```bash
-gcloud beta run domain-mappings create --service=finmemory-retailer --domain=parceiros.finmemory.com.br --region=southamerica-east1 --project=exalted-entry-480904-s9
+gcloud beta run domain-mappings create --service=finmemorycomerciantes --domain=parceiros.finmemory.com.br --region=southamerica-east1 --project=exalted-entry-480904-s9
 ```
 
 Aplique os registros DNS que o GCP retornar. Cloudflare: proxy **desligado** no primeiro teste.
@@ -51,7 +51,7 @@ Aplique os registros DNS que o GCP retornar. Cloudflare: proxy **desligado** no 
 Whitelist e `FINMEMORY_API_BASE_URL` devem usar **somente HTTPS**:
 
 - `https://parceiros.finmemory.com.br` (após DNS OK), ou
-- `https://finmemory-retailer-836908221936.southamerica-east1.run.app` (já funciona)
+- `https://finmemorycomerciantes-836908221936.southamerica-east1.run.app` (já funciona)
 
 ## Verificação
 

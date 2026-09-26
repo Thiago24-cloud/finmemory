@@ -7,8 +7,10 @@ import {
   Plus,
   ShoppingBag,
   Store,
+  Wallet,
   Zap,
 } from 'lucide-react';
+import Link from 'next/link';
 import { SkipButton } from './SkipButton';
 import { SkipCard, SkipCardContent } from './SkipCard';
 import { cn } from '../../../lib/skip/cn';
@@ -167,6 +169,19 @@ export function MerchantSkipDashboard({
           </div>
         </SkipCardContent>
       </SkipCard>
+
+      <Link
+        href="/parceiros/carteira"
+        className="block rounded-xl border border-primary/20 bg-primary/5 p-4 no-underline text-inherit hover:border-primary/40 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Wallet className="w-5 h-5 text-primary shrink-0" />
+          <div>
+            <p className="text-sm font-semibold m-0">Carteira de créditos</p>
+            <p className="text-xs text-muted-foreground m-0 mt-1">Cashback de campanhas e saldo auditável</p>
+          </div>
+        </div>
+      </Link>
     </div>
   );
 }

@@ -704,7 +704,7 @@ export default function Dashboard() {
   }, [userId, handleSyncEmails]);
 
   const handleConnectGmail = () => {
-    if (typeof window !== 'undefined') window.location.href = '/login?callbackUrl=/mapa';
+    if (typeof window !== 'undefined') window.location.href = '/login?callbackUrl=/inicio';
   };
 
   const handleDisconnect = async () => {

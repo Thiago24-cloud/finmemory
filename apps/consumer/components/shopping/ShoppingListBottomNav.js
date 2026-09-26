@@ -4,8 +4,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ListOrdered, BarChart3, Map, User, Navigation } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { canUseRestrictedFeatures } from '../../lib/restrictedFeatureAccess';
-import { useSession } from 'next-auth/react';
 
 /**
  * Barra inferior gamificada — só na página de lista de compras.
@@ -13,9 +11,7 @@ import { useSession } from 'next-auth/react';
  */
 export function ShoppingListBottomNav({ mapHref = '/mapa' }) {
   const { pathname } = useRouter();
-  const { data: session } = useSession();
-  const restricted = !canUseRestrictedFeatures(session?.user?.email);
-  const mapLink = restricted ? '/em-breve' : mapHref;
+  const mapLink = mapHref;
   const listasActive = pathname === '/listas' || pathname === '/shopping-list';
   const mapTabActive = pathname === '/mapa';
 

@@ -22,7 +22,7 @@
         {
           "source": "**",
           "run": {
-            "serviceId": "finmemory-retailer",
+            "serviceId": "finmemorycomerciantes",
             "region": "southamerica-east1"
           }
         }

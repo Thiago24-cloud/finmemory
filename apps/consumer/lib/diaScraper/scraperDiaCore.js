@@ -16,7 +16,23 @@ const { buildDiaOffersExtractionPrompt } = require('../diaOffersGptPrompt.js');
 export const SCRAPER_DIA_ORIGEM = 'scraper_dia';
 export const SCRAPER_DIA_PRICE_SOURCE = 'scraper_dia';
 export const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+export const OPENAI_VISION_MODEL = process.env.DIA_OPENAI_VISION_MODEL || 'gpt-4o-mini';
 export const DIA_VISION_BATCH_SIZE = 15;
+
+function diaVisionPromptText(validCount, finishDateIso) {
+  return `Você analisa cartões de oferta do Supermercado DIA (Brasil).
+Para cada uma das ${validCount} imagens acima, extraia:
+- "nome": nome do produto (ex: "Alface-Crespa")
+- "preco_promocional": número decimal do preço "Por" / promocional em destaque (ex: 2.99). Se não visível, null.
+- "preco_unitario": número decimal do preço unitário (ex: 9.99/kg, 3.49/un), quando houver no cartão. Se não visível, null.
+- "preco": manter igual ao "preco_promocional" para compatibilidade do pipeline.
+- "unidade": embalagem/quantidade visível no cartão (ex: "1 un.", "500g"). Se não visível, "".
+- "valid_until": "${finishDateIso || ''}"
+
+Responda APENAS com JSON válido, sem markdown, sem texto fora do JSON:
+{"ofertas":[{"nome":"...","preco_promocional":2.99,"preco_unitario":9.99,"preco":2.99,"unidade":"1 un.","valid_until":"${finishDateIso || ''}"}]}
+Deve ter exatamente ${validCount} itens na array, na mesma ordem das imagens.`;
+}
 
 const DIA_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -91,8 +107,18 @@ export async function fetchImageAsBase64(url) {
   const res = await fetch(url, { headers: { 'User-Agent': DIA_UA } });
   if (!res.ok) throw new Error(`Image HTTP ${res.status} for ${url}`);
   const buf = await res.arrayBuffer();
-  const ct = res.headers.get('content-type') || 'image/png';
-  return { base64: Buffer.from(buf).toString('base64'), mediaType: ct.split(';')[0].trim() };
+  let mediaType = (res.headers.get('content-type') || 'image/png').split(';')[0].trim().toLowerCase();
+  // Anthropic só aceita jpeg/png/gif/webp
+  if (mediaType === 'image/jpg') mediaType = 'image/jpeg';
+  if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mediaType)) {
+    const b = Buffer.from(buf);
+    if (b[0] === 0xff && b[1] === 0xd8) mediaType = 'image/jpeg';
+    else if (b[0] === 0x89 && b[1] === 0x50) mediaType = 'image/png';
+    else if (b[0] === 0x47 && b[1] === 0x49) mediaType = 'image/gif';
+    else if (b[0] === 0x52 && b[1] === 0x49) mediaType = 'image/webp';
+    else mediaType = 'image/jpeg';
+  }
+  return { base64: Buffer.from(buf).toString('base64'), mediaType };
 }
 
 /**
@@ -121,18 +147,7 @@ async function callVisionBatch(apiKey, imageUrls, finishDateIso) {
   });
   content.push({
     type: 'text',
-    text: `Você analisa cartões de oferta do Supermercado DIA (Brasil).
-Para cada uma das ${valid.length} imagens acima, extraia:
-- "nome": nome do produto (ex: "Alface-Crespa")
-- "preco_promocional": número decimal do preço "Por" / promocional em destaque (ex: 2.99). Se não visível, null.
-- "preco_unitario": número decimal do preço unitário (ex: 9.99/kg, 3.49/un), quando houver no cartão. Se não visível, null.
-- "preco": manter igual ao "preco_promocional" para compatibilidade do pipeline.
-- "unidade": embalagem/quantidade visível no cartão (ex: "1 un.", "500g"). Se não visível, "".
-- "valid_until": "${finishDateIso || ''}"
-
-Responda APENAS com JSON válido, sem markdown, sem texto fora do JSON:
-{"ofertas":[{"nome":"...","preco_promocional":2.99,"preco_unitario":9.99,"preco":2.99,"unidade":"1 un.","valid_until":"${finishDateIso || ''}"}]}
-Deve ter exatamente ${valid.length} itens na array, na mesma ordem das imagens.`,
+    text: diaVisionPromptText(valid.length, finishDateIso),
   });
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -162,6 +177,61 @@ Deve ter exatamente ${valid.length} itens na array, na mesma ordem das imagens.`
 
   const jsonStr = extractJsonObject(rawText);
   if (!jsonStr) throw new Error('JSON não encontrado na resposta Haiku vision');
+  const parsed = JSON.parse(jsonStr);
+  return Array.isArray(parsed?.ofertas) ? parsed.ofertas : [];
+}
+
+/**
+ * Mesmo prompt do Haiku, via OpenAI vision (fallback quando Anthropic sem crédito).
+ * @param {string} apiKey
+ * @param {string[]} imageUrls
+ * @param {string|null} finishDateIso
+ */
+async function callVisionBatchOpenAI(apiKey, imageUrls, finishDateIso) {
+  const downloaded = await Promise.all(
+    imageUrls.map((url) =>
+      fetchImageAsBase64(url).catch((e) => {
+        console.warn('[scraper-dia] falha ao baixar imagem:', url, e.message);
+        return null;
+      })
+    )
+  );
+  const valid = downloaded.filter(Boolean);
+  if (valid.length === 0) return [];
+
+  const content = [{ type: 'text', text: diaVisionPromptText(valid.length, finishDateIso) }];
+  for (const img of valid) {
+    const media = img.mediaType || 'image/jpeg';
+    content.push({
+      type: 'image_url',
+      image_url: { url: `data:${media};base64,${img.base64}` },
+    });
+  }
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_VISION_MODEL,
+      temperature: 0.1,
+      max_tokens: 4096,
+      messages: [{ role: 'user', content }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`OpenAI HTTP ${res.status}: ${errText.slice(0, 500)}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.choices?.[0]?.message?.content || '';
+  if (!rawText) throw new Error('Resposta OpenAI sem texto');
+  const jsonStr = extractJsonObject(rawText);
+  if (!jsonStr) throw new Error('JSON não encontrado na resposta OpenAI vision');
   const parsed = JSON.parse(jsonStr);
   return Array.isArray(parsed?.ofertas) ? parsed.ofertas : [];
 }
@@ -209,21 +279,32 @@ export async function extractOffersFromHtmlAnthropic(apiKey, truncatedPlainText)
   return JSON.parse(jsonStr);
 }
 
-export async function extractOffersViaVision(apiKey, allImageUrls, finishDateIso) {
-  const allOfertas = [];
-  const batchDelayMs = Math.max(0, Number(process.env.SCRAPER_DIA_BATCH_DELAY_MS || 220));
-  for (let i = 0; i < allImageUrls.length; i += DIA_VISION_BATCH_SIZE) {
-    const batch = allImageUrls.slice(i, i + DIA_VISION_BATCH_SIZE);
-    if (i > 0 && batchDelayMs > 0) {
-      // Delay curto para evitar rajadas no OCR vision.
+export async function extractOffersViaVision(apiKey, allImageUrls, finishDateIso, options = {}) {
+  const provider = String(options.provider || process.env.DIA_VISION_PROVIDER || 'anthropic').toLowerCase();
+  const anthropicKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
+
+  async function runWith(batchFn, key) {
+    const allOfertas = [];
+    const batchDelayMs = Math.max(0, Number(process.env.SCRAPER_DIA_BATCH_DELAY_MS || 220));
+    for (let i = 0; i < allImageUrls.length; i += DIA_VISION_BATCH_SIZE) {
+      const batch = allImageUrls.slice(i, i + DIA_VISION_BATCH_SIZE);
+      if (i > 0 && batchDelayMs > 0) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, batchDelayMs));
+      }
       // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, batchDelayMs));
+      const ofertas = await batchFn(key, batch, finishDateIso);
+      allOfertas.push(...ofertas);
     }
-    // eslint-disable-next-line no-await-in-loop
-    const ofertas = await callVisionBatch(apiKey, batch, finishDateIso);
-    allOfertas.push(...ofertas);
+    return allOfertas;
   }
-  return allOfertas;
+
+  if (provider === 'openai') {
+    throw new Error('OpenAI vision desativado neste fluxo — use Anthropic (créditos Claude).');
+  }
+
+  if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY ausente');
+  return runWith(callVisionBatch, anthropicKey);
 }
 
 export function inferLocalityForCity(city) {

@@ -12,7 +12,8 @@ export function usePlan() {
     plan,
     isPaid: plan !== 'free',
     isEnterprise: plan === 'enterprise',
-    isPro: planRank(plan) >= 1,
+    isPlus: plan === 'plus' || planRank(plan) >= 1,
+    isPro: planRank(plan) >= planRank('pro'),
     isFamilia: plan === 'familia',
     can: (feature) => canAccessFeature(plan, feature),
     refresh: update,
@@ -21,5 +22,5 @@ export function usePlan() {
 }
 
 function planRank(p) {
-  return { free: 0, enterprise: 1, pro: 2, familia: 3 }[p] ?? 0;
+  return { free: 0, plus: 1, enterprise: 1, pro: 2, familia: 3 }[p] ?? 0;
 }

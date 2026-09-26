@@ -44,7 +44,7 @@ function productionBaseUrl(raw) {
 
 const RETAILER_CLOUD_RUN_URL =
   process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL?.trim() ||
-  'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+  'https://finmemorycomerciantes-836908221936.southamerica-east1.run.app';
 const retailerFromEnv =
   process.env.NEXT_PUBLIC_RETAILER_APP_URL?.trim() ||
   process.env.NEXT_PUBLIC_APP_URL?.trim() ||
@@ -122,9 +122,13 @@ if (result.error) {
 
 if (result.status === 0) {
   console.log('\n[deploy-cloud-run:retailer] Deploy concluído.');
-  console.log('  • Serviço: finmemory-retailer (Cloud Run, southamerica-east1)');
-  console.log('  • Health (quando disponível): https://finmemory-retailer-<hash>-uc.a.run.app/api/health');
-  console.log('  • Próximo passo: mapear domínio parceiros.finmemory.com.br para este serviço.\n');
+  console.log('  • Serviço: finmemorycomerciantes (Cloud Run, southamerica-east1)');
+  console.log(
+    '  • URL: https://finmemorycomerciantes-836908221936.southamerica-east1.run.app'
+  );
+  console.log(
+    '  • Health: https://finmemorycomerciantes-836908221936.southamerica-east1.run.app/api/health\n'
+  );
 }
 
 process.exit(result.status === 0 ? 0 : result.status ?? 1);

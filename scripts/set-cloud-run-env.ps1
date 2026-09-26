@@ -71,10 +71,10 @@ if (-not $vars["FINMEMORY_PUBLIC_ACCESS"]) {
 }
 $vars.Remove("FINMEMORY_LOCKDOWN_SINGLE_USER") | Out-Null
 # App lojista: Cloud Run (subdomínio custom só após domain mapping no GCP + DNS)
-$retailerRunUrl = "https://finmemory-retailer-836908221936.southamerica-east1.run.app"
+$retailerRunUrl = "https://finmemorycomerciantes-836908221936.southamerica-east1.run.app"
 if (-not $vars["NEXT_PUBLIC_RETAILER_APP_URL"] -or $vars["NEXT_PUBLIC_RETAILER_APP_URL"] -match 'parceiros\.finmemory\.com\.br') {
     $vars["NEXT_PUBLIC_RETAILER_APP_URL"] = $retailerRunUrl
-    Write-Host "NEXT_PUBLIC_RETAILER_APP_URL = $retailerRunUrl (finmemory-retailer)" -ForegroundColor Cyan
+    Write-Host "NEXT_PUBLIC_RETAILER_APP_URL = $retailerRunUrl (finmemorycomerciantes)" -ForegroundColor Cyan
 }
 # Rollout gradual: mapa, lista, missões, código de barras — só allowlist (não depende de PUBLIC_ACCESS)
 $vars['FINMEMORY_RESTRICTED_FEATURE_EMAILS'] = 'finmemory.oficial@gmail.com,nickzila2709@gmail.com'

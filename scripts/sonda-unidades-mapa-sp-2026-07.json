@@ -1,0 +1,174 @@
+{
+  "description": "Sonda — unidades 2026-07 (pins geocodificados; CEP resolvido no scraper)",
+  "units": [
+    {
+      "id": "maria-zelia",
+      "label": "Maria Zélia",
+      "address": "Rua Maria Zélia, 77 - Belenzinho, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.503409,
+      "lng": -46.711817,
+      "siteCep": "02071012",
+      "siteAddressNote": "Rua Maria Cândida, 1511",
+      "matchQuality": "proximate",
+      "matchScore": 4
+    },
+    {
+      "id": "pompeia",
+      "label": "Pompeia",
+      "address": "Av. Francisco Matarazzo, 892 - Água Branca, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.526975,
+      "lng": -46.67151,
+      "siteCep": "05001000",
+      "siteAddressNote": "Av. Francisco Matarazzo, 892",
+      "matchQuality": "proximate",
+      "matchScore": 4
+    },
+    {
+      "id": "mooca",
+      "label": "Mooca",
+      "address": "Rua Apucarana, 1000 - Tatuapé / Mooca, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.546723,
+      "lng": -46.563657,
+      "siteCep": "03311001",
+      "siteAddressNote": "R. Apucarana, 1.000",
+      "matchQuality": "exact"
+    },
+    {
+      "id": "vila-maria",
+      "label": "Vila Maria",
+      "address": "Av. Guilherme Cotching, 1200 - Vila Maria, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.518821,
+      "lng": -46.589734,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem loja Sonda próxima no site"
+    },
+    {
+      "id": "lapa",
+      "label": "Lapa",
+      "address": "Rua Guaicurus, 1313 - Lapa, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.521617,
+      "lng": -46.698033,
+      "siteCep": "05033060",
+      "siteAddressNote": "Rua: Guaicurus, 1469",
+      "matchQuality": "street"
+    },
+    {
+      "id": "sao-mateus",
+      "label": "São Mateus",
+      "address": "Av. Mateo Bei, 2200 - São Mateus, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.601573,
+      "lng": -46.483693,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem match CEP no site Sonda",
+      "matchScore": 0
+    },
+    {
+      "id": "cidade-dutra",
+      "label": "Cidade Dutra",
+      "address": "Av. Senador Teotônio Vilela, 1800 - Cidade Dutra, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.745006,
+      "lng": -46.707156,
+      "siteCep": "04801010",
+      "siteAddressNote": "Av. Senador Teotônio Vilela, 1433",
+      "matchQuality": "proximate",
+      "matchScore": 3
+    },
+    {
+      "id": "imigrantes",
+      "label": "Imigrantes",
+      "address": "Av. Ricardo Jafet, 1500 - Vila Mariana, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.589365,
+      "lng": -46.620773,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem match CEP no site Sonda",
+      "matchScore": 2
+    },
+    {
+      "id": "aricanduva",
+      "label": "Aricanduva",
+      "address": "Av. Aricanduva, 5555 - Aricanduva, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.562863,
+      "lng": -46.515819,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem match CEP no site Sonda",
+      "matchScore": 0
+    },
+    {
+      "id": "penha",
+      "label": "Penha",
+      "address": "Av. Amador Bueno da Veiga, 2500 - Penha, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.523538,
+      "lng": -46.521972,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem match CEP no site Sonda",
+      "matchScore": 0
+    },
+    {
+      "id": "pirituba",
+      "label": "Pirituba",
+      "address": "Av. Raimundo Pereira de Magalhães, 11001 - Pirituba, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.444992,
+      "lng": -46.723531,
+      "siteCep": "02938000",
+      "siteAddressNote": "Avenida Raimundo Pereira de Magalhães, 11333",
+      "matchQuality": "proximate",
+      "matchScore": 3
+    },
+    {
+      "id": "itaquera",
+      "label": "Itaquera",
+      "address": "Av. Campanella, 900 - Itaquera, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.536354,
+      "lng": -46.466147,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem match CEP no site Sonda",
+      "matchScore": 2
+    },
+    {
+      "id": "boacava",
+      "label": "Boaçava",
+      "address": "Av. Queiroz Filho, 1200 - Vila Hamburguesa, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.541628,
+      "lng": -46.730174,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem match CEP no site Sonda",
+      "matchScore": 0
+    },
+    {
+      "id": "santana",
+      "label": "Santana",
+      "address": "Av. Engenheiro Caetano Álvares, 4500 - Santana, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.486965,
+      "lng": -46.645203,
+      "pinOnly": true,
+      "pinOnlyReason": "Sem match CEP no site Sonda",
+      "matchScore": 1
+    },
+    {
+      "id": "vila-carrao",
+      "label": "Vila Carrão",
+      "address": "Av. Conselheiro Carrão, 2100 - Vila Carrão, São Paulo - SP",
+      "city": "São Paulo",
+      "lat": -23.547338,
+      "lng": -46.541018,
+      "siteCep": "03403002",
+      "siteAddressNote": "Av. Conselheiro Carrão, 2255",
+      "matchQuality": "exact",
+      "matchScore": 6
+    }
+  ]
+}

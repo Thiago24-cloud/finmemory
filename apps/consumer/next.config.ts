@@ -2,13 +2,21 @@ import type { NextConfig } from 'next';
 import path from 'path';
 import { config as loadEnv } from 'dotenv';
 
-/** Carrega .env da raiz do monorepo (dev local + Cloud Build). */
+/**
+ * Todos os .env ficam na raiz do monorepo (Finmemory/):
+ *   .env + .env.local (compartilhado)
+ *   .env.consumer.local (OAuth/URL :3000 em dev)
+ *   .env.production (públicas)
+ */
 const monorepoRoot = path.join(__dirname, '../..');
 loadEnv({ path: path.join(monorepoRoot, '.env') });
 loadEnv({ path: path.join(monorepoRoot, '.env.local'), override: true });
 loadEnv({ path: path.join(monorepoRoot, '.env.production') });
 if (process.env.NODE_ENV !== 'production') {
-  loadEnv({ path: path.join(__dirname, '.env.development.local'), override: true });
+  loadEnv({
+    path: path.join(monorepoRoot, '.env.consumer.local'),
+    override: true,
+  });
 }
 
 /** Upstream PostHog (ingest + assets) conforme `NEXT_PUBLIC_POSTHOG_HOST` no build. */
@@ -29,7 +37,7 @@ function posthogUpstream() {
 function retailerAppBaseUrl(): string {
   const runApp =
     process.env.FINMEMORY_RETAILER_CLOUD_RUN_URL ||
-    'https://finmemory-retailer-836908221936.southamerica-east1.run.app';
+    'https://finmemorycomerciantes-836908221936.southamerica-east1.run.app';
   const fromEnv =
     process.env.NEXT_PUBLIC_RETAILER_APP_URL || process.env.NEXT_PUBLIC_FINMEMORY_RETAILER_URL || '';
   const base =
@@ -54,6 +62,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/parceiros', destination: `${retailer}/parceiros`, permanent: false },
       { source: '/parceiros/:path*', destination: `${retailer}/parceiros/:path*`, permanent: false },
+      { source: '/equipe', destination: `${retailer}/equipe`, permanent: false },
+      { source: '/equipe/:path*', destination: `${retailer}/equipe/:path*`, permanent: false },
       { source: '/escolher-perfil', destination: `${retailer}/escolher-perfil`, permanent: false },
       {
         source: '/historico-inventario-varejo',

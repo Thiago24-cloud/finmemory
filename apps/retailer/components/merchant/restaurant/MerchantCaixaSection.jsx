@@ -1,15 +1,27 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, DollarSign, Loader2, Receipt, Utensils } from 'lucide-react';
+import {
+  CheckCircle2,
+  Loader2,
+  Receipt,
+  Split,
+  Utensils,
+  WifiOff,
+} from 'lucide-react';
 import { painelApi } from '../../../lib/merchant/painelApiPaths';
 import { usePedidosLojaRealtime } from '../../../hooks/usePedidosLojaRealtime';
+import {
+  peekCaixaSyncQueue,
+  removeCaixaSyncItem,
+} from '../../../lib/merchant/caixa/dividirContaOffline';
 import { SkipPageHeader } from '../skip/SkipPageHeader';
 import { SkipCard, SkipCardContent } from '../skip/SkipCard';
 import { SkipButton } from '../skip/SkipButton';
+import { DividirContaMesa } from './DividirContaMesa';
 
 function formatBrl(v) {
-  return `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export function MerchantCaixaSection({ lojaId }) {
@@ -17,8 +29,11 @@ export function MerchantCaixaSection({ lojaId }) {
   const [mesas, setMesas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMesa, setSelectedMesa] = useState(null);
+  const [dividirOpen, setDividirOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [cancelId, setCancelId] = useState(null);
+  const [pendingSync, setPendingSync] = useState(0);
+  const [syncMsg, setSyncMsg] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,9 +51,55 @@ export function MerchantCaixaSection({ lojaId }) {
     }
   }, []);
 
+  const flushSyncQueue = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setPendingSync(peekCaixaSyncQueue().length);
+      return;
+    }
+    const q = peekCaixaSyncQueue();
+    setPendingSync(q.length);
+    if (!q.length) return;
+
+    let ok = 0;
+    for (const item of q) {
+      try {
+        const res = await fetch(painelApi.caixaPagar, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pedido_ids: item.pedido_ids,
+            mesa_id: item.mesa_id || null,
+            forma_pagamento: item.forma_pagamento,
+            pagamentos: item.pagamentos,
+          }),
+        });
+        if (res.ok || res.status === 400) {
+          // 400 = já pago / inválido — remove da fila para não travar
+          removeCaixaSyncItem(item.id);
+          if (res.ok) ok += 1;
+        }
+      } catch {
+        break;
+      }
+    }
+    const left = peekCaixaSyncQueue().length;
+    setPendingSync(left);
+    if (ok > 0) {
+      setSyncMsg(`${ok} mesa(s) sincronizada(s) após ficar offline.`);
+      await load();
+    }
+  }, [load]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void flushSyncQueue();
+    const onOnline = () => void flushSyncQueue();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [flushSyncQueue]);
 
   usePedidosLojaRealtime(lojaId, load);
 
@@ -76,25 +137,6 @@ export function MerchantCaixaSection({ lojaId }) {
     selectedMesa === 'balcao' ? t.numero === -1 : t.numero === selectedMesa
   );
 
-  const pagarMesa = async () => {
-    if (!selected?.orders?.length) return;
-    setBusy(true);
-    try {
-      await fetch(painelApi.caixaPagar, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pedido_ids: selected.orders.map((o) => o.id),
-          mesa_id: selected.mesa?.id || null,
-        }),
-      });
-      setSelectedMesa(null);
-      await load();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const cancelOrder = async (id, mode) => {
     setBusy(true);
     try {
@@ -115,8 +157,18 @@ export function MerchantCaixaSection({ lojaId }) {
       <SkipPageHeader
         icon={Receipt}
         title="Caixa"
-        description="Contas em aberto — pagamento na mesa."
+        description="Divida a conta sem calculadora — funciona offline."
       />
+
+      {pendingSync > 0 ? (
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          <WifiOff className="h-4 w-4 shrink-0" />
+          {pendingSync} fechamento(s) aguardando internet para sincronizar.
+        </div>
+      ) : null}
+      {syncMsg ? (
+        <p className="mb-3 text-xs text-emerald-700 dark:text-emerald-300 m-0">{syncMsg}</p>
+      ) : null}
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -144,7 +196,7 @@ export function MerchantCaixaSection({ lojaId }) {
         </div>
       )}
 
-      {selected ? (
+      {selected && !dividirOpen ? (
         <div className="fixed inset-0 z-40 flex flex-col justify-end sm:justify-center sm:items-center sm:p-4">
           <button
             type="button"
@@ -179,17 +231,42 @@ export function MerchantCaixaSection({ lojaId }) {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between items-center mb-4 pt-3 border-t border-border">
+              <div className="flex justify-between items-center mb-2 pt-3 border-t border-border">
                 <span className="text-muted-foreground">Total</span>
                 <span className="text-2xl font-black text-primary">{formatBrl(selected.total)}</span>
               </div>
-              <SkipButton disabled={busy} onClick={() => void pagarMesa()} className="w-full h-12 rounded-xl text-base font-bold">
-                <DollarSign className="h-5 w-5" />
-                Confirmar pagamento
+              <p className="text-xs text-muted-foreground m-0 mb-4">
+                Cobre na maquininha e registre cada pagamento no app — a conta não some se a internet cair.
+              </p>
+              <SkipButton
+                disabled={busy}
+                onClick={() => setDividirOpen(true)}
+                className="w-full h-12 rounded-xl text-base font-bold"
+              >
+                <Split className="h-5 w-5" />
+                Dividir conta
               </SkipButton>
             </SkipCardContent>
           </SkipCard>
         </div>
+      ) : null}
+
+      {dividirOpen && selected ? (
+        <DividirContaMesa
+          lojaId={lojaId}
+          title={selected.numero === -1 ? 'Balcão' : `Mesa ${selected.numero}`}
+          total={selected.total}
+          pedidoIds={selected.orders.map((o) => o.id)}
+          mesaId={selected.mesa?.id || null}
+          onClose={() => setDividirOpen(false)}
+          onClosed={async () => {
+            setDividirOpen(false);
+            setSelectedMesa(null);
+            setPendingSync(peekCaixaSyncQueue().length);
+            await load();
+            void flushSyncQueue();
+          }}
+        />
       ) : null}
 
       {cancelId ? (

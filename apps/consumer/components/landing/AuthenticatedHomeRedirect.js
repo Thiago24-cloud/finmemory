@@ -5,8 +5,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 
 /**
- * PWA e sessão ativa: a landing (/) não redireciona sozinha no servidor em todos os casos.
- * Quem já entrou e reabre o app na home vai para o dashboard.
+ * PWA / sessão ativa na landing: vai para o home do plano escolhido (não força /mapa).
  */
 export function AuthenticatedHomeRedirect() {
   const router = useRouter();
@@ -17,7 +16,27 @@ export function AuthenticatedHomeRedirect() {
     const userId = session?.user?.supabaseId;
     if (!userId) return;
     if (router.query?.msg === 'nao-cadastrado') return;
-    void router.replace('/dashboard');
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/account/app-home');
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        const home = data.home || '/inicio';
+        if (/^https?:\/\//i.test(home)) {
+          window.location.href = home;
+          return;
+        }
+        void router.replace(home);
+      } catch {
+        if (!cancelled) void router.replace('/inicio');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [status, session?.user?.supabaseId, router.query?.msg, router]);
 
   return null;

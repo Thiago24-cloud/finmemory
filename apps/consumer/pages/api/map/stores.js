@@ -11,7 +11,7 @@ import {
 import { isExcludedFromPriceMapPoint } from '../../../lib/mapExcludedMapStores';
 import { parsePriceToNumber } from '../../../lib/parseMapPrice';
 import { displayPromoProductName, productNameForThumbnailSearch } from '../../../lib/mapOfferDisplay';
-import { isPomarDaVilaCuratedStoreName, isSacolaoSaoJorgeCuratedStoreName } from '../../../lib/storeLogos';
+import { getStoreLogoPinSrc } from '../../../lib/storeLogos';
 import { pickStoreLogoFromCacheRows } from '../../../lib/mapStoreLogoCache';
 import {
   inferChainSlugFromPromoStoreName,
@@ -30,6 +30,7 @@ import { fetchCuratedPinOptOutStoreIds } from '../../../lib/mapCuratedPinOptOut'
 import { httpsPromoImageUrlForMapJson } from '../../../lib/httpsPromoImageUrlForMap';
 import { formatAgentPromoMapCategory } from '../../../lib/mapPromoCategory';
 import { MAP_PUBLIC_PRICE_POINT_SOURCES } from '../../../lib/mapPublicPricePointSources';
+import { isSimulatedMapProductName } from '../../../lib/mapSimulatedOffers';
 
 /**
  * GET /api/map/stores
@@ -62,23 +63,6 @@ function isPharmacyStoreType(type) {
     t.includes('farmacia') ||
     t.includes('drogaria')
   );
-}
-
-/**
- * Supermercados e padarias só entram no JSON do mapa se tiverem oferta/promo ativa no app
- * (price_points promocionais recentes ou promocoes_supermercados). Outros tipos (ex.: restaurante) seguem visíveis.
- */
-function isSupermarketOrBakeryMapType(type) {
-  const t = String(type || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '');
-  if (!t) return false;
-  if (t === 'bakery' || t === 'padaria') return true;
-  if (t === 'supermarket' || t === 'supermercado') return true;
-  if (t.includes('supermercado') || t.includes('hipermercado')) return true;
-  if (t.includes('padaria') || t.includes('panificadora')) return true;
-  return false;
 }
 
 /**
@@ -121,7 +105,12 @@ export default async function handler(req, res) {
 
   const lat = parseFloat(req.query.lat);
   const lng = parseFloat(req.query.lng);
-  const radiusM = Math.min(Number(req.query.radius) || 2000, 5000);
+  // Aceita `radius` (legado) ou `radius_m` (cliente skip). Cap alto para “Qualquer” / metro SP.
+  const rawRadius = Number(req.query.radius_m ?? req.query.radius);
+  const radiusM = Math.min(
+    Number.isFinite(rawRadius) && rawRadius > 0 ? rawRadius : 2000,
+    120000
+  );
 
   let latMin, latMax, lngMin, lngMax;
 
@@ -178,7 +167,7 @@ export default async function handler(req, res) {
             1200,
             Math.max(400, Number.parseInt(process.env.MAP_STORES_BBOX_LIMIT || '600', 10) || 600)
           )
-      : 100;
+      : Math.min(800, Math.max(100, Math.ceil(radiusM / 80)));
 
     const storesQuery = supabase
       .from('stores')
@@ -302,6 +291,7 @@ export default async function handler(req, res) {
     const storeOfferPreviewMap = new Map();
 
     const attachOffer = (store, p) => {
+      if (isSimulatedMapProductName(p?.product_name)) return;
       const storeId = store.id;
       storeOfferMap.set(storeId, true);
       storeOfferCountMap.set(storeId, (storeOfferCountMap.get(storeId) || 0) + 1);
@@ -405,6 +395,7 @@ export default async function handler(req, res) {
       ...promoFromTableRows.filter((p) => !isExcludedFromPriceMapPoint(p)),
     ];
     for (const p of points) {
+      if (isSimulatedMapProductName(p.product_name)) continue;
       if (isLikelyNonProductScraperTitle(p.product_name)) continue;
       const pLat = Number(p.lat);
       const pLng = Number(p.lng);
@@ -459,14 +450,13 @@ export default async function handler(req, res) {
       if (bestStore) attachOffer(bestStore, p);
     }
 
+    // Google Maps style: mostrar todos os mercados no bbox/raio.
+    // Opt-out curado só some se não tiver oferta ativa.
     const storesVisible = storesRows.filter((s) => {
-      if (!isSupermarketOrBakeryMapType(s.type)) return true;
       if (curatedPinOptOutIds.has(String(s.id))) {
         return !!storeOfferMap.get(s.id);
       }
-      if (isPomarDaVilaCuratedStoreName(s.name)) return true;
-      if (isSacolaoSaoJorgeCuratedStoreName(s.name)) return true;
-      return !!storeOfferMap.get(s.id);
+      return true;
     });
 
     const offerPreviewCap = getStoreOfferPreviewLimit();
@@ -583,6 +573,7 @@ export default async function handler(req, res) {
         return clean;
       });
       const pinLogoFromCache = pickStoreLogoFromCacheRows(s.name, storeLogoCacheRows);
+      const pinLogoFallback = getStoreLogoPinSrc(s.name);
       return {
         id: s.id,
         name: s.name,
@@ -619,7 +610,7 @@ export default async function handler(req, res) {
             product_id: product_id ?? null,
           })
         ),
-        pin_logo_url: pinLogoFromCache || null,
+        pin_logo_url: pinLogoFromCache || pinLogoFallback || null,
       };
     };
 

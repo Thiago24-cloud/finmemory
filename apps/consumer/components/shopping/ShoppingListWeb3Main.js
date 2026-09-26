@@ -1,6 +1,6 @@
 'use client';
 
-import { Mic, MicOff, Trash2, Check, Navigation, Minus, Plus } from 'lucide-react';
+import { Mic, MicOff, Trash2, Check, Navigation, Minus, Plus, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '../../lib/utils';
 import { emojiForShoppingItemName } from '../../lib/shoppingListEmoji';
@@ -24,6 +24,7 @@ export function ShoppingListWeb3Main({
   onToggleChecked,
   onDelete,
   mapaListaHref,
+  orcamentoListaHref,
   listCount,
   voiceHint,
   placeholder = 'Digite aqui...',
@@ -150,17 +151,31 @@ export function ShoppingListWeb3Main({
           </ul>
 
           {mapaListaHref && listCount > 0 ? (
-            <Link
-              href={mapaListaHref}
-              className={cn(
-                'flex items-center justify-center gap-2 w-full rounded-2xl py-3.5 text-sm font-black',
-                'border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 transition'
-              )}
-            >
-              <Navigation className="h-4 w-4" />
-              Localizar no Mapa de Preços
-              {listCount ? ` (${listCount})` : ''}
-            </Link>
+            <div className="space-y-2">
+              <Link
+                href={mapaListaHref}
+                className={cn(
+                  'flex items-center justify-center gap-2 w-full rounded-2xl py-3.5 text-sm font-black',
+                  'border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 transition'
+                )}
+              >
+                <Navigation className="h-4 w-4" />
+                Localizar no Mapa de Preços
+                {listCount ? ` (${listCount})` : ''}
+              </Link>
+              {orcamentoListaHref ? (
+                <Link
+                  href={orcamentoListaHref}
+                  className={cn(
+                    'flex items-center justify-center gap-2 w-full rounded-2xl py-3 text-sm font-bold',
+                    'border border-[#25D366]/40 bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/15 transition'
+                  )}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Comparar e enviar no WhatsApp
+                </Link>
+              ) : null}
+            </div>
           ) : null}
         </>
       ) : (

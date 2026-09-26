@@ -259,7 +259,9 @@ export const authOptions = {
         try {
           const { data, error } = await supabase
             .from('users')
-            .select('id, created_at, plano, plano_ativo, name, avatar_url, account_type')
+            .select(
+              'id, created_at, plano, plano_ativo, name, avatar_url, account_type, preferred_audience, preferred_plan, plan_trial_ends_at'
+            )
             .eq('email', email)
             .maybeSingle();
           if (data?.id) {
@@ -270,6 +272,9 @@ export const authOptions = {
             if (data.name) token.name = data.name;
             if (data.avatar_url) token.picture = data.avatar_url;
             token.account_type = data.account_type || 'consumidor';
+            token.preferred_audience = data.preferred_audience || null;
+            token.preferred_plan = data.preferred_plan || null;
+            token.plan_trial_ends_at = data.plan_trial_ends_at || null;
           } else if (error) {
             // plano/plano_ativo columns may not exist yet — fallback to basic query
             console.warn('jwt callback: extended query failed, trying fallback:', error?.message);
@@ -296,6 +301,13 @@ export const authOptions = {
         if (typeof session.name === 'string') token.name = session.name;
         if (session.image !== undefined) token.picture = session.image;
         if (typeof session.account_type === 'string') token.account_type = session.account_type;
+        if (session.preferred_audience !== undefined) {
+          token.preferred_audience = session.preferred_audience;
+        }
+        if (session.preferred_plan !== undefined) token.preferred_plan = session.preferred_plan;
+        if (session.plan_trial_ends_at !== undefined) {
+          token.plan_trial_ends_at = session.plan_trial_ends_at;
+        }
       }
 
       return token;
@@ -349,6 +361,9 @@ export const authOptions = {
         session.user.plano = token.plano || 'free';
         session.user.plano_ativo = Boolean(token.plano_ativo);
         session.user.account_type = token.account_type || 'consumidor';
+        session.user.preferred_audience = token.preferred_audience || null;
+        session.user.preferred_plan = token.preferred_plan || null;
+        session.user.plan_trial_ends_at = token.plan_trial_ends_at || null;
         if (token.name) session.user.name = token.name;
         if (token.picture) session.user.image = token.picture;
       }
@@ -358,7 +373,9 @@ export const authOptions = {
           if (supabase) {
             const { data, error } = await supabase
               .from('users')
-              .select('id, created_at, plano, plano_ativo, name, avatar_url, account_type')
+              .select(
+                'id, created_at, plano, plano_ativo, name, avatar_url, account_type, preferred_audience, preferred_plan, plan_trial_ends_at'
+              )
               .eq('email', session.user.email)
               .maybeSingle();
             if (data) {
@@ -369,6 +386,9 @@ export const authOptions = {
               if (data.name) session.user.name = data.name;
               if (data.avatar_url) session.user.image = data.avatar_url;
               session.user.account_type = data.account_type || 'consumidor';
+              session.user.preferred_audience = data.preferred_audience || null;
+              session.user.preferred_plan = data.preferred_plan || null;
+              session.user.plan_trial_ends_at = data.plan_trial_ends_at || null;
             } else if (error) {
               console.warn('session callback: extended query failed, trying fallback:', error?.message);
               const { data: basic } = await supabase

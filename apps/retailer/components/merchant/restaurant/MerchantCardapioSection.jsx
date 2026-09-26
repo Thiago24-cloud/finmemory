@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Pencil, Plus, Search, Trash2, Utensils } from 'lucide-react';
 import { painelApi } from '../../../lib/merchant/painelApiPaths';
 import { SkipButton } from '../skip/SkipButton';
@@ -21,6 +22,24 @@ export function MerchantCardapioSection({ products, onProductSaved, onProductUpd
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!deleteId || typeof document === 'undefined') return undefined;
+    const { body, documentElement } = document;
+    const prevBody = body.style.overflow;
+    const prevHtml = documentElement.style.overflow;
+    body.style.overflow = 'hidden';
+    documentElement.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = prevBody;
+      documentElement.style.overflow = prevHtml;
+    };
+  }, [deleteId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -195,37 +214,41 @@ export function MerchantCardapioSection({ products, onProductSaved, onProductUpd
         }}
       />
 
-      {deleteId ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/80"
-            aria-label="Fechar"
-            onClick={() => !deleting && setDeleteId(null)}
-          />
-          <div
-            role="alertdialog"
-            className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-background p-5 shadow-2xl space-y-4"
-          >
-            <h3 className="text-base font-semibold m-0">Remover item do cardápio?</h3>
-            <p className="text-sm text-muted-foreground m-0">
-              Esta ação não pode ser desfeita. O item será permanentemente removido.
-            </p>
-            <div className="flex justify-end gap-2">
-              <SkipButton
-                variant="outline"
-                onClick={() => setDeleteId(null)}
-                disabled={deleting}
+      {deleteId && mounted
+        ? createPortal(
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" role="presentation">
+              <button
+                type="button"
+                className="absolute inset-0 z-0 bg-black/50 backdrop-blur-sm"
+                aria-label="Fechar"
+                onClick={() => !deleting && setDeleteId(null)}
+              />
+              <div
+                role="alertdialog"
+                className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-background p-5 shadow-2xl space-y-4"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancelar
-              </SkipButton>
-              <SkipButton variant="destructive" onClick={handleDelete} disabled={deleting}>
-                {deleting ? 'Removendo…' : 'Remover'}
-              </SkipButton>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                <h3 className="text-base font-semibold m-0">Remover item do cardápio?</h3>
+                <p className="text-sm text-muted-foreground m-0">
+                  Esta ação não pode ser desfeita. O item será permanentemente removido.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <SkipButton
+                    variant="outline"
+                    onClick={() => setDeleteId(null)}
+                    disabled={deleting}
+                  >
+                    Cancelar
+                  </SkipButton>
+                  <SkipButton variant="destructive" onClick={handleDelete} disabled={deleting}>
+                    {deleting ? 'Removendo…' : 'Remover'}
+                  </SkipButton>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

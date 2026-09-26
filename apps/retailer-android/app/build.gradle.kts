@@ -35,7 +35,7 @@ android {
         buildConfigField(
             "String",
             "FINMEMORY_API_BASE_URL",
-            "\"${readProp("FINMEMORY_API_BASE_URL", "https://finmemory-retailer-836908221936.southamerica-east1.run.app")}\""
+            "\"${readProp("FINMEMORY_API_BASE_URL", "https://finmemorycomerciantes-836908221936.southamerica-east1.run.app")}\""
         )
     }
 

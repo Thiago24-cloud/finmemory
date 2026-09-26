@@ -43,6 +43,14 @@ const SettingsPlanosBlock = memo(function SettingsPlanosBlock({ supabaseId, user
         Assinatura no Stripe — Pro ou Família. Os preços vêm do Stripe Checkout.
       </p>
       <Link
+        href="/inicio?change=1"
+        prefetch={false}
+        scroll={false}
+        className="mt-3 block w-full rounded-xl border border-[#2ECC49]/40 bg-transparent py-3 px-4 text-center text-sm font-semibold text-[#2ECC49] transition-all duration-200 hover:bg-[#2ECC49]/10"
+      >
+        Escolher plano para testar (sem pagamento)
+      </Link>
+      <Link
         href="/planos"
         prefetch={false}
         scroll={false}
