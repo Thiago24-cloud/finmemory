@@ -17,7 +17,10 @@ import { SkipPageHeader } from './skip/SkipPageHeader';
 import { SkipCard, SkipCardContent } from './skip/SkipCard';
 import { SkipButton } from './skip/SkipButton';
 import { painelApi } from '../../lib/merchant/painelApiPaths';
-import { buildCestaConsumerMapUrl } from '../../lib/merchant/compras/cestaMapUrl';
+import {
+  buildCestaConsumerMapUrl,
+  buildCestaGoogleMapsRouteUrl,
+} from '../../lib/merchant/compras/cestaMapUrl';
 import { offerKey } from '../../lib/merchant/compras/cestaCompare';
 import { InsumoProductImage } from './InsumoProductImage';
 
@@ -295,8 +298,19 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
       storeLat,
       storeLng,
       minCoverage: 1,
+      rota: true,
     });
   }, [items, stores, summary, storeLat, storeLng]);
+
+  const googleRouteUrl = useMemo(() => {
+    if (!stores.length) return null;
+    return buildCestaGoogleMapsRouteUrl({
+      stores,
+      storeLat,
+      storeLng,
+      maxStops: 5,
+    });
+  }, [stores, storeLat, storeLng]);
 
   const routeTotal = summary?.estimatedBestTotal ?? stores[0]?.total ?? 0;
 
@@ -552,19 +566,33 @@ export function MerchantMinhaCompraSection({ storeLat, storeLng, onOpenMap }) {
         <div className="space-y-2">
           {stores.length > 0 ? (
             <p className="text-[10px] text-muted-foreground m-0">
-              Mapa filtrado: {stores.length} mercado(s) com itens da sua cesta.
+              Melhor cobertura: {stores[0].storeName}
+              {Number.isFinite(Number(stores[0].total))
+                ? ` · ${formatBrl(stores[0].total)}`
+                : ''}
+              {stores.length > 1 ? ` · +${stores.length - 1} mercado(s)` : ''}
             </p>
           ) : null}
           <button
-          type="button"
-          onClick={() => {
-            if (typeof onOpenMap === 'function') onOpenMap(mapUrl);
-          }}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 py-3 text-sm font-bold text-primary hover:bg-primary/15"
-        >
-          <MapPin className="h-4 w-4" aria-hidden />
-          Ver cesta no mapa
-        </button>
+            type="button"
+            onClick={() => {
+              if (typeof onOpenMap === 'function') onOpenMap(mapUrl);
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary py-3 text-sm font-bold text-primary-foreground hover:opacity-95"
+          >
+            <MapPin className="h-4 w-4" aria-hidden />
+            Abrir rota da cesta no mapa
+          </button>
+          {googleRouteUrl ? (
+            <a
+              href={googleRouteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-bold text-foreground no-underline hover:bg-muted/40"
+            >
+              Abrir no Google Maps
+            </a>
+          ) : null}
         </div>
       ) : null}
 

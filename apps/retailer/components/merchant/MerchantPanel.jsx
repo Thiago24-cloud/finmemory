@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
-import { Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus } from 'lucide-react';
 import { MerchantProductForm } from './MerchantProductForm';
 import { MerchantProductCard } from './MerchantProductCard';
 import { MerchantInsumosSection } from './MerchantInsumosSection';
@@ -13,6 +13,7 @@ import { useProdutosLojaRealtime } from '../../hooks/useProdutosLojaRealtime';
 import { MerchantMinhaCompraSection } from './MerchantMinhaCompraSection';
 import { MerchantVendasSection } from './MerchantVendasSection';
 import { MerchantSkipPrecosMap } from './precos/MerchantSkipPrecosMap';
+import { ParceirosMapFrame } from './ParceirosMapFrame';
 import { MerchantMesasSection } from './restaurant/MerchantMesasSection';
 import { MerchantCozinhaSection } from './restaurant/MerchantCozinhaSection';
 import { MerchantCardapioSection } from './restaurant/MerchantCardapioSection';
@@ -40,6 +41,8 @@ export function MerchantPanel() {
   const [repairing, setRepairing] = useState(false);
   const [panelTab, setPanelTab] = useState('ofertas');
   const [insumosCount, setInsumosCount] = useState(0);
+  /** URL do mapa consumidor com ?cesta= — aberto a partir de “Rota de Compras”. */
+  const [cestaMapUrl, setCestaMapUrl] = useState(null);
 
   const tryRepairLink = useCallback(async () => {
     setRepairing(true);
@@ -214,6 +217,30 @@ export function MerchantPanel() {
   const flashCount = products.filter((p) => p.em_oferta).length;
   const mapTabAttention = panelTab !== 'mapa';
 
+  if (panelTab === 'mapa' && !loading && cestaMapUrl) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#e8e4de]">
+        <div className="z-10 flex shrink-0 items-center gap-3 border-b border-[#dadce0] bg-white px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))] shadow-[0_1px_3px_rgba(60,64,67,0.12)]">
+          <button
+            type="button"
+            onClick={() => {
+              setCestaMapUrl(null);
+              setPanelTab('lista');
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-3 py-2 text-xs font-bold text-[#202124] hover:bg-[#f8f9fa]"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Voltar à cesta
+          </button>
+          <span className="text-sm font-bold text-[#202124]">Rota da cesta</span>
+        </div>
+        <div className="relative min-h-0 flex-1">
+          <ParceirosMapFrame mapUrl={cestaMapUrl} title="Rota de compras — FinMemory" />
+        </div>
+      </div>
+    );
+  }
+
   if (panelTab === 'mapa' && !loading) {
     return (
       <MerchantSkipPrecosMap
@@ -291,7 +318,12 @@ export function MerchantPanel() {
             <MerchantMinhaCompraSection
               storeLat={ctx?.store?.lat}
               storeLng={ctx?.store?.lng}
-              onOpenMap={() => setPanelTab('mapa')}
+              onOpenMap={(url) => {
+                if (typeof url === 'string' && url.trim()) {
+                  setCestaMapUrl(url.trim());
+                }
+                setPanelTab('mapa');
+              }}
             />
           ) : panelTab === 'vendas' ? (
             <MerchantVendasSection lojaId={ctx?.store?.id} />

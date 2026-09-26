@@ -45,7 +45,7 @@ export async function getServerSideProps(ctx) {
     };
   }
 
-  const { lat, lng, zoom, lista } = ctx.query;
+  const { lat, lng, zoom, lista, cesta, cesta_min: cestaMin, rota } = ctx.query;
   const mapUrl = buildConsumerMapUrl({
     lat,
     lng,
@@ -53,6 +53,9 @@ export async function getServerSideProps(ctx) {
     from: 'parceiros',
     embed: true,
     lista: typeof lista === 'string' ? lista : undefined,
+    cesta: typeof cesta === 'string' ? cesta : undefined,
+    cestaMin: cestaMin != null && cestaMin !== '' ? Number(cestaMin) : undefined,
+    rota: rota === '1' || rota === 'true',
   });
 
   return { props: { mapUrl } };
