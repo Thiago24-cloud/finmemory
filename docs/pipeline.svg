@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 470" width="880" height="470">
+  <defs>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <linearGradient id="emerald-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00e676" />
+      <stop offset="100%" stop-color="#00bcd4" />
+    </linearGradient>
+    <pattern id="pgrid" width="34" height="34" patternUnits="userSpaceOnUse">
+      <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#2ecc49" stroke-opacity="0.05" />
+    </pattern>
+    <marker id="arr-e" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#2ecc49" stroke-width="1.2"/></marker>
+    <marker id="arr-c" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#00bcd4" stroke-width="1.2"/></marker>
+    <marker id="arr-m" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#6272a4" stroke-width="1.2"/></marker>
+    <marker id="arr-y" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#f1fa8c" stroke-width="1.2"/></marker>
+  </defs>
+
+  <rect width="880" height="470" fill="#0a0f1a" />
+  <rect x="10" y="10" width="860" height="450" rx="10" fill="url(#pgrid)" />
+  <rect x="10" y="10" width="860" height="450" rx="10" fill="none" stroke="#2ecc49" stroke-opacity="0.5" stroke-width="1.5" />
+
+  <style>
+    .box { fill: #141c2e; stroke-width: 1.5; }
+    .t1 { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 13px; font-weight: bold; }
+    .t2 { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 10.5px; fill: #6272a4; }
+    .lbl { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 10px; fill: #6272a4; }
+  </style>
+
+  <!-- fontes -> ingestão -->
+  <path d="M190 95 L 238 95" fill="none" stroke="#2ecc49" stroke-opacity="0.6" stroke-width="1.4" marker-end="url(#arr-e)" />
+  <path d="M190 205 L 238 205" fill="none" stroke="#00bcd4" stroke-opacity="0.6" stroke-width="1.4" marker-end="url(#arr-c)" />
+  <path d="M190 315 L 238 315" fill="none" stroke="#f1fa8c" stroke-opacity="0.5" stroke-width="1.4" marker-end="url(#arr-y)" />
+
+  <!-- ingestão -> supabase -->
+  <path d="M420 95 C 445 95, 442 140, 468 148" fill="none" stroke="#2ecc49" stroke-opacity="0.6" stroke-width="1.4" marker-end="url(#arr-e)" />
+  <path d="M420 205 L 468 205" fill="none" stroke="#00bcd4" stroke-opacity="0.6" stroke-width="1.4" marker-end="url(#arr-c)" />
+  <path d="M420 315 C 445 315, 442 275, 468 268" fill="none" stroke="#f1fa8c" stroke-opacity="0.55" stroke-width="1.4" marker-end="url(#arr-y)" />
+
+  <!-- supabase -> saídas -->
+  <path d="M658 148 C 685 140, 682 100, 708 95" fill="none" stroke="#2ecc49" stroke-opacity="0.6" stroke-width="1.4" marker-end="url(#arr-e)" />
+  <path d="M658 205 L 708 205" fill="none" stroke="#00bcd4" stroke-opacity="0.6" stroke-width="1.4" marker-end="url(#arr-c)" />
+  <path d="M658 268 C 685 275, 682 310, 708 315" fill="none" stroke="#6272a4" stroke-opacity="0.65" stroke-width="1.4" marker-end="url(#arr-m)" />
+
+  <!-- pulsos -->
+  <circle r="3.5" fill="#2ecc49" filter="url(#glow)"><animateMotion dur="1.8s" repeatCount="indefinite" path="M190 95 L 238 95"/></circle>
+  <circle r="3.5" fill="#00bcd4" filter="url(#glow)"><animateMotion dur="2.2s" begin="0.7s" repeatCount="indefinite" path="M190 205 L 238 205"/></circle>
+  <circle r="3.5" fill="#2ecc49" filter="url(#glow)"><animateMotion dur="2.0s" begin="0.4s" repeatCount="indefinite" path="M420 95 C 445 95, 442 140, 468 148"/></circle>
+  <circle r="3.5" fill="#00bcd4" filter="url(#glow)"><animateMotion dur="1.6s" begin="1.0s" repeatCount="indefinite" path="M420 205 L 468 205"/></circle>
+  <circle r="3.5" fill="#f1fa8c" filter="url(#glow)"><animateMotion dur="2.1s" begin="0.2s" repeatCount="indefinite" path="M420 315 C 445 315, 442 275, 468 268"/></circle>
+  <circle r="3.5" fill="#2ecc49" filter="url(#glow)"><animateMotion dur="1.9s" begin="0.5s" repeatCount="indefinite" path="M658 148 C 685 140, 682 100, 708 95"/></circle>
+  <circle r="3.5" fill="#00bcd4" filter="url(#glow)"><animateMotion dur="1.7s" begin="1.2s" repeatCount="indefinite" path="M658 205 L 708 205"/></circle>
+
+  <!-- fontes -->
+  <g>
+    <rect x="30" y="60" width="160" height="70" rx="8" class="box" stroke="#2ecc49" stroke-opacity="0.8" />
+    <text x="110" y="86" text-anchor="middle" class="t1" fill="#2ecc49">gmail api</text>
+    <text x="110" y="104" text-anchor="middle" class="t2">nf-e · cupons</text>
+    <text x="110" y="119" text-anchor="middle" class="t2">gmail.readonly</text>
+
+    <rect x="30" y="170" width="160" height="70" rx="8" class="box" stroke="#00bcd4" stroke-opacity="0.8" />
+    <text x="110" y="196" text-anchor="middle" class="t1" fill="#00bcd4">finmemory-agent</text>
+    <text x="110" y="214" text-anchor="middle" class="t2">playwright 1.62</text>
+    <text x="110" y="229" text-anchor="middle" class="t2">11 redes BR</text>
+
+    <rect x="30" y="280" width="160" height="70" rx="8" class="box" stroke="#f1fa8c" stroke-opacity="0.6" />
+    <text x="110" y="306" text-anchor="middle" class="t1" fill="#f1fa8c">apps/retailer</text>
+    <text x="110" y="324" text-anchor="middle" class="t2">lojista · ocr nota</text>
+    <text x="110" y="339" text-anchor="middle" class="t2">cielo · stone pos</text>
+  </g>
+
+  <!-- ingestão -->
+  <g>
+    <rect x="240" y="60" width="180" height="70" rx="8" class="box" stroke="#2ecc49" stroke-opacity="0.8" />
+    <text x="330" y="86" text-anchor="middle" class="t1" fill="#2ecc49">openai extract</text>
+    <text x="330" y="104" text-anchor="middle" class="t2">nf-e → json</text>
+    <text x="330" y="119" text-anchor="middle" class="t2">gpt-4o-mini · gemini</text>
+
+    <rect x="240" y="170" width="180" height="70" rx="8" class="box" stroke="#00bcd4" stroke-opacity="0.8" />
+    <text x="330" y="196" text-anchor="middle" class="t1" fill="#00bcd4">lib/ingest</text>
+    <text x="330" y="214" text-anchor="middle" class="t2">enqueuePromocoes()</text>
+    <text x="330" y="229" text-anchor="middle" class="t2">origem=scraper_*</text>
+
+    <rect x="240" y="280" width="180" height="70" rx="8" class="box" stroke="#f1fa8c" stroke-opacity="0.6" />
+    <text x="330" y="306" text-anchor="middle" class="t1" fill="#f1fa8c">retailer api</text>
+    <text x="330" y="324" text-anchor="middle" class="t2">vendas · insumos</text>
+    <text x="330" y="339" text-anchor="middle" class="t2">onnx stock scan</text>
+  </g>
+
+  <!-- supabase hub -->
+  <g>
+    <rect x="470" y="110" width="188" height="200" rx="8" class="box" stroke="url(#emerald-grad)" stroke-width="2" filter="url(#glow)">
+      <animate attributeName="stroke-opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite" />
+    </rect>
+    <text x="564" y="138" text-anchor="middle" class="t1" fill="#00e676">supabase pg</text>
+    <text x="564" y="162" text-anchor="middle" class="t2">users · transacoes</text>
+    <text x="564" y="180" text-anchor="middle" class="t2">produtos · stores</text>
+    <text x="564" y="198" text-anchor="middle" class="t2">price_points</text>
+    <text x="564" y="216" text-anchor="middle" class="t2">promocoes · fila</text>
+    <text x="564" y="240" text-anchor="middle" class="t2">next-auth adapter</text>
+    <text x="564" y="258" text-anchor="middle" class="t2">RLS por usuário</text>
+    <text x="564" y="284" text-anchor="middle" class="t2">pluggy open finance</text>
+  </g>
+
+  <!-- saídas -->
+  <g>
+    <rect x="710" y="60" width="140" height="70" rx="8" class="box" stroke="#2ecc49" stroke-opacity="0.8" />
+    <text x="780" y="86" text-anchor="middle" class="t1" fill="#2ecc49">dashboard</text>
+    <text x="780" y="104" text-anchor="middle" class="t2">/dashboard</text>
+    <text x="780" y="119" text-anchor="middle" class="t2">next-auth · oauth</text>
+
+    <rect x="710" y="170" width="140" height="70" rx="8" class="box" stroke="#00bcd4" stroke-opacity="0.9" filter="url(#glow)">
+      <animate attributeName="stroke-opacity" values="0.7;1;0.7" dur="2.2s" repeatCount="indefinite" />
+    </rect>
+    <text x="780" y="196" text-anchor="middle" class="t1" fill="#00bcd4">/mapa</text>
+    <text x="780" y="214" text-anchor="middle" class="t2">leaflet · maplibre</text>
+    <text x="780" y="229" text-anchor="middle" class="t2">supercluster · ttl 24h</text>
+
+    <rect x="710" y="280" width="140" height="70" rx="8" class="box" stroke="#6272a4" />
+    <text x="780" y="306" text-anchor="middle" class="t1" fill="#6272a4">mobile</text>
+    <text x="780" y="324" text-anchor="middle" class="t2">capacitor 8</text>
+    <text x="780" y="339" text-anchor="middle" class="t2">android · ios</text>
+  </g>
+
+  <!-- faixa crons -->
+  <g>
+    <rect x="30" y="392" width="820" height="48" rx="8" fill="none" stroke="#6272a4" stroke-dasharray="8 5" stroke-opacity="0.7" />
+    <text x="440" y="412" text-anchor="middle" class="t1" fill="#6272a4">gh actions · 3 crons</text>
+    <text x="440" y="429" text-anchor="middle" class="t2">scraper-dia (dom 05:00 utc) · scraper-atacadao (dom 06:00 utc) · reengagement (diário 14:00 utc)</text>
+  </g>
+
+  <!-- labels de coluna -->
+  <text x="110" y="46" text-anchor="middle" class="lbl">fontes</text>
+  <text x="330" y="46" text-anchor="middle" class="lbl">ingestão</text>
+  <text x="564" y="46" text-anchor="middle" class="lbl">banco</text>
+  <text x="780" y="46" text-anchor="middle" class="lbl">saída</text>
+</svg>

@@ -1,8 +1,8 @@
 <div align="center">
-  <a href="#root"><img src="./docs/banner.svg?v=1" alt="finmemory · nf-e to price map" width="100%"/></a>
+  <a href="#root"><img src="./banner.svg?v=1" alt="finmemory · nf-e vira mapa de preços" width="100%"/></a>
 </div>
 
-> 🇧🇷 [Versão em Português](docs/README.pt-BR.md) · Production: [finmemory.com.br](https://finmemory.com.br) · Retailer: [parceiros.finmemory.com.br](https://parceiros.finmemory.com.br)
+> 🇺🇸 [English version](../README.md) · Produção: [finmemory.com.br](https://finmemory.com.br) · Lojista: [parceiros.finmemory.com.br](https://parceiros.finmemory.com.br)
 
 <table width="100%">
   <tr>
@@ -43,38 +43,39 @@
 
 ### ❯ o_que_e
 
-FinMemory is a Brazilian fintech monorepo. The consumer app connects to Gmail
-(read-only), pulls NF-e and receipts out of the inbox, extracts items with an AI
-parser and turns the purchase history into two things: a dashboard of what you
-spent and a live price map of what supermarkets around you are charging. Around
-that core sit a retailer app for merchants (OCR of paper receipts, Cielo
-payments, an ONNX-based shelf scanner), a Playwright agent that harvests
-promotions from 11 Brazilian grocery chains, and open-finance sync via Pluggy.
+O FinMemory é um monorepo fintech brasileiro. O app do consumidor conecta no
+Gmail (somente leitura), puxa NF-e e cupons da caixa de entrada, extrai os itens
+com um parser de IA e transforma o histórico de compras em duas coisas: um
+dashboard do que você gastou e um mapa de preços ao vivo do que os mercados ao
+redor estão cobrando. Em volta desse núcleo há um app para o lojista (OCR de
+nota de papel, pagamentos Cielo, scanner de prateleira em ONNX), um agente
+Playwright que coleta promoções de 11 redes de mercado e sincronização de open
+finance via Pluggy.
 
 ---
 
 ### ❯ pipeline
 
 <div align="center">
-  <img src="./docs/pipeline.svg?v=1" alt="Pipeline: gmail/scrapers/retailer → ingest → supabase → apps" width="100%"/>
+  <img src="./pipeline.svg?v=1" alt="Pipeline: gmail/scrapers/retailer → ingestão → supabase → apps" width="100%"/>
 </div>
 
-Every scraper write goes through `enqueuePromocoes()` in
-`apps/consumer/lib/ingest` with an `origem` tag (`scraper_dia`,
-`scraper_assai`, ...). Manual flows (user OCR, Quick Add, admin) may write
-`price_points` directly. This contract is enforced by project rules, not by
-convention.
+Todo scraper escreve via `enqueuePromocoes()` em `apps/consumer/lib/ingest` com
+tag de `origem` (`scraper_dia`, `scraper_assai`, ...). Fluxos manuais (OCR do
+usuário, Quick Add, admin) podem escrever em `price_points` diretamente. Esse
+contrato é regra de projeto, não convenção.
 
 ---
 
 ### ❯ monorepo
 
-npm workspaces. One root `.env` drives all apps (consumer's `next.config.ts`
-loads it via dotenv; scripts use `-r dotenv/config`).
+npm workspaces. Um único `.env` na raiz alimenta todos os apps (o
+`next.config.ts` do consumer carrega via dotenv; os scripts usam
+`-r dotenv/config`).
 
 | dir | package | o que é | dev |
 |---|---|---|---|
-| `apps/consumer` | `@finmemory/consumer` | app do consumidor: Gmail sync, dashboard, `/mapa`, API routes | `npm run dev` → :3000 |
+| `apps/consumer` | `@finmemory/consumer` | app do consumidor: sync do Gmail, dashboard, `/mapa`, API routes | `npm run dev` → :3000 |
 | `apps/retailer` | `@finmemory/retailer` | app do lojista: OCR de nota, Cielo, cardápio, visão de estoque ONNX | `npm run dev:retailer` → :3001 |
 | `apps/retailer-android` | Kotlin/Gradle | app nativo p/ SmartPOS Stone, fila offline em Room → `POST /api/merchant/vendas` | `./gradlew :app:assembleDebug` |
 | `finmemory-agent` | `finmemory-agent` | agente Playwright de promoções, Docker (`Dockerfile.all`) | `npm run promo:agent:dry` |
@@ -86,34 +87,34 @@ loads it via dotenv; scripts use `-r dotenv/config`).
 
 ### ❯ mapa_de_precos
 
-- `/mapa` renders stores and prices with Leaflet `divIcon` pins, MapLibre tiles
-  and supercluster. Promo pins get a distinct color so offers are visible from
-  the zoomed-out view.
-- `pages/api/map/stores.js` serves stores by bbox; `pages/api/map/points.js`
-  serves price points with a 24h TTL.
-- Product thumbnails are backfilled by cron using Gemini + Google CSE
-  (`pages/api/cron/backfill-map-images.js`, `map:backfill-images` scripts).
-- Deep-dives: [docs/MAPA-PRECOS-PROMOCOES-ESTRATEGIA.md](docs/MAPA-PRECOS-PROMOCOES-ESTRATEGIA.md),
-  [DESIGN-BRIEF.md](DESIGN-BRIEF.md).
+- `/mapa` renderiza lojas e preços com pins `divIcon` do Leaflet, tiles MapLibre
+  e supercluster. Pins de promoção têm cor própria para a oferta aparecer já no
+  zoom afastado.
+- `pages/api/map/stores.js` serve lojas por bbox; `pages/api/map/points.js`
+  serve pontos de preço com TTL de 24h.
+- Thumbnails de produto são preenchidas por cron com Gemini + Google CSE
+  (`pages/api/cron/backfill-map-images.js`, scripts `map:backfill-images*`).
+- Aprofundamentos: [MAPA-PRECOS-PROMOCOES-ESTRATEGIA.md](MAPA-PRECOS-PROMOCOES-ESTRATEGIA.md),
+  [DESIGN-BRIEF.md](../DESIGN-BRIEF.md).
 
 ---
 
 ### ❯ scrapers_e_crons
 
-`finmemory-agent` runs headed or headless Playwright against 11 chains:
+O `finmemory-agent` roda Playwright (headed ou headless) contra 11 redes:
 `dia`, `assai`, `carrefour`, `sonda`, `paodeacucar`, `hirota`, `saojorge`,
-`mambo`, `agape`, `armazemdocampo`, plus `atacadao` via HTTP route
+`mambo`, `agape`, `armazemdocampo`, além de `atacadao` via rota HTTP
 (`pages/api/scraper/atacadao.js`).
 
 | workflow | agenda (UTC) | alvo |
 |---|---|---|
 | `scraper-dia-cron.yml` | dom 05:00 | lotes Grande SP → `POST /api/scraper/dia` |
 | `scraper-atacadao-cron.yml` | dom 06:00 | `POST /api/scraper/atacadao` |
-| `reengagement-cron.yml` | diário 14:00 | `POST` reengagement de usuários inativos |
+| `reengagement-cron.yml` | diário 14:00 | `POST` de reengajamento de usuários inativos |
 
-Run locally: `npm run promo:dia`, `npm run promo:p1` (Assaí+Carrefour),
-`npm run promo:regional` (saojorge/mambo/agape/armazemdocampo/sonda). Agent
-details: [finmemory-agent/README.md](finmemory-agent/README.md).
+Rodar local: `npm run promo:dia`, `npm run promo:p1` (Assaí+Carrefour),
+`npm run promo:regional` (saojorge/mambo/agape/armazemdocampo/sonda). Detalhes
+do agente: [finmemory-agent/README.md](../finmemory-agent/README.md).
 
 ---
 
@@ -123,13 +124,13 @@ details: [finmemory-agent/README.md](finmemory-agent/README.md).
 |---|---|
 | consumer | Next.js 15.5 (Pages Router), React 18.3, Tailwind 3.4, Radix UI, next-auth 4 + `@next-auth/supabase-adapter` |
 | retailer | Next.js 15.5, onnxruntime-web, @zxing, sonner |
-| ia | OpenAI 4.77 (gpt-4o-mini parse), `@google/generative-ai` + Google CSE (imagens de produto) |
+| ia | OpenAI 4.77 (parse gpt-4o-mini), `@google/generative-ai` + Google CSE (imagens de produto) |
 | dados | Supabase 2.45 (postgres + RLS), googleapis 144 (`gmail.readonly`) |
 | mapa | leaflet 1.9, maplibre-gl 5, supercluster 8, react-leaflet |
 | pagamentos | Stripe 22 (`create-checkout-session`), Cielo e-Commerce (`payments/cielo`) |
 | open finance | pluggy-sdk + react-pluggy-connect (`pages/api/pluggy/*`) |
 | agente | Playwright 1.62, p-limit, supabase-js |
-| mobile | Capacitor 8 (consumer shell), Kotlin + Room + Koin (Stone SmartPOS) |
+| mobile | Capacitor 8 (shell do consumer), Kotlin + Room + Koin (Stone SmartPOS) |
 | observabilidade | posthog-js |
 | testes | vitest 3.2.4 (`npm test`), scripts `promo:test-*`, `auth:test-*` |
 
@@ -138,10 +139,10 @@ details: [finmemory-agent/README.md](finmemory-agent/README.md).
 ### ❯ deploy
 
 Docker multi-stage → Cloud Build (`cloudbuild.yaml`, `cloudbuild.retailer.yaml`,
-`cloudbuild-promo-agent-all.yaml`) → Cloud Run `southamerica-east1`
-(services `finmemory` and `finmemory-retailer`). Firebase Hosting serves static
-targets (`firebase.json`), and the root `Dockerfile` builds the consumer in
-Next standalone mode.
+`cloudbuild-promo-agent-all.yaml`) → Cloud Run `southamerica-east1` (serviços
+`finmemory` e `finmemory-retailer`). Firebase Hosting serve os targets estáticos
+(`firebase.json`); o `Dockerfile` da raiz compila o consumer em modo standalone
+do Next.
 
 ```bash
 npm run deploy:cloud-run            # consumer
@@ -149,10 +150,10 @@ npm run deploy:cloud-run:retailer   # retailer
 npm run deploy:promo-agent-all      # agente de promoções
 ```
 
-Runbooks: [docs/DEPLOY-GOOGLE-CLOUD-RUN.md](docs/DEPLOY-GOOGLE-CLOUD-RUN.md),
-[CHECKLIST-CLOUD-RUN-ENV.md](CHECKLIST-CLOUD-RUN-ENV.md). `.env.production` is
-tracked on purpose and holds only `NEXT_PUBLIC_*` values; real secrets live in
-Cloud Run env.
+Runbooks: [DEPLOY-GOOGLE-CLOUD-RUN.md](DEPLOY-GOOGLE-CLOUD-RUN.md),
+[CHECKLIST-CLOUD-RUN-ENV.md](../CHECKLIST-CLOUD-RUN-ENV.md). O `.env.production`
+é versionado de propósito e só contém `NEXT_PUBLIC_*`; segredos de verdade ficam
+no env do Cloud Run.
 
 ---
 
@@ -171,10 +172,10 @@ npm test                 # vitest run
 npm run promo:agent:dry  # dry-run do agente de promoções
 ```
 
-Key env groups in `.env.example`: Supabase (`NEXT_PUBLIC_SUPABASE_URL`,
+Grupos de variáveis no `.env.example`: Supabase (`NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`), Google OAuth
 (`GOOGLE_CLIENT_ID/SECRET`, redirect URIs), `OPENAI_API_KEY`, NextAuth, Pluggy,
-Stripe, Cielo, PostHog, Cloud Run URLs.
+Stripe, Cielo, PostHog, URLs do Cloud Run.
 
 ---
 
@@ -190,10 +191,10 @@ apps/retailer-android/       Kotlin/Stone: SecureTokenStore, SaleSyncRepository
 finmemory-agent/             agent.js + lib/ + Dockerfiles
 packages/shared/             rbac · supabase · cielo · cosmos · validation
 .github/workflows/           3 crons (dia, atacadao, reengagement)
-docs/                        runbooks, SQL, este arquivo em pt-BR</code></pre>
+docs/                        runbooks, SQL, este arquivo</code></pre>
 
 ---
 
 ### ❯ licença
 
-MIT, see [LICENSE](LICENSE) · [@Thiago24-cloud](https://github.com/Thiago24-cloud)
+MIT, veja [LICENSE](../LICENSE) · [@Thiago24-cloud](https://github.com/Thiago24-cloud)
