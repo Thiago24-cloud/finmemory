@@ -1,151 +1,148 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 250" width="880" height="250">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 320" width="1100" height="320" role="img" aria-label="finmemory — mapa de preços ao vivo">
   <defs>
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="4" result="blur" />
       <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
     </filter>
-    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
       <feGaussianBlur stdDeviation="2" result="blur" />
       <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
     </filter>
-    <linearGradient id="emerald-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00e676" />
-      <stop offset="100%" stop-color="#00bcd4" />
-    </linearGradient>
     <linearGradient id="sweep" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#2ecc49" stop-opacity="0.55" />
+      <stop offset="0%" stop-color="#2ecc49" stop-opacity="0.5" />
       <stop offset="100%" stop-color="#2ecc49" stop-opacity="0" />
     </linearGradient>
-    <pattern id="ngrid" width="34" height="34" patternUnits="userSpaceOnUse">
-      <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#2ecc49" stroke-opacity="0.06" />
-    </pattern>
-    <clipPath id="frame"><rect x="10" y="10" width="860" height="230" rx="10" /></clipPath>
-    <clipPath id="mapclip"><rect x="478" y="26" width="384" height="192" rx="8" /></clipPath>
-    <clipPath id="typeclip">
-      <rect x="0" y="192" width="0" height="26">
-        <animate attributeName="width" from="0" to="330" dur="2.2s" begin="0.5s" fill="freeze" />
-      </rect>
-    </clipPath>
+    <linearGradient id="titleg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#2ecc49" />
+    </linearGradient>
+    <clipPath id="mclip"><rect x="12" y="12" width="1076" height="262" rx="12" /></clipPath>
+    <!-- pin: teardrop, tip em (0,0), topo em y-36 -->
+    <path id="pin" d="M 0 0 C -10 -10 -16 -18 -16 -26 A 16 16 0 1 1 16 -26 C 16 -18 10 -10 0 0 Z" />
   </defs>
 
-  <rect x="0" y="0" width="880" height="250" fill="#0a0f1a" />
-  <rect x="10" y="10" width="860" height="230" rx="10" fill="url(#ngrid)" />
-  <rect x="10" y="10" width="860" height="230" rx="10" fill="none" stroke="#2ecc49" stroke-opacity="0.7" stroke-width="1.5" filter="url(#glow)" />
+  <rect width="1100" height="320" fill="#0b1220" />
 
-  <!-- varredura de luz -->
-  <g clip-path="url(#frame)">
-    <rect x="10" y="12" width="860" height="6" fill="#00e676" opacity="0.06">
-      <animate attributeName="y" values="12;232;12" dur="10s" repeatCount="indefinite" />
-    </rect>
-  </g>
-
-  <!-- ============ mapa de preços (direita) ============ -->
-  <g clip-path="url(#mapclip)">
-    <rect x="478" y="26" width="384" height="192" fill="#0d1526" />
-    <!-- ruas -->
-    <g stroke="#1e2a45" stroke-width="3" stroke-opacity="0.9">
-      <line x1="478" y1="66" x2="862" y2="58" />
-      <line x1="478" y1="112" x2="862" y2="118" />
-      <line x1="478" y1="164" x2="862" y2="156" />
-      <line x1="540" y1="26" x2="548" y2="218" />
-      <line x1="620" y1="26" x2="612" y2="218" />
-      <line x1="700" y1="26" x2="706" y2="218" />
-      <line x1="780" y1="26" x2="774" y2="218" />
-      <line x1="836" y1="26" x2="830" y2="218" />
-    </g>
-    <g stroke="#141c2e" stroke-width="7" stroke-opacity="0.8">
-      <line x1="478" y1="140" x2="862" y2="134" />
-      <line x1="660" y1="26" x2="654" y2="218" />
+  <!-- ============ o mapa É o banner ============ -->
+  <g clip-path="url(#mclip)">
+    <!-- quadras / blocos -->
+    <g fill="#0f1a2e">
+      <rect x="60" y="40" width="150" height="70" rx="4" transform="rotate(-3 135 75)" />
+      <rect x="250" y="30" width="120" height="86" rx="4" transform="rotate(2 310 73)" />
+      <rect x="70" y="150" width="180" height="90" rx="4" transform="rotate(1.5 160 195)" />
+      <rect x="300" y="160" width="140" height="100" rx="4" transform="rotate(-2 370 210)" />
+      <rect x="500" y="40" width="160" height="74" rx="4" transform="rotate(2.5 580 77)" />
+      <rect x="700" y="46" width="150" height="66" rx="4" transform="rotate(-2 775 79)" />
+      <rect x="490" y="200" width="130" height="66" rx="4" transform="rotate(1 555 233)" />
+      <rect x="880" y="40" width="150" height="80" rx="4" transform="rotate(-1.5 955 80)" />
+      <rect x="840" y="160" width="190" height="90" rx="4" transform="rotate(2 935 205)" />
+      <rect x="640" y="130" width="120" height="60" rx="4" transform="rotate(-2.5 700 160)" />
     </g>
 
-    <!-- radar -->
+    <!-- ruas: traçado irregular -->
+    <g fill="none" stroke-linecap="round">
+      <!-- arteriais -->
+      <path d="M 12 132 L 260 118 L 470 138 L 700 122 L 900 140 L 1088 128" stroke="#22345a" stroke-width="9" />
+      <path d="M 120 274 L 340 262 L 560 272 L 800 258 L 1088 268" stroke="#22345a" stroke-width="9" />
+      <path d="M 462 12 L 470 120 L 452 274" stroke="#22345a" stroke-width="8" />
+      <!-- secundárias -->
+      <path d="M 232 12 L 226 274" stroke="#182642" stroke-width="5" />
+      <path d="M 12 58 L 200 66 L 452 52" stroke="#182642" stroke-width="5" />
+      <path d="M 640 12 L 654 132 L 640 274" stroke="#182642" stroke-width="5" />
+      <path d="M 830 12 L 822 140 L 846 274" stroke="#182642" stroke-width="5" />
+      <path d="M 470 210 L 640 200 L 830 214 L 1088 204" stroke="#182642" stroke-width="5" />
+      <path d="M 452 92 C 560 80, 660 96, 830 84 L 1088 96" stroke="#182642" stroke-width="4" />
+      <path d="M 1010 12 L 1000 274" stroke="#182642" stroke-width="4" />
+    </g>
+    <!-- traços de rua (dash miolo) -->
+    <g fill="none" stroke="#3a5f9e" stroke-opacity="0.35" stroke-width="1.2" stroke-dasharray="8 10">
+      <path d="M 12 132 L 260 118 L 470 138 L 700 122 L 900 140 L 1088 128" />
+      <path d="M 120 274 L 340 262 L 560 272 L 800 258 L 1088 268" />
+    </g>
+
+    <!-- parque -->
+    <rect x="96" y="180" width="120" height="70" rx="8" fill="#12331f" opacity="0.8" transform="rotate(-4 156 215)" />
+
+    <!-- ============ radar: o agente varrendo a cidade ============ -->
     <g>
-      <circle cx="668" cy="122" r="76" fill="none" stroke="#2ecc49" stroke-width="1" stroke-dasharray="4 7" stroke-opacity="0.5">
-        <animateTransform attributeName="transform" type="rotate" from="0 668 122" to="360 668 122" dur="30s" repeatCount="indefinite" />
+      <circle cx="735" cy="200" r="118" fill="none" stroke="#2ecc49" stroke-width="1" stroke-dasharray="3 8" stroke-opacity="0.4">
+        <animateTransform attributeName="transform" type="rotate" from="0 735 200" to="360 735 200" dur="40s" repeatCount="indefinite" />
       </circle>
-      <circle cx="668" cy="122" r="46" fill="none" stroke="#2ecc49" stroke-width="1" stroke-dasharray="3 6" stroke-opacity="0.6">
-        <animateTransform attributeName="transform" type="rotate" from="360 668 122" to="0 668 122" dur="20s" repeatCount="indefinite" />
+      <circle cx="735" cy="200" r="78" fill="none" stroke="#2ecc49" stroke-width="1" stroke-dasharray="4 7" stroke-opacity="0.5">
+        <animateTransform attributeName="transform" type="rotate" from="360 735 200" to="0 735 200" dur="26s" repeatCount="indefinite" />
       </circle>
-      <!-- cone de varredura -->
-      <path d="M 668 122 L 668 46 A 76 76 0 0 1 734 74 Z" fill="url(#sweep)">
-        <animateTransform attributeName="transform" type="rotate" from="0 668 122" to="360 668 122" dur="5.5s" repeatCount="indefinite" />
+      <circle cx="735" cy="200" r="40" fill="none" stroke="#2ecc49" stroke-width="0.8" stroke-opacity="0.3" />
+      <!-- cone -->
+      <path d="M 735 200 L 735 82 A 118 118 0 0 1 818 117 Z" fill="url(#sweep)">
+        <animateTransform attributeName="transform" type="rotate" from="0 735 200" to="360 735 200" dur="7s" repeatCount="indefinite" />
       </path>
-      <circle cx="668" cy="122" r="7" fill="#2ecc49" filter="url(#soft)">
-        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.4s" repeatCount="indefinite" />
-        <animate attributeName="r" values="6;9;6" dur="2.4s" repeatCount="indefinite" />
+      <circle cx="735" cy="200" r="6" fill="#2ecc49" filter="url(#soft)">
+        <animate attributeName="r" values="5;8;5" dur="2.4s" repeatCount="indefinite" />
       </circle>
+      <text x="735" y="222" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" fill="#8ff0a4">agente</text>
     </g>
 
-    <!-- pins caindo com price tag -->
-    <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="9" font-weight="bold">
-      <g>
-        <animateTransform attributeName="transform" type="translate" values="0 -70;0 0;0 -4;0 0" keyTimes="0;0.7;0.85;1" dur="1.4s" begin="0.9s" fill="freeze" />
-        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.9s" fill="freeze" />
-        <path d="M 596 96 c -6 0 -10 4.5 -10 10 c 0 7 10 16 10 16 c 0 0 10 -9 10 -16 c 0 -5.5 -4 -10 -10 -10 z" fill="#2ecc49" stroke="#0a0f1a" stroke-width="1.5" />
-        <circle cx="596" cy="105" r="3.4" fill="#0a0f1a" />
-        <rect x="576" y="76" width="42" height="14" rx="3" fill="#141c2e" stroke="#2ecc49" stroke-opacity="0.8" />
-        <text x="597" y="86" text-anchor="middle" fill="#00e676">R$ 4,99</text>
+    <!-- ============ pins de preço ============ -->
+    <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="15" font-weight="bold">
+      <!-- p1 esmeralda -->
+      <g transform="translate(180 232)">
+        <use href="#pin" fill="#2ecc49" stroke="#0b1220" stroke-width="2" filter="url(#soft)" />
+        <circle cy="-26" r="5" fill="#0b1220" />
+        <rect x="-42" y="-66" width="84" height="26" rx="6" fill="#0f1a2e" stroke="#2ecc49" stroke-width="1.4" />
+        <text y="-48" text-anchor="middle" fill="#2ecc49">R$ 4,99</text>
       </g>
-      <g>
-        <animateTransform attributeName="transform" type="translate" values="0 -80;0 0;0 -4;0 0" keyTimes="0;0.7;0.85;1" dur="1.4s" begin="1.7s" fill="freeze" />
-        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.7s" fill="freeze" />
-        <path d="M 742 140 c -6 0 -10 4.5 -10 10 c 0 7 10 16 10 16 c 0 0 10 -9 10 -16 c 0 -5.5 -4 -10 -10 -10 z" fill="#00bcd4" stroke="#0a0f1a" stroke-width="1.5" />
-        <circle cx="742" cy="149" r="3.4" fill="#0a0f1a" />
-        <rect x="722" y="120" width="42" height="14" rx="3" fill="#141c2e" stroke="#00bcd4" stroke-opacity="0.8" />
-        <text x="743" y="130" text-anchor="middle" fill="#00bcd4">R$ 8,49</text>
+      <!-- p2 cyan -->
+      <g transform="translate(430 212)">
+        <use href="#pin" fill="#00c2d8" stroke="#0b1220" stroke-width="2" filter="url(#soft)" />
+        <circle cy="-26" r="5" fill="#0b1220" />
+        <rect x="-42" y="-66" width="84" height="26" rx="6" fill="#0f1a2e" stroke="#00c2d8" stroke-width="1.4" />
+        <text y="-48" text-anchor="middle" fill="#35d6e8">R$ 8,49</text>
       </g>
-      <g>
-        <animateTransform attributeName="transform" type="translate" values="0 -60;0 0;0 -4;0 0" keyTimes="0;0.7;0.85;1" dur="1.4s" begin="2.4s" fill="freeze" />
-        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.4s" fill="freeze" />
-        <path d="M 806 74 c -6 0 -10 4.5 -10 10 c 0 7 10 16 10 16 c 0 0 10 -9 10 -16 c 0 -5.5 -4 -10 -10 -10 z" fill="#f1fa8c" stroke="#0a0f1a" stroke-width="1.5" />
-        <circle cx="806" cy="83" r="3.4" fill="#0a0f1a" />
-        <rect x="784" y="54" width="46" height="14" rx="3" fill="#141c2e" stroke="#f1fa8c" stroke-opacity="0.7" />
-        <text x="807" y="64" text-anchor="middle" fill="#f1fa8c">R$ 12,90</text>
+      <!-- p3 âmbar -->
+      <g transform="translate(566 246)">
+        <use href="#pin" fill="#f5b83d" stroke="#0b1220" stroke-width="2" filter="url(#soft)" />
+        <circle cy="-26" r="5" fill="#0b1220" />
+        <rect x="-45" y="-66" width="90" height="26" rx="6" fill="#0f1a2e" stroke="#f5b83d" stroke-width="1.4" />
+        <text y="-48" text-anchor="middle" fill="#f5b83d">R$ 12,90</text>
+      </g>
+      <!-- p4 esmeralda -->
+      <g transform="translate(905 168)">
+        <use href="#pin" fill="#2ecc49" stroke="#0b1220" stroke-width="2" filter="url(#soft)" />
+        <circle cy="-26" r="5" fill="#0b1220" />
+        <rect x="-42" y="-66" width="84" height="26" rx="6" fill="#0f1a2e" stroke="#2ecc49" stroke-width="1.4" />
+        <text y="-48" text-anchor="middle" fill="#2ecc49">R$ 6,29</text>
+      </g>
+      <!-- p5 cyan -->
+      <g transform="translate(1014 244)">
+        <use href="#pin" fill="#00c2d8" stroke="#0b1220" stroke-width="2" filter="url(#soft)" />
+        <circle cy="-26" r="5" fill="#0b1220" />
+        <rect x="-42" y="-66" width="84" height="26" rx="6" fill="#0f1a2e" stroke="#00c2d8" stroke-width="1.4" />
+        <text y="-48" text-anchor="middle" fill="#35d6e8">R$ 3,79</text>
+      </g>
+      <!-- p6 esmeralda promo -->
+      <g transform="translate(690 96)">
+        <use href="#pin" fill="#2ecc49" stroke="#0b1220" stroke-width="2" filter="url(#soft)" />
+        <circle cy="-26" r="5" fill="#0b1220" />
+        <rect x="-48" y="-68" width="96" height="28" rx="6" fill="#14301c" stroke="#2ecc49" stroke-width="1.6" filter="url(#soft)" />
+        <text y="-49" text-anchor="middle" fill="#8ff0a4">R$ 2,49</text>
       </g>
     </g>
 
-    <!-- nota sendo escaneada -->
-    <g transform="rotate(-5 522 178)">
-      <rect x="486" y="140" width="74" height="86" rx="3" fill="#f4f0e8" stroke="#0a0f1a" stroke-width="1.5" />
-      <rect x="494" y="150" width="58" height="5" rx="1.5" fill="#c6c4b8" />
-      <rect x="494" y="162" width="44" height="4" rx="1" fill="#d8d5c9" />
-      <rect x="494" y="172" width="52" height="4" rx="1" fill="#d8d5c9" />
-      <rect x="494" y="182" width="38" height="4" rx="1" fill="#d8d5c9" />
-      <rect x="494" y="196" width="58" height="6" rx="1.5" fill="#2ecc49" />
-      <rect x="486" y="140" width="74" height="4" fill="#00e676" opacity="0.85" filter="url(#soft)">
-        <animate attributeName="y" values="140;218;140" dur="2.8s" repeatCount="indefinite" />
-      </rect>
-    </g>
-    <text x="523" y="241" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="9.5" fill="#6272a4">nf-e → dados</text>
-    <rect x="478" y="26" width="384" height="192" rx="8" fill="none" stroke="#2ecc49" stroke-opacity="0.4" />
+    <!-- vinheta suave -->
+    <rect x="12" y="12" width="1076" height="262" fill="none" stroke="#2ecc49" stroke-opacity="0.5" stroke-width="1.4" />
   </g>
 
-  <!-- ============ título ============ -->
-  <text x="44" y="82" font-family="'JetBrains Mono','Fira Code',monospace" font-size="46" font-weight="bold" fill="url(#emerald-grad)" filter="url(#glow)" letter-spacing="1">finmemory</text>
-  <text x="46" y="112" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13.5" fill="#e2e8f0">// gmail → nf-e → mapa de preços · BR</text>
-
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="11">
-    <rect x="46" y="130" width="86" height="20" rx="4" fill="none" stroke="#00e676" stroke-opacity="0.6" />
-    <text x="89" y="144" text-anchor="middle" fill="#00e676">gmail api</text>
-    <rect x="140" y="130" width="72" height="20" rx="4" fill="none" stroke="#6272a4" stroke-opacity="0.8" />
-    <text x="176" y="144" text-anchor="middle" fill="#6272a4">openai</text>
-    <rect x="220" y="130" width="92" height="20" rx="4" fill="none" stroke="#00bcd4" stroke-opacity="0.6" />
-    <text x="266" y="144" text-anchor="middle" fill="#00bcd4">playwright</text>
-    <rect x="320" y="130" width="86" height="20" rx="4" fill="none" stroke="#2ecc49" stroke-opacity="0.7" />
-    <text x="363" y="144" text-anchor="middle" fill="#2ecc49">supabase</text>
-    <rect x="414" y="130" width="92" height="20" rx="4" fill="none" stroke="#f1fa8c" stroke-opacity="0.5" />
-    <text x="460" y="144" text-anchor="middle" fill="#f1fa8c">cloud run</text>
+  <!-- ============ título sobre o mapa ============ -->
+  <g>
+    <rect x="34" y="34" width="396" height="100" rx="10" fill="#0b1220" fill-opacity="0.72" />
+    <text x="48" y="88" font-family="'JetBrains Mono','Fira Code',monospace" font-size="52" font-weight="bold" letter-spacing="1" fill="url(#titleg)" filter="url(#glow)">finmemory</text>
+    <text x="50" y="116" font-family="'JetBrains Mono','Fira Code',monospace" font-size="14.5" fill="#c9d6e8">sua nf-e do gmail virada em mapa de preços</text>
   </g>
 
-  <!-- prompt -->
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="13">
-    <text x="44" y="209" fill="#2ecc49">$</text>
-    <g clip-path="url(#typeclip)">
-      <text x="60" y="209" fill="#e2e8f0">finmemory scan --gmail</text>
-    </g>
-    <rect x="252" y="198" width="9" height="15" fill="#2ecc49">
-      <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.51;1" dur="1.1s" repeatCount="indefinite" />
-    </rect>
-    <text x="452" y="209" text-anchor="end" fill="#f1fa8c" font-size="11.5">[ 11 redes · 3 crons ]</text>
+  <!-- ============ faixa rodapé ============ -->
+  <line x1="34" y1="288" x2="1066" y2="288" stroke="#22345a" stroke-width="1" />
+  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="12.5">
+    <text x="34" y="308" fill="#5b7290">nf-e → openai → supabase · preço + unidade + geo</text>
+    <text x="1066" y="308" text-anchor="end" fill="#2ecc49">11 redes · 3 crons · playwright · ttl 24h</text>
   </g>
 </svg>

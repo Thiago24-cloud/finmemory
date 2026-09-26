@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="#root"><img src="./banner.svg?v=1" alt="finmemory · nf-e vira mapa de preços" width="100%"/></a>
+  <a href="#root"><img src="./banner.svg?v=2" alt="finmemory · nf-e vira mapa de preços" width="100%"/></a>
 </div>
 
 > 🇺🇸 [English version](../README.md) · Produção: [finmemory.com.br](https://finmemory.com.br) · Lojista: [parceiros.finmemory.com.br](https://parceiros.finmemory.com.br)
@@ -57,7 +57,7 @@ finance via Pluggy.
 ### ❯ pipeline
 
 <div align="center">
-  <img src="./pipeline.svg?v=1" alt="Pipeline: gmail/scrapers/retailer → ingestão → supabase → apps" width="100%"/>
+  <img src="./pipeline.svg?v=2" alt="Pipeline: gmail/scrapers/retailer → ingestão → supabase → apps" width="100%"/>
 </div>
 
 Todo scraper escreve via `enqueuePromocoes()` em `apps/consumer/lib/ingest` com

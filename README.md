@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="#root"><img src="./docs/banner.svg?v=1" alt="finmemory · nf-e to price map" width="100%"/></a>
+  <a href="#root"><img src="./docs/banner.svg?v=2" alt="finmemory · nf-e to price map" width="100%"/></a>
 </div>
 
 > 🇧🇷 [Versão em Português](docs/README.pt-BR.md) · Production: [finmemory.com.br](https://finmemory.com.br) · Retailer: [parceiros.finmemory.com.br](https://parceiros.finmemory.com.br)
@@ -56,7 +56,7 @@ promotions from 11 Brazilian grocery chains, and open-finance sync via Pluggy.
 ### ❯ pipeline
 
 <div align="center">
-  <img src="./docs/pipeline.svg?v=1" alt="Pipeline: gmail/scrapers/retailer → ingest → supabase → apps" width="100%"/>
+  <img src="./docs/pipeline.svg?v=2" alt="Pipeline: gmail/scrapers/retailer → ingest → supabase → apps" width="100%"/>
 </div>
 
 Every scraper write goes through `enqueuePromocoes()` in

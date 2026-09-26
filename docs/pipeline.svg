@@ -23,9 +23,9 @@
 
   <style>
     .box { fill: #141c2e; stroke-width: 1.5; }
-    .t1 { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 13px; font-weight: bold; }
-    .t2 { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 10.5px; fill: #6272a4; }
-    .lbl { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 10px; fill: #6272a4; }
+    .t1 { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 14.5px; font-weight: bold; }
+    .t2 { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; fill: #8ba3c7; }
+    .lbl { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; fill: #8ba3c7; letter-spacing: 1px; }
   </style>
 
   <!-- fontes -> ingestão -->
@@ -115,7 +115,7 @@
     </rect>
     <text x="780" y="196" text-anchor="middle" class="t1" fill="#00bcd4">/mapa</text>
     <text x="780" y="214" text-anchor="middle" class="t2">leaflet · maplibre</text>
-    <text x="780" y="229" text-anchor="middle" class="t2">supercluster · ttl 24h</text>
+    <text x="780" y="229" text-anchor="middle" class="t2">cluster · ttl 24h</text>
 
     <rect x="710" y="280" width="140" height="70" rx="8" class="box" stroke="#6272a4" />
     <text x="780" y="306" text-anchor="middle" class="t1" fill="#6272a4">mobile</text>
